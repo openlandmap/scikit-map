@@ -1,0 +1,29 @@
+Package: eumap
+Title: European environmental maps processing and production
+Version: 0.0.1
+Authors@R: person("Tomislav", "Hengl", email = "tom.hengl@opengeohub.org", role = c("aut", "cre"))
+Description: Functions and sample datasets for accessing, processing and producing spatial layers for EU. It includes standard tiling systems, functions to overlay points and large stacks of grids, fit spatial prediction and harmonization models, harmonize multisource Earth Observation Data. Find out more about this project from: https://opendatascience.eu/.
+Depends: R (>= 3.5.0)
+License: GPL-2 | MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+URL: https://gitlab.com/geoharmonizer_inea/eumap
+BugReports: https://gitlab.com/geoharmonizer_inea/eumap/issues/
+Imports: 
+    methods,
+    utils,
+    parallel,
+    matrixStats,
+    ranger,
+    nnet,
+    glmnet,
+    mlr3,
+    sp,
+    xgboost, 
+    rgdal,
+    raster,
+    terra
+Suggests: 
+RoxygenNote: 7.1.0
+SystemRequirements: C++11, GDAL (>= 2.0.1), GEOS (>= 3.4.0),
+    PROJ (>= 4.8.0)
