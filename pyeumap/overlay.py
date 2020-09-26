@@ -197,7 +197,7 @@ class SpaceOverlay(ParallelOverlay):
 					points = gpd.read_file(points)
 			
 				self.pts = points
-				self.pts['overlay_id'] = range(1,len(self.pts)+1)
+				self.pts.loc[:,'overlay_id'] = range(1,len(self.pts)+1)
 
 				super().__init__(self.pts.geometry.x.values, self.pts.geometry.y.values, fn_layers, max_workers)
 
@@ -217,12 +217,14 @@ class SpaceTimeOverlay():
 				self.col_date = col_date
 				self.overlay_objs = {}
 
-				self.pts[self.col_date] = pd.to_datetime(self.pts[self.col_date])
+				print('OPA')
+				self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
 				self.uniq_years = self.pts[self.col_date].dt.year.unique()
 
 				for year in self.uniq_years:
 					year_layers = os.path.join(dir_layers, str(year))
 					year_points = self.pts[self.pts[self.col_date].dt.year == year]
+					
 					ttprint(f'Preparing the overlay for {year}')
 					self.overlay_objs[year] = SpaceOverlay(year_points, year_layers, max_workers)
 
