@@ -8,7 +8,7 @@ import rasterio
 import rasterio.windows
 from pathlib import Path
 import numpy as np
-import os 
+import os
 import pandas as pd
 import geopandas as gpd
 import concurrent.futures
@@ -24,12 +24,13 @@ class ParallelOverlay:
 		# sampling only first band in every layer
 		# assumption is that all layers have same blocks
 
-		def __init__(self, points_x: np.ndarray, points_y:np.ndarray, fn_layers:List[str], max_workers:int = multiprocessing.cpu_count()):
+		def __init__(self, points_x: np.ndarray, points_y:np.ndarray, fn_layers:List[str], max_workers:int = multiprocessing.cpu_count(), verbose:bool = True):
 				self.points_x = points_x
 				self.points_y = points_y
 				self.points_len = len(points_x)
 				self.fn_layers = fn_layers
 				self.max_workers = max_workers
+				self.verbose = verbose
 
 				self.layer_names = [fn_layer.with_suffix('').name for fn_layer in fn_layers]
 				sources = [rasterio.open(fn_layer) for fn_layer in self.fn_layers]
@@ -124,7 +125,8 @@ class ParallelOverlay:
 				res={}
 				n_layers = len(self.fn_layers)
 				for i_layer, fn_layer in enumerate(self.fn_layers):
-						ttprint(f'{i_layer}/{n_layers} {Path(fn_layer).name}')
+						if self.verbose:
+							ttprint(f'{i_layer}/{n_layers} {Path(fn_layer).name}')
 						# fn_layer=self.fn_layers[0]
 						col = Path(fn_layer).with_suffix('').name
 						sample,_ = self._sample_one_layer_sp(fn_layer)
@@ -138,7 +140,8 @@ class ParallelOverlay:
 				res={}
 				n_layers = len(self.fn_layers)
 				for i_layer, fn_layer in enumerate(self.fn_layers):
-						ttprint(f'{i_layer}/{n_layers} {Path(fn_layer).name}')
+						if self.verbose:
+							ttprint(f'{i_layer}/{n_layers} {Path(fn_layer).name}')
 						# fn_layer=self.fn_layers[0]
 						col = Path(fn_layer).with_suffix('').name
 						sample = self._sample_one_layer_mt(fn_layer)
@@ -156,7 +159,8 @@ class ParallelOverlay:
 				for sample, fn_layer in parallel.ThreadGeneratorLazy(self._sample_one_layer_sp, args,
 														self.max_workers, self.max_workers*2):
 						col = Path(fn_layer).with_suffix('').name
-						ttprint(f'{i_layer}/{n_layers} {col}')
+						if self.verbose:
+							ttprint(f'{i_layer}/{n_layers} {col}')
 						res[col] = sample
 						i_layer += 1
 				return res
@@ -173,33 +177,35 @@ class ParallelOverlay:
 						#for sample, fn_layer in executor.map(self._sample_one_layer_sp, args, chunksize=n_layers//self.max_workers):
 				for sample, fn_layer in parallel.ProcessGeneratorLazy(self._sample_one_layer_sp, args, self.max_workers, self.max_workers*2):
 						col = Path(fn_layer).with_suffix('').name
-						ttprint(f'{i_layer}/{n_layers} {col}')
+						if self.verbose:
+							ttprint(f'{i_layer}/{n_layers} {col}')
 						res[col] = sample
 						i_layer += 1
 				return res
 
 		def run(self):
-				# For now sample_v3 is the best method, because is parallel and use less memory than sample_v4 
+				# For now sample_v3 is the best method, because is parallel and use less memory than sample_v4
 				if self.result == None:
 					self.result = self.sample_v3()
 				else:
-					ttprint('You already did run the overlay. Geting the cached result')
+					if self.verbose:
+						ttprint('You already did run the overlay. Geting the cached result')
 
 				return self.result
 
 class SpaceOverlay(ParallelOverlay):
 
-		def __init__(self, points, dir_layers:List[str], max_workers:int = multiprocessing.cpu_count()):
-				
+		def __init__(self, points, dir_layers:List[str], max_workers:int = multiprocessing.cpu_count(), verbose:bool = True):
+
 				fn_layers = list(Path(dir_layers).glob('**/*.tif'))
 
 				if not isinstance(points, gpd.GeoDataFrame):
 					points = gpd.read_file(points)
-			
+
 				self.pts = points
 				self.pts.loc[:,'overlay_id'] = range(1,len(self.pts)+1)
 
-				super().__init__(self.pts.geometry.x.values, self.pts.geometry.y.values, fn_layers, max_workers)
+				super().__init__(self.pts.geometry.x.values, self.pts.geometry.y.values, fn_layers, max_workers, verbose)
 
 		def run(self):
 			result = super().run()
@@ -212,27 +218,35 @@ class SpaceOverlay(ParallelOverlay):
 
 class SpaceTimeOverlay():
 
-		def __init__(self, fn_points:str, col_date:str, dir_layers:str, max_workers:int = multiprocessing.cpu_count()):
-				self.pts = gpd.read_file(fn_points)
+		def __init__(self, points, col_date:str, dir_layers:str, max_workers:int = multiprocessing.cpu_count(), verbose:bool = True):
+
+				if not isinstance(points, gpd.GeoDataFrame):
+					points = gpd.read_file(points)
+
+				self.pts = points
 				self.col_date = col_date
 				self.overlay_objs = {}
+				self.verbose = verbose
 
-				print('OPA')
+				if self.verbose:
+					print('OPA')
 				self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
 				self.uniq_years = self.pts[self.col_date].dt.year.unique()
 
 				for year in self.uniq_years:
 					year_layers = os.path.join(dir_layers, str(year))
 					year_points = self.pts[self.pts[self.col_date].dt.year == year]
-					
-					ttprint(f'Preparing the overlay for {year}')
-					self.overlay_objs[year] = SpaceOverlay(year_points, year_layers, max_workers)
+
+					if self.verbose:
+						ttprint(f'Preparing the overlay for {year}')
+					self.overlay_objs[year] = SpaceOverlay(year_points, year_layers, max_workers, verbose)
 
 		def run(self):
 			self.result = None
 
 			for year in self.uniq_years:
-				ttprint(f'Running the overlay for {year}')
+				if self.verbose:
+					ttprint(f'Running the overlay for {year}')
 				year_result = self.overlay_objs[year].run()
 
 				if self.result is None:
