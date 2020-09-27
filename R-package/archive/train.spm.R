@@ -37,16 +37,18 @@ library("yardstick")
 library("plotKML")
 library("latticeExtra")
 library("devtools")
+# pskgs <- c("mlr3verse","EnvStats","grid","hexbin","BBmisc","lattice","MASS","gridExtra","MLmetrics","yardstick","plotKML","latticeExtra","magick","devtools","dplyr", "GSIF" ,"landmap", "sp", "mlr3spatiotempcv", "magrittr" ,"future" , "future.apply",  "FSelectorRcpp", "mlr3fselect", "data.table", "mltools", "ggplot2", "bbotk")
+# install.packages(pskgs, dependencies = TRUE)
 
 # Edgeroi Demo ----
 data(edgeroi)
 edgeroi <- na.omit(edgeroi)
 edgeroi <- left_join(edgeroi$horizons,edgeroi$sites,"SOURCEID")
 edgeroi <- na.omit(edgeroi)
-# edgeroi = one_hot(as.data.table(edgeroi), cols = c("TAXGAUC","HZDUSD"))
-# edgeroi$NOTEOBS = as.numeric(as.factor(edgeroi$NOTEOBS))
-# edgeroi$SOURCEID <- NULL
-# edgeroi$NOTEOBS <- NULL
+edgeroi = one_hot(as.data.table(edgeroi), cols = c("TAXGAUC","HZDUSD"))
+edgeroi$NOTEOBS = as.numeric(as.factor(edgeroi$NOTEOBS))
+edgeroi$SOURCEID <- NULL
+edgeroi$NOTEOBS <- NULL
 df <- edgeroi
 target.variable <- "ORCDRC"
 
@@ -57,10 +59,11 @@ df <- na.omit(meuse[,])
 crs = "+proj=lcc +lat_1=40.66666666666666 +lat_2=41.03333333333333 +lat_0=40.16666666666666 +lon_0=-74 +x_0=300000 +y_0=0 +datum=NAD83 +units=us-ft +no_defs"
 
 #classif
-target.variable = "landuse"
+target.variable = "lime"
 
 #regression
-# df <- na.omit(meuse[,c("lead","soil","dist","elev")])
+df <- na.omit(meuse[,c("lead","soil","dist","elev")])
+
 target.variable = "lead"
 
 # define generic var ----
@@ -69,28 +72,23 @@ set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[train_ind, ]
 df.ts <- df[-train_ind, ]
-folds = 5
-n_evals = 10
+folds = 2
+n_evals = 1
 
 # plot var ----
-colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
 colramp. = colorRampPalette(c("wheat2","red3"))
 xbins. = 30
 
 # fnc for data preparation ----
-# df.meuse = getmeuse()
-# df.edgeroi = getedgeroi()
+df.meuse = getmeuse()
+df.edgeroi = getedgeroi()
   
-# df.tr <- df.tr[1:200,]
+
 # MODELS ----
-train.model = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE)
-train.model
+train.model = train.spm(df.tr, target.variable = target.variable, parallel = TRUE, var.ens = TRUE, folds = folds ,n_evals = n_evals, plot.workflow = TRUE,agg = TRUE ,crs = crs )
 
-# predict.variable = train.model(df.ts, task = NULL)
-# predict.variable
-# predict.variable = predict.spm(df.ts,target.variable = target.variable, train.model, crs = crs)
+predict.variable = predict.spm(df.ts,target.variable = target.variable, train.model,crs = crs)
 
-predict.variable = predict.spm(df.ts, task = NULL)
 accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
 
 
