@@ -1,8 +1,3 @@
-## Accuracy plot function
-## Project: GeoHarmonizer_INEA
-## Mohammadreza.Sheykhmousa@opengeohub.org
-
-source('predict.spm.fnc.R')
 
 pfun <- function(x,y, ...){
   panel.xyplot(x, y, ...)
