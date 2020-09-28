@@ -14,6 +14,6 @@ LaTeX: pdfLaTeX
 
 BuildType: Package
 PackageUseDevtools: Yes
-PackagePath: R-package/R
+PackagePath: R-package
 PackageInstallArgs: --no-multiarch --with-keep.source
 PackageRoxygenize: vignette

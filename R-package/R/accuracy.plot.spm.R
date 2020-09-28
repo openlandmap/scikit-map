@@ -16,7 +16,11 @@ pfun <- function(x,y, ...){
   return(pfun)
 }
 
+<<<<<<< HEAD
 #' accuracy.plot.spm
+=======
+#' Accuracy plot
+>>>>>>> master
 #'
 #' @param x 
 #' @param y 
@@ -25,7 +29,11 @@ pfun <- function(x,y, ...){
 #' @param xbins 
 #' @param rng 
 #'
+<<<<<<< HEAD
 #' @return plt
+=======
+#' @return
+>>>>>>> master
 #' @export
 #'
 #' @examples
@@ -42,7 +50,7 @@ if(rng == "norm"){
    }
   print(plt)
   return(plt)
-  }
+}
 
 
 
