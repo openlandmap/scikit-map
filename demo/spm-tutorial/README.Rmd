@@ -40,7 +40,7 @@ knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 
 - In `train.spm` we need to install the required packages as followings:
 
-```{r}
+```{r, warning=FALSE}
 start_time <- Sys.time()
 ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
     "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv", 
@@ -50,7 +50,7 @@ if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstu
 ```
 
 ###meuse dataset
-```{r include=FALSE}
+```{r include=FALSE, warning=FALSE}
 library("sp")
 data(meuse)
 df = meuse
@@ -62,7 +62,7 @@ crs = "+proj=lcc +lat_1=40.66666666666666 +lat_2=41.03333333333333 +lat_0=40.166
 Splitting training (tr) and test (ts) sets and defining generic variables
 - The user can modify them.
 
-```{r }
+```{r, message=FALSE, warning=FALSE}
 smp_size <- floor(0.5 * nrow(df))
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
@@ -77,7 +77,7 @@ target.variable = "lead"
 ```
 
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 
 library("mlr3verse")
 library("bbotk")
@@ -93,7 +93,6 @@ library("progress")
 library("mlr3spatiotempcv")
 library("sp")
 library("landmap")  
-library("GSIF")
 library("dplyr")
 library("EnvStats")
 library("grid")
@@ -119,7 +118,7 @@ Here we have four scenarios:
 - `classification` task with **spatial** resampling methods
 - `regression` task with **spatial** resampling methods
 
-```{r}
+```{r, echo=FALSE, warning=FALSE}
 train.spm = function(df.tr, target.variable, 
 parallel = TRUE, predict_type = NULL, folds = 5, method.list = NULL,  n_evals = 3, plot.workflow = FALSE, var.ens = TRUE, meta.learner = NULL, crs){
   id = deparse(substitute(df.tr))
@@ -268,7 +267,7 @@ The above code has fitted multiple models/learners depending on the `class()` of
 
 prediction on new dataset
 
-```{r}
+```{r, echo=FALSE, warning=FALSE}
 predict.spm = function (df.ts , task = NULL){
    id = deparse(substitute(df.ts))
    if(is.factor(df.ts[,target.variable])){
@@ -304,7 +303,7 @@ predict.spm = function (df.ts , task = NULL){
 Accuracy plot in case of regression task
 Note: don't use it for classification tasks for obvious reasons
 
-```{r fig.show='asis'}
+```{r , echo=FALSE, warning=FALSE}
 
 pfun <- function(x,y, ...){
   panel.xyplot(x, y, ...)
