@@ -1,4 +1,57 @@
 
+#' train.spm
+#'@description
+#' This is the abstract base class for training objects like [TaskClassif] and [TaskRegr].
+#' For example, for a classification task columns must be marked as ID, df, target column.
+#' train.spm  it multiple models/learners depending on the
+#'class() of the target.variable and for now only returns a
+#'trained model function so later on we could use it to train a new dataset.
+#' 
+#' 
+#' @param df.tr 
+#' @param target.variable 
+#' @param parallel 
+#' @param predict_type 
+#' @param folds 
+#' @param method.list 
+#' @param n_evals 
+#' @param plot.workflow 
+#' @param var.ens 
+#' @param meta.learner 
+#' @param crs 
+#'
+#' @return train.model
+#' @export 
+#'
+#' @examples
+#' #'ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
+#'"hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv", 
+#'"FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools","gridExtra","yardstick","plotKML", "latticeExtra","devtools")
+#'new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
+#'if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
+#'Splitting training (tr) and test (ts) sets and defining generic variables
+#'Meuse Demo
+#'data(meuse)
+#'df <- meuse
+#'df <- na.omit(meuse[,])
+#'crs = "+proj=lcc +lat_1=40.66666666666666 +lat_2=41.03333333333333 +lat_0=40.16666666666666 +lon_0=-74 +x_0=300000 +y_0=0 +datum=NAD83 +units=us-ft +no_defs"
+#'target.variable = "lead"
+#'define generic var
+#'smp_size <- floor(0.5 * nrow(df))
+#'set.seed(123)
+#'train_ind <- sample(seq_len(nrow(df)), size = smp_size)
+#'df.tr <- df[train_ind, ]
+#'df.ts <- df[-train_ind, ]
+#'folds = 2
+#'plot var
+#'colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
+#'colramp. = colorRampPalette(c("wheat2","red3"))
+#'xbins. = 50
+#'train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE, crs)
+#'predict.spm(df.ts, task = NULL)
+#'accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
+#'
+
 train.spm = function(df.tr, target.variable, 
 parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.ens = TRUE, meta.learner = NULL, crs){
   id = deparse(substitute(df.tr))

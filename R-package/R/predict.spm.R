@@ -1,4 +1,15 @@
 
+#' predict.spm
+#' @description
+#' prediction on new dataset
+#'
+#' @param df.ts 
+#' @param task 
+#'
+#' @return y
+#' @export
+#'
+#' @examples
 predict.spm = function (df.ts , task = NULL){
    id = deparse(substitute(df.ts))
    if(is.factor(df.ts[,target.variable])){
