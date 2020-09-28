@@ -351,10 +351,6 @@ frame** by only defining following arguments:
 
                Fitting a ensemble ML using 'mlr3::Taskregr'...TRUE
 
-<PredictionDataRegr/PredictionData>, messages: }
-    DEBUG [06:18:39.226] Erasing stored model for learner 'regr.ranger' 
-    INFO  [06:18:39.227] Applying learner 'regr.ranger' on task 'df.tr' (iter 1/50) 
-    DEBUG [06:18:39.237] Subsetting task 'df.tr' to 60 rows {task: <TaskRegr/TaskSupervised/Task/R6>, row_ids: [16, 18, 22, 24, 26, 28, 33, 38, 48, 49, 51, 61, 62, 67, 68, 5, 8, 19, 29, 34, 35, 39, 42, 43, 47, 54, 70, 74, 75..]}
     DEBUG [06:18:39.240] Calling train method of Learner 'regr.ranger' on task 'df.tr' with 60 observations {learner: <LearnerRegrRanger/LearnerRegr/Learner/R6>}
     DEBUG [06:18:39.251] Learner 'regr.ranger' on task 'df.tr' succeeded to fit a model {learner: <LearnerRegrRanger/LearnerRegr/Learner/R6>, result: <ranger>, messages: }
     DEBUG [06:18:39.253] Creating Prediction for predict set 'test' 
