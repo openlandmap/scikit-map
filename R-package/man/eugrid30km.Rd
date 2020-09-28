@@ -4,10 +4,8 @@
 \title{eugrid30km: Tiling system continental Europe at 30km}
 \description{
 Tiling system with the cartographic and image coordinates. Can be used to speed up processing of the data.
-\usage{data(eugrid30km)}
-\format{
 The \code{eugrid30km} is an object of type \code{SpatialPolygonsDataFrame} with the following columns:
-  \describe{
+\describe{
   \item{\code{xl}}{numeric; lower left x-map coordinates},
   \item{\code{yl}}{numeric; lower left y-map coordinates},
   \item{\code{xu}}{numeric; upper right x-map coordinates},
@@ -16,6 +14,7 @@ The \code{eugrid30km} is an object of type \code{SpatialPolygonsDataFrame} with 
   \item{\code{offst_x}}{numeric; offsets in the image coordinates rows (starting from top left)},
   \item{\code{rgn_dm_y}}{numeric; tile dimensions in image coordinates},
   \item{\code{rgn_dm_x}}{numeric; tile dimensions in image coordinates},
+}
 }
 \examples{
 library(sp)

@@ -5,6 +5,19 @@ pfun <- function(x,y, ...){
   panel.abline(coef = c(0,1), col="black", size = 0.25, lwd = 2)
 }
 
+#' Accuracy plot
+#'
+#' @param x 
+#' @param y 
+#' @param main 
+#' @param colramp 
+#' @param xbins 
+#' @param rng 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 accuracy.plot.spm <- function(x, y, main, colramp, xbins = xbins. , rng ="nat"){
 if(rng == "norm"){
     x.= normalize(x, method = "range", range = c(0, 1))
@@ -18,7 +31,7 @@ if(rng == "norm"){
    }
   print(plt)
   return(plt)
-  }
+}
 
 
 
