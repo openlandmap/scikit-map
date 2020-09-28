@@ -117,7 +117,16 @@ classification tasks for obvious reasons
 in a nutshell the user can `train` an arbitrary `s3` **(spatial) data
 frame** by only defining following arguments:
 
-`train.spm()` \*\*\*
+`train.spm()`
+
+-   User only **must** define a `df` and the `target.variable`.
+    `train.spm()` will automatically perform `classification` or
+    `regression` tasks.
+-   The rest of arguments can be set or default values will be set.
+-   If **crs** is set `train.spm()` will automatically take care of
+    **spatial cross validation**.
+
+<!-- -->
 
     train.model = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE, crs )
 
@@ -129,21 +138,14 @@ frame** by only defining following arguments:
 
     train.model
 
--   User only **must** define a `df` and the `target.variable` and
-    `train.spm()` will automatically perform `classification` or
-    `regression` tasks.
--   The rest of arguments can be set or default values will be set.
--   If **crs** is set `train.spm()` will automatically take care of
-    **spatial cross validation**.
-
 `predict.spm()`
+
+User needs to only set`df.ts = test set` and leave the `task = NULL`
 
     predict.variable = predict.spm(df.ts, task = NULL)
     predict.variable
 
-User needs to set only `df.ts = test set` and leave the `task = NULL`
-
-`accuracy.plot()` \*\*\*
+`accuracy.plot()`
 
     accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
 
@@ -159,8 +161,6 @@ Accuracy plot
 
 References
 ----------
-
-------------------------------------------------------------------------
 
 Lang, M., Schratz, P., Binder, M., Pfisterer, F., Richter, J., Reich, N.
 G., & Bischl, B. (2020, September 9). mlr3 book. Retrieved from
