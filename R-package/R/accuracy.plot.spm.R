@@ -1,14 +1,4 @@
 
-#' pfun
-#'
-#' @param x 
-#' @param y 
-#' @param ... 
-#'
-#' @return pfun
-#' @export
-#'
-#' @examples
 pfun <- function(x,y, ...){
   panel.xyplot(x, y, ...)
   panel.hexbinplot(x,y, ...)  
@@ -16,11 +6,7 @@ pfun <- function(x,y, ...){
   return(pfun)
 }
 
-<<<<<<< HEAD
-#' accuracy.plot.spm
-=======
 #' Accuracy plot
->>>>>>> master
 #'
 #' @param x 
 #' @param y 
@@ -29,14 +15,9 @@ pfun <- function(x,y, ...){
 #' @param xbins 
 #' @param rng 
 #'
-<<<<<<< HEAD
 #' @return plt
-=======
 #' @return
->>>>>>> master
 #' @export
-#'
-#' @examples
 accuracy.plot.spm <- function(x, y, main, colramp, xbins = xbins. , rng ="nat"){
 if(rng == "norm"){
     x.= normalize(x, method = "range", range = c(0, 1))
@@ -51,6 +32,3 @@ if(rng == "norm"){
   print(plt)
   return(plt)
 }
-
-
-

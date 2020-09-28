@@ -20,6 +20,8 @@ accuracy.plot.spm(x, y, main, colramp, xbins = xbins., rng = "nat")
 \item{rng}{}
 }
 \value{
+plt
+
 
 }
 \description{

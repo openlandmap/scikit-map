@@ -24,11 +24,6 @@
 #' @export 
 #'
 #' @examples
-#' #'ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
-#'"hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv", 
-#'"FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools","gridExtra","yardstick","plotKML", "latticeExtra","devtools")
-#'new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
-#'if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
 #'Splitting training (tr) and test (ts) sets and defining generic variables
 #'Meuse Demo
 #'data(meuse)
@@ -51,7 +46,6 @@
 #'predict.spm(df.ts, task = NULL)
 #'accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
 #'
-
 train.spm = function(df.tr, target.variable, 
 parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.ens = TRUE, meta.learner = NULL, crs){
   id = deparse(substitute(df.tr))
