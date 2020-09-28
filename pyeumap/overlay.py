@@ -228,8 +228,6 @@ class SpaceTimeOverlay():
 				self.overlay_objs = {}
 				self.verbose = verbose
 
-				if self.verbose:
-					print('OPA')
 				self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
 				self.uniq_years = self.pts[self.col_date].dt.year.unique()
 
