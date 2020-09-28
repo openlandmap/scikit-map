@@ -26,13 +26,8 @@ Follow me on [![alt text][1.1]][1]
 knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 ```
 
-### Aims of this tutorial
-
-
-- create an R function `train.spm` to train (classification and regression Spatial Prediction Model) models using Ensemble Machine Learning on spatial data in mlr3
-,
-- create an R function accuracy.plot.spm to visualize accuracy plots (regression) for models produced using `train.spm`,
-- create an R function `predict.spm` that can used the models fitted using `train.spm` and predict values that can be exported as a map.
+### Aims of demo
+- To show how to load `meuse` and `eberg` data and fit `spm` and generate `predictions`
 
 ### train.spm
 
@@ -49,7 +44,10 @@ new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
 ```
 
-###meuse dataset
+### meuse dataset
+
+Below setting should works with `eberg` dataset (`crs` must change to `eberg` setting in case of SPCV resampling).
+
 ```{r include=FALSE, warning=FALSE}
 library("sp")
 data(meuse)
@@ -333,8 +331,9 @@ if(rng == "norm"){
 in a nutshell the user can `train` an arbitrary `s3` **(spatial) data frame** by only defining following arguments:
 
 `train.spm()`
+***
 
-```{r }
+```{r ,results='hide', warning=FALSE}
 train.model = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE, crs )
 train.model
 ```
@@ -345,18 +344,20 @@ train.model
 
 `predict.spm()`
 
-```{r}
+```{r, warning=FALSE,results='hide' }
 predict.variable = predict.spm(df.ts, task = NULL)
 predict.variable
 ```
 
-User needs to set only `df.ts = test set` and  put the `task = NULL`
+User needs to set only `df.ts = test set` and leave the `task = NULL`
 
 `accuracy.plot()`
+***
 
-```{r}
+```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
 accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
 ```
 
 
 ## References
+***
