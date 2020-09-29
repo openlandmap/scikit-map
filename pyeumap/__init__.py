@@ -1,4 +1,4 @@
-__version__ = '0.0.1'
+__version__ = '0.1.0'
 
 from . import (
     misc,
@@ -6,5 +6,6 @@ from . import (
     parallel,
     mapper,
     datasets,
-    gapfiller
+    gapfiller,
+    plotter,
 )
