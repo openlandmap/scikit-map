@@ -27,3 +27,6 @@ plt
 \description{
 Accuracy plot
 }
+\author{
+\href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
+}
