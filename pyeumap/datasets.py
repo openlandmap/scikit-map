@@ -2,76 +2,155 @@ import requests
 import zipfile
 import tempfile
 import os, sys
+import threading
+import time
+import re
+from functools import reduce
+from operator import add
+from typing import Union, List
+import shutil
 
 DATASETS = [
-    'croatia_9529',
-    'ireland_16057',
-    'sweden_22497',
+    '22497_sweden_landcover_samples.gpkg',
+    '22497_sweden_rasters.zip',
+    '22497_sweden_rasters_gapfilled.zip',
+    '9529_croatia_landcover_samples.gpkg',
+    '9529_croatia_rasters.zip',
+    '9529_croatia_rasters_gapfilled.zip',
+    'eu_tilling system_30km.gpkg',
 ]
+ALL = DATASETS
 
-DATA_ROOT_NAME = 'pilot_tiles'
+KEYWORDS = reduce(add, map(
+    lambda ds_name: re.split(r'[\s_\d\.]+', ds_name),
+    DATASETS
+))
+KEYWORDS = sorted(set(filter(
+    lambda kw: kw not in ('', 'km', 'eu', 'system'),
+    KEYWORDS
+)))
 
-_datasets = DATASETS + ['all']
+TILES = sorted(set(reduce(add, map(
+    lambda ds_name: re.findall(r'\d+_[a-z]+', ds_name),
+    DATASETS
+))))
+
+DATA_ROOT_NAME = 'eumap_data'
+_CHUNK_LENGTH = 2**13
+_DOWNLOAD_DIR = os.getcwd()
+_PROGRESS_INTERVAL = .2 # seconds
+
+def get_datasets(keywords: Union[str, List[str]]='') -> list:
+    if isinstance(keywords, str):
+        keywords = [keywords]
+    return [*filter(
+        lambda ds_name: sum([
+            keyword in ds_name
+            for keyword in keywords
+        ]) == len(keywords),
+        ALL
+    )]
 
 def _make_download_request(dataset:str) -> requests.Response:
-    datapath = '/pilot_tiles'
-    if dataset != 'all':
-        datapath += f'/{dataset}'
+    url = f'https://zenodo.org/record/4058447/files/{dataset}?download=1'
+    return requests.get(url, stream=True)
 
-    url = f'http://80.56.23.93:5000/fsdownload/webapi/file_download.cgi/{dataset}.zip'
-    dlname = f'"{dataset}.zip"'
-    urlpath = f'["{datapath}"]'
+class _DownloadWorker:
 
-    return requests.post(
-        url,
-        headers={
-            'Cookie': 'sharing_sid=Dw1ZbveLuz0i7pPnicJLqbzHCSnDjXXC',
-            'Accept-Encoding': 'gzip, deflate',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        data={
-            'api': 'SYNO.FolderSharing.Download',
-            'method': 'download',
-            'version': '2',
-            'mode': 'download',
-            'stdhtml': 'false',
-            'dlname': dlname,
-            'path': urlpath,
-            '_sharing_id': '"ztCVujZhz"',
-            'codepage': 'enu',
-        },
-        stream=True,
-    )
+    def __init__(self, dataset:str, download_dir: str=_DOWNLOAD_DIR):
+        self.done = False
+        self.dataset = dataset
+        self.download_dir = download_dir
+        self.progress = 0
+        self.downloaded = 0
+        self.size = None
+        __, self.tmpfile = tempfile.mkstemp()
 
-def _unpack(dataset:str, tmpfile:str, download_dir:str) -> str:
-    datapath = download_dir
-    if dataset in DATASETS:
-        datapath = os.path.join(download_dir, DATA_ROOT_NAME)
-    if not os.path.isdir(datapath):
-        os.mkdir(datapath)
-    with zipfile.ZipFile(tmpfile) as archive:
-        archive.extractall(datapath)
-    os.remove(tmpfile)
+    def _unpack(self):
+        datapath = os.path.join(self.download_dir, DATA_ROOT_NAME)
+        try:
+            tile_name = next(filter(
+                lambda tile: self.dataset.startswith(tile),
+                TILES
+            ))
+            datapath = os.path.join(datapath, tile_name)
+        except StopIteration:
+            pass
 
-def get_data(dataset:str, download_dir:str=os.getcwd()):
-    if dataset not in _datasets:
-        print('Dataset not available, please choose one of the following:')
-        for _ds in _datasets:
-            print('\t • '+_ds)
-        return
+        lock = threading.Lock()
+        lock.acquire()
+        if not os.path.isdir(datapath):
+            os.makedirs(datapath)
+        lock.release()
 
-    with _make_download_request(dataset) as resp:
-        resp.raise_for_status()
-        downloaded = 0
-        __, tmpfile = tempfile.mkstemp()
-        with open(tmpfile, 'wb') as dst:
-            for chunk in resp.iter_content(2**20):
-                dst.write(chunk)
-                dst.flush()
-                downloaded += len(chunk)
-                sys.stdout.write('\r%d MB downloaded'%(downloaded // 2**20))
-                sys.stdout.flush()
-        print('\nUnpacking...')
-        _unpack(dataset, tmpfile, download_dir)
-        print('Download complete.')
+        if self.dataset.endswith('.zip'):
+            with zipfile.ZipFile(self.tmpfile) as archive:
+                archive.extractall(datapath)
+            os.remove(self.tmpfile)
+        else:
+            shutil.move(
+                self.tmpfile,
+                os.path.join(datapath, self.dataset)
+            )
+
+    def _download(self):
+        with _make_download_request(self.dataset) as resp:
+            resp.raise_for_status()
+            self.size = int(resp.headers.get('content-length'))
+            with open(self.tmpfile, 'wb') as dst:
+                for chunk in resp.iter_content(_CHUNK_LENGTH):
+                    dst.write(chunk)
+                    dst.flush()
+                    self.downloaded += _CHUNK_LENGTH
+                    self.progress = (100 * self.downloaded) // self.size
+        self._unpack()
+        self.done = True
+
+    def start(self):
+        self.thread = threading.Thread(target=self._download)
+        self.thread.start()
+
+def get_data(datasets: Union[str, list], download_dir: str=_DOWNLOAD_DIR):
+    if datasets == 'all':
+        datasets = DATASETS
+    if isinstance(datasets, str):
+        datasets = [datasets]
+    for dataset in datasets:
+        if dataset not in DATASETS:
+            print(f'Dataset {dataset} not available, please choose "all" or one/more of the following:')
+            for ds_name in DATASETS:
+                print('\t • '+ds_name)
+            return
+
+    workers = [
+        _DownloadWorker(ds, download_dir)
+        for ds in datasets
+    ]
+    n_workers = len(workers)
+    for w in workers:
+        w.start()
+
+    while True:
+        time.sleep(_PROGRESS_INTERVAL)
+        done = sum((w.done for w in workers)) == n_workers
+        sizes = [w.size for w in workers]
+        if None in sizes:
+            print('Starting downloads...', end='\r')
+            continue
+        total_size = sum(sizes)
+        total_download = sum((w.downloaded for w in workers))
+        total_progress = (100 * total_download) // total_size
+        if total_progress < 100:
+            print(
+                f'{total_progress}% of {n_workers} downloads / ' \
+                f'{round(total_download/2**20, 2)} of {round(total_size/2**20, 2)} MB',
+                end='\r',
+            )
+        else:
+            print(f'{round(total_size/2**20, 2)} MB downloaded, unpacking...' + ' '*20, end='\r')
+        if done:
+            print('\nDownload complete.')
+            break
+
+if __name__ == '__main__':
+    get_data(DATASETS)
