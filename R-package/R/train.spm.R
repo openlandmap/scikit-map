@@ -60,7 +60,7 @@
 #' accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
 #'
 train.spm = function(df.tr, target.variable, 
-parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs){
+parallel = TRUE, predict_type = NULL, folds = foldhs, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs){
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
    if(is.factor(df.tr[,target.variable]) & missing(crs)){
