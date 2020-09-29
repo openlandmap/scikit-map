@@ -17,6 +17,9 @@ import multiprocessing
 from . import parallel
 from .misc import ttprint
 
+import warnings
+warnings.filterwarnings('ignore')
+
 #%%
 
 class ParallelOverlay:
@@ -203,7 +206,7 @@ class SpaceOverlay(ParallelOverlay):
 					points = gpd.read_file(points)
 
 				self.pts = points
-				self.pts.loc[:,'overlay_id'] = range(1,len(self.pts)+1)
+				self.pts['overlay_id'] = range(1,len(self.pts)+1)
 
 				super().__init__(self.pts.geometry.x.values, self.pts.geometry.y.values, fn_layers, max_workers, verbose)
 
@@ -211,10 +214,9 @@ class SpaceOverlay(ParallelOverlay):
 			result = super().run()
 
 			for col in result:
-				self.pts[col] = result[col]
+				self.pts.loc[:,col] = result[col]
 
 			return self.pts
-
 
 class SpaceTimeOverlay():
 

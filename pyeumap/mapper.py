@@ -22,7 +22,7 @@ class LandMapper():
 	def __init__(self, points:GeoDataFrame, feat_col_prfxs:List[str], target_col:str, 
 		estimator:BaseEstimator = RandomForestClassifier(n_estimators=100), 
 		imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean'),
-		eval_strategy = 'train_val_split', val_samples_pct = 0.2):
+		eval_strategy = 'train_val_split', val_samples_pct = 0.2, min_samples_per_class = 0.05):
 
 		if not isinstance(points, gpd.GeoDataFrame):
 			points = gpd.read_file(points)
@@ -31,13 +31,22 @@ class LandMapper():
 		self.target_col = target_col
 		self.estimator = estimator
 		self.imputer = imputer
+		self.min_samples_per_class = min_samples_per_class
 
 		self.feature_cols = []
 		for feat_prfx in feat_col_prfxs:
 			self.feature_cols += list(self.pts.columns[self.pts.columns.str.startswith(feat_prfx)])
 
-		self.features = self.pts[self.feature_cols].to_numpy()
-		self.target = self.pts[self.target_col].to_numpy()
+
+		classes_pct = (self.pts[self.target_col].value_counts() / self.pts[target_col].count())
+		self.rows_to_remove = self.pts[self.target_col].isin(classes_pct[classes_pct > min_samples_per_class].axes[0])
+		nrows, _ = self.pts[~self.rows_to_remove].shape
+		if nrows > 0:
+			self.pts = self.pts[self.rows_to_remove]
+			ttprint(f'Removing {nrows} sampes due min_samples_per_class = {min_samples_per_class}')
+
+		self.features = self.pts[self.feature_cols].to_numpy().astype('float16')
+		self.target = self.pts[self.target_col].to_numpy().astype('float16')
 
 		self.eval_strategies = enumerate(['train_val_split'])
 		if eval_strategy not in self.eval_strategies:
@@ -48,6 +57,7 @@ class LandMapper():
 
 		self.features_raw = self.features
 		self.features = self.fill_nodata(self.features, fit_and_tranform = True)
+
 
 	def fill_nodata(self, data, fit_and_tranform = False):
 		nodata_idx = self._nodata_idx(data)
@@ -124,7 +134,11 @@ class LandMapper():
 		fn_layers = []
 		
 		for dirs_layer in dirs_layers:
-			fn_layers += list(Path(dirs_layer).glob('**/*.tif'))
+			for fn_layer in list(Path(dirs_layer).glob('**/*.tif')):
+				if fn_layer.stem in self.feature_cols:
+					fn_layers.append(fn_layer)
+				else:
+					print(f'Ignoring {fn_layer}')
 
 		fn_layers.sort(key=self._feature_idx)
 
