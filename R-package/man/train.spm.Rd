@@ -13,7 +13,7 @@ train.spm(
   method.list = NULL,
   n_evals = n_evals,
   plot.workflow = FALSE,
-  var.ens = TRUE,
+  var.imp = TRUE,
   meta.learner = NULL,
   crs
 )
@@ -35,7 +35,7 @@ train.spm(
 
 \item{plot.workflow}{}
 
-\item{var.ens}{}
+\item{var.imp}{}
 
 \item{meta.learner}{}
 
@@ -52,26 +52,39 @@ class() of the target.variable and for now only returns a
 trained model function so later on we could use it to train a new dataset.
 }
 \examples{
-Splitting training (tr) and test (ts) sets and defining generic variables
-Meuse Demo
+## Splitting training (tr) and test (ts) sets and defining generic variables
+## Meuse Demo
+library(sp)
+library(mlr3verse)
 data(meuse)
 df <- meuse
-df <- na.omit(meuse[,])
-crs = "+proj=lcc +lat_1=40.66666666666666 +lat_2=41.03333333333333 +lat_0=40.16666666666666 +lon_0=-74 +x_0=300000 +y_0=0 +datum=NAD83 +units=us-ft +no_defs"
+df <- na.omit(df[,])
+crs = "+init=epsg:3035"
 target.variable = "lead"
-define generic var
+## define generic var
 smp_size <- floor(0.5 * nrow(df))
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[train_ind, ]
 df.ts <- df[-train_ind, ]
 folds = 2
-plot var
+xbins. = 50
+tr = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE)
+train.model= tr[[1]]
+
+var.imp = tr[[2]]
+var.imp
+
+summary = tr[[3]]
+summary
+
+predict.variable = predict.spm(df.ts, task = NULL, train.model)
+## plot var
 colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
 colramp. = colorRampPalette(c("wheat2","red3"))
-xbins. = 50
-train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE, crs)
-predict.spm(df.ts, task = NULL)
 accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
 
+}
+\author{
+\href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 }

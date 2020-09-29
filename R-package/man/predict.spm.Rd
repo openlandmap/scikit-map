@@ -4,7 +4,7 @@
 \alias{predict.spm}
 \title{predict.spm}
 \usage{
-\method{predict}{spm}(df.ts, task = NULL)
+\method{predict}{spm}(df.ts, task = NULL, train.model)
 }
 \arguments{
 \item{df.ts}{}
@@ -16,4 +16,7 @@ y
 }
 \description{
 prediction on new dataset
+}
+\author{
+\href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 }

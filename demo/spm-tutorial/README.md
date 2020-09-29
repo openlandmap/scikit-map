@@ -12,52 +12,54 @@ frame** in `mlr3` ecosystem by defining following arguments:
 
 *df* and the *target.variable*.
     `train.spm()` will automatically perform `classification` or
-    `regression` tasks.
+    `regression` tasks and will output a `train.model` later for prediction and also a *summary* of the model and *variable importance*.
 The rest of arguments can be set or default values will be set.
 If **crs** is set `train.spm()` will automatically take care of
     **spatial cross validation**,
 
-* `predict.spm()` --- prediction on new dataset,
+* `predict.spm()` --- prediction on a new dataset using `train.model`,
 
-* `accuracy.plot()` --- Accuracy plot in case of regression task Note: don’t use it for classification tasks for obvious reasons
+* `accuracy.plot()` --- Accuracy plot in case of regression task (don’t use it for classification tasks for obvious reason)
 
 
 Warning: most of functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
 
+Spatial prediction using [Ensemble Machine Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r) with geographical distances 
+is explained in detail in:
 
+- Hengl, T., MacMillan, R.A., (2019). 
+   [Predictive Soil Mapping with R](https://soilmapper.org/soilmapping-using-mla.html). 
+   OpenGeoHub foundation, Wageningen, the Netherlands, 370 pages, www.soilmapper.org, 
+   ISBN: 978-0-359-30635-0.
+- Hengl, T., Nussbaum, M., Wright, M. N., Heuvelink, G. B., and Gräler, B. (2018). 
+   [Random Forest as a generic framework for predictive modeling of spatial and spatio-temporal variables](https://doi.org/10.7717/peerj.5518). PeerJ 6:e5518.
 
 The following examples demostrates spatial prediction using the meuse data set:
 
 ```r
-ls <- c("mlr3verse","rgdal", "raster", "ranger", "mlr3", 
-        "xgboost", "glmnet", "matrixStats", "deepnet")
+ls <- c("mlr3verse","sp", "raster", "yardstick", "hexbin", 
+        "mlr3spatiotempcv", "mlr3fselect", "FSelectorRcpp", "bbotk")
 new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
-library("bbotk")
 library("ggplot2")
 library("mltools")
 library("data.table")
-library("mlr3fselect")
-library("FSelectorRcpp")
 library("future")
 library("future.apply")
 library("magrittr")
-library("progress")
-library("mlr3spatiotempcv")
-library("sp")
 library("dplyr")
 library("EnvStats")
 library("grid")
-library("hexbin")
 library("BBmisc")
 library("lattice")
 library("MASS")
 library("gridExtra")
 library("MLmetrics")
-library("yardstick")
 library("latticeExtra")
 library("devtools")
 library("landmap")
+demo(meuse, echo=FALSE)
+target.variable = "lead"
 ```
 
 <!-- -->
@@ -71,12 +73,27 @@ library("landmap")
                Fitting a ensemble ML using 'mlr3::Taskregr'...TRUE
 
     train.model
+    > var.imp
+      copper      cadmium         elev       dist.m         zinc         soil         dist         lead           om 
+0.0270375435 0.0260349549 0.0196909307 0.0153951701 0.0141349411 0.0118281616 0.0088289879 0.0066457337 0.0046673471 
+        lime        ffreq 
+0.0043261842 0.0004014055 
+    > summary
+    Type:                             Classification 
+Number of trees:                  500 
+Sample size:                      76 
+Number of independent variables:  11 
+Mtry:                             3 
+Target node size:                 1 
+Variable importance mode:         permutation 
+Splitrule:                        gini 
+OOB prediction error:             64.47 % 
 
 `predict.spm()`
 
-User needs to set`df.ts = test set` and `task = NULL`
+User needs to set`df.ts = test set` and `task = NULL` and pass the `train.model`.
 
-    predict.variable = predict.spm(df.ts, task = NULL)
+    predict.variable = predict.spm(df.ts, task = NULL, train.model)
     predict.variable
 
 `accuracy.plot()`
