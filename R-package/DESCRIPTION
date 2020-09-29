@@ -4,7 +4,8 @@ Version: 0.0.1
 Authors@R: 
    c(person("Tomislav", "Hengl", email = "tom.hengl@opengeohub.org", role = c("aut", "cre")),
      person("Mohammadreza", "Sheykhmousa", email = "mohammadreza.sheykhmousa@opengeohub.org", role = c("aut")),
-     person("Leandro", "Leal Parente", email = "leandro.parente@opengeohub.org", role = c("aut")))
+     person("Leandro", "Leal Parente", email = "leandro.parente@opengeohub.org", role = c("aut")),
+     person("Carmelo", "Bonannella", email = "carmelo.bonannella@opengeohub.org", role = c("aut")))
 Description: Functions and sample datasets for accessing, processing and producing spatial layers for EU. It includes standard tiling systems, functions to overlay points and large stacks of grids, fit spatial prediction and harmonization models, harmonize multisource Earth Observation Data. Find out more about this project from: https://opendatascience.eu/.
 Depends: R (>= 3.5.0)
 License: GPL-2 | MIT + file LICENSE
