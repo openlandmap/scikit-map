@@ -16,7 +16,7 @@
 #' @param method.list 
 #' @param n_evals 
 #' @param plot.workflow 
-#' @param var.ens 
+#' @param var.imp 
 #' @param meta.learner 
 #' @param crs 
 #'
@@ -44,15 +44,23 @@
 #' df.ts <- df[-train_ind, ]
 #' folds = 2
 #' xbins. = 50
-#' train.spm(df.tr, target.variable = target.variable, folds = folds, n_evals = n_evals, plot.workflow = TRUE, crs)
-#' predict.spm(df.ts, task = NULL)
+#' tr = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE)
+#' train.model= tr[[1]]
+#' 
+#' var.imp = tr[[2]]
+#' var.imp
+#' 
+#' summary = tr[[3]]
+#' summary
+#' 
+#' predict.variable = predict.spm(df.ts, task = NULL, train.model)
 #' ## plot var
 #' colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
 #' colramp. = colorRampPalette(c("wheat2","red3"))
 #' accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
 #'
 train.spm = function(df.tr, target.variable, 
-parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.ens = TRUE, meta.learner = NULL, crs){
+parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs){
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
    if(is.factor(df.tr[,target.variable]) & missing(crs)){
@@ -90,10 +98,13 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         lgr::get_logger("mlr3")$set_threshold("debug")
         message("           Fitting a ensemble ML using 'mlr3::TaskClassif'...", immediate. = TRUE)
         at$train(tsk_clasif1)
-        
         at$learner$train(tsk_clasif1)
+        best.model = at$archive$best()
+        var.imp = at$learner$importance()
+        summary = at$learner$state$model
         tr.mdl = at$learner
         train.model = tr.mdl$predict_newdata
+        
       } else if (is.numeric(df.tr[,target.variable]) & missing(crs)) {
       message(paste("regression Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)  
         if( missing(predict_type)){
@@ -131,13 +142,21 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
       at$train(tsk_regr1)
       at$learner$train(tsk_regr1)
       tr.mdl = at$learner
+      summary = tr.model$model
+      var.imp = tr.model$importance()
       train.model = tr.mdl$predict_newdata
+
     } else if (is.factor(df.tr[,target.variable]) & crs == crs){ 
         method.list <- c("classif.ranger", "classif.rpart")
         meta.learner = "classif.ranger"
         df.trf = mlr3::as_data_backend(df.tr)
-        tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list(
-        positive = "TRUE", coordinate_names = c("x", "y"), coords_as_features = FALSE,crs = crs))
+        tsk_clf1 = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list( positive = "TRUE", coordinate_names = c("x", "y"), coords_as_features = FALSE,crs = crs))
+        lrn = lrn("classif.ranger")
+        gr = pipeline_robustify(tsk_clf1, lrn) %>>% po("learner", lrn)
+        ede = resample(tsk_clf1, GraphLearner$new(gr), rsmp("holdout"))
+        tsk_clf = ede$task$clone()
+        tsk_clf$missings()
+        
         g = gunion(list(
         po("learner_cv", id = "cv1", lrn("classif.ranger")),
         po("pca") %>>% po("learner_cv", id = "cv2", lrn("classif.rpart")),
@@ -164,16 +183,22 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
                    method.list <- c("regr.ranger", "regr.rpart")
                    meta.learner <- "regr.ranger"}
         df.trf = mlr3::as_data_backend(df.tr)
-        tsk_regr = TaskRegrST$new(id = id, backend = df.trf, target = target.variable,
+        tsk_regr1 = TaskRegrST$new(id = id, backend = df.trf, target = target.variable,
         extra_args = list( positive = "TRUE", coordinate_names = c("x", "y"), coords_as_features = FALSE,
         crs = crs))
+        lrn = lrn("regr.rpart")
+        gr = pipeline_robustify(tsk_regr1, lrn) %>>% po("learner", lrn)
+        ede = resample(tsk_regr1, GraphLearner$new(gr), rsmp("holdout"))
+        tsk_regr = ede$task$clone()
+        tsk_regr$missings()
+       
         g = gunion(list(
         po("learner_cv", id = "cv1", lrn("regr.ranger")),
         po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.rpart")),
         po("nop") %>>% po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
         )) %>>%
         po("featureunion") %>>%
-        po("learner", lrn("regr.ranger")) 
+        po("learner", lrn("regr.ranger",importance ="permutation")) 
         g$param_set$values$cv1.resampling.method = "spcv_coords"
         g$param_set$values$cv2.resampling.method = "spcv_coords"
         g$keep_results = "TRUE"
@@ -185,9 +210,11 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         g$predict(tsk_regr)
         summary = g$pipeops$regr.ranger$learner_model$model
         tr.model = g$pipeops$regr.ranger$learner$train(tsk_regr)
+        var.imp = tr.model$importance()
         train.model = tr.model$predict_newdata
+        
   }
-  return(train.model)
+  return(list(train.model, var.imp, summary))
 }
 
   

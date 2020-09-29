@@ -2,13 +2,14 @@
 #' predict.spm
 #' @description
 #' prediction on new dataset
-#'
+#' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' @param df.ts 
 #' @param task 
 #'
 #' @return y
 #' @export
-predict.spm = function (df.ts , task = NULL){
+predict.spm = function (df.ts , task = NULL, train.model){
+  print('test')
    id = deparse(substitute(df.ts))
    if(is.factor(df.ts[,target.variable])){
        tsk_clf <- mlr3::TaskClassif$new(id = id, backend = df.ts, target = target.variable)
