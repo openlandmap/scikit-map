@@ -7,3 +7,5 @@ build
 dist
 *.egg*
 .ipynb_checkpoints
+eumap_data
+gapfilled
