@@ -1,15 +1,23 @@
-## Accuracy plot function
-## Project: GeoHarmonizer_INEA
-## Mohammadreza.Sheykhmousa@opengeohub.org
-
-source('predict.spm.fnc.R')
 
 pfun <- function(x,y, ...){
   panel.xyplot(x, y, ...)
   panel.hexbinplot(x,y, ...)  
   panel.abline(coef = c(0,1), col="black", size = 0.25, lwd = 2)
+  return(pfun)
 }
 
+#' Accuracy plot
+#'
+#' @param x 
+#' @param y 
+#' @param main 
+#' @param colramp 
+#' @param xbins 
+#' @param rng 
+#'
+#' @return plt
+#' @return
+#' @export
 accuracy.plot.spm <- function(x, y, main, colramp, xbins = xbins. , rng ="nat"){
 if(rng == "norm"){
     x.= normalize(x, method = "range", range = c(0, 1))
@@ -23,7 +31,4 @@ if(rng == "norm"){
    }
   print(plt)
   return(plt)
-  }
-
-
-
+}
