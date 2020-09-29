@@ -19,9 +19,10 @@
 #' @param var.imp 
 #' @param meta.learner 
 #' @param crs 
-#'
+#' @param 
 #' @return train.model
-#' 
+#' @return summary
+#' @return var.imp
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' 
 #' @export 
@@ -31,36 +32,63 @@
 #' ## Meuse Demo
 #' library(sp)
 #' library(mlr3verse)
-#' data(meuse)
-#' df <- meuse
-#' df <- na.omit(df[,])
+#' demo(meuse, echo=FALSE)
+#' 
+#' # Meuse Demo ----
+#' demo(meuse, echo=FALSE)
+#' pr.vars = c("x","y","dist","elev","soil","lead")
+#' df <- as.data.frame(meuse)
+#' # df <- df[complete.cases(df[,pr.vars]),pr.vars]
+#' df = na.omit(df[,])
+#' summary(is.na(df))
 #' crs = "+init=epsg:3035"
+#' #target.variable = "landuse"
 #' target.variable = "lead"
-#' ## define generic var
+#' # define generic var ----
 #' smp_size <- floor(0.5 * nrow(df))
 #' set.seed(123)
 #' train_ind <- sample(seq_len(nrow(df)), size = smp_size)
-#' df.tr <- df[train_ind, ]
-#' df.ts <- df[-train_ind, ]
+#' df.tr <- df[train_ind, c("x","y","dist","elev","soil","lead")]
+#' df.ts <- df[-train_ind, c("x","y","dist","elev","soil")]
 #' folds = 2
-#' xbins. = 50
-#' tr = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE)
+#' n_evals = 3
+#' newdata = df.ts
+#' # plot var ----
+#' colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
+#' colramp. = colorRampPalette(c("wheat2","red3"))
+#' xbins. = 20
+#' # coords=c("x","y")
+#' # id = deparse(substitute(df.tr))
+#' # MODELS ----
+#' tr = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE, coords, crs, var.imp)
 #' train.model= tr[[1]]
-#' 
 #' var.imp = tr[[2]]
 #' var.imp
-#' 
 #' summary = tr[[3]]
 #' summary
 #' 
-#' predict.variable = predict.spm(df.ts, task = NULL, train.model)
-#' ## plot var
-#' colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
-#' colramp. = colorRampPalette(c("wheat2","red3"))
-#' accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
-#'
+#' predict.variable = predict.spm(train.model, newdata)
+#' predict.variable
+#' plt = accuracy.plot.spm(x = df.tr[,target.variable], y = predict.variable, rng = "norm")
+#' 
+#' # predicct for all var
+#' prd.all = predict.spm(train.model, df)
+#' str(prd.all)
+#' df$leadp = prd.all
+#' coordinates(df) <- ~x+y
+#' proj4string(df) <- CRS("+init=epsg:28992")
+#' # creat raster out of output
+#' is.projected(df)
+#' extent(df)
+#' r = raster::raster(extent(df), crs=crs(df), resolution=150)
+#' values(r) = 0
+#' # plot(r)
+#' lead.r=rasterize(df, r, 'leadp', fun=mean)
+#' plot(lead.r)
+#' 
+
 train.spm = function(df.tr, target.variable, 
-parallel = TRUE, predict_type = NULL, folds = foldhs, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs){
+parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs, coords=c("x","y")){
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
    if(is.factor(df.tr[,target.variable]) & missing(crs)){
@@ -102,8 +130,8 @@ parallel = TRUE, predict_type = NULL, folds = foldhs, method.list = NULL,  n_eva
         best.model = at$archive$best()
         var.imp = at$learner$importance()
         summary = at$learner$state$model
-        tr.mdl = at$learner
-        train.model = tr.mdl$predict_newdata
+        tr.model = at$learner
+        train.model = tr.model$predict_newdata
         
       } else if (is.numeric(df.tr[,target.variable]) & missing(crs)) {
       message(paste("regression Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)  
@@ -141,29 +169,26 @@ parallel = TRUE, predict_type = NULL, folds = foldhs, method.list = NULL,  n_eva
       message("           Fitting a ensemble ML using 'mlr3::Taskregr'...", immediate. = TRUE)
       at$train(tsk_regr1)
       at$learner$train(tsk_regr1)
-      tr.mdl = at$learner
+      tr.model = at$learner
       summary = tr.model$model
       var.imp = tr.model$importance()
-      train.model = tr.mdl$predict_newdata
+      train.model = tr.model$predict_newdata
 
     } else if (is.factor(df.tr[,target.variable]) & crs == crs){ 
         method.list <- c("classif.ranger", "classif.rpart")
         meta.learner = "classif.ranger"
         df.trf = mlr3::as_data_backend(df.tr)
-        tsk_clf1 = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list( positive = "TRUE", coordinate_names = c("x", "y"), coords_as_features = FALSE,crs = crs))
-        lrn = lrn("classif.ranger")
-        gr = pipeline_robustify(tsk_clf1, lrn) %>>% po("learner", lrn)
-        ede = resample(tsk_clf1, GraphLearner$new(gr), rsmp("holdout"))
-        tsk_clf = ede$task$clone()
+        tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list( positive = "TRUE", coordinate_names = coords, coords_as_features = FALSE,crs = crs))
         tsk_clf$missings()
-        
-        g = gunion(list(
-        po("learner_cv", id = "cv1", lrn("classif.ranger")),
-        po("pca") %>>% po("learner_cv", id = "cv2", lrn("classif.rpart")),
-        po("nop") %>>% po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
+        pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
+        g = pre %>>% gunion(list(
+          po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.lm")),
+          po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.rpart")),
+          po("nop")
         )) %>>%
-        po("featureunion") %>>%
-        po("learner", lrn("classif.ranger",importance ="permutation")) 
+          po("featureunion") %>>%
+          po("learner", lrn("regr.ranger",importance ="permutation")) 
+        
         g$param_set$values$cv1.resampling.method = "spcv_coords"
         g$param_set$values$cv2.resampling.method = "spcv_coords"
         if(plot.workflow == "TRUE"){
@@ -183,19 +208,16 @@ parallel = TRUE, predict_type = NULL, folds = foldhs, method.list = NULL,  n_eva
                    method.list <- c("regr.ranger", "regr.rpart")
                    meta.learner <- "regr.ranger"}
         df.trf = mlr3::as_data_backend(df.tr)
-        tsk_regr1 = TaskRegrST$new(id = id, backend = df.trf, target = target.variable,
-        extra_args = list( positive = "TRUE", coordinate_names = c("x", "y"), coords_as_features = FALSE,
+        tsk_regr = TaskRegrST$new(id = id, backend = df.trf, target = target.variable,
+        extra_args = list( positive = "TRUE", coordinate_names = coords, coords_as_features = FALSE,
         crs = crs))
-        lrn = lrn("regr.rpart")
-        gr = pipeline_robustify(tsk_regr1, lrn) %>>% po("learner", lrn)
-        ede = resample(tsk_regr1, GraphLearner$new(gr), rsmp("holdout"))
-        tsk_regr = ede$task$clone()
+
         tsk_regr$missings()
-       
-        g = gunion(list(
-        po("learner_cv", id = "cv1", lrn("regr.ranger")),
+        pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
+        g = pre %>>% gunion(list(
+        po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.lm")),
         po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.rpart")),
-        po("nop") %>>% po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
+        po("nop")
         )) %>>%
         po("featureunion") %>>%
         po("learner", lrn("regr.ranger",importance ="permutation")) 
@@ -212,8 +234,9 @@ parallel = TRUE, predict_type = NULL, folds = foldhs, method.list = NULL,  n_eva
         tr.model = g$pipeops$regr.ranger$learner$train(tsk_regr)
         var.imp = tr.model$importance()
         train.model = tr.model$predict_newdata
-        
-  }
+        tr.model$predict_newdata
+         tr.model$predict_newdata(newdata )
+        }
   return(list(train.model, var.imp, summary))
 }
 

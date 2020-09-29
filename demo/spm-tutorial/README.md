@@ -58,6 +58,7 @@ library("MLmetrics")
 library("latticeExtra")
 library("devtools")
 library("landmap")
+library("raster")
 demo(meuse, echo=FALSE)
 target.variable = "lead"
 ```
@@ -73,25 +74,29 @@ target.variable = "lead"
                Fitting a ensemble ML using 'mlr3::Taskregr'...TRUE
 
     train.model
-    > var.imp
-                        copper      cadmium         elev       dist.m         zinc         soil         dist         lead           om 
-                  0.0270375435 0.0260349549 0.0196909307 0.0153951701 0.0141349411 0.0118281616 0.0088289879 0.0066457337 0.0046673471 
-                          lime        ffreq 
-                  0.0043261842 0.0004014055 
-    > summary
-    Type:                             Classification 
-      Number of trees:                  500 
-      Sample size:                      76 
-      Number of independent variables:  11 
-      Mtry:                             3 
-      Target node size:                 1 
-      Variable importance mode:         permutation 
-      Splitrule:                        gini 
-      OOB prediction error:             64.47 % 
-
+            > var.imp
+             dist      elev         x         y      soil 
+        205576.50 134165.45  64556.00  54564.07  15096.94 
+        > summary = tr[[3]]
+        > summary
+        Ranger result
+        
+        Call:
+         ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 2L, sample.fraction = 0.616943608154543, num.trees = 189L) 
+        
+        Type:                             Regression 
+        Number of trees:                  189 
+        Sample size:                      76 
+        Number of independent variables:  5 
+        Mtry:                             2 
+        Target node size:                 5 
+        Variable importance mode:         impurity 
+        Splitrule:                        variance 
+        OOB prediction error (MSE):       4522.931 
+        R squared (OOB):                  0.6128183 
 `predict.spm()`
 
-User needs to set`df.ts = test set` and `task = NULL` and pass the `train.model`.
+User needs to set`df.ts = test set` and pass the `train.model`.
 
     predict.variable = predict.spm(df.ts, task = NULL, train.model)
     predict.variable
@@ -99,10 +104,17 @@ User needs to set`df.ts = test set` and `task = NULL` and pass the `train.model`
 `accuracy.plot()`
 
     accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
-
+    
 <img src="README_files/figure-markdown_strict/unnamed-chunk-10-1.png" alt="Accuracy plot"  />
 <p class="caption">
 
+`rasterizing regression matrix`
+
+    lead.r=rasterize(df, r, 'leadp', fun=mean)
+        plot(lead.r)
+
+<img src="README_files/figure-markdown_strict/unnamed-chunk-10-2.png" alt="prediction map (lead)"  />
+<p class="caption">
 </p>
 
 ## Contributions
