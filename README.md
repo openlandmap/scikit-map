@@ -29,6 +29,14 @@ This animation shows the land-cover classes for an area located in Sweden (tile 
 
 ![pyeumap Workflow](img/land_cover_predictions.gif)
 
+Spatiotemporal Machine-Learning
+-------------------------------
+In the Geo-harmonizer project, we prepare Analysis-Ready Earth Observation images from Landsat and 
+Sentinel missions, then use ground observations from the European Commission projects such as [LUCAS surveys](https://land.copernicus.eu/imagery-in-situ/lucas) and CORINE and similar to 
+overlay the ground observations in the spacetime cubes. From this data we create spatiotemporal regression and classification matrices (see: [sample data set](https://doi.org/10.5281/zenodo.4058447)). The eumap package (python and R versions) will allow accessing this data and testing models that apply Machine Learning for predictive mapping in spacetime.
+
+![EU LUCAS scheme](img/Scheme_LUCAS_poinst_st_overlay.png)
+
 License
 -------
 © Contributors, 2020. Licensed under an [Apache-2](https://gitlab.com/geoharmonizer_inea/eumap/blob/master/LICENSE) license.
