@@ -1,5 +1,5 @@
 
-#' train.spm
+#'@title  train.spm
 #'@description
 #' This is the abstract base class for training objects like [TaskClassif] and [TaskRegr].
 #' For example, for a classification task columns must be marked as ID, df, target column.
@@ -88,7 +88,7 @@
 #' 
 
 train.spm = function(df.tr, target.variable, 
-parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs, coords=c("x","y")){
+parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs, coords){
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
    if(is.factor(df.tr[,target.variable]) & missing(crs)){
@@ -135,15 +135,9 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         
       } else if (is.numeric(df.tr[,target.variable]) & missing(crs)) {
       message(paste("regression Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)  
-        if( missing(predict_type)){
-          predict_type <- "response" 
-        }
+        if( missing(predict_type)){ predict_type <- "response" }
       message(paste0("Using learners: ", paste("method.list", collapse = ", "), "..."), immediate. = TRUE)
       tsk_rgr <- mlr3::TaskRegr$new(id = id, backend = df.tr, target = target.variable)
-      lrn = lrn("regr.rpart")
-      gr = pipeline_robustify(tsk_rgr, lrn) %>>% po("learner", lrn)
-      ede = resample(tsk_rgr, GraphLearner$new(gr), rsmp("holdout"))
-      tsk_regr1 = ede$task$clone()
       ranger_lrn = lrn("regr.ranger", predict_type = "response",importance ="permutation")
       ps_ranger = ParamSet$new(
         list(
@@ -167,23 +161,25 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
       lgr::get_logger("mlr3")$set_threshold("warn")
       lgr::get_logger("mlr3")$set_threshold("debug")
       message("           Fitting a ensemble ML using 'mlr3::Taskregr'...", immediate. = TRUE)
-      at$train(tsk_regr1)
-      at$learner$train(tsk_regr1)
+      at$train(tsk_regr)
+      at$learner$train(tsk_regr)
       tr.model = at$learner
       summary = tr.model$model
       var.imp = tr.model$importance()
       train.model = tr.model$predict_newdata
 
     } else if (is.factor(df.tr[,target.variable]) & crs == crs){ 
+      if(is.null(method.list) & is.null(meta.learner)){
         method.list <- c("classif.ranger", "classif.rpart")
         meta.learner = "classif.ranger"
+      }
         df.trf = mlr3::as_data_backend(df.tr)
         tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list( positive = "TRUE", coordinate_names = coords, coords_as_features = FALSE,crs = crs))
         tsk_clf$missings()
         pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
         g = pre %>>% gunion(list(
-          po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.lm")),
-          po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.rpart")),
+          po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
+          po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.xgboost")),
           po("nop")
         )) %>>%
           po("featureunion") %>>%
@@ -215,8 +211,8 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         tsk_regr$missings()
         pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
         g = pre %>>% gunion(list(
-        po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.lm")),
-        po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.rpart")),
+        po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
+        po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.xgboost")),
         po("nop")
         )) %>>%
         po("featureunion") %>>%
