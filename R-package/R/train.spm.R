@@ -1,5 +1,5 @@
 
-#'@title  train.spm
+#' train.spm
 #'@description
 #' This is the abstract base class for training objects like [TaskClassif] and [TaskRegr].
 #' For example, for a classification task columns must be marked as ID, df, target column.
@@ -19,14 +19,11 @@
 #' @param var.imp 
 #' @param meta.learner 
 #' @param crs 
-#' @param 
 #' @return train.model
 #' @return summary
 #' @return var.imp
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
-#' 
 #' @export 
-#'
 #' @examples
 #' ## Splitting training (tr) and test (ts) sets and defining generic variables
 #' ## Meuse Demo
@@ -88,7 +85,7 @@
 #' 
 
 train.spm = function(df.tr, target.variable, 
-parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs, coords){
+parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs, coords = c("x","y")){
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
    if(is.factor(df.tr[,target.variable]) & missing(crs)){
@@ -99,7 +96,6 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         gr = pipeline_robustify(tsk_clf, lrn) %>>% po("learner", lrn)
         ede = resample(tsk_clf, GraphLearner$new(gr), rsmp("holdout"))
         tsk_clasif1 = ede$task$clone()
-        
         ranger_lrn = lrn("classif.ranger", predict_type = "response",importance ="permutation")
         ps_ranger = ParamSet$new(
            list(
@@ -132,12 +128,14 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         summary = at$learner$state$model
         tr.model = at$learner
         train.model = tr.model$predict_newdata
-        
+        response = tr.model$model$predictions
       } else if (is.numeric(df.tr[,target.variable]) & missing(crs)) {
-      message(paste("regression Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)  
-        if( missing(predict_type)){ predict_type <- "response" }
+        if( missing(predict_type)){
+          predict_type <- "response" 
+        }
+      message(paste("Regr Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)
       message(paste0("Using learners: ", paste("method.list", collapse = ", "), "..."), immediate. = TRUE)
-      tsk_rgr <- mlr3::TaskRegr$new(id = id, backend = df.tr, target = target.variable)
+      tsk_regr <- mlr3::TaskRegr$new(id = id, backend = df.tr, target = target.variable)
       ranger_lrn = lrn("regr.ranger", predict_type = "response",importance ="permutation")
       ps_ranger = ParamSet$new(
         list(
@@ -167,19 +165,18 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
       summary = tr.model$model
       var.imp = tr.model$importance()
       train.model = tr.model$predict_newdata
-
+      response = tr.model$model$predictions
     } else if (is.factor(df.tr[,target.variable]) & crs == crs){ 
       if(is.null(method.list) & is.null(meta.learner)){
         method.list <- c("classif.ranger", "classif.rpart")
-        meta.learner = "classif.ranger"
-      }
+        meta.learner = "classif.ranger"}
         df.trf = mlr3::as_data_backend(df.tr)
-        tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list( positive = "TRUE", coordinate_names = coords, coords_as_features = FALSE,crs = crs))
+        tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list( positive = "TRUE", coordinate_names = c("x","y"), coords_as_features = FALSE,crs = crs))
         tsk_clf$missings()
         pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
         g = pre %>>% gunion(list(
-          po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
-          po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.xgboost")),
+          po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.lm")),
+          po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.rpart")),
           po("nop")
         )) %>>%
           po("featureunion") %>>%
@@ -198,21 +195,21 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         summary = g$pipeops$classif.ranger$learner_model$model
         tr.model = g$pipeops$classif.ranger$learner$train(tsk_clf)
         train.model = tr.model$predict_newdata
-        
+        response = tr.model$model$predictions
   } else if(is.numeric(df.tr[,target.variable]) & crs == crs){
         if(is.null(method.list) & is.null(meta.learner)){
                    method.list <- c("regr.ranger", "regr.rpart")
                    meta.learner <- "regr.ranger"}
         df.trf = mlr3::as_data_backend(df.tr)
         tsk_regr = TaskRegrST$new(id = id, backend = df.trf, target = target.variable,
-        extra_args = list( positive = "TRUE", coordinate_names = coords, coords_as_features = FALSE,
+        extra_args = list( positive = "TRUE", coordinate_names = c("x","y"), coords_as_features = FALSE,
         crs = crs))
 
         tsk_regr$missings()
         pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
         g = pre %>>% gunion(list(
-        po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
-        po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.xgboost")),
+        po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.lm")),
+        po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.rpart")),
         po("nop")
         )) %>>%
         po("featureunion") %>>%
@@ -229,11 +226,12 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         summary = g$pipeops$regr.ranger$learner_model$model
         tr.model = g$pipeops$regr.ranger$learner$train(tsk_regr)
         var.imp = tr.model$importance()
+        response = tr.model$model$predictions
         train.model = tr.model$predict_newdata
         tr.model$predict_newdata
          tr.model$predict_newdata(newdata )
         }
-  return(list(train.model, var.imp, summary))
+  return(list(train.model, var.imp, summary,response))
 }
 
   
