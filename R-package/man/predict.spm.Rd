@@ -4,12 +4,12 @@
 \alias{predict.spm}
 \title{predict.spm}
 \usage{
-\method{predict}{spm}(df.ts, task = NULL, train.model)
+\method{predict}{spm}(train.model, newdata, task = NULL)
 }
 \arguments{
-\item{df.ts}{}
+\item{train.model}{}
 
-\item{task}{}
+\item{newdata}{}
 }
 \value{
 y

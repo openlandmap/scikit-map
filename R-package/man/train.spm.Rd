@@ -15,7 +15,8 @@ train.spm(
   plot.workflow = FALSE,
   var.imp = TRUE,
   meta.learner = NULL,
-  crs
+  crs,
+  coords = c("x", "y")
 )
 }
 \arguments{
@@ -43,6 +44,10 @@ train.spm(
 }
 \value{
 train.model
+
+summary
+
+var.imp
 }
 \description{
 This is the abstract base class for training objects like [TaskClassif] and [TaskRegr].
@@ -56,33 +61,59 @@ trained model function so later on we could use it to train a new dataset.
 ## Meuse Demo
 library(sp)
 library(mlr3verse)
-data(meuse)
-df <- meuse
-df <- na.omit(df[,])
+demo(meuse, echo=FALSE)
+
+# Meuse Demo ----
+demo(meuse, echo=FALSE)
+pr.vars = c("x","y","dist","elev","soil","lead")
+df <- as.data.frame(meuse)
+# df <- df[complete.cases(df[,pr.vars]),pr.vars]
+df = na.omit(df[,])
+summary(is.na(df))
 crs = "+init=epsg:3035"
+#target.variable = "landuse"
 target.variable = "lead"
-## define generic var
+# define generic var ----
 smp_size <- floor(0.5 * nrow(df))
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
-df.tr <- df[train_ind, ]
-df.ts <- df[-train_ind, ]
+df.tr <- df[train_ind, c("x","y","dist","elev","soil","lead")]
+df.ts <- df[-train_ind, c("x","y","dist","elev","soil")]
 folds = 2
-xbins. = 50
-tr = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE)
+n_evals = 3
+newdata = df.ts
+# plot var ----
+colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
+colramp. = colorRampPalette(c("wheat2","red3"))
+xbins. = 20
+# coords=c("x","y")
+# id = deparse(substitute(df.tr))
+# MODELS ----
+tr = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE, coords, crs, var.imp)
 train.model= tr[[1]]
-
 var.imp = tr[[2]]
 var.imp
-
 summary = tr[[3]]
 summary
 
-predict.variable = predict.spm(df.ts, task = NULL, train.model)
-## plot var
-colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
-colramp. = colorRampPalette(c("wheat2","red3"))
-accuracy.plot.spm(x = df.ts[,target.variable], y = predict.variable)
+predict.variable = predict.spm(train.model, newdata)
+predict.variable
+plt = accuracy.plot.spm(x = df.tr[,target.variable], y = predict.variable, rng = "norm")
+
+# predicct for all var
+prd.all = predict.spm(train.model, df)
+str(prd.all)
+df$leadp = prd.all
+coordinates(df) <- ~x+y
+proj4string(df) <- CRS("+init=epsg:28992")
+# creat raster out of output
+is.projected(df)
+extent(df)
+r = raster::raster(extent(df), crs=crs(df), resolution=150)
+values(r) = 0
+# plot(r)
+lead.r=rasterize(df, r, 'leadp', fun=mean)
+plot(lead.r)
 
 }
 \author{

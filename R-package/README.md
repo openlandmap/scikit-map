@@ -13,7 +13,7 @@ Package provides easier access to EU environmental maps and functions to produce
 
 A general tutorial for `train.spm` is available [here](https://gitlab.com/geoharmonizer_inea/eumap/-/tree/master/demo/spm-tutorial). The eumap package builds up on top of the [mlr3](https://mlr3.mlr-org.com/), [terra](https://github.com/rspatial/terra) and similar packages. As such, it's main purpose is to automate as much as possible Machine Learning and prediction in a scalable system.
 
-![General workflow eumap package](../img/spm_general_workflow.png)
+<img src="../img/spm_general_workflow.png" alt="General workflow eumap package" width="550"/>
 
 Warning: most of functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
 
