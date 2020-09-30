@@ -1,9 +1,12 @@
+R package for EU mapping
 -   [meuse dataset](#meuse-dataset)
 -   [Basic requirements user needs to
     set](#basic-requirements-user-needs-to-set)
 -   [References](#references)
 
-Follow me on [\[alt text\]\[1.1\]](https://twitter.com/sheykhmousa)
+Follow me on [![alt
+text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitter.com/sheykhmousa)
+
 
 Package provides easier access to EU environmental maps. Basic functions
 include: \* `train.spm` — train a spatial prediction model using [mlr3
