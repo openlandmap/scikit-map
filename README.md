@@ -11,7 +11,7 @@
 [Release Notes](NEWS.md)
 
 eumap is a library to enable easier access to EU environmental maps and functions to produce and improve new value-added spatial layers.
-It implements efficient spatial and spatiotemporal overlay, High Performance Computing, extends the Ensemble Machine Learning algorithms developed within the [mlr3](https://mlr3.mlr-org.com/) framework.
+It implements efficient spatial and spatiotemporal overlay, High Performance Computing, extends the Ensemble Machine Learning algorithms developed within the [mlr3](https://mlr3.mlr-org.com/) and [scikit-learn](https://scikit-learn.org) framework.
 eumap builds upon various existing softare, especially on GDAL, R and Python packages for spatial analysis and Machine Learning libraries.
 
 pyeumap Workflow 
