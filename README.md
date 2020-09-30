@@ -19,7 +19,7 @@ pyeumap Workflow
 
 ![pyeumap Workflow](img/pyeumap_workflow.png)
 
-The workflow implemented by pyeumap 1) fills all the gaps for diferent remote sensing time-series, 2) does the space time overlay of point samples on several raster layers according to the reference date, 3) trains and evaluate a machine learning model, and 4) does the space time predictions for a specific target variable. These processing steps are [demonstrate](demo/python) using a [benchmark dataset for land-cover classification](http://doi.org/10.5281/zenodo.4058447) in diferent areas of the EU
+The workflow implemented by pyeumap 1) fills all the gaps for different remote sensing time-series, 2) does the space time overlay of point samples on several raster layers according to the reference date, 3) trains and evaluate a machine learning model, and 4) does the space time predictions for a specific target variable. These processing steps are [demonstrated ](demo/python) using a [benchmark dataset for land-cover classification](http://doi.org/10.5281/zenodo.4058447) in different areas of the EU
 
 This image presents the output of the gap filing approach for an area located in Croatia (tile 9529). This image refers to a Landsat temporal composites for the 2010 fall season, however all the 4 seasons since 2000 were analysed to fill the gaps.
 

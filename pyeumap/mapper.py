@@ -13,8 +13,7 @@ from geopandas import GeoDataFrame
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
 
 class LandMapper():
@@ -22,11 +21,13 @@ class LandMapper():
 	def __init__(self, points:GeoDataFrame, feat_col_prfxs:List[str], target_col:str, 
 		estimator:BaseEstimator = RandomForestClassifier(n_estimators=100), 
 		imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean'),
-		eval_strategy = 'train_val_split', val_samples_pct = 0.2, min_samples_per_class = 0.05):
+		eval_strategy = 'train_val_split', val_samples_pct = 0.2, min_samples_per_class = 0.05,
+		verbose = True):
 
 		if not isinstance(points, gpd.GeoDataFrame):
 			points = gpd.read_file(points)
 
+		self.verbose = verbose
 		self.pts = points
 		self.target_col = target_col
 		self.estimator = estimator
@@ -39,18 +40,15 @@ class LandMapper():
 
 
 		classes_pct = (self.pts[self.target_col].value_counts() / self.pts[target_col].count())
-		self.rows_to_remove = self.pts[self.target_col].isin(classes_pct[classes_pct > min_samples_per_class].axes[0])
+		self.rows_to_remove = self.pts[self.target_col].isin(classes_pct[classes_pct >= min_samples_per_class].axes[0])
 		nrows, _ = self.pts[~self.rows_to_remove].shape
 		if nrows > 0:
 			self.pts = self.pts[self.rows_to_remove]
-			ttprint(f'Removing {nrows} sampes due min_samples_per_class = {min_samples_per_class}')
+			if self.verbose:
+				ttprint(f'Removing {nrows} sampes due min_samples_per_class condition (< {min_samples_per_class})')
 
 		self.features = self.pts[self.feature_cols].to_numpy().astype('float16')
 		self.target = self.pts[self.target_col].to_numpy().astype('float16')
-
-		self.eval_strategies = enumerate(['train_val_split'])
-		if eval_strategy not in self.eval_strategies:
-			ttprint(f'{eval_strategy} is a invalid validation strategy')
  
 		self.eval_strategy = eval_strategy
 		self.val_samples_pct = val_samples_pct
@@ -84,14 +82,17 @@ class LandMapper():
 
 	def _train_val_split(self):
 		train_feat, val_feat, train_targ, val_targ = train_test_split(self.features, self.target, test_size=self.val_samples_pct)
-		ttprint('Training and evaluating the model')
+		if self.verbose:
+			ttprint('Training and evaluating the model')
 		self.estimator.fit(train_feat, train_targ)
 
 		pred_targ = self.estimator.predict(val_feat)
 		self.cm = confusion_matrix(val_targ, pred_targ)
 		self.overall_acc = accuracy_score(val_targ, pred_targ)
+		self.classification_report = classification_report(val_targ, pred_targ)
 
-		ttprint('Training the final model using all data')
+		if self.verbose:
+			ttprint('Training the final model using all data')
 		self.estimator.fit(self.features, self.target)
 
 	def train(self):
@@ -137,8 +138,8 @@ class LandMapper():
 			for fn_layer in list(Path(dirs_layer).glob('**/*.tif')):
 				if fn_layer.stem in self.feature_cols:
 					fn_layers.append(fn_layer)
-				else:
-					print(f'Ignoring {fn_layer}')
+				elif self.verbose:
+					ttprint(f'Ignoring {fn_layer}')
 
 		fn_layers.sort(key=self._feature_idx)
 
@@ -148,7 +149,9 @@ class LandMapper():
 		result = []
 		
 		for fn_layer in fn_layers:
-			ttprint(f'Reading {fn_layer}')
+			if self.verbose:
+				ttprint(f'Reading {fn_layer}')
+			
 			ds = gdal.Open(str(fn_layer))
 			nodata = ds.GetRasterBand(1).GetNoDataValue()
 			band_data = ds.GetRasterBand(1).ReadAsArray().astype('Float16')
@@ -169,9 +172,12 @@ class LandMapper():
 
 		input_data = self.fill_nodata(input_data)
 
-		ttprint(f'Predicing {x_size * y_size} pixels')
+		if self.verbose:
+			ttprint(f'Predicing {x_size * y_size} pixels')
+		
 		result = self.estimator.predict(input_data)
 		result = result.reshape(1, x_size, y_size)
 		
-		ttprint(f'Saving the result in {fn_result}')
+		if self.verbose:
+			ttprint(f'Saving the result in {fn_result}')
 		self._data_to_new_img(fn_layers[0], fn_result, result, data_type = data_type)

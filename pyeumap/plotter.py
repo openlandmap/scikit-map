@@ -49,7 +49,7 @@ def plot_rasters(
         fig_dims = (figsize, figsize*plot_h/plot_w)
     fig, axes = plt.subplots(
         *subplot_dims,
-        figsize=fig_dims,
+        #figsize=fig_dims,
         frameon=False,
         dpi=dpi,
     )
