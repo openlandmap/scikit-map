@@ -6,7 +6,7 @@ pfun <- function(x,y, ...){
   return(pfun)
 }
 
-#' Accuracy plot
+#'@title Accuracy plot
 #' 
 #' 
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
@@ -24,6 +24,7 @@ pfun <- function(x,y, ...){
 
 accuracy.plot.spm <- function(x, y, main, colramp, xbins = xbins. , rng ="nat"){
 if(rng == "norm"){
+  #summary(unique(df.tr$x & df.tr$y %in% df.ts$x & df.ts$y))
     x.= normalize(x, method = "range", range = c(0, 1))
     y. = normalize(y, method = "range", range = c(0, 1))
     CCC <- signif(ccc(data.frame(x,y), x, y)$.estimate, digits=3)
