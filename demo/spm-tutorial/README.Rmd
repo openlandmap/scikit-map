@@ -392,7 +392,12 @@ gridded(df.ts) = TRUE
  
 grid output:
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Raster grid"}
-plot(df.ts)
+plot(df.ts[,"leadp"])
+points(meuse, pch="+")
 ```
 
 ## References
+
+
+
+
