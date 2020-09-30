@@ -35,8 +35,6 @@ frame** in `mlr3` ecosystem by defining following arguments:
     `train.spm()` will automatically perform `classification` or
     `regression` tasks and will output a `train.model` later for prediction and also a *summary* of the model and *variable importance*.
 The rest of arguments can be set or default values will be set.
-If **crs** is set `train.spm()` will automatically take care of
-    **spatial cross validation**,
 
 * `predict.spm()` --- prediction on a new dataset using `train.model`,
 
@@ -45,15 +43,8 @@ If **crs** is set `train.spm()` will automatically take care of
 
 Warning: most of functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
 
-Spatial prediction using [Ensemble Machine Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r) with geographical distances 
-is explained in detail in:
+Spatial prediction using [Ensemble Machine Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r) with [mlr3](https://mlr3.mlr-org.com/) ecosystem.
 
-- Hengl, T., MacMillan, R.A., (2019). 
-   [Predictive Soil Mapping with R](https://soilmapper.org/soilmapping-using-mla.html). 
-   OpenGeoHub foundation, Wageningen, the Netherlands, 370 pages, www.soilmapper.org, 
-   ISBN: 978-0-359-30635-0.
-- Hengl, T., Nussbaum, M., Wright, M. N., Heuvelink, G. B., and Gräler, B. (2018). 
-   [Random Forest as a generic framework for predictive modeling of spatial and spatio-temporal variables](https://doi.org/10.7717/peerj.5518). PeerJ 6:e5518.
 
 The following examples demostrates spatial prediction using the meuse data set:
 
@@ -395,18 +386,13 @@ df.ts$leadp = predict.variable
 coordinates(df.ts) <- ~x+y
 proj4string(df.ts) <- CRS("+init=epsg:28992")
 # creat raster out of output
-is.projected(df.ts)
-extent(df.ts)
-r = raster::raster(extent(df.ts), crs=crs(df.ts), resolution=30)
-values(r) = 0
-# plot(r)
-lead.r=rasterize(df.ts, r, predict.variable, fun=mean)
+gridded(df.ts) = TRUE
 
 ```
  
 grid output:
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Raster grid"}
-plot(lead.r)
+plot(df.ts)
 ```
 
 ## References

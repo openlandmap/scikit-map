@@ -21,8 +21,7 @@ a nutshell one can `train` an arbitrary `s3` **(spatial) data frame** in
 `classification` or `regression` tasks and will output a `train.model`
 later for prediction and also a *summary* of the model and *variable
 importance*. The rest of arguments can be set or default values will be
-set. If **crs** is set `train.spm()` will automatically take care of
-**spatial cross validation**,
+set.
 
 -   `predict.spm()` — prediction on a new dataset using `train.model`,
 
@@ -34,16 +33,7 @@ This might result in high RAM and CPU usage.
 
 Spatial prediction using [Ensemble Machine
 Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r)
-with geographical distances is explained in detail in:
-
--   Hengl, T., MacMillan, R.A., (2019). [Predictive Soil Mapping with
-    R](https://soilmapper.org/soilmapping-using-mla.html). OpenGeoHub
-    foundation, Wageningen, the Netherlands, 370 pages,
-    www.soilmapper.org, ISBN: 978-0-359-30635-0.
--   Hengl, T., Nussbaum, M., Wright, M. N., Heuvelink, G. B., and
-    Gräler, B. (2018). [Random Forest as a generic framework for
-    predictive modeling of spatial and spatio-temporal
-    variables](https://doi.org/10.7717/peerj.5518). PeerJ 6:e5518.
+with [mlr3](https://mlr3.mlr-org.com/) ecosystem.
 
 The following examples demostrates spatial prediction using the meuse
 data set:
@@ -657,17 +647,9 @@ Accuracy plot
 
 make a raster grid out of predicted variables e.g., lead (in this case)
 
-    [1] TRUE
-
-    class      : Extent 
-    xmin       : 178460 
-    xmax       : 181540 
-    ymin       : 329620 
-    ymax       : 333740 
-
 grid output:
 
-    plot(lead.r)
+    plot(df.ts)
 
 <img src="README_files/figure-markdown_strict/unnamed-chunk-13-1.png" alt="Raster grid"  />
 <p class="caption">
