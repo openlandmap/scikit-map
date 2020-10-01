@@ -2,25 +2,7 @@
 title: " demo: eumap Rpackage functionalities"
 author: "Mohammadreza Sheykhmousa (mohammadreza.sheykhmousa@OpenGeoHub.org)"
 date: "Last compiled on: 01 October, 2020"
-output: 
-   rmarkdown::html_document:
-    keep_md: true
-    md_extensions: +autolink_bare_uris+hard_line_breaks
-    theme: united
-    number_sections: false
-    highlight: tango
-    toc: true
-    toc_float:
-      collapsed: false
-      smooth_scroll: true
-    toc_depth: 3
-bibliography: ./tex/refs.bib
-csl: ./tex/apa.csl  
-fig_caption: yes
-link-citations: yes
-twitter-handle: opengeohub
-header-includes:
-- \usepackage{caption}
+
 ---
 
 [1.1]: http://i.imgur.com/tXSoThF.png (twitter icon with padding)
