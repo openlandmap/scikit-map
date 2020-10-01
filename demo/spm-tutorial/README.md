@@ -18,7 +18,7 @@ Introduction
 `eumap` aims at providing easier access to EU environmental maps.
 Basic functions train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/), [@mlr3], and related extensions in the [mlr3 ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages) [@casalicchio2017openml; @MichelLang2020mlr3book], 
 which includes spatial prediction using [Ensemble Machine
-Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r)
+Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r/)
 taking spatial coordinates and spatial cross-validation into account. In
 a nutshell one can `train` an arbitrary `s3` **(spatial)dataframe** in
 `mlr3` ecosystem by defining *df* and *target.variable* i.e., response.
