@@ -24,12 +24,15 @@ a nutshell one can `train` an arbitrary `s3` **(spatial)dataframe** in
 `mlr3` ecosystem by defining *df* and *target.variable* i.e., response.
 main functions are as the following:
 
-1.  `train.spm()` 1.1 `train.spm()` will automatically perform
+1.  `train.spm()` 
+
+    1.1 `train.spm()` will automatically perform
     `classification` or `regression` tasks and the output is a
     `train.model` which later can be used to predict `newdata`.It also
     provides *summary* of the model and *variable importance* and
     *response*. The rest of arguments can be either pass or default
-    values will be passed. 1.2 `train.spm()` provides four scenarios:
+    values will be passed.  
+    1.2 `train.spm()` provides four scenarios:
 
     1.  `classification` task with **non spatial** resampling methods
     2.  `regression` task with **non spatial** resampling methods
@@ -250,18 +253,14 @@ calling `predict.spm()`
     [3095] 323.49008 325.73026 322.67222 320.85128 319.77166 307.73029 221.11597
     [3102] 211.57886 209.28414
 
-calling `accuracy.plot.spm` … result
+calling `accuracy.plot.spm` 
 
     plt = accuracy.plot.spm(x = df.tr[,target.variable], y = response, rng = "norm")
 
 <img src="README_files/figure-markdown_strict/unnamed-chunk-14-1.png" alt="Accuracy plot"  />
 <p class="caption">
-Accuracy plot
 </p>
-
-make a raster grid out of predicted variables e.g., lead (in this case)
-
-raster grid output:
+raster grid
 
     plot(df.ts[,"leadp"])
     points(meuse, pch="+")
