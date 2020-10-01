@@ -1,15 +1,16 @@
--   [meuse dataset](#meuse-dataset)
+eumap package in R  
+- [meuse dataset](#meuse-dataset)
 -   [Basic requirements user needs to
     set](#basic-requirements-user-needs-to-set)
 -   [References](#references)
 
-Follow me on [\[alt text\]\[1.1\]](https://twitter.com/sheykhmousa)
+Follow me on [![alt
+text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitter.com/sheykhmousa)
 
-Package provides easier access to EU environmental maps. Basic functions
-include: \* `train.spm` — train a spatial prediction model using [mlr3
-package](https://mlr3.mlr-org.com/))
-([Lang](https://mlr3book.mlr-org.com/introduction.html#ref-mlr3) et
-al. 2019)(Lang et al., [2020](#ref-MichelLang2020mlr3book)) package and
+`eumap` package provides easier access to EU environmental maps. Basic functions
+include: \ `train.spm` 
+- train a spatial prediction model using [mlr3](https://mlr3.mlr-org.com/))
+[Lang al. 2019](https://mlr3book.mlr-org.com/introduction.html#ref-mlr3),and [Lang et al., 2020](#ref-MichelLang2020mlr3book) package and
 [ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages)
 implementation with spatial coordinates and spatial cross-validation. In
 a nutshell one can `train` an arbitrary `s3` **(spatial) data frame** in
