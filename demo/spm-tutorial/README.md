@@ -1,5 +1,3 @@
-
-
 -   [Introduction](#introduction)
     -   [Required packages](#required-packages)
     -   [meuse dataset](#meuse-dataset)
@@ -14,18 +12,11 @@
 Follow me on [![alt
 text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitter.com/sheykhmousa)
 
-`eumap` provides easier access to EU environmental maps. Basic functions
-include:
 
 Introduction
 ------------
-
-train a spatial prediction model using [mlr3
-package](https://mlr3.mlr-org.com/), [Lang
-al. 2019](https://mlr3book.mlr-org.com/introduction.html#ref-mlr3),
-[Lang et al.,2020](#ref-MichelLang2020mlr3book) and related extensions
-in [mlr3
-ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages),
+`eumap` aims at providing easier access to EU environmental maps.
+Basic functions train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/), [@mlr3], and related extensions in the [mlr3 ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages) [@casalicchio2017openml; @MichelLang2020mlr3book], 
 which includes spatial prediction using [Ensemble Machine
 Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r)
 taking spatial coordinates and spatial cross-validation into account. In
