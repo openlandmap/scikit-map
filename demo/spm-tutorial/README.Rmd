@@ -89,7 +89,8 @@ note: don't use it for classification tasks for obvious reasons.
 The following examples demostrates spatial prediction using the meuse data set:
 
 ## Required packages
-```{r, results="hide", warning=FALSE}
+
+```{r , warning=FALSE}
 start_time <- Sys.time()
 ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
     "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv", 
@@ -97,8 +98,10 @@ ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr"
 new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
 ```
+
 ## meuse dataset
-```{r , results="hide", warning=FALSE}
+
+```{r ,results='hide', warning=FALSE}
 library("sp")
 demo(meuse, echo=FALSE)
 pr.vars = c("x","y","dist","ffreq","soil","lead")
@@ -358,7 +361,7 @@ if(rng == "norm"){
 }
 ```
 
-## `train.spm`
+## train.spm
 
 `train.spm` fits multiple models/learners depending on the `class()` of the **target.variable** and for returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a new dataset. 
 
@@ -375,6 +378,8 @@ var.imp
 summary = tr[[3]]
 summary
 response = tr[[4]]
+```
+```{r ,output.lines= (1:10)}
 response
 ```
 
