@@ -1,41 +1,71 @@
-eumap package in R  
-- [meuse dataset](#meuse-dataset)
--   [Basic requirements user needs to
-    set](#basic-requirements-user-needs-to-set)
+
+
+-   [Introduction](#introduction)
+    -   [Required packages](#required-packages)
+    -   [meuse dataset](#meuse-dataset)
+    -   [split training (tr) and test (ts)
+        set](#split-training-tr-and-test-ts-set)
+    -   [setting generic variables](#setting-generic-variables)
+    -   [setting generic accuracy plot
+        variables](#setting-generic-accuracy-plot-variables)
+    -   [Loading required libraries:](#loading-required-libraries)
 -   [References](#references)
 
 Follow me on [![alt
 text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitter.com/sheykhmousa)
 
-`eumap` package provides easier access to EU environmental maps. Basic functions
-include: \ `train.spm` 
-- train a spatial prediction model using [mlr3](https://mlr3.mlr-org.com/))
-[Lang al. 2019](https://mlr3book.mlr-org.com/introduction.html#ref-mlr3),and [Lang et al., 2020](#ref-MichelLang2020mlr3book) package and
-[ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages)
-implementation with spatial coordinates and spatial cross-validation. In
-a nutshell one can `train` an arbitrary `s3` **(spatial) data frame** in
-`mlr3` ecosystem by defining following arguments:
+`eumap` provides easier access to EU environmental maps. Basic functions
+include:
 
-*df* and the *target.variable*. `train.spm()` will automatically perform
-`classification` or `regression` tasks and will output a `train.model`
-later for prediction and also a *summary* of the model and *variable
-importance*. The rest of arguments can be set or default values will be
-set.
+Introduction
+------------
 
--   `predict.spm()` — prediction on a new dataset using `train.model`,
-
--   `accuracy.plot()` — Accuracy plot in case of regression task (don’t
-    use it for classification tasks for obvious reason)
-
-Warning: most of functions are optimized to run in parallel by default.
-This might result in high RAM and CPU usage.
-
-Spatial prediction using [Ensemble Machine
+train a spatial prediction model using [mlr3
+package](https://mlr3.mlr-org.com/), [Lang
+al. 2019](https://mlr3book.mlr-org.com/introduction.html#ref-mlr3),
+[Lang et al.,2020](#ref-MichelLang2020mlr3book) and related extensions
+in [mlr3
+ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages),
+which includes spatial prediction using [Ensemble Machine
 Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r)
-with [mlr3](https://mlr3.mlr-org.com/) ecosystem.
+taking spatial coordinates and spatial cross-validation into account. In
+a nutshell one can `train` an arbitrary `s3` **(spatial)dataframe** in
+`mlr3` ecosystem by defining *df* and *target.variable* i.e., response.
+main functions are as the following:
+
+1.  `train.spm()` 1.1 `train.spm()` will automatically perform
+    `classification` or `regression` tasks and the output is a
+    `train.model` which later can be used to predict `newdata`.It also
+    provides *summary* of the model and *variable importance* and
+    *response*. The rest of arguments can be either pass or default
+    values will be passed. 1.2 `train.spm()` provides four scenarios:
+
+    1.  `classification` task with **non spatial** resampling methods
+    2.  `regression` task with **non spatial** resampling methods
+    3.  `classification` task with **spatial** resampling methods
+    4.  `regression` task with **spatial** resampling methods
+
+2.  `predict.spm()` 2.1. Prediction on a new dataset using `train.model`
+    2.2. User needs to set`df.ts = test set` and also pass the
+    `train.model`.
+
+3.  `accuracy.plot()` 3.1 Accuracy plot in case of regression task
+    (don’t use it for classification tasks for obvious reason), 3.2 in
+    case of regression task,
+
+    -   for now we have two scenarios including:
+        -   rng = “nat” provides visualizations with real values
+        -   rng = “norm” provides visualizations with the normalized
+            (0~1) values note: don’t use it for classification tasks for
+            obvious reasons.
+
+**Warning:** most of functions are optimized to run in parallel by
+default. This might result in high RAM and CPU usage.
 
 The following examples demostrates spatial prediction using the meuse
 data set:
+
+### Required packages
 
     start_time <- Sys.time()
     ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
@@ -46,10 +76,62 @@ data set:
 
 ### meuse dataset
 
--   pre processing and Splitting training (tr) and test (ts) sets and
-    defining generic variables.
+    library("sp")
+    demo(meuse, echo=FALSE)
+    pr.vars = c("x","y","dist","ffreq","soil","lead")
+    df <- as.data.frame(meuse)
+    df.grid <- as.data.frame(meuse.grid)
+    # df <- df[complete.cases(df[,pr.vars]),pr.vars]
+    df = na.omit(df[,])
+    df.grid = na.omit(df.grid[,])
+    summary(is.na(df))
 
-Loading required libraries:
+         x               y            cadmium          copper       
+     Mode :logical   Mode :logical   Mode :logical   Mode :logical  
+     FALSE:152       FALSE:152       FALSE:152       FALSE:152      
+        lead            zinc            elev            dist        
+     Mode :logical   Mode :logical   Mode :logical   Mode :logical  
+     FALSE:152       FALSE:152       FALSE:152       FALSE:152      
+         om            ffreq            soil            lime        
+     Mode :logical   Mode :logical   Mode :logical   Mode :logical  
+     FALSE:152       FALSE:152       FALSE:152       FALSE:152      
+      landuse          dist.m       
+     Mode :logical   Mode :logical  
+     FALSE:152       FALSE:152      
+
+    summary(is.na(df.grid))
+
+       part.a          part.b           dist            soil        
+     Mode :logical   Mode :logical   Mode :logical   Mode :logical  
+     FALSE:3103      FALSE:3103      FALSE:3103      FALSE:3103     
+       ffreq             x               y          
+     Mode :logical   Mode :logical   Mode :logical  
+     FALSE:3103      FALSE:3103      FALSE:3103     
+
+    crs = "+init=epsg:28992"
+    target.variable = "lead"
+
+### split training (tr) and test (ts) set
+
+    smp_size <- floor(0.5 * nrow(df))
+    set.seed(123)
+    train_ind <- sample(seq_len(nrow(df)), size = smp_size)
+    df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
+    df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
+
+### setting generic variables
+
+    folds = 2
+    n_evals = 3
+    newdata = df.ts
+
+### setting generic accuracy plot variables
+
+    colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
+    colramp. = colorRampPalette(c("wheat2","red3"))
+    xbins. = 50
+
+### Loading required libraries:
 
     library("mlr3verse")
     library("bbotk")
@@ -80,15 +162,6 @@ Loading required libraries:
     library("devtools")
     library("raster")
 
-`train.spm()`
-
-Here we have four scenarios:
-
--   `classification` task with **non spatial** resampling methods
--   `regression` task with **non spatial** resampling methods
--   `classification` task with **spatial** resampling methods
--   `regression` task with **spatial** resampling methods
-
 `train.spm` fits multiple models/learners depending on the `class()` of
 the **target.variable** and for returns a `trained model`, **var.imp**,
 **summary** of the model, and **response** variables. `trained model`
@@ -98,20 +171,9 @@ later can predict a new dataset.
 
 prediction on new dataset
 
-### Basic requirements user needs to set
+accuracy plot
 
-in a nutshell the user can `train` an arbitrary `s3` **(spatial) data
-frame** by only defining following arguments:
-
-`train.spm()`
-
--   User need to pass a `df`, `target.variable`. `train.spm()` will
-    automatically perform `classification` or `regression` tasks.
--   The rest of arguments can be set or default values will be set.
--   If **crs** is passed `train.spm()` will automatically take care of
-    **spatial cross validation**.
-
-<!-- -->
+calling `train.spm`
 
     tr = train.spm(df.tr, target.variable = target.variable , folds = folds , n_evals = n_evals , crs)
 
@@ -175,9 +237,7 @@ frame** by only defining following arguments:
     [141] 187.44688 107.48677 200.00631 163.21052 181.22554  99.22140 134.59688
     [148]  80.66763  87.35705 146.63598  78.32593 202.47290
 
-`predict.spm()`
-
-User needs to set`df.ts = test set` and pass the `train.model`.
+calling `predict.spm()`
 
     predict.variable = predict.spm(train.model, newdata)
 
@@ -199,28 +259,23 @@ User needs to set`df.ts = test set` and pass the `train.model`.
     [3095] 323.49008 325.73026 322.67222 320.85128 319.77166 307.73029 221.11597
     [3102] 211.57886 209.28414
 
-`accuracy.plot()`
-
-Accuracy plot in case of regression task - for now we have two scenarios
-including - rng = “nat” provides matrix with the real values - rng =
-“norm” provides matrix with the normalized (0~1) values (don’t use it
-for classification tasks for obvious reasons)
+calling `accuracy.plot.spm` … result
 
     plt = accuracy.plot.spm(x = df.tr[,target.variable], y = response, rng = "norm")
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-11-1.png" alt="Accuracy plot"  />
+<img src="README_files/figure-markdown_strict/unnamed-chunk-14-1.png" alt="Accuracy plot"  />
 <p class="caption">
 Accuracy plot
 </p>
 
 make a raster grid out of predicted variables e.g., lead (in this case)
 
-grid output:
+raster grid output:
 
     plot(df.ts[,"leadp"])
     points(meuse, pch="+")
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-13-1.png" alt="Raster grid"  />
+<img src="README_files/figure-markdown_strict/unnamed-chunk-16-1.png" alt="Raster grid"  />
 <p class="caption">
 Raster grid
 </p>
