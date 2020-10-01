@@ -156,18 +156,11 @@ data set:
     library("devtools")
     library("raster")
 
-`train.spm` fits multiple models/learners depending on the `class()` of
+### train.spm 
+fits multiple models/learners depending on the `class()` of
 the **target.variable** and for returns a `trained model`, **var.imp**,
 **summary** of the model, and **response** variables. `trained model`
 later can predict a new dataset.
-
-`predict.spm()`
-
-prediction on new dataset
-
-accuracy plot
-
-calling `train.spm`
 
     tr = train.spm(df.tr, target.variable = target.variable , folds = folds , n_evals = n_evals , crs)
 
@@ -177,7 +170,7 @@ calling `train.spm`
 
                Fitting a ensemble ML using 'mlr3::Taskregr'...TRUE
 
-`train.spm` results:
+results:
 
     train.model= tr[[1]]
     var.imp = tr[[2]]
@@ -206,7 +199,7 @@ calling `train.spm`
     R squared (OOB):                  0.631821 
 
     response = tr[[4]]
-    response
+response
 
       [1] 245.74701 198.56257 175.88260 152.64985 109.78419  89.92654 133.32049
       [8] 187.69835 152.62631  96.49871  90.27788 140.63443 230.66843 151.79353
@@ -231,11 +224,13 @@ calling `train.spm`
     [141] 187.44688 107.48677 200.00631 163.21052 181.22554  99.22140 134.59688
     [148]  80.66763  87.35705 146.63598  78.32593 202.47290
 
-calling `predict.spm()`
+
+### predict.spm
+prediction on new dataset
 
     predict.variable = predict.spm(train.model, newdata)
 
-`predict.spm()` results:
+results:
 
     predict.variable
 
@@ -253,21 +248,22 @@ calling `predict.spm()`
     [3095] 323.49008 325.73026 322.67222 320.85128 319.77166 307.73029 221.11597
     [3102] 211.57886 209.28414
 
-calling `accuracy.plot.spm` 
+### accuracy.plot.spm
 
     plt = accuracy.plot.spm(x = df.tr[,target.variable], y = response, rng = "norm")
 
 <img src="README_files/figure-markdown_strict/unnamed-chunk-14-1.png" alt="Accuracy plot"  />
 <p class="caption">
 </p>
-raster grid
+
+### raster grid
+
 
     plot(df.ts[,"leadp"])
     points(meuse, pch="+")
 
 <img src="README_files/figure-markdown_strict/unnamed-chunk-16-1.png" alt="Raster grid"  />
 <p class="caption">
-Raster grid
 </p>
 
 References
