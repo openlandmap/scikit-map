@@ -1,4 +1,7 @@
-## Testing R code
+## Code testing
+## tom.hengl@opengeohub.org
+
+## Ensemble Machine Learning in mlr
 
 library(mlr)
 library(matrixStats)
@@ -12,7 +15,7 @@ m = makeStackedLearner(base.learners = lrns, predict.type = "response", method =
 tmp = train(m, tsk)
 summary(tmp$learner.model$super.model$learner.model)
 
-## Testing 
+## Testing model fitting soil spectroscopy 
 
 library(resemble)
 library(tidyr)
@@ -31,7 +34,7 @@ Xr <- Xr[!is.na(Yr),]
 Yu <- Yu[!is.na(Yu)]
 Yr <- Yr[!is.na(Yr)]
 
-# Example 1
+# Model 1:
 # A mbl implemented in Ramirez-Lopez et al. (2013, the spectrum-based learner)
 ctrl_1.3 <- mblControl(sm = "pls", pcSelection = list("opc", 40), 
                        valMethod = "NNv", progress = FALSE,
@@ -42,7 +45,7 @@ sbl_1.3 <- mbl(Yr = Yr, Xr = Xr, Yu = Yu, Xu = Xu,
                k = seq(40, 120, by = 10), 
                method = "gpr")
 sbl_1.3
-
+# Model 2:
 ctrl <- mblControl(sm = "pc", pcSelection = list("opc", 40), 
                    valMethod = "NNv", progress = FALSE,
                    scaled = FALSE, center = TRUE)
@@ -56,7 +59,6 @@ mbl.p
 ## Spatial-cross validation
 library(sp)
 demo("meuse", echo=FALSE)
-str(meuse)
 library(mlr)
 spatial.task = makeRegrTask(data = meuse@data[,c("zinc","dist","ffreq")], target = "zinc", 
                             coordinates = data.frame(meuse@coords))
@@ -66,4 +68,3 @@ r2 = makeResampleDesc("RepCV", fold = 5, reps = 2)
 set.seed(123)
 out1 = resample(learner = learner.rf, task = spatial.task, resampling = r1)
 out2 = resample(learner = learner.rf, task = spatial.task, resampling = r2)
-
