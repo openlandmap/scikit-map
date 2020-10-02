@@ -4,8 +4,10 @@ author: "Mohammadreza Sheykhmousa (mohammadreza.sheykhmousa@OpenGeoHub.org)"
 date: "Last compiled on: `r format(Sys.time(), '%d %B, %Y')`"
 output: 
    rmarkdown::html_document:
+    keep_md: true
+    md_extensions: +autolink_bare_uris+hard_line_breaks
     theme: united
-    number_sections: true
+    number_sections: false
     highlight: tango
     toc: true
     toc_float:
@@ -31,6 +33,10 @@ knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 
 ```{r}
 library(knitr)
+library(eumap)
+```
+
+```{r, echo=FALSE, warning=FALSE}
 hook_output <- knit_hooks$get("output")
 knit_hooks$set(output = function(x, options) {
    lines <- options$output.lines
@@ -78,15 +84,10 @@ The rest of arguments can be either pass or default values will be passed. `trai
 ## `accuracy.plot()` 
 
 1. Accuracy plot in case of regression task (don’t use it for classification tasks for obvious reason),
-    1.2 in case of regression task,
-      - for now we have two scenarios including:
-        - rng = "nat" provides visualizations with real values
-        - rng = "norm" provides visualizations with the normalized (0~1) values
-note: don't use it for classification tasks for obvious reasons.
  
 **Warning:** most of functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
 
-The following examples demostrates spatial prediction using the meuse data set:
+The following examples demonstrates spatial prediction using the `meuse` data set:
 
 ## Required packages
 
@@ -361,9 +362,9 @@ if(rng == "norm"){
 }
 ```
 
-## train.spm
+## `train.spm`
 
-`train.spm` fits multiple models/learners depending on the `class()` of the **target.variable** and for returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a new dataset. 
+`train.spm` fits multiple models/learners depending on the `class()` of the **target.variable** and for returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
 ```{r ,results='hide', warning=FALSE}
 tr = train.spm(df.tr, target.variable = target.variable , folds = folds , n_evals = n_evals , crs)
@@ -371,40 +372,51 @@ tr = train.spm(df.tr, target.variable = target.variable , folds = folds , n_eval
 
 `train.spm` results:
 
-```{r}
+1st element is the *trained model*:
+
+```{r ,results='hide', warning=FALSE}
 train.model= tr[[1]]
+```
+2nd element is the *variable importance*:
+```{r}
 var.imp = tr[[2]]
 var.imp
+```
+3rd element of the summary of the *trained model*:
+```{r}
 summary = tr[[3]]
 summary
-response = tr[[4]]
 ```
-```{r ,output.lines= (1:10)}
+
+4th element is the predicted values of our trained model
+note: here we just show start and the ending values
+```{r ,output.lines= -(4:145)}
+response = tr[[4]]
 response
 ```
 
 ## `predict.spm()`
 
-prediction on new dataset
-
+prediction on `newdata` set
 ```{r, warning=FALSE,results='hide' }
 predict.variable = predict.spm(train.model, newdata)
 ```
-
-results:
-```{r ,output.lines= -(3:3000)}
+### predicted values for the *newdata* set:
+note: here we just show start and the ending values
+```{r ,output.lines= -(3:3200)}
 predict.variable
 ```
-
 ## `accuracy.plot.spm` 
+in case of regression task,
+- for now we have two scenarios including:
+ - rng = "nat" provides visualizations with real values
+ - rng = "norm" provides visualizations with the normalized (0~1) values
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
 plt = accuracy.plot.spm(x = df.tr[,target.variable], y = response, rng = "norm")
 ```
 
-## raster grid 
 
-make a map out of predicted variables e.g., lead (in this case)
 ```{r , echo=FALSE, warning=FALSE}
 
 df.ts$leadp = predict.variable
@@ -414,7 +426,8 @@ proj4string(df.ts) <- CRS("+init=epsg:28992")
 gridded(df.ts) = TRUE
 
 ```
- 
+## raster grid 
+make a map using ensemble machine learning with spatial cross validation for the predicted variables e.g., *lead* (in this case) 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Raster grid"}
 plot(df.ts[,"leadp"])
 points(meuse, pch="+")
