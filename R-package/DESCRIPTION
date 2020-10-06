@@ -1,6 +1,6 @@
 Package: eumap
 Title: European environmental maps processing and production
-Version: 0.0.1
+Version: 0.0.2
 Authors@R: 
    c(person("Tomislav", "Hengl", email = "tom.hengl@opengeohub.org", role = c("aut", "cre")),
      person("Mohammadreza", "Sheykhmousa", email = "mohammadreza.sheykhmousa@opengeohub.org", role = c("aut")),
@@ -16,18 +16,11 @@ BugReports: https://gitlab.com/geoharmonizer_inea/eumap/issues/
 Imports: 
     methods,
     utils,
-    parallel,
-    matrixStats,
     ranger,
     nnet,
     glmnet,
-    mlr3,
-    sp,
-    xgboost, 
-    rgdal,
-    raster,
-    terra
-Suggests: 
+    mlr3
+Suggests: rgdal, parallel, terra, raster, xgboost, matrixStats
 RoxygenNote: 7.1.1
 SystemRequirements: C++11, GDAL (>= 2.0.1), GEOS (>= 3.4.0),
     PROJ (>= 4.8.0)

@@ -4,7 +4,7 @@
 \alias{predict.spm}
 \title{predict.spm}
 \usage{
-\method{predict}{spm}(train.model, newdata, task = NULL)
+predict.spm(train.model, newdata, task = NULL)
 }
 \arguments{
 \item{train.model}{}

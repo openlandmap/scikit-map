@@ -1,6 +1,6 @@
 
-#' train.spm
-#'@description
+#' Train Spatial Learner
+#' @description
 #' This is the abstract base class for training objects like [TaskClassif] and [TaskRegr].
 #' For example, for a classification task columns must be marked as ID, df, target column.
 #' train.spm  it multiple models/learners depending on the

@@ -2,7 +2,7 @@
 % Please edit documentation in R/train.spm.R
 \name{train.spm}
 \alias{train.spm}
-\title{train.spm}
+\title{Train Spatial Learner}
 \usage{
 train.spm(
   df.tr,
