@@ -85,17 +85,17 @@
 #' 
 
 train.spm = function(df.tr, target.variable, 
-parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs, coords = c("x","y")){
+parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs = NULL,  coordinate_names = c("x","y")){
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
-   if(is.factor(df.tr[,target.variable]) & missing(crs)){
+   if(is.factor(df.tr[,target.variable]) & is.null(crs)){
     message(paste("classification Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)
         message(paste0("Using learners: ", paste("method.list", collapse = ", "), "..."), immediate. = TRUE)
         tsk_clf <- mlr3::TaskClassif$new(id = id, backend = df.tr, target = target.variable)
-        lrn = lrn("classif.rpart")
-        gr = pipeline_robustify(tsk_clf, lrn) %>>% po("learner", lrn)
-        ede = resample(tsk_clf, GraphLearner$new(gr), rsmp("holdout"))
-        tsk_clasif1 = ede$task$clone()
+        # lrn = lrn("classif.rpart")
+        # gr = pipeline_robustify(tsk_clf, lrn) %>>% po("learner", lrn)
+        # ede = resample(tsk_clf, GraphLearner$new(gr), rsmp("holdout"))
+        # tsk_clasif1 = ede$task$clone()
         ranger_lrn = lrn("classif.ranger", predict_type = "response",importance ="permutation")
         ps_ranger = ParamSet$new(
            list(
@@ -121,15 +121,15 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         lgr::get_logger("mlr3")$set_threshold("warn")
         lgr::get_logger("mlr3")$set_threshold("debug")
         message("           Fitting a ensemble ML using 'mlr3::TaskClassif'...", immediate. = TRUE)
-        at$train(tsk_clasif1)
-        at$learner$train(tsk_clasif1)
+        at$train(tsk_clf)
+        at$learner$train(tsk_clf)
         best.model = at$archive$best()
         var.imp = at$learner$importance()
         summary = at$learner$state$model
         tr.model = at$learner
         train.model = tr.model$predict_newdata
         response = tr.model$model$predictions
-      } else if (is.numeric(df.tr[,target.variable]) & missing(crs)) {
+      } else if (is.numeric(df.tr[,target.variable]) & is.null(crs)) {
         if( missing(predict_type)){
           predict_type <- "response" 
         }
@@ -168,22 +168,27 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
       response = tr.model$model$predictions
     } else if (is.factor(df.tr[,target.variable]) & crs == crs){ 
       if(is.null(method.list) & is.null(meta.learner)){
-        method.list <- c("classif.ranger", "classif.rpart")
+        method.list <- c("classif.kknn", "classif.featureless")
         meta.learner = "classif.ranger"}
         df.trf = mlr3::as_data_backend(df.tr)
-        tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list( positive = "TRUE", coordinate_names = c("x","y"), coords_as_features = FALSE,crs = crs))
+        tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list( positive = "TRUE", coordinate_names = coordinate_names, coords_as_features = FALSE, crs = crs))
         tsk_clf$missings()
+        # mlr_reflections$task_types
+        # mlr_reflections$task_col_roles
+        # as.data.table(mlr_resamplings)
         pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
         g = pre %>>% gunion(list(
-          po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.lm")),
-          po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.rpart")),
+          po("select") %>>% po("learner_cv", id = "cv1", lrn("classif.kknn")),
+          po("pca") %>>% po("learner_cv", id = "cv2", lrn("classif.featureless")),
           po("nop")
         )) %>>%
           po("featureunion") %>>%
-          po("learner", lrn("regr.ranger",importance ="permutation")) 
-        
+          po("learner", lrn("classif.ranger",importance ="permutation")) 
         g$param_set$values$cv1.resampling.method = "spcv_coords"
         g$param_set$values$cv2.resampling.method = "spcv_coords"
+        g$keep_results = "TRUE"
+        
+        
         if(plot.workflow == "TRUE"){
           plt = g$plot()
         }
@@ -198,7 +203,7 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         response = tr.model$model$predictions
   } else if(is.numeric(df.tr[,target.variable]) & crs == crs){
         if(is.null(method.list) & is.null(meta.learner)){
-                   method.list <- c("regr.ranger", "regr.rpart")
+                   method.list <- c("regr.kknn", "regr.featureless")
                    meta.learner <- "regr.ranger"}
         df.trf = mlr3::as_data_backend(df.tr)
         tsk_regr = TaskRegrST$new(id = id, backend = df.trf, target = target.variable,
@@ -208,8 +213,8 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         tsk_regr$missings()
         pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
         g = pre %>>% gunion(list(
-        po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.lm")),
-        po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.rpart")),
+        po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
+        po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.featureless")),
         po("nop")
         )) %>>%
         po("featureunion") %>>%
