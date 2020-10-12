@@ -7,5 +7,5 @@ from . import (
     mapper,
     datasets,
     gapfiller,
-    plotter,
+    plotter
 )

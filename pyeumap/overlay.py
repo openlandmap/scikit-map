@@ -13,6 +13,7 @@ import pandas as pd
 import geopandas as gpd
 import concurrent.futures
 import multiprocessing
+import traceback
 
 from . import parallel
 from .misc import ttprint
@@ -28,6 +29,8 @@ class ParallelOverlay:
 		# assumption is that all layers have same blocks
 
 		def __init__(self, points_x: np.ndarray, points_y:np.ndarray, fn_layers:List[str], max_workers:int = multiprocessing.cpu_count(), verbose:bool = True):
+				
+				self.error_val = -32768
 				self.points_x = points_x
 				self.points_y = points_y
 				self.points_len = len(points_x)
@@ -49,13 +52,19 @@ class ParallelOverlay:
 		def _find_blocks_for_src(self, src, ptsx, ptsy):
 				# find blocks for every point in given source
 				blocks = {}
-				for ij, block in src.block_windows(1):
-						left, bottom, right, top = rasterio.windows.bounds(block, src.transform)
-						ind = (ptsx>=left) & (ptsx<right) & (ptsy>=bottom) & (ptsy<top)
-						if ind.any():
-								inv_block_transform = ~rasterio.windows.transform(block, src.transform)
-								col, row = inv_block_transform * (ptsx[ind], ptsy[ind])
-								blocks[ij]=[block, np.nonzero(ind)[0], col.astype(int), row.astype(int)]
+				for ij, block in list(src.block_windows(1)):
+					left, bottom, right, top = rasterio.windows.bounds(block, src.transform)
+					ind = (ptsx>=left) & (ptsx<right) & (ptsy>bottom) & (ptsy<=top)
+					if ind.any():                
+						inv_block_transform = ~rasterio.windows.transform(block, src.transform)
+						col, row = inv_block_transform * (ptsx[ind], ptsy[ind])
+						#print(left, bottom, right, top)
+						#print(ptsx[ind], ptsy[ind])
+						#print(inv_block_transform)
+						#print(col, row)
+						#print(col.astype(int), row.astype(int))
+						#print(ind.to_numpy().nonzero())
+						blocks[ij]=[block, np.nonzero(ind)[0], col.astype(int), row.astype(int)]
 				return blocks
 
 		def find_blocks(self):
@@ -80,22 +89,34 @@ class ParallelOverlay:
 						for ij in blocks:
 								# ij=next(iter(blocks)); (window, ind, col, row) = blocks[ij]
 								(window, ind, col, row) = blocks[ij]
-								data = src.read(1, window=window)
-								mask = src.read_masks(1, window=window)
-								sample = data[row,col].astype(np.float32)
-								sample_mask = mask[row,col].astype(bool)
-								sample[~sample_mask] = np.nan
-								#sample = data[row.astype(int),col.astype(int)]
+								
+								try:
+									data = src.read(1, window=window)
+									mask = src.read_masks(1, window=window)
+									sample = data[row,col].astype(np.float32)
+									sample_mask = mask[row,col].astype(bool)
+									sample[~sample_mask] = np.nan
+									#sample = data[row.astype(int),col.astype(int)]
+								except Exception as exception:
+									traceback.print_exc()
+									sample = self.error_val
+
 								out_sample[ind] = sample
 				return out_sample, fn_layer
 
 		def _sample_one_block(self, args):
 				out_sample, fn_layer, window, ind, col, row = args
 				with rasterio.open(fn_layer) as src:
+					
+					try:
 						data = src.read(1, window=window)
 						sample = data[row,col]
-						out_sample[ind] = sample
-				#return sample, ind
+					except Exception as exception:
+						traceback.print_exc()
+						sample = self.error_val
+							
+					out_sample[ind] = sample
+						#return sample, ind
 
 		def _sample_one_layer_mt(self, fn_layer):
 				with rasterio.open(fn_layer) as src:
@@ -198,9 +219,9 @@ class ParallelOverlay:
 
 class SpaceOverlay(ParallelOverlay):
 
-		def __init__(self, points, dir_layers:List[str], max_workers:int = multiprocessing.cpu_count(), verbose:bool = True):
+		def __init__(self, points, dir_layers:List[str], max_workers:int = multiprocessing.cpu_count(), regex_layers = '**/*.tif', verbose:bool = True):
 
-				fn_layers = list(Path(dir_layers).glob('**/*.tif'))
+				fn_layers = list(Path(dir_layers).glob(regex_layers))
 
 				if not isinstance(points, gpd.GeoDataFrame):
 					points = gpd.read_file(points)
