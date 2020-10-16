@@ -14,6 +14,8 @@ import geopandas as gpd
 import concurrent.futures
 import multiprocessing
 import traceback
+import re
+import math
 
 from . import parallel
 from .misc import ttprint
@@ -49,22 +51,32 @@ class ParallelOverlay:
 		def _get_dimension(src):
 				return (src.height, src.width, *src.block_shapes[0], *src.transform.to_gdal())
 
+		def _find_blocks_for_src_mt(self, ij, block, src, ptsx, ptsy):
+			left, bottom, right, top = rasterio.windows.bounds(block, src.transform)
+			ind = (ptsx>=left) & (ptsx<right) & (ptsy>bottom) & (ptsy<=top)
+
+			if ind.any():
+				inv_block_transform = ~rasterio.windows.transform(block, src.transform)
+				col, row = inv_block_transform * (ptsx[ind], ptsy[ind])
+				result = [block, np.nonzero(ind)[0], col.astype(int), row.astype(int)]
+				return ij, result
+			else:
+				return None, None
+
 		def _find_blocks_for_src(self, src, ptsx, ptsy):
 				# find blocks for every point in given source
 				blocks = {}
-				for ij, block in list(src.block_windows(1)):
-					left, bottom, right, top = rasterio.windows.bounds(block, src.transform)
-					ind = (ptsx>=left) & (ptsx<right) & (ptsy>bottom) & (ptsy<=top)
-					if ind.any():                
-						inv_block_transform = ~rasterio.windows.transform(block, src.transform)
-						col, row = inv_block_transform * (ptsx[ind], ptsy[ind])
-						#print(left, bottom, right, top)
-						#print(ptsx[ind], ptsy[ind])
-						#print(inv_block_transform)
-						#print(col, row)
-						#print(col.astype(int), row.astype(int))
-						#print(ind.to_numpy().nonzero())
-						blocks[ij]=[block, np.nonzero(ind)[0], col.astype(int), row.astype(int)]
+
+				args = src.block_windows(1)
+				fixed_args = (src, ptsx, ptsy)
+
+				chunk_size = math.ceil(len(list(src.block_windows(1))) / self.max_workers)
+
+				for ij, result in parallel.ThreadGeneratorLazy(self._find_blocks_for_src_mt, args,
+																				self.max_workers, chunk=chunk_size, fixed_args = fixed_args):
+					if ij is not None:
+						blocks[ij] = result
+
 				return blocks
 
 		def find_blocks(self):
@@ -89,7 +101,6 @@ class ParallelOverlay:
 						for ij in blocks:
 								# ij=next(iter(blocks)); (window, ind, col, row) = blocks[ij]
 								(window, ind, col, row) = blocks[ij]
-								
 								try:
 									data = src.read(1, window=window)
 									mask = src.read_masks(1, window=window)
@@ -199,7 +210,7 @@ class ParallelOverlay:
 				args = ((fn_layer.as_posix(),) for fn_layer in self.fn_layers)
 				#with concurrent.futures.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
 						#for sample, fn_layer in executor.map(self._sample_one_layer_sp, args, chunksize=n_layers//self.max_workers):
-				for sample, fn_layer in parallel.ProcessGeneratorLazy(self._sample_one_layer_sp, args, self.max_workers, self.max_workers*2):
+				for sample, fn_layer in parallel.ProcessGeneratorLazy(self._sample_one_layer_sp, args, self.max_workers, 1):
 						col = Path(fn_layer).with_suffix('').name
 						if self.verbose:
 							ttprint(f'{i_layer}/{n_layers} {col}')
@@ -231,17 +242,20 @@ class SpaceOverlay(ParallelOverlay):
 
 				super().__init__(self.pts.geometry.x.values, self.pts.geometry.y.values, fn_layers, max_workers, verbose)
 
-		def run(self):
+		def run(self, dict_newnames={}):
 			result = super().run()
 
 			for col in result:
-				self.pts.loc[:,col] = result[col]
+				new_col = col
+				for newname in dict_newnames.keys():
+					new_col = re.sub(dict_newnames[newname], newname, new_col)
+				self.pts.loc[:,new_col] = result[col]
 
 			return self.pts
 
 class SpaceTimeOverlay():
 
-		def __init__(self, points, col_date:str, dir_layers:str, max_workers:int = multiprocessing.cpu_count(), verbose:bool = True):
+		def __init__(self, points, col_date:str, dir_layers:str, time_regex:str, max_workers:int = multiprocessing.cpu_count(), verbose:bool = True):
 
 				if not isinstance(points, gpd.GeoDataFrame):
 					points = gpd.read_file(points)
@@ -255,20 +269,26 @@ class SpaceTimeOverlay():
 				self.uniq_years = self.pts[self.col_date].dt.year.unique()
 
 				for year in self.uniq_years:
-					year_layers = os.path.join(dir_layers, str(year))
+					regex_layers = time_regex.replace('{year}', str(int(year)))
 					year_points = self.pts[self.pts[self.col_date].dt.year == year]
-
 					if self.verbose:
-						ttprint(f'Preparing the overlay for {year}')
-					self.overlay_objs[year] = SpaceOverlay(year_points, year_layers, max_workers, verbose)
+						ttprint(f'Overlay {len(year_points)} points from {year} in {len(list(Path(dir_layers).glob(regex_layers)))} raster layers')
+					
+					self.overlay_objs[year] = SpaceOverlay(points=year_points, dir_layers=dir_layers, regex_layers=regex_layers, max_workers=max_workers, verbose=verbose)
 
-		def run(self):
+
+		def run(self, dict_newnames={}):
 			self.result = None
 
 			for year in self.uniq_years:
+				
+				year_newnames = dict_newnames.copy()
+				for newname in dict_newnames.keys():
+					year_newnames[newname] = year_newnames[newname].replace('{year}', str(int(year)))
+
 				if self.verbose:
 					ttprint(f'Running the overlay for {year}')
-				year_result = self.overlay_objs[year].run()
+				year_result = self.overlay_objs[year].run(year_newnames)
 
 				if self.result is None:
 					self.result = year_result

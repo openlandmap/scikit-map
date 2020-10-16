@@ -9,3 +9,4 @@ dist
 .ipynb_checkpoints
 eumap_data
 gapfilled
+*.tif
