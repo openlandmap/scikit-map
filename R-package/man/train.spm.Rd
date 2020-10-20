@@ -15,8 +15,8 @@ train.spm(
   plot.workflow = FALSE,
   var.imp = TRUE,
   meta.learner = NULL,
-  crs,
-  coords = c("x", "y")
+  crs = NULL,
+  coordinate_names = c("x", "y")
 )
 }
 \arguments{
