@@ -1,4 +1,4 @@
-from .misc import ttprint
+from pyeumap.misc import ttprint
 
 from typing import List
 
@@ -17,7 +17,7 @@ from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
-from sklearn.model_selection import train_test_split, KFold
+from sklearn.model_selection import train_test_split
 
 class LandMapper():
 
@@ -25,17 +25,17 @@ class LandMapper():
 		estimator:BaseEstimator = RandomForestClassifier(n_estimators=100), 
 		imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean'),
 		eval_strategy = 'train_val_split', val_samples_pct = 0.2, min_samples_per_class = 0.05,
-				cv = KFold(5, shuffle=True), param_grid = {}, verbose = True, random_state = 1989):
+		weight_col = None, cv = 5, param_grid = {}, verbose = True):
 
 		if not isinstance(points, gpd.GeoDataFrame):
 			points = gpd.read_file(points)
-
+				
 		self.verbose = verbose
 		self.pts = points
 		self.target_col = target_col
 		self.estimator = estimator
 		self.imputer = imputer
-		self.random_state = random_state
+		self.weight_col = weight_col
 		self.min_samples_per_class = min_samples_per_class
 
 		self.feature_cols = []
@@ -49,10 +49,15 @@ class LandMapper():
 			self.pts = self.pts[self.rows_to_remove]
 			if self.verbose:
 				ttprint(f'Removing {nrows} sampes due min_samples_per_class condition (< {min_samples_per_class})')
-
+				
+		if self.weight_col is not None:
+			self.feature_cols.append(self.weight_col)
+			self.weight_idx = self.pts[self.feature_cols].columns.get_loc(self.weight_col)
+			print(self.weight_idx)
+				
 		self.features = self.pts[self.feature_cols].to_numpy().astype('float16')
 		self.target = self.pts[self.target_col].to_numpy().astype('float16')
-		 
+						
 		self.cv = cv
 		self.param_grid = param_grid
 
@@ -62,8 +67,6 @@ class LandMapper():
 		self.features_raw = self.features
 		self.features = self.fill_nodata(self.features, fit_and_tranform = True)
 
-		self.cv.random_state = self.random_state
-		self.estimator.random_state = self.random_state
 
 	def fill_nodata(self, data, fit_and_tranform = False):
 		nodata_idx = self._nodata_idx(data)
@@ -88,51 +91,63 @@ class LandMapper():
 		else:
 			return (data == self.imputer.missing_values)
 		
-	def _grid_search_cv(self, train_feat, train_targ):
-
+	def _grid_search_cv(self):
+	
 		if self.verbose:
-			ttprint('Finding the best hyperparmaters through a grid search')
+			ttprint('Training and evaluating the model')
 	
 		search_cpu_count = 1
 		estimator_cpu_count = self.estimator.n_jobs
-		if estimator_cpu_count is not None and estimator_cpu_count != -1:
+		if estimator_cpu_count != -1:
 			search_cpu_count = math.ceil(multiprocessing.cpu_count() / estimator_cpu_count)
 
-		self.grid_search = GridSearchCV(self.estimator, self.param_grid, cv=self.cv, \
-															scoring="accuracy", return_train_score=False, \
-															verbose=self.verbose, refit = True, n_jobs=search_cpu_count)
+		weight = None
+		if self.weight_col != None:
+			weight = self.features[:,self.weight_idx]
+			ttprint(f'Using {self.weight_col} as weight')
+			self.features = np.delete(self.features, self.weight_idx, 1)
 		
-		self.grid_search.fit(train_feat, train_targ)
-		self.estimator = self.grid_search.best_estimator_
+		self.grid_search = GridSearchCV(self.estimator, self.param_grid, cv=self.cv,
+															scoring="accuracy",
+															return_train_score=True,
+															verbose=self.verbose, refit = True,
+															n_jobs=search_cpu_count)
+		
+		self.grid_search.fit(self.features, self.target, sample_weight=weight)
 
-	def _train_val_split(self, train_feat, train_targ):
-
+	def _train_val_split(self):
+		train_feat, val_feat, train_targ, val_targ = train_test_split(self.features, self.target, test_size=self.val_samples_pct)
+		
+		train_feat_weight = None
+		features_weight = None
+		if self.weight_col != None:
+			ttprint(f'Using {self.weight_col} as weight')
+						
+			train_feat_weight = train_feat[:,self.weight_idx]
+			train_feat = np.delete(train_feat, self.weight_idx, 1)
+			val_feat = np.delete(val_feat, self.weight_idx, 1)
+						
+			features_weight = self.features[:,self.weight_idx]
+			self.features = np.delete(self.features, self.weight_idx, 1)
+						
 		if self.verbose:
 			ttprint('Training and evaluating the model')
-		self.estimator.fit(train_feat, train_targ)
+		self.estimator.fit(train_feat, train_targ, sample_weight=train_feat_weight)
+
+		pred_targ = self.estimator.predict(val_feat)
+		self.cm = confusion_matrix(val_targ, pred_targ)
+		self.overall_acc = accuracy_score(val_targ, pred_targ)
+		self.classification_report = classification_report(val_targ, pred_targ)
+
+		if self.verbose:
+			ttprint('Training the final model using all data')
+		self.estimator.fit(self.features, self.target, sample_weight=features_weight)
 
 	def train(self):
-
 		method_name = '_%s' % (self.eval_strategy)
 		if hasattr(self, method_name):
-			train_feat, val_feat, train_targ, val_targ = train_test_split(self.features, self.target, \
-				test_size=self.val_samples_pct, random_state=self.random_state)
-
 			train_method = getattr(self, method_name)
-			train_method(train_feat, train_targ)
-
-			if self.verbose:
-				ttprint('Calculating the accuracy metrics')
-
-			pred_targ = self.estimator.predict(val_feat)
-			self.cm = confusion_matrix(val_targ, pred_targ)
-			self.overall_acc = accuracy_score(val_targ, pred_targ)
-			self.classification_report = classification_report(val_targ, pred_targ)
-
-			if self.verbose:
-				ttprint('Training the final model using all data')
-			self.estimator.fit(self.features, self.target)
-
+			train_method()
 		else:
 			ttprint(f'{self.eval_strategy} is a invalid validation strategy')
 

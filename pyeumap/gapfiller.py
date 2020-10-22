@@ -43,9 +43,14 @@ class TimeGapFiller():
 
 		for fn_layer in fn_layers:
 			ds = gdal.Open(str(fn_layer))
-			nodata = ds.GetRasterBand(1).GetNoDataValue()
-			band_data = ds.GetRasterBand(1).ReadAsArray().astype('Float32')
-			band_data[band_data == nodata] = np.nan
+			band_data = ds.GetRasterBand(1).ReadAsArray()
+			if (isinstance(band_data, np.ndarray)):
+				nodata = ds.GetRasterBand(1).GetNoDataValue()
+				band_data = band_data.astype('Float32')
+				band_data[band_data == nodata] = np.nan
+			else:
+				band_data = np.empty((ds.RasterXSize, ds.RasterXSize))
+				band_data[:] = np.nan
 			result.append(band_data)
 
 		result = np.stack(result, axis=2)
