@@ -15,6 +15,7 @@ tif1.lst = list.files("/data/eumap/sample-data/R-sample-tiles/9529", pattern=".t
 year.span = c(2000:2020)
 
 x = download.file("https://zenodo.org/record/4058447/files/9529_croatia_landcover_samples.gpkg?download=1", "/data/eumap/sample-data/R-sample-tiles/9529_croatia_landcover_samples.gpkg")
+
 df = readOGR("/data/eumap/sample-data/R-sample-tiles/9529_croatia_landcover_samples.gpkg")
 df <- as.data.frame(df)
 df$Date = format.Date(as.Date(paste(df$survey_date), format="%Y/%m/%d"), "%Y-%m-%d")
@@ -24,6 +25,7 @@ summary(as.factor(df$Date))
 df$row.id = 1:nrow(df)
 ## get dates based on the file name
 begin.tif1.lst = sapply(tif1.lst, function(i){strip_dates(i, type="begin")})
+#begin.tif1.lstM = as.Date(paste0(substr(begin.tif1.lst-1, 1, 4), "-12-12"))
 end.tif1.lst = sapply(tif1.lst, function(i){strip_dates(i, type="end")})
 write.csv(data.frame(tif=basename(tif1.lst), dirname(tif1.lst), begin.tif1.lst, end.tif1.lst), "/data/eumap/sample-data/R-sample-tiles/9529_tif_samples.csv", row.names = FALSE)
 
@@ -47,7 +49,7 @@ ov.tifs = plyr::join_all(ov.pnts, by="row.id", type="full")
 ## subset to complete cases:
 str(ov.tifs)
 cm.croatia = plyr::join(df, ov.tifs)
-#head(cm.croatia)
+head(cm.croatia)
 hist(cm.croatia$landsat_ard_summer_green_p50)
 hist(cm.croatia$dtm_elevation)
 saveRDS(cm.croatia, "./sample-data/R-sample-tiles/cm_9529_croatia_landcover_samples.rds")
