@@ -1,5 +1,3 @@
-
-
 -   [Introduction](#introduction)
 -   [`train_spm`](#train_spm)
 -   [`predict_spm`](#predict_spm)
@@ -655,7 +653,7 @@ optional
 
     
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-29-1.png" alt="LC map"  />
+<img src="README_files/figure-markdown_strict/unnamed-chunk-29-1.png" alt="LC map 2019 Crotia tile"  />
 <p class="caption">
 LC map
 </p>
