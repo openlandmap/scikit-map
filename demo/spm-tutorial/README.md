@@ -653,7 +653,7 @@ optional
     newdata$pred <- droplevels(newdata$pred)
     str(summary(newdata$pred, maxsum=length(levels(newdata$pred))))
 
-    plot(runif(10,1,10),runif(10,100,1e6))
+    
 
 <img src="README_files/figure-markdown_strict/unnamed-chunk-29-1.png" alt="LC map"  />
 <p class="caption">
