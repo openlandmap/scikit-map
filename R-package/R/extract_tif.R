@@ -43,7 +43,7 @@ extract_tif <- function(tif, df, date, date.tif.begin, date.tif.end, coords=c("x
   if(missing(date.tif.end)){ 
     date.tif.end = date.tif.begin
   }
-  sel <- date < as.Date(date.tif.end, format=format.date, origin="1970-01-01") & date >= as.Date(date.tif.begin, format=format.date, origin="1970-01-01")
+  sel <- date <= as.Date(date.tif.end, format=format.date, origin="1970-01-01") & date >= as.Date(date.tif.begin, format=format.date, origin="1970-01-01")
   if(sum(sel)>0){
     pnts = as.matrix(df[sel, coords])
     attr(pnts, "dimnames")[[2]] = c("x","y") 
