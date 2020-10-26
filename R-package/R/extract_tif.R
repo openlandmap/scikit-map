@@ -9,12 +9,12 @@
 #' @param crs projection system for the coordinates,
 #' @param format.date default formatting date,
 #'
-#' @return data frame with row.ids and results of overlay
+#' @return list of data frames with row.ids and results of overlay
 #' 
 #' @details Extends the \code{terra::extract} functionality. 
 #' Works best if the GeoTIFF are Cloud-Optimized and located on SSD or similar.
 #' 
-#' @export
+#' @export 
 #' 
 #' @examples
 #' \dontrun{
@@ -27,8 +27,8 @@
 #' df <- as.data.frame(df)
 #' df$Date = format.Date(as.Date(paste(df$survey_date), format="%Y/%m/%d"), "%Y-%m-%d")
 #' df$row.id = 1:nrow(df)
-#' begin.tif1.lst = sapply(tif1.lst, function(i){strip_dates(i, type="begin")})
-#' end.tif1.lst = sapply(tif1.lst, function(i){strip_dates(i, type="end")})
+#' begin.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="begin")})
+#' end.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="end")})
 #' x = extract_tif(tif=tif1.lst[43], df, date="Date", date.tif.begin=begin.tif1.lst[43], date.tif.end=end.tif1.lst[43], coords=c("coords.x1","coords.x2"))
 #' }
 extract_tif <- function(tif, df, date, date.tif.begin, date.tif.end, coords=c("x","y"), crs="+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs", format.date="%Y-%m-%d"){

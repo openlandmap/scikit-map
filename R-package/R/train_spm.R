@@ -8,30 +8,26 @@
 #'trained model function so later on we could use it to train a new dataset.
 #' 
 #' 
-#' @param df.tr 
-#' @param target.variable 
-#' @param parallel 
-#' @param predict_type 
-#' @param folds 
-#' @param method.list 
-#' @param n_evals 
-#' @param plot.workflow 
-#' @param var.imp 
-#' @param meta.learner 
-#' @param crs 
+#' @param df.tr observation data
+#' @param target.variable response variable 
+#' @param parallel parallel processing mode
+#' @param predict_type e.g., response and prob
+#' @param folds sub-item for cv
+#' @param method.list learning methods
+#' @param n_evals number of evaluation process
+#' @param plot.workflow graph work flow
+#' @param var.imp variable importance 
+#' @param meta.learner super learner (mostly RF)
+#' @param crs coordinate reference system for spcv
 #' @return train.model
 #' @return summary
 #' @return var.imp
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @export 
 #' @examples
-#' ## Splitting training (tr) and test (ts) sets and defining generic variables
 #' ## Meuse Demo
 #' library(sp)
 #' library(mlr3verse)
-#' demo(meuse, echo=FALSE)
-#' 
-#' # Meuse Demo ----
 #' demo(meuse, echo=FALSE)
 #' pr.vars = c("x","y","dist","elev","soil","lead")
 #' df <- as.data.frame(meuse)
@@ -50,41 +46,16 @@
 #' folds = 2
 #' n_evals = 3
 #' newdata = df.ts
-#' # plot var ----
-#' colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
-#' colramp. = colorRampPalette(c("wheat2","red3"))
-#' xbins. = 20
-#' # coords=c("x","y")
-#' # id = deparse(substitute(df.tr))
-#' # MODELS ----
-#' tr = train.spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE, coords, crs, var.imp)
+#' tr = train_spm(df.tr, target.variable = target.variable, folds = folds ,n_evals = n_evals, plot.workflow = TRUE, coords, crs, var.imp)
 #' train.model= tr[[1]]
 #' var.imp = tr[[2]]
 #' var.imp
 #' summary = tr[[3]]
 #' summary
 #' 
-#' predict.variable = predict.spm(train.model, newdata)
-#' predict.variable
-#' plt = accuracy.plot.spm(x = df.tr[,target.variable], y = predict.variable, rng = "norm")
-#' 
-#' # predicct for all var
-#' prd.all = predict.spm(train.model, df)
-#' str(prd.all)
-#' df$leadp = prd.all
-#' coordinates(df) <- ~x+y
-#' proj4string(df) <- CRS("+init=epsg:28992")
-#' # creat raster out of output
-#' is.projected(df)
-#' extent(df)
-#' r = raster::raster(extent(df), crs=crs(df), resolution=150)
-#' values(r) = 0
-#' # plot(r)
-#' lead.r=rasterize(df, r, 'leadp', fun=mean)
-#' plot(lead.r)
-#' 
 
-train.spm = function(df.tr, target.variable, 
+
+train_spm = function(df.tr, target.variable, 
 parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs = NULL,  coordinate_names = c("x","y")){
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)

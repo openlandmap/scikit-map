@@ -6,23 +6,38 @@ pfun <- function(x,y, ...){
   return(pfun)
 }
 
-#'@title Accuracy plot
-#' 
-#' 
+#' Accuracy plot
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' 
-#' @param x 
-#' @param y 
-#' @param main 
-#' @param colramp 
-#' @param xbins 
-#' @param rng 
-#'
-#' @return plt
-#' @return
+#' @param x observation vector
+#' @param y estimated vector
+#' @param main title
+#' @param colramp color
+#' @param xbins number of bins
+#' @param rng methods for data representaion e.g., `norm`; normalized , `nat`;real values
+#' @return plt accuracy plot
 #' @export
-
-accuracy.plot.spm <- function(x, y, main, colramp, xbins = xbins. , rng ="nat"){
+#' @example 
+#' \dontrun{
+#' colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
+#' colramp. = colorRampPalette(c("wheat2","red3"))
+#' xbins. = 50
+#' library("stats")  
+#' library("dplyr")
+#' library("EnvStats")
+#' library("grid")
+#' library("hexbin")
+#' library("BBmisc")
+#' library("lattice")
+#' library("MASS")
+#' library("gridExtra")
+#' library("MLmetrics")
+#' library("yardstick")
+#' library("eumap")
+#' plt = eumap::accuracy_plot_spm(x = runif(1e3,1,1e9) , y = runif(1e3,0,1), rng = "norm")
+#' }
+#' 
+accuracy_plot_spm <- function(x, y, main, colramp, xbins = xbins. , rng ="nat"){
 if(rng == "norm"){
   #summary(unique(df.tr$x & df.tr$y %in% df.ts$x & df.ts$y))
     x.= normalize(x, method = "range", range = c(0, 1))

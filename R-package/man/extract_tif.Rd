@@ -34,7 +34,7 @@ extract_tif(
 \item{format.date}{default formatting date,}
 }
 \value{
-data frame with row.ids and results of overlay
+list of data frames with row.ids and results of overlay
 }
 \description{
 Extract points from a GeoTIFF using spatiotemporal overlay
@@ -54,8 +54,8 @@ df = readOGR("/data/eumap/sample-data/R-sample-tiles/9529_croatia_landcover_samp
 df <- as.data.frame(df)
 df$Date = format.Date(as.Date(paste(df$survey_date), format="\%Y/\%m/\%d"), "\%Y-\%m-\%d")
 df$row.id = 1:nrow(df)
-begin.tif1.lst = sapply(tif1.lst, function(i){strip_dates(i, type="begin")})
-end.tif1.lst = sapply(tif1.lst, function(i){strip_dates(i, type="end")})
+begin.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="begin")})
+end.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="end")})
 x = extract_tif(tif=tif1.lst[43], df, date="Date", date.tif.begin=begin.tif1.lst[43], date.tif.end=end.tif1.lst[43], coords=c("coords.x1","coords.x2"))
 }
 }
