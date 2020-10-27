@@ -15,17 +15,12 @@
 #' df$leadp = prd.all
 #' }
 #' 
-#' 
-#' 
 predict_spm = function (train.model, newdata, task = NULL){
- if (is.factor(df.tr[,target.variable])){
-        newdataf = mlr3::as_data_backend(newdata)
-        tsk_clf = TaskClassifST$new(id = id, backend = newdataf, target = target.variable, extra_args = list(
-        positive = "TRUE", coordinate_names = c("x", "y"), coords_as_features = FALSE,crs = crs))
+  if(is.factor(df.ts[,target.variable])){
         predict.variable = train.model(newdata)
-        yy = newdata[,target.variable]
         y = predict.variable$response
- }
+  }  else if (is.numeric(df.ts[,target.variable])){
+      predict.variable = train.model(newdata)
+      y = predict.variable$response
    return(y)
 }
-
