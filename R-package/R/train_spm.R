@@ -54,11 +54,10 @@
 #' summary
 #' 
 
-
+id = deparse(substitute(df.tr))
+cv3 = rsmp("repeated_cv", folds = folds)
 train_spm = function(df.tr, target.variable, 
 parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs = NULL,  coordinate_names = c("x","y")){
-  id = deparse(substitute(df.tr))
-  cv3 = rsmp("repeated_cv", folds = folds)
    if(is.factor(df.tr[,target.variable]) & is.null(crs)){
     message(paste("classification Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)
         message(paste0("Using learners: ", paste("method.list", collapse = ", "), "..."), immediate. = TRUE)
@@ -176,12 +175,9 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         if(is.null(method.list) & is.null(meta.learner)){
                    method.list <- c("regr.kknn", "regr.featureless")
                    meta.learner <- "regr.ranger"}
-        df.trf = mlr3::as_data_backend(df.tr)
-        tsk_regr = TaskRegrST$new(id = id, backend = df.trf, target = target.variable,
+        tsk_regr = TaskRegrST$new(id = id, backend = df.tr, target = target.variable,
         extra_args = list( positive = "TRUE", coordinate_names = c("x","y"), coords_as_features = FALSE,
         crs = crs))
-
-        tsk_regr$missings()
         pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
         g = pre %>>% gunion(list(
         po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
@@ -210,4 +206,3 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
   return(list(train.model, var.imp, summary,response))
 }
 
-  
