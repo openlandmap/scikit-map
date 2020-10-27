@@ -192,7 +192,7 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
     tr.model$predict_newdata
     tr.model$predict_newdata(newdata )
         }
-  return(list(train.model, var.imp, summary,response))
+  return(list(train.model, var.imp, summary, response))
 
 }
 

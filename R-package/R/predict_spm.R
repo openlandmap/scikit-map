@@ -16,13 +16,7 @@
 #' }
 #' 
 predict_spm = function (train.model, newdata, task = NULL){
-  if(is.factor(df.ts[,target.variable])){
         predict.variable = train.model(newdata)
         y = predict.variable$response
         return(y)
-  } else if (is.numeric(df.ts[,target.variable])){
-      predict.variable = train.model(newdata)
-      y = predict.variable$response
-      return(y)
-  }  
 }
