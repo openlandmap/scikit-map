@@ -53,11 +53,10 @@
 #' summary = tr[[3]]
 #' summary
 #' 
-
-id = deparse(substitute(df.tr))
-cv3 = rsmp("repeated_cv", folds = folds)
 train_spm = function(df.tr, target.variable, 
 parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs = NULL,  coordinate_names = c("x","y")){
+  id = deparse(substitute(df.tr))
+  cv3 = rsmp("repeated_cv", folds = folds)
    if(is.factor(df.tr[,target.variable]) & is.null(crs)){
     message(paste("classification Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)
         message(paste0("Using learners: ", paste("method.list", collapse = ", "), "..."), immediate. = TRUE)
@@ -175,33 +174,39 @@ parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_eval
         if(is.null(method.list) & is.null(meta.learner)){
                    method.list <- c("regr.kknn", "regr.featureless")
                    meta.learner <- "regr.ranger"}
-        tsk_regr = TaskRegrST$new(id = id, backend = df.tr, target = target.variable,
-        extra_args = list( positive = "TRUE", coordinate_names = c("x","y"), coords_as_features = FALSE,
-        crs = crs))
-        pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
-        g = pre %>>% gunion(list(
-        po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
-        po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.featureless")),
-        po("nop")
-        )) %>>%
-        po("featureunion") %>>%
-        po("learner", lrn("regr.ranger",importance ="permutation")) 
-        g$param_set$values$cv1.resampling.method = "spcv_coords"
-        g$param_set$values$cv2.resampling.method = "spcv_coords"
-        g$keep_results = "TRUE"
-        if(plot.workflow == "TRUE"){
-          plt = g$plot()
-        }
-        message(paste( "         fit the regression model  (rsmp = SPCV by cooridinates) ..."), immediate. = TRUE)
-        g$train(tsk_regr)
-        g$predict(tsk_regr)
-        summary = g$pipeops$regr.ranger$learner_model$model
-        tr.model = g$pipeops$regr.ranger$learner$train(tsk_regr)
-        var.imp = tr.model$importance()
-        response = tr.model$model$predictions
-        train.model = tr.model$predict_newdata
-        tr.model$predict_newdata
-         tr.model$predict_newdata(newdata )
+    df.trf = mlr3::as_data_backend(df.tr)
+    tsk_regr = TaskRegrST$new(id = id, backend = df.trf, target = target.variable,
+                              extra_args = list( positive = "TRUE", coordinate_names = c("x","y"), coords_as_features = FALSE,
+                                                 crs = crs))
+    pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
+    g = pre %>>% gunion(list(
+      po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
+      po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.featureless")),
+      po("nop")
+    )) %>>%
+      po("featureunion") %>>%
+      po("learner", lrn("regr.ranger",importance ="permutation")) 
+    resampling_sp = rsmp("repeated_spcv_coords", folds = folds, repeats = 4)
+    rr_sp = resample(
+      task = tsk_regr, learner = g,
+      resampling = resampling_sp)
+    
+    g$keep_results = "TRUE"
+    if(plot.workflow == "TRUE"){
+      plt = g$plot()
+    }
+    message(paste( "         fit the regression model  (rsmp = SPCV by cooridinates) ..."), immediate. = TRUE)
+    lgr::get_logger("bbotk")$set_threshold("warn")
+    lgr::get_logger("mlr3")$set_threshold("warn")
+    g$train(tsk_regr)
+    g$predict(tsk_regr)
+    summary = g$pipeops$regr.ranger$learner_model$model
+    tr.model = g$pipeops$regr.ranger$learner$train(tsk_regr)
+    var.imp = tr.model$importance()
+    response = tr.model$model$predictions
+    train.model = tr.model$predict_newdata
+    tr.model$predict_newdata
+    tr.model$predict_newdata(newdata )
         }
   return(list(train.model, var.imp, summary,response))
 }
