@@ -1,4 +1,3 @@
-
 pfun <- function(x,y, ...){
   panel.xyplot(x, y, ...)
   panel.hexbinplot(x,y, ...)  
@@ -34,10 +33,10 @@ pfun <- function(x,y, ...){
 #' library("MLmetrics")
 #' library("yardstick")
 #' library("eumap")
-#' plt = eumap::accuracy_plot_spm(x = runif(1e3,1,1e9) , y = runif(1e3,0,1), rng = "norm")
+#' plt = eumap::plot_spm(x = runif(1e3,1,1e9) , y = runif(1e3,0,1), rng = "norm")
 #' }
 #' 
-accuracy_plot_spm <- function(x, y, main, colramp, xbins = xbins. , rng ="nat"){
+plot_spm <- function(x, y, main, colramp, xbins = xbins. , rng ="nat"){
 if(rng == "norm"){
   #summary(unique(df.tr$x & df.tr$y %in% df.ts$x & df.ts$y))
     x.= normalize(x, method = "range", range = c(0, 1))
