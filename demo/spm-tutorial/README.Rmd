@@ -27,6 +27,13 @@ knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 library(knitr)
 ```
 
+
+```{r ,echo=FALSE}
+remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
+```
+
+
+
 ```{r, echo=FALSE, warning=FALSE}
 hook_output <- knit_hooks$get("output")
 knit_hooks$set(output = function(x, options) {
@@ -124,12 +131,6 @@ n_evals = 3
 newdata = df.ts
 ```
 
-## setting generic accuracy plot variables
-```{r }
-colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
-colramp. = colorRampPalette(c("wheat2","red3"))
-xbins. = 50
-```
 
 ## Loading required libraries:
 ```{r, message=FALSE, warning=FALSE}
@@ -163,6 +164,8 @@ library("devtools")
 library("raster")
 library("rgdal")
 library("eumap")
+library("ppcor")
+
 ```
 
 ## `train_spm`
@@ -184,6 +187,7 @@ train_model= tr[[1]]
 ```{r}
 var.imp = tr[[2]]
 var.imp
+
 ```
 3rd element of the summary of the *trained model*:
 ```{r}
@@ -197,6 +201,10 @@ note: here we just show start and the ending values
 response = tr[[4]]
 response
 ```
+```{r}
+vlp = tr[[5]]
+vlp
+```
 
 ## `predict_spm`
 
@@ -207,16 +215,19 @@ predict.variable = eumap::predict_spm(train_model, newdata)
 ### predicted values for the *newdata* set:
 note: here we just show start and the ending values
 ```{r ,output.lines= -(3:3200)}
-predict.variable
+pred.v = predict.variable[1]
+pred.v
 ```
-## `accuracy_plot_spm` 
+```{r ,results='hide'}
+valu.imp= predict.variable[[2]]
+valu.imp
+```
+
+## `plot_spm` 
 in case of regression task,
-- for now we have two scenarios including:
- - rng = "nat" provides visualizations with real values
- - rng = "norm" provides visualizations with the normalized (0~1) values
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = eumap::accuracy_plot_spm(x = df.tr[,target.variable], y = response, rng = "norm")
+plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "correlation", gvar_imp = "TRUE")
 ```
 
 
