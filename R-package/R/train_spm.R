@@ -50,151 +50,237 @@
 #' summary = tr[[3]]
 #' summary
 #' 
-train_spm = function(df.tr, target.variable, 
-parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,  n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs = NULL,  coordinate_names = c("x","y")){
+train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,
+n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs = NULL,  coordinate_names = c("x","y")){
+  
+  if( missing(predict_type)){
+    predict_type <- "response"
+  }
+  
+  #defining constant vars
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
-   if(is.factor(df.tr[,target.variable]) & is.null(crs)){
-    message(paste("classification Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)
-        message(paste0("Using learners: ", paste("method.list", collapse = ", "), "..."), immediate. = TRUE)
-        tsk_clf <- mlr3::TaskClassif$new(id = id, backend = df.tr, target = target.variable)
-        ranger_lrn = lrn("classif.ranger", predict_type = "response",importance ="permutation")
-        ps_ranger = ParamSet$new(
-           list(
-             ParamInt$new("mtry", lower = 1L, upper = 5L),
-             ParamDbl$new("sample.fraction", lower = 0.5, upper = 1),
-             ParamInt$new("num.trees", lower = 50L, upper = 500L),
-             ParamFct$new("importance", "permutation")
-           ))
-         at = AutoTuner$new(
-           learner = ranger_lrn,
-           resampling = cv3,
-           measure = msr("classif.acc"),
-           search_space = ps_ranger,
-           terminator = trm("evals", n_evals = n_evals), 
-           tuner = tnr("random_search")
-         )
-         at$store_tuning_instance = TRUE
-        requireNamespace("lgr")
-        logger = lgr::get_logger("mlr3")
-        logger$set_threshold("trace")
-        lgr::get_logger("mlr3")$set_threshold("warn")
-        lgr::get_logger("mlr3")$set_threshold("debug")
-        message("           Fitting a ensemble ML using 'mlr3::TaskClassif'...", immediate. = TRUE)
-        at$train(tsk_clf)
-        at$learner$train(tsk_clf)
-        best.model = at$archive$best()
-        var.imp = at$learner$importance()
-        summary = at$learner$state$model
-        tr.model = at$learner
-        train.model = tr.model$predict_newdata
-        response = tr.model$model$predictions
-      } else if (is.numeric(df.tr[,target.variable]) & is.null(crs)) {
-        if( missing(predict_type)){
-          predict_type <- "response" }
-      message(paste("Regr Task  ","resampling method: non-spatialCV ", "ncores: ",availableCores(), "..."), immediate. = TRUE)
-      message(paste0("Using learners: ", paste("method.list", collapse = ", "), "..."), immediate. = TRUE)
-      tsk_regr <- mlr3::TaskRegr$new(id = id, backend = df.tr, target = target.variable)
-      ranger_lrn = lrn("regr.ranger", predict_type = "response",importance ="permutation")
-      ps_ranger = ParamSet$new(
-        list(
-          ParamInt$new("mtry", lower = 1L, upper = 5L),
-          ParamDbl$new("sample.fraction", lower = 0.5, upper = 1),
-          ParamInt$new("num.trees", lower = 50L, upper = 500L),
-          ParamFct$new("importance", "impurity")
-        ))
-      at = AutoTuner$new(
-        learner = ranger_lrn,
-        resampling = cv3,
-        measure = msr("regr.rmse"),
-        search_space = ps_ranger,
-        terminator = trm("evals", n_evals = n_evals), 
-        tuner = tnr("random_search")
+  task_type = c("        classification Task  ", "        Regression Task  ")
+  ml_method = c( " kknn", " featureless")
+  meta_learner = " Randome Forests"
+  resample_method = c("  resampling method: (non-spatial) repeated_cv ...", "  resampling method: (spatial)repeated_cv by cooridinates ...")
+  number_cores = paste0(" ncores: ", availableCores())
+  run_model = paste0("           Fitting an ensemble ML using ", ml_method[1]," ", ml_method[2], ", and" , meta_learner," models",  number_cores)
+  
+  ## start running ensemble
+  
+  ##  classif CV ----
+  if(is.factor(df.tr[,target.variable]) & is.null(crs)){
+    
+    message( 
+    paste0(task_type[1],"...", immediate. = TRUE)
+    )
+    
+    tsk_clf <- mlr3::TaskClassif$new(
+    id = id, backend = df.tr, target = target.variable
+    )
+    
+    ranger_lrn = lrn("classif.ranger", predict_type = "response",importance ="permutation")
+    ps_ranger = 
+      ParamSet$new(
+      list(ParamInt$new("mtry", lower = 1L, upper = 5L),
+      ParamDbl$new("sample.fraction", lower = 0.5, upper = 1),
+      ParamInt$new("num.trees", lower = 50L, upper = 500L),
+      ParamFct$new("importance", "permutation"))
+      )
+    at = AutoTuner$new(
+      learner = ranger_lrn,
+      resampling = cv3,
+      measure = msr("classif.acc"),
+      search_space = ps_ranger,
+      terminator = trm("evals", n_evals = n_evals), 
+      tuner = tnr("random_search")
       )
       at$store_tuning_instance = TRUE
-      requireNamespace("lgr")
-      logger = lgr::get_logger("mlr3")
-      logger$set_threshold("trace")
-      lgr::get_logger("mlr3")$set_threshold("warn")
-      lgr::get_logger("mlr3")$set_threshold("debug")
-      message("           Fitting a ensemble ML using 'mlr3::Taskregr'...", immediate. = TRUE)
-      at$train(tsk_regr)
-      at$learner$train(tsk_regr)
+      # requireNamespace("lgr")
+      # logger = lgr::get_logger("mlr3")
+      # logger$set_threshold("trace")
+      # lgr::get_logger("mlr3")$set_threshold("warn")
+      # lgr::get_logger("mlr3")$set_threshold("debug")
+      message(runmodel,resample_method[1], immediate. = TRUE)
+      if (requireNamespace("progress", quietly = TRUE)) {
+        handlers("progress")
+        with_progress({
+          at$train(tsk_clf)
+        })
+      }
+      
+      at$learner$train(tsk_clf)
+      best.model = at$archive$best()
+      var.imp = at$learner$importance()
+      vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
+      #value.imp = df.trf$data(1:df.trf$nrow,vlp)
+      summary = at$learner$state$model
       tr.model = at$learner
-      summary = tr.model$model
-      var.imp = tr.model$importance()
       train.model = tr.model$predict_newdata
       response = tr.model$model$predictions
-    } else if (is.factor(df.tr[,target.variable]) & crs == crs){ 
-      if(is.null(method.list) & is.null(meta.learner)){
-        method.list <- c("classif.kknn", "classif.featureless")
-        meta.learner = "classif.ranger"}
-        df.trf = mlr3::as_data_backend(df.tr)
-        tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable, extra_args = list( positive = "TRUE", coordinate_names = coordinate_names, coords_as_features = FALSE, crs = crs))
-        tsk_clf$missings()
-        pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
-        g = pre %>>% gunion(list(
+  }
+  ## regr CV ----
+  else if (is.numeric(df.tr[,target.variable]) & is.null(crs)) {
+      
+    message( 
+    paste0(task_type[2],"...", immediate. = TRUE)
+    )   
+    
+    tsk_regr <- mlr3::TaskRegr$new(id = id, backend = df.tr, target = target.variable)
+    ranger_lrn = lrn("regr.ranger", predict_type = "response",importance ="permutation")
+    ps_ranger = ParamSet$new(
+      list(
+        ParamInt$new("mtry", lower = 1L, upper = 5L),
+        ParamDbl$new("sample.fraction", lower = 0.5, upper = 1),
+        ParamInt$new("num.trees", lower = 50L, upper = 500L),
+        ParamFct$new("importance", "impurity")
+        )
+      )
+    at = AutoTuner$new(
+      learner = ranger_lrn,
+      resampling = cv3,
+      measure = msr("regr.rmse"),
+      search_space = ps_ranger,
+      terminator = trm("evals", n_evals = n_evals), 
+      tuner = tnr("random_search")
+      )
+    at$store_tuning_instance = TRUE
+    # requireNamespace("lgr")
+    # logger = lgr::get_logger("mlr3")
+    # logger$set_threshold("trace")
+    # lgr::get_logger("mlr3")$set_threshold("warn")
+    # lgr::get_logger("mlr3")$set_threshold("debug")
+    message(runmodel,resample_method[1], immediate. = TRUE)
+    if (requireNamespace("progress", quietly = TRUE)) {
+      handlers("progress")
+      with_progress({
+        at$train(tsk_regr)
+      })
+    }
+    
+    at$learner$train(tsk_regr)
+    tr.model = at$learner
+    summary = tr.model$model
+    var.imp = tr.model$importance()
+    vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
+    #value.imp = df.trf$data(1:df.trf$nrow,vlp)
+    train.model = tr.model$predict_newdata
+    response = tr.model$model$predictions
+  }
+  ## classif spcv ----
+  else if (is.factor(df.tr[,target.variable]) & crs == crs){ 
+    
+    message( 
+      paste0(task_type[1],"...", immediate. = TRUE)
+    ) 
+    if(is.null(method.list) & is.null(meta.learner)){
+    method.list <- c("classif.kknn", "classif.featureless")
+    meta.learner = "classif.ranger"
+    }
+    
+    df.trf = mlr3::as_data_backend(df.tr)
+    tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable,
+    extra_args = list( positive = "TRUE", coordinate_names = coordinate_names,
+    coords_as_features = FALSE, crs = crs))
+    
+    pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
+    g = pre %>>% 
+      gunion(
+        list(
           po("select") %>>% po("learner_cv", id = "cv1", lrn("classif.kknn")),
           po("pca") %>>% po("learner_cv", id = "cv2", lrn("classif.featureless")),
           po("nop")
-        )) %>>%
-          po("featureunion") %>>%
-          po("learner", lrn("classif.ranger",importance ="permutation")) 
-        g$param_set$values$cv1.resampling.method = "spcv_coords"
-        g$param_set$values$cv2.resampling.method = "spcv_coords"
-        g$keep_results = "TRUE"
-        if(plot.workflow == "TRUE"){
-          plt = g$plot()
-        }
-        message(paste( "           fit the classif model  (rsmp = SPCV by cooridinates) ..."), immediate. = TRUE)
-        g$train(tsk_clf)
-        g$predict(tsk_clf)
-        conf.mat = g$pipeops$classif.ranger$learner_model$model$confusion.matrix
-        var.imp = g$pipeops$classif.ranger$learner_model$model$variable.importance
-        summary = g$pipeops$classif.ranger$learner_model$model
-        tr.model = g$pipeops$classif.ranger$learner$train(tsk_clf)
-        train.model = tr.model$predict_newdata
-        response = tr.model$model$predictions
-  } else if(is.numeric(df.tr[,target.variable]) & crs == crs){
-        if(is.null(method.list) & is.null(meta.learner)){
-                   method.list <- c("regr.kknn", "regr.featureless")
-                   meta.learner <- "regr.ranger"}
-    df.trf = mlr3::as_data_backend(df.tr)
-    tsk_regr = TaskRegrST$new(id = id, backend = df.trf, target = target.variable,
-                              extra_args = list( positive = "TRUE", coordinate_names = c("x","y"), coords_as_features = FALSE,
-                                                 crs = crs))
-    pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
-    g = pre %>>% gunion(list(
-      po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
-      po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.featureless")),
-      po("nop")
-    )) %>>%
+          )
+        ) %>>%
       po("featureunion") %>>%
-      po("learner", lrn("regr.ranger",importance ="permutation")) 
-    resampling_sp = rsmp("repeated_spcv_coords", folds = folds, repeats = 4)
-    rr_sp = resample(
+      po("learner", lrn("classif.ranger",importance ="permutation")) 
+      resampling_sp = rsmp("repeated_spcv_coords", folds = folds, repeats = 4)
+      rr_sp = rsmp(
       task = tsk_regr, learner = g,
-      resampling = resampling_sp)
-    g$keep_results = "TRUE"
-    if(plot.workflow == "TRUE"){
+      resampling = resampling_sp
+      )
+    
+      g$keep_results = "TRUE"
       plt = g$plot()
+      message(runmodel,resample_method[2], immediate. = TRUE)
+      if (requireNamespace("progress", quietly = TRUE)) {
+        handlers("progress")
+        with_progress({
+          g$train(tsk_clf)
+        })
+      }
+      
+      g$predict(tsk_clf)
+      conf.mat = g$pipeops$classif.ranger$learner_model$model$confusion.matrix
+      var.imp = g$pipeops$classif.ranger$learner_model$model$variable.importance
+      vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
+      #value.imp = df.trf$data(1:df.trf$nrow,vlp)
+      summary = g$pipeops$classif.ranger$learner_model$model
+      tr.model = g$pipeops$classif.ranger$learner$train(tsk_clf)
+      train.model = tr.model$predict_newdata
+      response = tr.model$model$predictions
+  }
+  ## regr spcv ----
+  else if(is.numeric(df.tr[,target.variable]) & crs == crs){
+    
+    message( 
+    paste0(task_type[2],"...", immediate. = TRUE)
+    ) 
+    if(is.null(method.list) & is.null(meta.learner)){
+      method.list <- c("regr.kknn", "regr.featureless")
+      meta.learner <- "regr.ranger"
     }
-    message(paste( "         fit the regression model  (rsmp = SPCV by cooridinates) ..."), immediate. = TRUE)
-    lgr::get_logger("bbotk")$set_threshold("warn")
-    lgr::get_logger("mlr3")$set_threshold("warn")
-    g$train(tsk_regr)
+    
+    df.trf = mlr3::as_data_backend(df.tr)
+    
+    tsk_regr = TaskRegrST$new(
+    id = id, backend = df.trf, target = target.variable,
+    extra_args = list(
+      positive = "TRUE", coordinate_names = c("x","y"),
+      coords_as_features = FALSE, crs = crs
+      )
+    )
+    
+    pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
+    g = pre %>>% 
+      gunion(
+        list(
+          po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
+          po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.featureless")),
+          po("nop")
+          )
+        ) %>>%
+      po("featureunion") %>>%
+      po("learner", lrn("regr.ranger",importance ="permutation"))
+    
+    resampling_sp = rsmp("repeated_spcv_coords", folds = folds, repeats = 4)
+    rr_sp = rsmp(
+      task = tsk_regr, learner = g,
+      resampling = resampling_sp
+      )
+    g$keep_results = "TRUE"
+    plt = g$plot()
+    message(runmodel,resample_method[2], immediate. = TRUE)
+    # lgr::get_logger("bbotk")$set_threshold("warn")
+    # lgr::get_logger("mlr3")$set_threshold("warn")
+    if (requireNamespace("progress", quietly = TRUE)) {
+      handlers("progress")
+      with_progress({
+        g$train(tsk_regr)
+      })
+    }
     g$predict(tsk_regr)
     summary = g$pipeops$regr.ranger$learner_model$model
     tr.model = g$pipeops$regr.ranger$learner$train(tsk_regr)
     var.imp = tr.model$importance()
+    vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
+    #value.imp = df.trf$data(1:df.trf$nrow,vlp)
     response = tr.model$model$predictions
     train.model = tr.model$predict_newdata
     tr.model$predict_newdata
     tr.model$predict_newdata(newdata )
         }
-  return(list(train.model, var.imp, summary, response))
+  return(list(train.model, var.imp, summary, response, vlp))
 
 }
-
-
-
