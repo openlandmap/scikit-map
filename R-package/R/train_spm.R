@@ -68,7 +68,7 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
       # logger$set_threshold("trace")
       # lgr::get_logger("mlr3")$set_threshold("warn")
       # lgr::get_logger("mlr3")$set_threshold("debug")
-      message(runmodel,resample_method[1], immediate. = TRUE)
+      message(run_model,resample_method[1], immediate. = TRUE)
       if (requireNamespace("progress", quietly = TRUE)) {
         handlers("progress")
         with_progress({
@@ -117,7 +117,7 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
     # logger$set_threshold("trace")
     # lgr::get_logger("mlr3")$set_threshold("warn")
     # lgr::get_logger("mlr3")$set_threshold("debug")
-    message(runmodel,resample_method[1], immediate. = TRUE)
+    message(run_model,resample_method[1], immediate. = TRUE)
     if (requireNamespace("progress", quietly = TRUE)) {
       handlers("progress")
       with_progress({
@@ -169,7 +169,7 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
     
       g$keep_results = "TRUE"
       plt = g$plot()
-      message(runmodel,resample_method[2], immediate. = TRUE)
+      message(run_model,resample_method[2], immediate. = TRUE)
       if (requireNamespace("progress", quietly = TRUE)) {
         handlers("progress")
         with_progress({
@@ -227,7 +227,7 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
       )
     g$keep_results = "TRUE"
     plt = g$plot()
-    message(runmodel,resample_method[2], immediate. = TRUE)
+    message(run_model,resample_method[2], immediate. = TRUE)
     # lgr::get_logger("bbotk")$set_threshold("warn")
     # lgr::get_logger("mlr3")$set_threshold("warn")
     if (requireNamespace("progress", quietly = TRUE)) {
