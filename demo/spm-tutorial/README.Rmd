@@ -212,6 +212,7 @@ vlp
 prediction on `newdata` set
 ```{r}
 predict.variable = eumap::predict_spm(train_model, newdata)
+
 ```
 ### predicted values for the *newdata* set:
 note: here we just show start and the ending values
@@ -342,7 +343,7 @@ df.ts <- df[ -train_ind,]
 folds = 5  #you can change the number to get a better result
 n_evals = 5  #you can change the number to get a better result
 newdata = df.ts
-
+ 
 ```
 
 ## train_spm
