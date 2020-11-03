@@ -9,7 +9,7 @@
 #' @param n_evals 
 #' @param plot.workflow 
 #' @param var.imp 
-#' @param meta.learner 
+#' @param super.learner 
 #' @param crs 
 #' @param coordinate_names 
 #'
@@ -17,12 +17,13 @@
 #' @export
 #'
 #' @examples
-train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = folds, method.list = NULL,
-n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, crs = NULL,  coordinate_names = c("x","y")){
-  if( missing(predict_type)){
+train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 3, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL,  coordinate_names = c("x","y"), ...){
+  target = target.variable
+  assert_data_frame(df.tr)
+  if( is.null(predict_type)){
     predict_type <- "response"
   }
-  
+  assert_string(predict_type)
   #defining constant vars
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
@@ -140,9 +141,9 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
     message( 
       paste0(task_type[1],"...", immediate. = TRUE)
     ) 
-    if(is.null(method.list) & is.null(meta.learner)){
-    method.list <- c("classif.kknn", "classif.featureless")
-    meta.learner = "classif.ranger"
+    if(is.null(method.list) & is.null(super.learner)){
+    method.list <- c("classif.kknn", "classif.featureless", "classif.rpart")
+    super.learner = "classif.ranger"
     }
     
     df.trf = mlr3::as_data_backend(df.tr)
@@ -154,9 +155,10 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
     g = pre %>>% 
       gunion(
         list(
-          po("select") %>>% po("learner_cv", id = "cv1", lrn("classif.kknn")),
-          po("pca") %>>% po("learner_cv", id = "cv2", lrn("classif.featureless")),
-          po("nop")
+          po("select") %>>% po("learner_cv", id = "kknn", lrn("classif.kknn")),
+          po("pca") %>>% po("learner_cv", id = "featureless", lrn("classif.featureless")),
+          po("subsample") %>>% po("learner_cv", id = "rpart", lrn("classif.rpart"))
+          
           )
         ) %>>%
       po("featureunion") %>>%
@@ -168,7 +170,7 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
       )
     
       g$keep_results = "TRUE"
-      plt = g$plot()
+      # plt = g$plot()
       message(run_model,resample_method[2], immediate. = TRUE)
       if (requireNamespace("progress", quietly = TRUE)) {
         handlers("progress")
@@ -193,9 +195,9 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
     message( 
     paste0(task_type[2],"...", immediate. = TRUE)
     ) 
-    if(is.null(method.list) & is.null(meta.learner)){
-      method.list <- c("regr.kknn", "regr.featureless")
-      meta.learner <- "regr.ranger"
+    if(is.null(method.list) & is.null(super.learner)){
+      method.list <- c("regr.kknn", "regr.featureless", "regr.rpart")
+      super.learner <- "regr.ranger"
     }
     
     df.trf = mlr3::as_data_backend(df.tr)
@@ -212,9 +214,10 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
     g = pre %>>% 
       gunion(
         list(
-          po("select") %>>% po("learner_cv", id = "cv1", lrn("regr.kknn")),
-          po("pca") %>>% po("learner_cv", id = "cv2", lrn("regr.featureless")),
-          po("nop")
+          po("select") %>>% po("learner_cv", id = "knn", lrn("regr.kknn")),
+          po("pca") %>>% po("learner_cv", id = "featureless", lrn("regr.featureless")),
+          po("scale") %>>% po("learner_cv", id = "rpart", lrn("regr.rpart"))
+          
           )
         ) %>>%
       po("featureunion") %>>%
@@ -226,7 +229,7 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
       resampling = resampling_sp
       )
     g$keep_results = "TRUE"
-    plt = g$plot()
+    # plt = g$plot()
     message(run_model,resample_method[2], immediate. = TRUE)
     # lgr::get_logger("bbotk")$set_threshold("warn")
     # lgr::get_logger("mlr3")$set_threshold("warn")
@@ -247,5 +250,5 @@ n_evals = n_evals, plot.workflow = FALSE, var.imp = TRUE, meta.learner = NULL, c
     tr.model$predict_newdata
     tr.model$predict_newdata(newdata )
         }
-  return(list(train.model, var.imp, summary, response, vlp))
+  return(list(train.model, var.imp, summary, response, vlp, target))
 }
