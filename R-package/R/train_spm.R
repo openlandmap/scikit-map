@@ -5,13 +5,13 @@
 #' @param parallel 
 #' @param predict_type 
 #' @param folds 
-#' @param method.list 
 #' @param n_evals 
-#' @param plot.workflow 
+#' @param method.list 
 #' @param var.imp 
 #' @param super.learner 
 #' @param crs 
 #' @param coordinate_names 
+#' @param ... 
 #'
 #' @return
 #' @export

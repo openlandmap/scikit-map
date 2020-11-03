@@ -9,18 +9,16 @@ pfun <- function(x,y, ...){
 
 #' Title
 #'
-#' @param x 
-#' @param y 
-#' @param z 
+#' @param df 
 #' @param main 
 #' @param palet 
 #' @param colorcut 
 #' @param xbins 
 #' @param gvar_imp 
-#' @param gmode 
 #' @param gtype 
-#' @param aggregate 
+#' @param gmode 
 #' @param aspect 
+#' @param ... 
 #'
 #' @return
 #' @export
