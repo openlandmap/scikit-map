@@ -9,14 +9,14 @@ train_spm(
   target.variable,
   parallel = TRUE,
   predict_type = NULL,
-  folds = folds,
+  folds = 5,
+  n_evals = 3,
   method.list = NULL,
-  n_evals = n_evals,
-  plot.workflow = FALSE,
-  var.imp = TRUE,
-  meta.learner = NULL,
+  var.imp = NULL,
+  super.learner = NULL,
   crs = NULL,
-  coordinate_names = c("x", "y")
+  coordinate_names = c("x", "y"),
+  ...
 )
 }
 \arguments{
@@ -30,19 +30,19 @@ train_spm(
 
 \item{folds}{}
 
-\item{method.list}{}
-
 \item{n_evals}{}
 
-\item{plot.workflow}{}
+\item{method.list}{}
 
 \item{var.imp}{}
 
-\item{meta.learner}{}
+\item{super.learner}{}
 
 \item{crs}{}
 
 \item{coordinate_names}{}
+
+\item{...}{}
 }
 \value{
 

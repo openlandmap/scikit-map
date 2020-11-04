@@ -19,20 +19,22 @@ header-includes:
 [1]: https://twitter.com/sheykhmousa
 Follow me on [![alt text][1.1]][1]
 
-```{r setup, include = FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 ```
 
-```{r , include = FALSE}
+```{r , include=FALSE}
 library(knitr)
 ```
 
 
-```{r , message=FALSE, echo = FALSE}
+```{r ,echo=FALSE}
 remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 ```
 
-```{r, echo=FALSE, warning = FALSE}
+
+
+```{r, echo=FALSE, warning=FALSE}
 hook_output <- knit_hooks$get("output")
 knit_hooks$set(output = function(x, options) {
    lines <- options$output.lines
@@ -57,7 +59,7 @@ knit_hooks$set(output = function(x, options) {
 
 ## Introduction
 `eumap` aims at providing easier access to EU environmental maps.
-Basic functions train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/), and related extensions in the [mlr3 ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages) [@casalicchio2017openml; @MichelLang2020mlr3book], 
+Basic functions train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/), [@mlr3], and related extensions in the [mlr3 ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages) [@casalicchio2017openml; @MichelLang2020mlr3book], 
 which includes spatial prediction using [Ensemble Machine Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r) taking spatial coordinates and spatial cross-validation into account. 
 In a nutshell one can `train` an arbitrary `s3` **(spatial)dataframe** in `mlr3` ecosystem by defining *df* and *target.variable* i.e., response.
 main functions are as the following:
@@ -67,10 +69,10 @@ main functions are as the following:
 1. `train_spm` will automatically perform `classification` or `regression` tasks and the output is a `train_model` which later can be used to predict `newdata`.It also provides *summary* of the model and *variable importance* and *response*.
 The rest of arguments can be either pass or default values will be passed. `train_spm` provides four scenarios:
 
-  1.1. `classification` task with **non spatial** resampling methods,
-  1.2. `regression` task with **non spatial** resampling methods,
-  1.3. `classification` task with **spatial** resampling methods,
-  1.4. `regression` task with **spatial** resampling methods.
+  1.1. `classification` task with **non spatial** resampling methods
+  1.2. `regression` task with **non spatial** resampling methods
+  1.3. `classification` task with **spatial** resampling methods
+  1.4. `regression` task with **spatial** resampling methods
 
 ## `predict_spm`
 
@@ -79,9 +81,13 @@ The rest of arguments can be either pass or default values will be passed. `trai
 
 ## `plot_spm` 
 
-1. Accuracy plot in case of regression task (don’t use it for classification tasks for obvious reason). The following examples demonstrates spatial prediction using the `sic97` data set:
+1. Accuracy plot in case of regression task (don’t use it for classification tasks for obvious reason),
+ 
+**Warning:** most of functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
 
-### Required packages
+The following examples demonstrates spatial prediction using the `sic97` data set:
+
+## Required packages
 
 ```{r , warning=FALSE}
 start_time <- Sys.time()
@@ -92,7 +98,7 @@ new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
 ```
 
-### sic97 dataset
+## sic97 dataset
 
 ```{r ,results='hide', warning=FALSE}
 #sic97 source data: https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html
@@ -116,8 +122,7 @@ df$test11 <- runif(1:nrow(df))/0.54545
 df$test12 <- sqrt(runif(1:nrow(df))) 
 ```
 
-### spliting the data 
-
+## split training (tr) and test (ts) set  
 ```{r }
 smp_size <- floor(0.5 * nrow(df))
 set.seed(123)
@@ -128,8 +133,7 @@ newdata = df.ts
 ```
 
 
-### Loading required libraries:
-
+## Loading required libraries:
 ```{r, message=FALSE, warning=FALSE}
 library("mlr3verse")#
 library("mlr3spatiotempcv")#
@@ -146,79 +150,87 @@ library("eumap")
 library("ppcor")
 library("progressr")
 library("checkmate")
-library("future")
 
 ```
 
-### `train_spm`
+## `train_spm`
 
-`train_spm` fits multiple models/learners depending on the `class` of the **target.variable** and returns a `trained model`, **variable importance**,  **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
+`train_spm` fits multiple models/learners depending on the `class` of the **target.variable** and for returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
 ```{r ,results='hide', warning=FALSE}
-tr = eumap::train_spm(df.tr, target.variable = "CHELSA_rainfall", folds = 5, n_evals = 3, crs = "+init=epsg:4326")
+tr = eumap::train_spm(df.tr, target.variable = target.variable , folds = folds , n_evals = n_evals , crs = "+init=epsg:28992")
 ```
 
-- 1st element contains the *trained model*,
-- 2nd element contains the *variable importance*,
-- 3rd element contains a summary of the *trained model*,
-- 4th  element contains the *predicted values* of our trained model,
-- 5th  element contains the ranking of the  *important variables*.
+`train_spm` results:
+
+1st element is the *trained model*:
 
 ```{r ,results='hide', warning=FALSE}
 train_model= tr[[1]]
+```
+2nd element is the *variable importance*:
+```{r}
 var.imp = tr[[2]]
-summary = tr[[3]]
-response = tr[[4]]
-vlp = tr[[5]]
-target = tr[[6]]
+var.imp
 
 ```
-### `predict_spm`
+3rd element of the summary of the *trained model*:
+```{r}
+summary = tr[[3]]
+summary
+```
+
+4th element is the predicted values of our trained model
+note: here we just show start and the ending values
+```{r , output.lines= -(4:145)}
+response = tr[[4]]
+response
+```
+```{r}
+vlp = tr[[5]]
+vlp
+```
+
+## `predict_spm`
 
 prediction on `newdata` set
 ```{r}
 predict.variable = eumap::predict_spm(train_model, newdata)
 
 ```
-
 ### predicted values for the *newdata* set:
-
-```{r ,output.lines= c(1:10)}
-predict.variable = predict_spm(train_model, df.ts)
-pred.v = predict.variable[[1]]
-valu.imp= predict.variable[[2]]
+note: here we just show start and the ending values
+```{r ,output.lines= -(3:3200)}
+pred.v = predict.variable[1]
 pred.v
-#valu.imp
+```
+```{r ,results='hide'}
+valu.imp= predict.variable[[2]]
+valu.imp
 ```
 
-### `plot_spm` 
-#### variable importance
+## `plot_spm` 
+in case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = plot_spm(df, gmode  = "norm" , gtype = "var.imp")
+plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "correlation", gvar_imp = "TRUE")
 ```
 
-#### 
 
-```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = plot_spm(df, gmode  = "norm" , gtype = "acuuracy")
-```
-### spatial prediction on *rainfall*
+```{r , echo=FALSE, warning=FALSE}
 
-```{r  warning=FALSE}
-predict.variable = predict_spm(train_model, df)
-df$rainP = predict.variable[[1]]
-coordinates(df) <- ~x+y
-proj4string(df) <- CRS("+init=epsg:28992")
+df.ts$leadp = predict.variable
+coordinates(df.ts) <- ~x+y
+proj4string(df.ts) <- CRS("+init=epsg:28992")
 # creat raster out of output
-gridded(df) = TRUE
+gridded(df.ts) = TRUE
+
 ```
-
-make a map using ensemble machine learning with spatial cross validation for the predicted variables e.g., *rainfall* (in this case). 
-
+## raster grid 
+make a map using ensemble machine learning with spatial cross validation for the predicted variables e.g., *lead* (in this case) 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Raster grid"}
-plot(df[,"rainP"])
-# points(sic1997, pch="+")
+plot(df.ts[,"leadp"])
+points(sic97, pch="+")
 ```
 
 ## Croatia tile
@@ -231,7 +243,6 @@ we will use the eumap package to overlay all the points of a vector layer (geopa
 Our dataset refers to 1 tile, located in Croatia, extracted from a tiling system created for European Union (7,042 tiles) by [GeoHarmonizer Project](https://opendatascience.eu/).
 
 ```{r}
-library(rgdal)
 tif1.lst = list.files("/data/eumap/sample-data/R-sample-tiles/9529", pattern=".tif", full.names=TRUE, recursive=TRUE) 
 df = readOGR("/data/eumap/sample-data/R-sample-tiles/9529_croatia_landcover_samples.gpkg")
 df <- as.data.frame(df)
@@ -249,22 +260,21 @@ unique(end.tif1.lst)
 
 ### `extract_tif` 
 
-```{r, warning=FALSE}
+```{r}
 cores = ifelse(parallel::detectCores()<length(tif1.lst), parallel::detectCores(), length(tif1.lst))
 ov.pnts <- parallel::mclapply(1:length(tif1.lst), function(i){ eumap::extract_tif(tif=tif1.lst[i], df, date="Date", date.tif.begin=begin.tif1.lst[i], date.tif.end=end.tif1.lst[i], coords=c("coords.x1","coords.x2")) }, mc.cores=cores)
 gc()
 ov.pnts = ov.pnts[!sapply(ov.pnts, is.null)]
 ```
 ```{r}
-str(ov.pnts[1:3])
+str(ov.pnts[1:6])
 ```
 
 ## Space-Time Overlay
 
 For the temporal layers, the points should be filtered by year and overlayed on the right raster files. The SpaceTimeOverlay class implements this approach using the parameter:
 - timeless_data: The result of SpaceOverlay (GeoPandas DataFrame) - col_date: The column that contains the date information (2018-09-13)
-- dir_temporal_layers: The directory where the temporal raster files are stored, organized by year.
-
+- dir_temporal_layers: The directory where the temporal raster files are stored, organized by year
 ```{r, results='hide', warning=FALSE}
 library(data.table)
 commcols <- Reduce(intersect, lapply(ov.pnts, names))
@@ -275,7 +285,7 @@ cm.tif <- cmt[, .SD, .SDcols = unique(names(cmt))]
 df <- as.data.table(df)
 cm <- Reduce(merge,list(df,cm.tif))
 tt = cbind(cm,df$year)
-#saveRDS(tt, "/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
+saveRDS(tt, "/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
 ```
 
 
@@ -283,16 +293,16 @@ tt = cbind(cm,df$year)
 str(tt)
 ```
 
-### (analysis ready) data
+## pre-processing Croatia data
 
-```{r, warning=FALSE,message=FALSE}
-library(dplyr)
+```{r}
 cm.croatia <- readRDS("/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
-# str(cm.croatia)
+
+str(cm.croatia)
 df <-  cm.croatia
 df$lc_class <- as.factor(df$lc_class)
-#crs = "+init=epsg:3035"
-#target.variable = "lc_class"
+crs = "+init=epsg:3035"
+target.variable = "lc_class"
 df <- df %>% group_by_if(is.character, as.factor)
 df$row.id <- NULL
 df$survey_date <- NULL
@@ -302,47 +312,37 @@ df$id <- NULL
 df$year <- NULL
 df$tile_id <- NULL
 df$confidence <- NULL
-# df$V2 <- NULL
-# colnames(df)
-colnames(df)[2] <- "x"
-colnames(df)[3] <- "y"
-#coordinate_names = c("x","y")
-df <- as.data.frame(df)
+df$V2 <- NULL
+df$coords.x1 <- NULL
+df$coords.x2 <- NULL
+colnames(df)
+# colnames(df)[4] <- "x"
+# colnames(df)[5] <- "y"
+coordinate_names = c("x","y")
 smp_size <- floor(0.5 * nrow(df))
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[train_ind, ]
 df.ts <- df[ -train_ind,]
+folds = 5  #you can change the number to get a better result
+n_evals = 5  #you can change the number to get a better result
 newdata = df.ts
  
 ```
 
-## `train_spm`
-
-```{r, output.lines= (1:10), warning=FALSE, results='hide'}
-library(mlr3verse)
-library(future)
-library(progressr)
-tr = eumap::train_spm(df.tr, target.variable = "lc_class" , folds = 5 , n_evals = 3)
-```
-
-```{r}
+## train_spm
+```{r, output.lines= -(4:145)}
+tr = eumap::train_spm(df.tr, target.variable = target.variable , folds = folds , n_evals = n_evals)
 train_model= tr[[1]]
 var.imp = tr[[2]]
+length(var.imp )
 summary = tr[[3]]
-response = tr[[4]]
-vlp = tr[[5]]
-target = tr[[6]]
 summary
+pred.model = tr[[4]]
+pred.model
 ```
 
-
-```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = plot_spm(df, gtype = "var.imp")
-```
-
-
-## `predict_spm`
+## predict_spm
 Prediction; raster map
 
 ```{r , eval=F, echo=T}
@@ -363,7 +363,7 @@ for (i in 1:2) {
 }
 ```
 
-- Removing small classes in prediction
+### get ride of small classess in prediction
 optional
 
 ```{r , eval=F, echo=T}

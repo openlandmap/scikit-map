@@ -17,7 +17,7 @@
 #' @export
 #'
 #' @examples
-train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 3, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL,  coordinate_names = c("x","y"), ...){
+train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 5, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL,  coordinate_names = c("x","y"), ...){
   target = target.variable
   assert_data_frame(df.tr)
   if( is.null(predict_type)){
@@ -37,7 +37,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
   ## start running ensemble
   
   ##  classif CV ----
-  if(is.factor(df.tr[,target.variable]) & is.null(crs)){
+  if(is.factor(df.tr[,target]) & is.null(crs)){
     
     message( 
     paste0(task_type[1],"...", immediate. = TRUE)

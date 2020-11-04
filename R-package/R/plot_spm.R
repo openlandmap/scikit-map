@@ -26,6 +26,11 @@ pfun <- function(x,y, ...){
 #' @examples
 plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL,
 xbins = 60 , gvar_imp = TRUE, gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
+  if(gtype == "var.imp" | missing(gmode)){
+    plt = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
+    title(main = "variable importance", font.main = 4)
+    print(plt)
+  }
   x = df.tr[,target]
   y = pred.v
   z = valu.imp 
@@ -44,7 +49,7 @@ xbins = 60 , gvar_imp = TRUE, gtype = c("accuracy", "correlation","var.imp") ,gm
     print(plt)
   #From Tom's book with a slight modification
     } else {
-      if(gtype == "var.imp"){
+      if(gtype == "var.imp" ){
         plt = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
         title(main = "variable importance", font.main = 4)
         print(plt)

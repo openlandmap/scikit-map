@@ -1,29 +1,30 @@
-
-
 -   [Introduction](#introduction)
 -   [`train_spm`](#train_spm)
 -   [`predict_spm`](#predict_spm)
--   [`plot_spm`](#plot_spm)
-    -   [Required packages](#required-packages)
-    -   [sic97 dataset](#sic97-dataset)
-    -   [spliting the data](#spliting-the-data)
-    -   [Loading required libraries:](#loading-required-libraries)
-    -   [`train_spm`](#train_spm-1)
-    -   [`predict_spm`](#predict_spm-1)
+-   [`accuracy_plot`](#accuracy_plot)
+-   [Required packages](#required-packages)
+-   [meuse dataset](#meuse-dataset)
+-   [split training (tr) and test (ts)
+    set](#split-training-tr-and-test-ts-set)
+-   [setting generic variables](#setting-generic-variables)
+-   [setting generic accuracy plot
+    variables](#setting-generic-accuracy-plot-variables)
+-   [Loading required libraries:](#loading-required-libraries)
+-   [`train_spm`](#train_spm-1)
+-   [`predict_spm`](#predict_spm-1)
     -   [predicted values for the *newdata*
         set:](#predicted-values-for-the-newdata-set)
-    -   [`plot_spm`](#plot_spm-1)
-    -   [spatial prediction on
-        *rainfall*](#spatial-prediction-on-rainfall)
+-   [`accuracy_plot_spm`](#accuracy_plot_spm)
+-   [raster grid](#raster-grid)
 -   [Croatia tile](#croatia-tile)
     -   [Overlay Demonstration](#overlay-demonstration)
     -   [reading Croatia data](#reading-croatia-data)
     -   [`stripe_years`](#stripe_years)
     -   [`extract_tif`](#extract_tif)
 -   [Space-Time Overlay](#space-time-overlay)
-    -   [make *Analysis ready* data](#make-analysis-ready-data)
--   [`train_spm`](#train_spm-2)
--   [`predict_spm`](#predict_spm-2)
+-   [pre-processing Croatia data](#pre-processing-croatia-data)
+-   [train\_spm](#train_spm-2)
+-   [predict\_spm](#predict_spm-2)
     -   [get ride of small classess in
         prediction](#get-ride-of-small-classess-in-prediction)
 -   [References](#references)
@@ -31,21 +32,13 @@
 Follow me on [![alt
 text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitter.com/sheykhmousa)
 
-
-         checking for file ‘/tmp/RtmpCALdy8/file3c1546643e4a0/R-package/DESCRIPTION’ ...  ✓  checking for file ‘/tmp/RtmpCALdy8/file3c1546643e4a0/R-package/DESCRIPTION’
-      ─  preparing ‘eumap’:
-       checking DESCRIPTION meta-information ...  ✓  checking DESCRIPTION meta-information
-      ─  checking for LF line-endings in source and make files and shell scripts
-      ─  checking for empty or unneeded directories
-      ─  building ‘eumap_0.0.2.tar.gz’
-         
-
 Introduction
 ------------
 
 `eumap` aims at providing easier access to EU environmental maps. Basic
 functions train a spatial prediction model using [mlr3
-package](https://mlr3.mlr-org.com/), and related extensions in the [mlr3
+package](https://mlr3.mlr-org.com/), (Lang et al., [2019](#ref-mlr3)),
+and related extensions in the [mlr3
 ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages)
 (Casalicchio et al., [2017](#ref-casalicchio2017openml); Lang et al.,
 [2020](#ref-MichelLang2020mlr3book)), which includes spatial prediction
@@ -66,10 +59,10 @@ main functions are as the following:
     be either pass or default values will be passed. `train_spm`
     provides four scenarios:
 
-1.1. `classification` task with **non spatial** resampling methods, 1.2.
-`regression` task with **non spatial** resampling methods, 1.3.
-`classification` task with **spatial** resampling methods, 1.4.
-`regression` task with **spatial** resampling methods.
+1.1. `classification` task with **non spatial** resampling methods 1.2.
+`regression` task with **non spatial** resampling methods 1.3.
+`classification` task with **spatial** resampling methods 1.4.
+`regression` task with **spatial** resampling methods
 
 `predict_spm`
 -------------
@@ -77,104 +70,162 @@ main functions are as the following:
 1.  Prediction on a new dataset using `train_model`,
 2.  User needs to set`df.ts = test set` and also pass the `train_model`.
 
-`plot_spm`
-----------
+`accuracy_plot`
+---------------
 
 1.  Accuracy plot in case of regression task (don’t use it for
-    classification tasks for obvious reason). The following examples
-    demonstrates spatial prediction using the `sic97` data set:
+    classification tasks for obvious reason),
 
-### Required packages
+**Warning:** most of functions are optimized to run in parallel by
+default. This might result in high RAM and CPU usage.
+
+The following examples demonstrates spatial prediction using the `meuse`
+data set:
+
+Required packages
+-----------------
 
     start_time <- Sys.time()
     ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
         "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv",  "tidyr", "lubridate", "R.utils", "terra","rgdal",
-        "FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools","gridExtra","yardstick","plotKML", "latticeExtra","devtools","progressr")
+        "FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools","gridExtra","yardstick","plotKML", "latticeExtra","devtools")
     new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
     if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
 
-### sic97 dataset
+meuse dataset
+-------------
 
-    #sic97 source data: https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html
-    library("landmap")  
+    library("sp")
+    demo(meuse, echo=FALSE)
+    pr.vars = c("x","y","dist","ffreq","soil","lead")
+    df <- as.data.frame(meuse)
+    df.grid <- as.data.frame(meuse.grid)
+    # df <- df[complete.cases(df[,pr.vars]),pr.vars]
+    df = na.omit(df[,])
+    df.grid = na.omit(df.grid[,])
+    summary(is.na(df))
+    summary(is.na(df.grid))
+    crs = "+init=epsg:28992"
+    target.variable = "lead"
 
-    version: 0.0.3
-
-    data(sic1997) 
-    sic97 <- na.omit(sic1997)
-    sic97 <- sic1997$swiss1km[c("CHELSA_rainfall","DEM")]
-    df <- data.frame(sic97)
-    #let's create some fake cov
-    df$test1 <- log10(df$DEM)*53.656 
-    df$test2 <- cos(df$DEM)*-0.13 
-    df$test3 <- sin(df$DEM)**31 
-    df$test4 <- (df$DEM)**-5.13 
-    df$test5 <- runif(1:nrow(df))
-    df$test6 <- (df$DEM/2**4)**6 
-    df$test7 <- (df$x)**-1
-    df$test8 <- (df$y)*3
-    df$test9 <- (df$CHELSA_rainfall)**-1
-    df$test10 <-((df$CHELSA_rainfall)*13/34)
-    df$test11 <- runif(1:nrow(df))/0.54545
-    df$test12 <- sqrt(runif(1:nrow(df))) 
-
-### spliting the data
+split training (tr) and test (ts) set
+-------------------------------------
 
     smp_size <- floor(0.5 * nrow(df))
     set.seed(123)
     train_ind <- sample(seq_len(nrow(df)), size = smp_size)
-    df.tr <- df[train_ind,]
-    df.ts <- df[-train_ind, ]
+    df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
+    df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
+
+setting generic variables
+-------------------------
+
+    folds = 2
+    n_evals = 3
     newdata = df.ts
 
-### Loading required libraries:
+setting generic accuracy plot variables
+---------------------------------------
 
-    library("mlr3verse")#
-    library("mlr3spatiotempcv")#
-    library("sp")#
-    library("grid")#
-    library("hexbin")#
-    library("BBmisc")#
-    library("lattice")#
-    library("gridExtra")#
-    library("MLmetrics")
-    library("yardstick")#
-    library("latticeExtra")#
-    library("eumap")
-    library("ppcor")
-    library("progressr")
-    library("checkmate")
+    colorcut. = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)
+    colramp. = colorRampPalette(c("wheat2","red3"))
+    xbins. = 50
+
+Loading required libraries:
+---------------------------
+
+    library("mlr3verse")
+    library("bbotk")
+    library("ggplot2")
+    library("mltools")
+    library("data.table")
+    library("mlr3fselect")
+    library("FSelectorRcpp")
     library("future")
+    library("future.apply")
+    library("magrittr")
+    library("progress")
+    library("mlr3spatiotempcv")
+    library("sp")
+    library("landmap")  
+    library("dplyr")
+    library("EnvStats")
+    library("grid")
+    library("hexbin")
+    library("BBmisc")
+    library("lattice")
+    library("MASS")
+    library("gridExtra")
+    library("MLmetrics")
+    library("yardstick")
+    library("plotKML")
+    library("latticeExtra")
+    library("devtools")
+    library("raster")
+    library("rgdal")
+    library("eumap")
 
-### `train_spm`
+`train_spm`
+-----------
 
 `train_spm` fits multiple models/learners depending on the `class` of
-the **target.variable** and returns a `trained model`, **variable
-importance**, **summary** of the model, and **response** variables.
-`trained model` later can predict a `newdata` set.
+the **target.variable** and for returns a `trained model`, **var.imp**,
+**summary** of the model, and **response** variables. `trained model`
+later can predict a `newdata` set.
 
-    tr = eumap::train_spm(df.tr, target.variable = "CHELSA_rainfall", folds = 5, n_evals = 3, crs = "+init=epsg:4326")
+    tr = eumap::train_spm(df.tr, target.variable = target.variable , folds = folds , n_evals = n_evals , crs = "+init=epsg:28992")
 
-            Regression Task  ...TRUE
+             fit the regression model  (rsmp = SPCV by cooridinates) ...TRUE
 
-               Fitting an ensemble ML using  kknn  featureless, and Randome Forests models ncores: 32  resampling method: (spatial)repeated_cv by cooridinates ...TRUE
+`train_spm` results:
 
--   1st element contains the *trained model*,
--   2nd element contains the *variable importance*,
--   3rd element contains a summary of the *trained model*,
--   4th element contains the *predicted values* of our trained model,
--   5th element contains the ranking of the *important variables*.
-
-<!-- -->
+1st element is the *trained model*:
 
     train_model= tr[[1]]
-    var.imp = tr[[2]]
-    summary = tr[[3]]
-    response = tr[[4]]
-    vlp = tr[[5]]
-    target = tr[[6]]
 
-### `predict_spm`
+2nd element is the *variable importance*:
+
+    var.imp = tr[[2]]
+    var.imp
+
+        dist    ffreq     soil 
+    4199.005 2418.450 1898.147 
+
+3rd element of the summary of the *trained model*:
+
+    summary = tr[[3]]
+    summary
+
+    Ranger result
+
+    Call:
+     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "permutation") 
+
+    Type:                             Regression 
+    Number of trees:                  500 
+    Sample size:                      152 
+    Number of independent variables:  9 
+    Mtry:                             3 
+    Target node size:                 5 
+    Variable importance mode:         permutation 
+    Splitrule:                        variance 
+    OOB prediction error (MSE):       6721.765 
+    R squared (OOB):                  0.4579194 
+
+4th element is the predicted values of our trained model note: here we
+just show start and the ending values
+
+    response = tr[[4]]
+    response
+
+    ...
+      [1] 268.05358 244.43426 205.18133 155.55110 119.10944 111.98254 152.94772
+      [8] 221.80734 207.79976 113.21834 112.47830 194.11921 267.23847 205.43335
+     [15] 210.43176 270.52192 251.40160 249.41321 272.16468 269.21231 225.45011
+    ...
+
+`predict_spm`
+-------------
 
 prediction on `newdata` set
 
@@ -182,76 +233,42 @@ prediction on `newdata` set
 
 ### predicted values for the *newdata* set:
 
-    predict.variable = predict_spm(train_model, df.ts)
-    pred.v = predict.variable[[1]]
-    valu.imp= predict.variable[[2]]
-    pred.v
+note: here we just show start and the ending values
+
+    predict.variable
 
     ...
-        [1]  71.78090  72.13103  71.46687  81.61097  69.73743  71.67500  72.14897
-        [8]  74.74163  83.41340  92.76453  99.94563  75.50320  67.68373  71.61597
-       [15]  72.73050  89.68160  95.41680  76.39263  85.77807  79.59717  88.18267
-       [22]  88.21530  86.91057 107.58407  88.37977  79.68947  72.77547  68.95707
-       [29]  91.87320  74.18283  78.56237  88.40613 107.83470  82.40497  72.94040
-       [36]  72.70167  94.95003  90.59617  84.03460  75.46420  75.19067  76.10240
-       [43]  85.71397  92.73960  71.32220  78.92720  88.99117 101.30787 104.71317
-       [50]  83.37010  87.89953  82.04120  69.93310  73.20517  84.65887  69.51963
-       [57] 102.44733  95.58033  87.14860  86.98527  85.34253  85.72560  78.38680
-       [64]  74.97600  76.90257  77.99773  80.18030  89.52967  76.23370  78.99193
+       [1] 266.38482 266.38482 244.39279 249.56899 266.38482 244.39279 241.15656
+       [8] 250.57212 266.22951 244.39279 241.15656 250.57212 223.56810 212.50498
     ...
 
-    #valu.imp
+`accuracy_plot_spm`
+-------------------
 
-### `plot_spm`
+in case of regression task, - for now we have two scenarios including: -
+rng = “nat” provides visualizations with real values - rng = “norm”
+provides visualizations with the normalized (0~1) values
 
-#### variable importance
+    plt = eumap::accuracy_plot_spm(x = df.tr[,target.variable], y = response, rng = "norm")
 
-    plt = plot_spm(df, gmode  = "norm" , gtype = "var.imp")
-
-<img src="README_files/figure-markdown_strict/unnamed-chunk-12-1.png" alt="Accuracy plot"  />
+<img src="README_files/figure-markdown_strict/unnamed-chunk-16-1.png" alt="Accuracy plot"  />
 <p class="caption">
 Accuracy plot
 </p>
 
-          [,1]
-     [1,]  0.7
-     [2,]  1.9
-     [3,]  3.1
-     [4,]  4.3
-     [5,]  5.5
-     [6,]  6.7
-     [7,]  7.9
-     [8,]  9.1
-     [9,] 10.3
-    [10,] 11.5
-    [11,] 12.7
-    [12,] 13.9
-    [13,] 15.1
-
-#### 
-
-    plt = plot_spm(df, gmode  = "norm" , gtype = "acuuracy")
-
-### spatial prediction on *rainfall*
-
-    predict.variable = predict_spm(train_model, df)
-    df$rainP = predict.variable[[1]]
-    coordinates(df) <- ~x+y
-    proj4string(df) <- CRS("+init=epsg:28992")
-    # creat raster out of output
-    gridded(df) = TRUE
+raster grid
+-----------
 
 make a map using ensemble machine learning with spatial cross validation
-for the predicted variables e.g., *rainfall* (in this case).
+for the predicted variables e.g., *lead* (in this case)
 
-    plot(df[,"rainP"])
+    plot(df.ts[,"leadp"])
+    points(meuse, pch="+")
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-15-1.png" alt="Raster grid"  />
+<img src="README_files/figure-markdown_strict/unnamed-chunk-18-1.png" alt="Raster grid"  />
 <p class="caption">
 Raster grid
 </p>
-
-    # points(sic1997, pch="+")
 
 Croatia tile
 ------------
@@ -271,17 +288,6 @@ light (VIIRS Night Band) layers are temporal (from 2000 to 2020).
 Our dataset refers to 1 tile, located in Croatia, extracted from a
 tiling system created for European Union (7,042 tiles) by [GeoHarmonizer
 Project](https://opendatascience.eu/).
-
-    library(rgdal)
-
-    rgdal: version: 1.5-18, (SVN revision 1082)
-    Geospatial Data Abstraction Library extensions to R successfully loaded
-    Loaded GDAL runtime: GDAL 3.1.3, released 2020/09/01
-    Path to GDAL shared files: /usr/share/gdal
-    GDAL binary built with GEOS: TRUE 
-    Loaded PROJ runtime: Rel. 4.8.0, 6 March 2012, [PJ_VERSION: 480]
-    Path to PROJ shared files: (autodetected)
-    Linking to sp version:1.4-4
 
     tif1.lst = list.files("/data/eumap/sample-data/R-sample-tiles/9529", pattern=".tif", full.names=TRUE, recursive=TRUE) 
     df = readOGR("/data/eumap/sample-data/R-sample-tiles/9529_croatia_landcover_samples.gpkg")
@@ -313,15 +319,15 @@ Project](https://opendatascience.eu/).
     ov.pnts <- parallel::mclapply(1:length(tif1.lst), function(i){ eumap::extract_tif(tif=tif1.lst[i], df, date="Date", date.tif.begin=begin.tif1.lst[i], date.tif.end=end.tif1.lst[i], coords=c("coords.x1","coords.x2")) }, mc.cores=cores)
     gc()
 
-               used  (Mb) gc trigger  (Mb) max used  (Mb)
-    Ncells  3967315 211.9    6952902 371.4  6952902 371.4
-    Vcells 24188400 184.6   39810297 303.8 37218406 284.0
+              used  (Mb) gc trigger  (Mb) max used  (Mb)
+    Ncells 4845595 258.8    7892042 421.5  7892042 421.5
+    Vcells 7712966  58.9   14786712 112.9 12255590  93.6
 
     ov.pnts = ov.pnts[!sapply(ov.pnts, is.null)]
 
-    str(ov.pnts[1:3])
+    str(ov.pnts[1:6])
 
-    List of 3
+    List of 6
      $ :'data.frame':   180 obs. of  2 variables:
       ..$ landsat_ard_fall_blue_p25: num [1:180] 4 6 4 6 6 4 6 6 4 8 ...
       ..$ row.id                   : int [1:180] 3 4 7 15 18 20 26 28 32 36 ...
@@ -331,6 +337,15 @@ Project](https://opendatascience.eu/).
      $ :'data.frame':   180 obs. of  2 variables:
       ..$ landsat_ard_fall_blue_p75: num [1:180] 4 7 5 7 7 6 8 6 5 9 ...
       ..$ row.id                   : int [1:180] 3 4 7 15 18 20 26 28 32 36 ...
+     $ :'data.frame':   180 obs. of  2 variables:
+      ..$ landsat_ard_fall_green_p25: num [1:180] 12 13 10 14 13 11 15 14 11 17 ...
+      ..$ row.id                    : int [1:180] 3 4 7 15 18 20 26 28 32 36 ...
+     $ :'data.frame':   180 obs. of  2 variables:
+      ..$ landsat_ard_fall_green_p50: num [1:180] 12 13 10 14 14 12 15 15 12 18 ...
+      ..$ row.id                    : int [1:180] 3 4 7 15 18 20 26 28 32 36 ...
+     $ :'data.frame':   180 obs. of  2 variables:
+      ..$ landsat_ard_fall_green_p75: num [1:180] 12 14 10 15 14 13 17 15 12 19 ...
+      ..$ row.id                    : int [1:180] 3 4 7 15 18 20 26 28 32 36 ...
 
 Space-Time Overlay
 ------------------
@@ -341,7 +356,7 @@ implements this approach using the parameter: - timeless\_data: The
 result of SpaceOverlay (GeoPandas DataFrame) - col\_date: The column
 that contains the date information (2018-09-13) - dir\_temporal\_layers:
 The directory where the temporal raster files are stored, organized by
-year.
+year
 
     library(data.table)
     commcols <- Reduce(intersect, lapply(ov.pnts, names))
@@ -352,7 +367,7 @@ year.
     df <- as.data.table(df)
     cm <- Reduce(merge,list(df,cm.tif))
     tt = cbind(cm,df$year)
-    #saveRDS(tt, "/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
+    saveRDS(tt, "/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
 
     str(tt)
 
@@ -456,43 +471,17 @@ year.
      - attr(*, ".internal.selfref")=<externalptr> 
      - attr(*, "sorted")= chr "row.id"
 
-### make *Analysis ready* data
-
-    library(dplyr)
-
-
-    Attaching package: 'dplyr'
-
-    The following objects are masked from 'package:data.table':
-
-        between, first, last
-
-    The following object is masked from 'package:MASS':
-
-        select
-
-    The following object is masked from 'package:gridExtra':
-
-        combine
-
-    The following objects are masked from 'package:BBmisc':
-
-        coalesce, collapse
-
-    The following objects are masked from 'package:stats':
-
-        filter, lag
-
-    The following objects are masked from 'package:base':
-
-        intersect, setdiff, setequal, union
+pre-processing Croatia data
+---------------------------
 
     cm.croatia <- readRDS("/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
-    # str(cm.croatia)
+
+    
+
     df <-  cm.croatia
     df$lc_class <- as.factor(df$lc_class)
-    #crs = "+init=epsg:3035"
-    #target.variable = "lc_class"
+    crs = "+init=epsg:3035"
+    target.variable = "lc_class"
     df <- df %>% group_by_if(is.character, as.factor)
     df$row.id <- NULL
     df$survey_date <- NULL
@@ -502,40 +491,135 @@ year.
     df$year <- NULL
     df$tile_id <- NULL
     df$confidence <- NULL
-    # df$V2 <- NULL
-    # colnames(df)
-    colnames(df)[2] <- "x"
-    colnames(df)[3] <- "y"
-    #coordinate_names = c("x","y")
-    df <- as.data.frame(df)
+    df$V2 <- NULL
+    df$coords.x1 <- NULL
+    df$coords.x2 <- NULL
+    colnames(df)
+
+     [1] "lc_class"                       "landsat_ard_fall_blue_p25"     
+     [3] "landsat_ard_fall_blue_p50"      "landsat_ard_fall_blue_p75"     
+     [5] "landsat_ard_fall_green_p25"     "landsat_ard_fall_green_p50"    
+     [7] "landsat_ard_fall_green_p75"     "landsat_ard_fall_nir_p25"      
+     [9] "landsat_ard_fall_nir_p50"       "landsat_ard_fall_nir_p75"      
+    [11] "landsat_ard_fall_red_p25"       "landsat_ard_fall_red_p50"      
+    [13] "landsat_ard_fall_red_p75"       "landsat_ard_fall_swir1_p25"    
+    [15] "landsat_ard_fall_swir1_p50"     "landsat_ard_fall_swir1_p75"    
+    [17] "landsat_ard_fall_swir2_p25"     "landsat_ard_fall_swir2_p50"    
+    [19] "landsat_ard_fall_swir2_p75"     "landsat_ard_fall_thermal_p25"  
+    [21] "landsat_ard_fall_thermal_p50"   "landsat_ard_fall_thermal_p75"  
+    [23] "landsat_ard_spring_blue_p25"    "landsat_ard_spring_blue_p50"   
+    [25] "landsat_ard_spring_blue_p75"    "landsat_ard_spring_green_p25"  
+    [27] "landsat_ard_spring_green_p50"   "landsat_ard_spring_green_p75"  
+    [29] "landsat_ard_spring_nir_p25"     "landsat_ard_spring_nir_p50"    
+    [31] "landsat_ard_spring_nir_p75"     "landsat_ard_spring_red_p25"    
+    [33] "landsat_ard_spring_red_p50"     "landsat_ard_spring_red_p75"    
+    [35] "landsat_ard_spring_swir1_p25"   "landsat_ard_spring_swir1_p50"  
+    [37] "landsat_ard_spring_swir1_p75"   "landsat_ard_spring_swir2_p25"  
+    [39] "landsat_ard_spring_swir2_p50"   "landsat_ard_spring_swir2_p75"  
+    [41] "landsat_ard_spring_thermal_p25" "landsat_ard_spring_thermal_p50"
+    [43] "landsat_ard_spring_thermal_p75" "landsat_ard_summer_blue_p25"   
+    [45] "landsat_ard_summer_blue_p50"    "landsat_ard_summer_blue_p75"   
+    [47] "landsat_ard_summer_green_p25"   "landsat_ard_summer_green_p50"  
+    [49] "landsat_ard_summer_green_p75"   "landsat_ard_summer_nir_p25"    
+    [51] "landsat_ard_summer_nir_p50"     "landsat_ard_summer_nir_p75"    
+    [53] "landsat_ard_summer_red_p25"     "landsat_ard_summer_red_p50"    
+    [55] "landsat_ard_summer_red_p75"     "landsat_ard_summer_swir1_p25"  
+    [57] "landsat_ard_summer_swir1_p50"   "landsat_ard_summer_swir1_p75"  
+    [59] "landsat_ard_summer_swir2_p25"   "landsat_ard_summer_swir2_p50"  
+    [61] "landsat_ard_summer_swir2_p75"   "landsat_ard_summer_thermal_p25"
+    [63] "landsat_ard_summer_thermal_p50" "landsat_ard_summer_thermal_p75"
+    [65] "landsat_ard_winter_blue_p25"    "landsat_ard_winter_blue_p50"   
+    [67] "landsat_ard_winter_blue_p75"    "landsat_ard_winter_green_p25"  
+    [69] "landsat_ard_winter_green_p50"   "landsat_ard_winter_green_p75"  
+    [71] "landsat_ard_winter_nir_p25"     "landsat_ard_winter_nir_p50"    
+    [73] "landsat_ard_winter_nir_p75"     "landsat_ard_winter_red_p25"    
+    [75] "landsat_ard_winter_red_p50"     "landsat_ard_winter_red_p75"    
+    [77] "landsat_ard_winter_swir1_p25"   "landsat_ard_winter_swir1_p50"  
+    [79] "landsat_ard_winter_swir1_p75"   "landsat_ard_winter_swir2_p25"  
+    [81] "landsat_ard_winter_swir2_p50"   "landsat_ard_winter_swir2_p75"  
+    [83] "landsat_ard_winter_thermal_p25" "landsat_ard_winter_thermal_p50"
+    [85] "landsat_ard_winter_thermal_p75" "night_lights"                  
+    [87] "dtm_elevation"                  "dtm_slope"                     
+
+    # colnames(df)[4] <- "x"
+    # colnames(df)[5] <- "y"
+    coordinate_names = c("x","y")
     smp_size <- floor(0.5 * nrow(df))
     set.seed(123)
     train_ind <- sample(seq_len(nrow(df)), size = smp_size)
     df.tr <- df[train_ind, ]
     df.ts <- df[ -train_ind,]
+    folds = 5  #you can change the number to get a better result
+    n_evals = 5  #you can change the number to get a better result
     newdata = df.ts
 
-`train_spm`
------------
+train\_spm
+----------
 
-    library(mlr3verse)
-    library(future)
-    library(progressr)
-    tr = eumap::train_spm(df.tr, target.variable = "lc_class" , folds = 5 , n_evals = 3)
+    tr = eumap::train_spm(df.tr, target.variable = target.variable , folds = folds , n_evals = n_evals)
 
-            classification Task  ...TRUE
+    classification Task   resampling method: non-spatialCV  ncores:  32 ...TRUE
 
-               Fitting an ensemble ML using  kknn  featureless, and Randome Forests models ncores: 32  resampling method: (non-spatial) repeated_cv ...TRUE
+    Using learners: method.list...TRUE
+
+               Fitting a ensemble ML using 'mlr3::TaskClassif'...TRUE
+
+    ...
+    DEBUG [17:13:18.134] Skip subsetting of task 'df.tr' 
+    DEBUG [17:13:18.137] Calling train method of Learner 'classif.ranger.tuned' on task 'df.tr' with 379 observations {learner: <AutoTuner/Learner/R6>}
+     ......................................
+    Warning: Dropped unused factor level(s) in dependent variable: 131.
+
+    Warning: Dropped unused factor level(s) in dependent variable: 131.
+
+    ...
+    INFO  [17:13:48.211] Finished benchmark 
+    INFO  [17:13:48.419] Result of batch 5: 
+    INFO  [17:13:48.422]  mtry sample.fraction num.trees  importance classif.acc 
+    ...
+
+    Warning: Dropped unused factor level(s) in dependent variable: 131.
+
+    ...
+    DEBUG [17:13:48.533] Learner 'classif.ranger' on task 'df.tr' succeeded to fit a model {learner: <LearnerClassifRanger/LearnerClassif/Learner/R6>, result: <ranger>, messages: }
+    DEBUG [17:13:48.543] Learner 'classif.ranger.tuned' on task 'df.tr' succeeded to fit a model {learner: <AutoTuner/Learner/R6>, result: <list>, messages: }
+    DEBUG [17:13:48.553] Skip subsetting of task 'df.tr' 
+    ...
+
+    Warning: Dropped unused factor level(s) in dependent variable: 131.
+
+    ...
+    DEBUG [17:13:48.609] Learner 'classif.ranger' on task 'df.tr' succeeded to fit a model {learner: <LearnerClassifRanger/LearnerClassif/Learner/R6>, result: <ranger>, messages: }
+    ...
 
     train_model= tr[[1]]
     var.imp = tr[[2]]
-    summary = tr[[3]]
-    response = tr[[4]]
-    vlp = tr[[5]]
-    target = tr[[6]]
+    length(var.imp )
 
-`predict_spm`
--------------
+    ...
+    [1] 87
+    ...
+
+    summary = tr[[3]]
+    summary
+
+    ...
+    Ranger result
+
+    Call:
+    ...
+
+    pred.model = tr[[4]]
+    pred.model
+
+    ...
+      [1] 311 324 311 324 324 324 324 231 312 231 324 311 324 324 231 324 231 321
+     [19] 324 324 312 231 231 324 124 324 324 324 311 231 231 324 324 231 324 324
+     [37] 231 321 231 231 324 124 312 311 324 231 231 311 311 324 333 324 311 312
+    ...
+
+predict\_spm
+------------
 
 Prediction; raster map
 
@@ -567,9 +651,9 @@ optional
     newdata$pred <- droplevels(newdata$pred)
     str(summary(newdata$pred, maxsum=length(levels(newdata$pred))))
 
-    plot(runif(10,1,10),runif(10,100,1e6))
+    
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-27-1.png" alt="LC map"  />
+<img src="README_files/figure-markdown_strict/unnamed-chunk-29-1.png" alt="LC map 2019 Crotia tile"  />
 <p class="caption">
 LC map
 </p>
@@ -581,6 +665,11 @@ Casalicchio, G., Bossek, J., Lang, M., Kirchhoff, D., Kerschke, P.,
 Hofner, B., … Bischl, B. (2017). OpenML: An R package to connect to the
 machine learning platform OpenML. *Computational Statistics*, 1–15.
 doi:[10.1007/s00180-017-0742-2](https://doi.org/10.1007/s00180-017-0742-2)
+
+Lang, M., Binder, M., Richter, J., Schratz, P., Pfisterer, F., Coors,
+S., … Bischl, B. (2019). mlr3: A modern object-oriented machine learning
+framework in R. *Journal of Open Source Software*.
+doi:[10.21105/joss.01903](https://doi.org/10.21105/joss.01903)
 
 Lang, M., Schratz, P., Binder, M., Pfisterer, F., Richter, J., Reich, N.
 G., & Bischl, B. (2020, September 9). mlr3 book. Retrieved from

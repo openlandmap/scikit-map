@@ -5,26 +5,20 @@
 \title{Title}
 \usage{
 plot_spm(
-  x,
-  y,
-  z = NULL,
+  df,
   main = NULL,
   palet = NULL,
-  colorcut = c(0, 0.01, 0.03, 0.07, 0.15, 0.25, 0.5, 0.75, 1),
+  colorcut = NULL,
   xbins = 60,
   gvar_imp = TRUE,
+  gtype = c("accuracy", "correlation", "var.imp"),
   gmode = c("root", "log10", "norm", "log2", "nat"),
-  gtype = c("accuracy", "correlation"),
-  aggregate = NULL,
-  aspect = 1
+  aspect = 1,
+  ...
 )
 }
 \arguments{
-\item{x}{}
-
-\item{y}{}
-
-\item{z}{}
+\item{df}{}
 
 \item{main}{}
 
@@ -36,13 +30,13 @@ plot_spm(
 
 \item{gvar_imp}{}
 
-\item{gmode}{}
-
 \item{gtype}{}
 
-\item{aggregate}{}
+\item{gmode}{}
 
 \item{aspect}{}
+
+\item{...}{}
 }
 \value{
 
