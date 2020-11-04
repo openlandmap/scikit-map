@@ -194,14 +194,14 @@ pred.v
 ### `plot_spm` 
 #### variable importance
 
-```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
+```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="var.imp"}
 plt = plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 ```
 
-#### 
+#### accuracy plot
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = plot_spm(df, gmode  = "norm" , gtype = "acuuracy")
+plt = plot_spm(df, gmode  = "norm" , gtype = "accuracy")
 ```
 ### spatial prediction on *rainfall*
 
@@ -323,6 +323,7 @@ newdata = df.ts
 library(mlr3verse)
 library(future)
 library(progressr)
+library(checkmate)
 tr = eumap::train_spm(df.tr, target.variable = "lc_class" , folds = 5 , n_evals = 3)
 ```
 

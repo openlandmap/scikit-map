@@ -25,16 +25,18 @@ pfun <- function(x,y, ...){
 #'
 #' @examples
 plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL,
-xbins = 60 , gvar_imp = TRUE, gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
-  if(gtype == "var.imp" | missing(gmode)){
+xbins = 60 , gvar_imp = TRUE, gtype = c("accuracy", "correlation","var.imp") ,gmode  = NULL, aspect = 1, ...){
+  if(gtype == "var.imp" | is.null(gmode)){
     plt = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
     title(main = "variable importance", font.main = 4)
     print(plt)
   }
   x = df.tr[,target]
   y = pred.v
-  z = valu.imp 
-
+  z = valu.imp
+  if(is.null(gmode)){
+  gmode  = c("root","log10","norm","log2","nat")
+  }
   if(is.null(colorcut)){
     colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)  
   }
