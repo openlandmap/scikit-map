@@ -63,7 +63,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       terminator = trm("evals", n_evals = n_evals), 
       tuner = tnr("random_search")
       )
-      at$store_tuning_instance = TRUE
+      #at$store_tuning_instance = TRUE
       # requireNamespace("lgr")
       # logger = lgr::get_logger("mlr3")
       # logger$set_threshold("trace")
