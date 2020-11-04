@@ -24,14 +24,12 @@ pfun <- function(x,y, ...){
 #' @export
 #'
 #' @examples
-plot_spm <- function(df , main = NULL, palet  = NULL, colorcut = NULL,
+plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL,
 xbins = 60 , gvar_imp = TRUE, gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
-  if(missing(df)){
-    x = df.tr[,target]
-    y = pred.v
-    z = valu.imp 
-    #print(list(x,y,z))
-  }
+  x = df.tr[,target]
+  y = pred.v
+  z = valu.imp 
+
   if(is.null(colorcut)){
     colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)  
   }

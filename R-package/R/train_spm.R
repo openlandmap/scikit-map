@@ -63,7 +63,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       terminator = trm("evals", n_evals = n_evals), 
       tuner = tnr("random_search")
       )
-      at$store_tuning_instance = TRUE
+      #at$store_tuning_instance = TRUE
       # requireNamespace("lgr")
       # logger = lgr::get_logger("mlr3")
       # logger$set_threshold("trace")
@@ -145,7 +145,8 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     method.list <- c("classif.kknn", "classif.featureless", "classif.rpart")
     super.learner = "classif.ranger"
     }
-    
+    # task$set_col_role('tile_id', 'group') later for whole eu should be used
+    # task$set_col_role('confidence', 'weight')
     df.trf = mlr3::as_data_backend(df.tr)
     tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable,
     extra_args = list( positive = "TRUE", coordinate_names = coordinate_names,
