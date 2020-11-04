@@ -21,18 +21,16 @@
     -   [`stripe_years`](#stripe_years)
     -   [`extract_tif`](#extract_tif)
 -   [Space-Time Overlay](#space-time-overlay)
-    -   [make *Analysis ready* data](#make-analysis-ready-data)
+    -   [(analysis ready) data](#analysis-ready-data)
 -   [`train_spm`](#train_spm-2)
 -   [`predict_spm`](#predict_spm-2)
-    -   [get ride of small classess in
-        prediction](#get-ride-of-small-classess-in-prediction)
 -   [References](#references)
 
 Follow me on [![alt
 text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitter.com/sheykhmousa)
 
 
-         checking for file ‘/tmp/RtmpCALdy8/file3c1546643e4a0/R-package/DESCRIPTION’ ...  ✓  checking for file ‘/tmp/RtmpCALdy8/file3c1546643e4a0/R-package/DESCRIPTION’
+         checking for file ‘/tmp/RtmpMV2OWU/file801f05e377471/R-package/DESCRIPTION’ ...  ✓  checking for file ‘/tmp/RtmpMV2OWU/file801f05e377471/R-package/DESCRIPTION’
       ─  preparing ‘eumap’:
        checking DESCRIPTION meta-information ...  ✓  checking DESCRIPTION meta-information
       ─  checking for LF line-endings in source and make files and shell scripts
@@ -188,29 +186,29 @@ prediction on `newdata` set
     pred.v
 
     ...
-        [1]  71.78090  72.13103  71.46687  81.61097  69.73743  71.67500  72.14897
-        [8]  74.74163  83.41340  92.76453  99.94563  75.50320  67.68373  71.61597
-       [15]  72.73050  89.68160  95.41680  76.39263  85.77807  79.59717  88.18267
-       [22]  88.21530  86.91057 107.58407  88.37977  79.68947  72.77547  68.95707
-       [29]  91.87320  74.18283  78.56237  88.40613 107.83470  82.40497  72.94040
-       [36]  72.70167  94.95003  90.59617  84.03460  75.46420  75.19067  76.10240
-       [43]  85.71397  92.73960  71.32220  78.92720  88.99117 101.30787 104.71317
-       [50]  83.37010  87.89953  82.04120  69.93310  73.20517  84.65887  69.51963
-       [57] 102.44733  95.58033  87.14860  86.98527  85.34253  85.72560  78.38680
-       [64]  74.97600  76.90257  77.99773  80.18030  89.52967  76.23370  78.99193
+        [1]  71.80220  72.19450  71.51627  81.67807  69.85040  71.80070  72.31600
+        [8]  74.60243  83.65640  92.89200  99.65280  75.37560  67.33663  72.05823
+       [15]  72.81940  89.57763  95.41123  76.39570  85.84480  79.36400  87.95857
+       [22]  87.97030  86.82043 107.80677  87.84647  80.42300  73.25390  68.23027
+       [29]  91.80843  73.83887  78.38040  87.88683 106.37567  82.63610  73.49277
+       [36]  72.48563  94.80540  90.38707  84.00703  75.68500  75.15710  76.14463
+       [43]  85.65677  92.76300  71.43830  78.56307  88.89390 101.05403 104.88523
+       [50]  83.84097  87.71750  81.90317  70.24460  73.33613  84.60890  69.39127
+       [57] 102.51810  95.90257  87.18923  87.08267  85.14340  85.49547  78.43923
+       [64]  74.64787  76.77847  78.00963  80.06790  89.70123  76.22707  78.99527
     ...
 
     #valu.imp
 
 ### `plot_spm`
 
-#### variable importance
+variable importance
 
     plt = plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-12-1.png" alt="Accuracy plot"  />
+<img src="README_files/figure-markdown_strict/unnamed-chunk-12-1.png" alt="var.imp"  />
 <p class="caption">
-Accuracy plot
+var.imp
 </p>
 
           [,1]
@@ -228,9 +226,13 @@ Accuracy plot
     [12,] 13.9
     [13,] 15.1
 
-#### 
 
-    plt = plot_spm(df, gmode  = "norm" , gtype = "acuuracy")
+    plt = plot_spm(df, gmode  = "norm" , gtype = "accuracy")
+
+<img src="README_files/figure-markdown_strict/unnamed-chunk-13-1.png" alt="Accuracy plot"  />
+<p class="caption">
+Accuracy plot
+</p>
 
 ### spatial prediction on *rainfall*
 
@@ -314,8 +316,8 @@ Project](https://opendatascience.eu/).
     gc()
 
                used  (Mb) gc trigger  (Mb) max used  (Mb)
-    Ncells  3967315 211.9    6952902 371.4  6952902 371.4
-    Vcells 24188400 184.6   39810297 303.8 37218406 284.0
+    Ncells  4088767 218.4    6952190 371.3  6952190 371.3
+    Vcells 24699156 188.5   39811058 303.8 39782918 303.6
 
     ov.pnts = ov.pnts[!sapply(ov.pnts, is.null)]
 
@@ -456,37 +458,9 @@ year.
      - attr(*, ".internal.selfref")=<externalptr> 
      - attr(*, "sorted")= chr "row.id"
 
-### make *Analysis ready* data
+### (analysis ready) data
 
     library(dplyr)
-
-
-    Attaching package: 'dplyr'
-
-    The following objects are masked from 'package:data.table':
-
-        between, first, last
-
-    The following object is masked from 'package:MASS':
-
-        select
-
-    The following object is masked from 'package:gridExtra':
-
-        combine
-
-    The following objects are masked from 'package:BBmisc':
-
-        coalesce, collapse
-
-    The following objects are masked from 'package:stats':
-
-        filter, lag
-
-    The following objects are masked from 'package:base':
-
-        intersect, setdiff, setequal, union
-
     cm.croatia <- readRDS("/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
     # str(cm.croatia)
     df <-  cm.croatia
@@ -521,6 +495,7 @@ year.
     library(mlr3verse)
     library(future)
     library(progressr)
+    library(checkmate)
     tr = eumap::train_spm(df.tr, target.variable = "lc_class" , folds = 5 , n_evals = 3)
 
             classification Task  ...TRUE
@@ -533,6 +508,32 @@ year.
     response = tr[[4]]
     vlp = tr[[5]]
     target = tr[[6]]
+    summary
+
+    Ranger result
+
+    Call:
+     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      probability = self$predict_type == "prob", case.weights = task$weights$weight,      importance = "permutation", mtry = 2L, sample.fraction = 0.964161029900424,      num.trees = 215L) 
+
+    Type:                             Classification 
+    Number of trees:                  215 
+    Sample size:                      379 
+    Number of independent variables:  89 
+    Mtry:                             2 
+    Target node size:                 1 
+    Variable importance mode:         permutation 
+    Splitrule:                        gini 
+    OOB prediction error:             2.11 % 
+
+variable importance plot
+
+    varImp = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
+      title(main = "variable importance", font.main = 4)
+
+<img src="README_files/figure-markdown_strict/unnamed-chunk-25-1.png" alt="Accuracy plot"  />
+<p class="caption">
+Accuracy plot
+</p>
 
 `predict_spm`
 -------------
@@ -555,9 +556,9 @@ Prediction; raster map
       writeGDAL(newdataa["pred"], out.tif, drivername="GTiff", type="Int16", mvFlag = -32768 ,options=c("COMPRESS=DEFLATE"))
     }
 
-### get ride of small classess in prediction
+-   Removing small classes in prediction optional
 
-optional
+<!-- -->
 
     xg <- summary(newdata$pred, maxsum=(1+length(levels(newdata$pred))))
     str(xg)
@@ -569,7 +570,7 @@ optional
 
     plot(runif(10,1,10),runif(10,100,1e6))
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-27-1.png" alt="LC map"  />
+<img src="README_files/figure-markdown_strict/unnamed-chunk-28-1.png" alt="LC map"  />
 <p class="caption">
 LC map
 </p>

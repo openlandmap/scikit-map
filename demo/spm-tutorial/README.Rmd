@@ -192,13 +192,13 @@ pred.v
 ```
 
 ### `plot_spm` 
-#### variable importance
+variable importance
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="var.imp"}
 plt = plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 ```
 
-#### accuracy plot
+accuracy plot
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
 plt = plot_spm(df, gmode  = "norm" , gtype = "accuracy")
@@ -336,10 +336,12 @@ vlp = tr[[5]]
 target = tr[[6]]
 summary
 ```
-
+variable importance plot
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = plot_spm(df, gtype = "var.imp")
+varImp = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
+  title(main = "variable importance", font.main = 4)
+  
 ```
 
 

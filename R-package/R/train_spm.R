@@ -251,6 +251,6 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     train.model = tr.model$predict_newdata
     tr.model$predict_newdata
     tr.model$predict_newdata(newdata )
-        }
+    }
   return(list(train.model, var.imp, summary, response, vlp, target))
-}
+  }

@@ -6,7 +6,6 @@ pfun <- function(x,y, ...){
   return(pfun)
 }
 
-
 #' Title
 #'
 #' @param df 
@@ -24,19 +23,13 @@ pfun <- function(x,y, ...){
 #' @export
 #'
 #' @examples
-plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL,
-xbins = 60 , gvar_imp = TRUE, gtype = c("accuracy", "correlation","var.imp") ,gmode  = NULL, aspect = 1, ...){
-  if(gtype == "var.imp" | is.null(gmode)){
-    plt = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
-    title(main = "variable importance", font.main = 4)
-    print(plt)
-  }
+plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gvar_imp = TRUE,
+                     gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
+  
   x = df.tr[,target]
   y = pred.v
   z = valu.imp
-  if(is.null(gmode)){
-  gmode  = c("root","log10","norm","log2","nat")
-  }
+
   if(is.null(colorcut)){
     colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)  
   }
@@ -54,7 +47,7 @@ xbins = 60 , gvar_imp = TRUE, gtype = c("accuracy", "correlation","var.imp") ,gm
       if(gtype == "var.imp" ){
         plt = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
         title(main = "variable importance", font.main = 4)
-        print(plt)
+        plt
         }
       else if(gtype == "accuracy"){
         #get everything from accuracy.plot  here and enjoy!
