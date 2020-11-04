@@ -9,29 +9,31 @@ pfun <- function(x,y, ...){
 
 #' Title
 #'
-#' @param x 
-#' @param y 
-#' @param z 
+#' @param df 
 #' @param main 
 #' @param palet 
 #' @param colorcut 
 #' @param xbins 
 #' @param gvar_imp 
-#' @param gmode 
 #' @param gtype 
-#' @param aggregate 
+#' @param gmode 
 #' @param aspect 
+#' @param ... 
 #'
 #' @return
 #' @export
 #'
 #' @examples
-plot_spm <- function(x, y, z = NULL, main = NULL, palet  = NULL, colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1),
-xbins = 60 , gvar_imp = TRUE, gmode  = c("root","log10","norm","log2","nat"), gtype = c("accuracy", "correlation"), aggregate = NULL, aspect = 1){
-  if(gvar_imp == TRUE){
-    var_imp = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
-    title(main = "variable importance", font.main = 4)
-    print(var_imp)
+plot_spm <- function(df , main = NULL, palet  = NULL, colorcut = NULL,
+xbins = 60 , gvar_imp = TRUE, gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
+  if(missing(df)){
+    x = df.tr[,target]
+    y = pred.v
+    z = valu.imp 
+    #print(list(x,y,z))
+  }
+  if(is.null(colorcut)){
+    colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)  
   }
   if(is.null(palet)){
       palet=colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4") )
@@ -44,15 +46,18 @@ xbins = 60 , gvar_imp = TRUE, gmode  = c("root","log10","norm","log2","nat"), gt
     print(plt)
   #From Tom's book with a slight modification
     } else {
-      if(gtype == "accuracy"){
+      if(gtype == "var.imp"){
+        plt = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
+        title(main = "variable importance", font.main = 4)
+        print(plt)
+        }
+      else if(gtype == "accuracy"){
         #get everything from accuracy.plot  here and enjoy!
-        
         if(is.null(main)){
           CCC <- signif(ccc(data.frame(x,y), x, y)$.estimate, digits=3)
           RMSE <- signif(rmse(data.frame(x,y), x, y)$.estimate, digits=3)
           main = paste0(expression(CCC) ,": ",  CCC, "  RMSE: ", RMSE)
         }
-        
         if(gmode == "norm"){
           df.x = normalize(x, method = "range", range = c(0, 1))
           df.y = normalize(y, method = "range", range = c(0, 1))
