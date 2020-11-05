@@ -348,7 +348,7 @@ summary
 - variable importance plot; (shows only 10% of important variables)
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-varImp = barplot(var.imp[1:(round(length(var.imp)*0.1)+1)], horiz = TRUE, las = 1,cex.names = 0.6)
+varImp = barplot(var.imp[1:(round(length(var.imp)*0.1)+1)], horiz = TRUE, las = 1,cex.names = 0.7)
   title(main = "variable importance", font.main = 4)
   
 ```
@@ -390,7 +390,7 @@ str(summary(newdata$pred, maxsum=length(levels(newdata$pred))))
 ```
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="LC map"}
-
+plot(x=10,y=100)
 ```
 
 
