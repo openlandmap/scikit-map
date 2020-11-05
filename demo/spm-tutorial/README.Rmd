@@ -20,7 +20,7 @@ header-includes:
 Follow me on [![alt text][1.1]][1]
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
+knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 8, fig.height = 8)
 ```
 
 ```{r , include = FALSE}
@@ -28,7 +28,7 @@ library(knitr)
 ```
 
 
-```{r , message=FALSE, echo = FALSE}
+```{r , message=FALSE,warning=FALSE,results='hide'}
 remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 ```
 
@@ -68,8 +68,11 @@ main functions are as the following:
 The rest of arguments can be either pass or default values will be passed. `train_spm` provides four scenarios:
 
   1.1. `classification` task with **non spatial** resampling methods,
+   
   1.2. `regression` task with **non spatial** resampling methods,
+  
   1.3. `classification` task with **spatial** resampling methods,
+  
   1.4. `regression` task with **spatial** resampling methods.
 
 ## `predict_spm`
@@ -79,15 +82,17 @@ The rest of arguments can be either pass or default values will be passed. `trai
 
 ## `plot_spm` 
 
-1. Accuracy plot in case of regression task (don’t use it for classification tasks for obvious reason). The following examples demonstrates spatial prediction using the `sic97` data set:
+1. Accuracy plot in case of regression task (don’t use it for classification tasks for obvious reason).
+
+The following examples demonstrates spatial prediction using the [sic97](https://wiki.52north.org/pub/AI_GEOSTATS/AI_GEOSTATSData/SIC97_description_01.pdf) data set:
 
 ### Required packages
 
 ```{r , warning=FALSE}
 start_time <- Sys.time()
-ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
-    "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv",  "tidyr", "lubridate", "R.utils", "terra","rgdal",
-    "FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools","gridExtra","yardstick","plotKML", "latticeExtra","devtools","progressr")
+ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse",
+    "hexbin", "sp", "ggplot2", "mlr3spatiotempcv",  "rgdal",
+    "FSelectorRcpp", "future", "future.apply", "mlr3filters", "grid", "mltools","gridExtra","yardstick", "latticeExtra","progressr")
 new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
 ```
@@ -97,23 +102,25 @@ if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstu
 ```{r ,results='hide', warning=FALSE}
 #sic97 source data: https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html
 library("landmap")  
+library("sp")  
 data(sic1997) 
 sic97 <- na.omit(sic1997)
 sic97 <- sic1997$swiss1km[c("CHELSA_rainfall","DEM")]
 df <- data.frame(sic97)
+# adding covariats i.e, principal component. (from landmap package https://github.com/Envirometrix/landmap)
+sp.df <- df
+coordinates(sp.df) <- ~x+y
+proj4string(sp.df) <- CRS("+init=epsg:28992")
+gridded(sp.df) = TRUE
+pc <- spc(sp.df)
+df$pc1 <- pc@predicted$PC1
+df$pc2 <- pc@predicted$PC2
 #let's create some fake cov
-df$test1 <- log10(df$DEM)*53.656 
-df$test2 <- cos(df$DEM)*-0.13 
-df$test3 <- sin(df$DEM)**31 
-df$test4 <- (df$DEM)**-5.13 
-df$test5 <- runif(1:nrow(df))
-df$test6 <- (df$DEM/2**4)**6 
-df$test7 <- (df$x)**-1
-df$test8 <- (df$y)*3
-df$test9 <- (df$CHELSA_rainfall)**-1
-df$test10 <-((df$CHELSA_rainfall)*13/34)
+df$test1 <- log10(df$DEM)*53.656
+df$test2 <- cos(df$DEM)*-0.13
+df$test3 <- sin(df$DEM)**31
 df$test11 <- runif(1:nrow(df))/0.54545
-df$test12 <- sqrt(runif(1:nrow(df))) 
+df$test12 <- sqrt(runif(1:nrow(df)))
 ```
 
 ### spliting the data 
@@ -133,7 +140,6 @@ newdata = df.ts
 ```{r, message=FALSE, warning=FALSE}
 library("mlr3verse")#
 library("mlr3spatiotempcv")#
-library("sp")#
 library("grid")#
 library("hexbin")#
 library("BBmisc")#
@@ -175,7 +181,8 @@ target = tr[[6]]
 ```
 ### `predict_spm`
 
-prediction on `newdata` set
+prediction on *newdata* set
+
 ```{r}
 predict.variable = eumap::predict_spm(train_model, newdata)
 
@@ -192,13 +199,13 @@ pred.v
 ```
 
 ### `plot_spm` 
-variable importance
+- Variable importance
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="var.imp"}
 plt = plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 ```
 
-accuracy plot
+- Accuracy plot
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
 plt = plot_spm(df, gmode  = "norm" , gtype = "accuracy")
@@ -218,7 +225,6 @@ make a map using ensemble machine learning with spatial cross validation for the
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Raster grid"}
 plot(df[,"rainP"])
-# points(sic1997, pch="+")
 ```
 
 ## Croatia tile
@@ -240,6 +246,7 @@ df$row.id = 1:nrow(df)
 ```
 
 ### `stripe_years`
+- strips the file names of the *.tif list file to specific years from 2000 to 2020
 
 ```{r}
 begin.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="begin")})
@@ -248,6 +255,7 @@ unique(end.tif1.lst)
 ```
 
 ### `extract_tif` 
+- spatio-temporal overlay of data points and *.tif data.
 
 ```{r, warning=FALSE}
 cores = ifelse(parallel::detectCores()<length(tif1.lst), parallel::detectCores(), length(tif1.lst))
@@ -255,6 +263,9 @@ ov.pnts <- parallel::mclapply(1:length(tif1.lst), function(i){ eumap::extract_ti
 gc()
 ov.pnts = ov.pnts[!sapply(ov.pnts, is.null)]
 ```
+
+- Structure of the Top 3 row of the data points.
+
 ```{r}
 str(ov.pnts[1:3])
 ```
@@ -278,8 +289,9 @@ tt = cbind(cm,df$year)
 #saveRDS(tt, "/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
 ```
 
+- To partially demonstrate the structure of the data:
 
-```{r}
+```{r,output.lines= c(1:10)}
 str(tt)
 ```
 
@@ -288,11 +300,8 @@ str(tt)
 ```{r, warning=FALSE,message=FALSE}
 library(dplyr)
 cm.croatia <- readRDS("/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
-# str(cm.croatia)
 df <-  cm.croatia
 df$lc_class <- as.factor(df$lc_class)
-#crs = "+init=epsg:3035"
-#target.variable = "lc_class"
 df <- df %>% group_by_if(is.character, as.factor)
 df$row.id <- NULL
 df$survey_date <- NULL
@@ -302,8 +311,6 @@ df$id <- NULL
 df$year <- NULL
 df$tile_id <- NULL
 df$confidence <- NULL
-# df$V2 <- NULL
-# colnames(df)
 colnames(df)[2] <- "x"
 colnames(df)[3] <- "y"
 #coordinate_names = c("x","y")
@@ -327,6 +334,8 @@ library(checkmate)
 tr = eumap::train_spm(df.tr, target.variable = "lc_class" , folds = 5 , n_evals = 3)
 ```
 
+- storing values of *tr* for further use.
+
 ```{r}
 train_model= tr[[1]]
 var.imp = tr[[2]]
@@ -336,14 +345,13 @@ vlp = tr[[5]]
 target = tr[[6]]
 summary
 ```
-variable importance plot
+- variable importance plot; (shows only 10% of important variables)
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-varImp = barplot(var.imp, horiz = TRUE, las = 1, col = gray.colors(10))
+varImp = barplot(var.imp[1:(round(length(var.imp)*0.1)+1)], horiz = TRUE, las = 1,cex.names = 0.6)
   title(main = "variable importance", font.main = 4)
   
 ```
-
 
 ## `predict_spm`
 Prediction; raster map
@@ -362,12 +370,12 @@ for (i in 1:2) {
   newdata$pred = predict.ts
   newdataa <- newdata ## copy and make new raster object
   newdataa@data$pred <- as.numeric(levels(newdataa@data$pred))[newdataa@data$pred]
-  writeGDAL(newdataa["pred"], out.tif, drivername="GTiff", type="Int16", mvFlag = -32768 ,options=c("COMPRESS=DEFLATE"))
+  #writeGDAL(newdataa["pred"], out.tif, drivername="GTiff", type="Int16", mvFlag = -32768 ,options=c("COMPRESS=DEFLATE"))
 }
 ```
 
 - Removing small classes in prediction
-optional
+(*optional*)
 
 ```{r , eval=F, echo=T}
 
@@ -379,11 +387,10 @@ newdata$pred[which(!newdata$pred %in% selg.levs)] <- NA
 newdata$pred <- droplevels(newdata$pred)
 str(summary(newdata$pred, maxsum=length(levels(newdata$pred))))
 
-
 ```
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="LC map"}
-plot(runif(10,1,10),runif(10,100,1e6))
+
 ```
 
 
