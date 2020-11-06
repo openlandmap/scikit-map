@@ -9,10 +9,6 @@
 #' @example 
 #' \dontrun{
 #' predict.variable = predict_spm(train.model, newdata)
-#' predict.variable
-#' prd.all = predict_spm(train.model, df)
-#' str(prd.all)
-#' df$leadp = prd.all
 #' }
 
 predict_spm = function (train_model, newdata){

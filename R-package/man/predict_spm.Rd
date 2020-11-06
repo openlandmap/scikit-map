@@ -7,14 +7,12 @@
 predict_spm(train_model, newdata)
 }
 \arguments{
-\item{newdata}{data at new location}
+\item{newdata}{data at new location,}
 
-\item{train.model}{trained model from `train_spm`}
+\item{train.model}{trained model from `train_spm`,}
 }
 \value{
-y response values
 
-vrimp variable importance value
 }
 \description{
 prediction on new dataset

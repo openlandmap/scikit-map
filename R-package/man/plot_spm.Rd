@@ -36,7 +36,7 @@ plot_spm(
 
 \item{aspect}{default values is aspect = 1}
 
-\item{...}{}
+\item{...}{other arguments that can be passed on to \code{hexbin::hexbin},}
 }
 \value{
 
@@ -48,4 +48,7 @@ Dedicated function to plot diagnostic graphs resulted from `train_spm ` and `pre
 \dontrun{
 plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 }
+}
+\author{
+\href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 }

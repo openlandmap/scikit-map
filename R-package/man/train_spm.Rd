@@ -20,32 +20,32 @@ train_spm(
 )
 }
 \arguments{
-\item{df.tr}{observation data}
+\item{df.tr}{observation data,}
 
-\item{target.variable}{target.variable response variable}
+\item{target.variable}{target.variable response variable,}
 
-\item{parallel}{parallel processing mode}
+\item{parallel}{parallel processing mode,}
 
-\item{predict_type}{e.g., response and prob}
+\item{predict_type}{e.g., response and prob,}
 
-\item{folds}{sub-item for spcv}
+\item{folds}{sub-item for spcv,}
 
-\item{n_evals}{number of evaluation process}
+\item{n_evals}{number of evaluation process,}
 
-\item{method.list}{learning methods}
+\item{method.list}{learning methods,}
 
-\item{var.imp}{variable importance}
+\item{var.imp}{variable importance,}
 
-\item{super.learner}{super learner}
+\item{super.learner}{super learner,}
 
-\item{crs}{coordinate reference system, necessary for spcv}
+\item{crs}{coordinate reference system, necessary for spcv,}
 
 \item{coordinate_names}{}
 
 \item{...}{other arguments that can be passed on to \code{mlr3spatiotempcv::TaskSupervised},}
 }
 \value{
-Object of class \code{mlr3}
+Object of class \code{mlr3},
 }
 \description{
 This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and    \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem.
