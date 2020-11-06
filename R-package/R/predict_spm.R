@@ -1,15 +1,23 @@
+#' predict_spm
+#' @description
+#' prediction on new dataset
+#' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
+#' @param newdata data at new location
+#' @param train.model trained model from `train_spm`
+#' @return y response values
+#' @return vrimp variable importance value
+#' 
+#' @export 
+#' @example 
+#' \dontrun{
+#' predict.variable = predict_spm(train.model, newdata)
+#' predict.variable
+#' prd.all = predict_spm(train.model, df)
+#' str(prd.all)
+#' df$leadp = prd.all
+#' }
 
-#' Title
-#'
-#' @param train_model 
-#' @param newdata 
-#' @param task 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-predict_spm = function (train_model, newdata, task = NULL){
+predict_spm = function (train_model, newdata){
         predict.variable = train_model(newdata)
         if(!is.data.frame(newdata)){
           newdata = as.data.frame(newdata)

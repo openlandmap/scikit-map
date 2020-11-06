@@ -7,24 +7,25 @@ pfun <- function(x,y, ...){
 }
 
 #' Accuracy plot
-#'
-#' @param df data frame
-#' @param main 
-#' @param palet 
-#' @param colorcut 
-#' @param xbins 
-#' @param gvar_imp 
-#' @param gtype 
-#' @param gmode 
-#' @param aspect 
+#' @description Dedicated function to plot diagnostic graphs resulted from `train_spm ` and `predict_spm`,
+#' @param df a data frame containing x,y, and z derived from `train_spm` and `predict_spm`,
+#' @param main Title of the plot,
+#' @param palet default values is palet=colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4),
+#' @param colorcut default value is colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1) ,
+#' @param xbins number of bins, default value is 50,
+#' @param gvar_imp variable importance,
+#' @param gtype graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provide partial correlatio plot for the regression matrix. "var.imp" provides a graph of top 10% of the most informative features.
+#' @param gmode graphical mode; in case `gtype=accuracy` gives user five option for representation of the accuracy plot as follwing: c("root","log10","norm","log2","nat"), "root" represent root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,"norm" represent normalized representation of the data
+#' @param aspect default values is aspect = 1 
 #' @param ... 
 #'
 #' @return
 #' @export
 #'
 #' @examples
-#' 
-#' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
+#' \dontrun{
+#' plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
+#' }
 plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gvar_imp = TRUE,gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
   
   x = df.tr[,target]
