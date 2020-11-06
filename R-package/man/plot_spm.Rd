@@ -30,13 +30,13 @@ plot_spm(
 
 \item{gvar_imp}{variable importance,}
 
-\item{gtype}{graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provide partial correlatio plot for the regression matrix. "var.imp" provides a graph of top 10% of the most informative features.}
+\item{gtype}{graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provides partial correlation plot for the regression matrix. "var.imp" provides a graph of top 10 percent of the most informative features,}
 
-\item{gmode}{graphical mode; in case `gtype=accuracy` gives user five option for representation of the accuracy plot as follwing: c("root","log10","norm","log2","nat"), "root" represent root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,"norm" represent normalized representation of the data}
+\item{gmode}{graphical mode; in case `gtype=accuracy` gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,}
 
-\item{aspect}{default values is aspect = 1}
+\item{aspect}{default values is aspect = 1,}
 
-\item{...}{other arguments that can be passed on to \code{hexbin::hexbin},}
+\item{...}{other arguments that can be passed on to \code{hexbin::hexbin}.}
 }
 \value{
 
