@@ -1,6 +1,6 @@
 #' Train Spatial matrix
 #' @description
-#' This is a function to train (spatial) dataframe [using Ensemble Machine Learning](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748) and [mlr3](https://mlr3.mlr-org.com/) ecosystem. 
+#' This is a function to train (spatial) dataframe \herf{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and {https://mlr3.mlr-org.com/}{mlr3} ecosystem. 
 #' 
 #' @param df.tr observation data
 #' @param target.variable target.variable response variable
@@ -290,7 +290,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
     #value.imp = df.trf$data(1:df.trf$nrow,vlp)
     response = tr.model$model$predictions
-    train.model = tr.model$predict_newdata
+    tr.model$predict_newdata
     tr.model$predict_newdata
     tr.model$predict_newdata(newdata )
     }
