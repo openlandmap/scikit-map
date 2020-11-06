@@ -6,9 +6,9 @@ pfun <- function(x,y, ...){
   return(pfun)
 }
 
-#' Title
+#' Accuracy plot
 #'
-#' @param df 
+#' @param df data frame
 #' @param main 
 #' @param palet 
 #' @param colorcut 
@@ -23,6 +23,8 @@ pfun <- function(x,y, ...){
 #' @export
 #'
 #' @examples
+#' 
+#' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gvar_imp = TRUE,gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
   
   x = df.tr[,target]

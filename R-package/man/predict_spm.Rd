@@ -4,10 +4,10 @@
 \alias{predict_spm}
 \title{Title}
 \usage{
-predict_spm(train.model, newdata, task = NULL)
+predict_spm(train_model, newdata, task = NULL)
 }
 \arguments{
-\item{train.model}{}
+\item{train_model}{}
 
 \item{newdata}{}
 

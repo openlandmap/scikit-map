@@ -2,10 +2,10 @@
 % Please edit documentation in R/plot_spm.R
 \name{plot_spm}
 \alias{plot_spm}
-\title{Title}
+\title{Accuracy plot}
 \usage{
 plot_spm(
-  df,
+  df = NULL,
   main = NULL,
   palet = NULL,
   colorcut = NULL,
@@ -18,7 +18,7 @@ plot_spm(
 )
 }
 \arguments{
-\item{df}{}
+\item{df}{data frame}
 
 \item{main}{}
 
@@ -42,5 +42,11 @@ plot_spm(
 
 }
 \description{
-Title
+Accuracy plot
+}
+\examples{
+
+}
+\author{
+\href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 }
