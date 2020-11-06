@@ -290,9 +290,8 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
     #value.imp = df.trf$data(1:df.trf$nrow,vlp)
     response = tr.model$model$predictions
-    tr.model$predict_newdata
-    tr.model$predict_newdata
-    tr.model$predict_newdata(newdata )
+    train.model = tr.model$predict_newdata
+    response = tr.model$model$predictions
     }
   return(list(train.model, var.imp, summary, response, vlp, target))
   }
