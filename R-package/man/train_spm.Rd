@@ -58,14 +58,17 @@ library(mlr3spatiotempcv)
 library(checkmate)
 library(future)
 library(progressr)
-demo(meuse, echo=TRUE)
-pr.vars = c("x","y","dist","elev","soil","lead")
+library(eumap)
+demo(meuse, echo=FALSE)
 df <- as.data.frame(meuse)
-smp_size <- floor(0.5 * nrow(df))
+df.grid <- as.data.frame(meuse.grid)
+df = na.omit(df[,])
+df.grid = na.omit(df.grid[,])
+smp_size <- floor(0.8 * nrow(df))
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
-df.tr <- df[train_ind, c("x","y","dist","elev","soil","lead")]
-df.ts <- df[-train_ind, c("x","y","dist","elev","soil")]
+df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
+df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
 newdata <-df.ts
 tr = eumap::train_spm(df.tr, target.variable = "lead", folds = 5 ,n_evals = 3,#' crs = "+init=epsg:3035")
 train_model= tr[[1]]
