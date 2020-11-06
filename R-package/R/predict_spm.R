@@ -1,6 +1,7 @@
+
 #' Title
 #'
-#' @param train.model 
+#' @param train_model 
 #' @param newdata 
 #' @param task 
 #'
@@ -8,8 +9,8 @@
 #' @export
 #'
 #' @examples
-predict_spm = function (train.model, newdata, task = NULL){
-        predict.variable = train.model(newdata)
+predict_spm = function (train_model, newdata, task = NULL){
+        predict.variable = train_model(newdata)
         if(!is.data.frame(newdata)){
           newdata = as.data.frame(newdata)
         }

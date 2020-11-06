@@ -1,23 +1,62 @@
-
-#' Title
-#'
-#' @param df.tr 
-#' @param target.variable 
-#' @param parallel 
-#' @param predict_type 
-#' @param folds 
-#' @param n_evals 
-#' @param method.list 
-#' @param var.imp 
-#' @param super.learner 
-#' @param crs 
+#' Train Spatial matrix
+#' @description
+#' This is a function to train (spatial) dataframe [using Ensemble Machine Learning](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748) and [mlr3](https://mlr3.mlr-org.com/) ecosystem. 
+#' 
+#' @param df.tr observation data
+#' @param target.variable target.variable response variable
+#' @param parallel parallel processing mode
+#' @param predict_type e.g., response and prob
+#' @param folds sub-item for spcv
+#' @param n_evals number of evaluation process
+#' @param method.list  learning methods
+#' @param var.imp variable importance
+#' @param super.learner super learner
+#' @param crs coordinate reference system, necessary for spcv
 #' @param coordinate_names 
-#' @param ... 
+#' @param ... other arguments that can be passed on to \code{mlr3spatiotempcv::TaskSupervised},
 #'
-#' @return
+#' @return Object of class \code{mlr3}
 #' @export
-#'
+#'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @examples
+#' ## Meuse Demo
+#' library(sp)
+#' library(mlr3verse)
+#' library(mlr3spatiotempcv)
+#' library(checkmate)
+#' library(future)
+#' library(progressr)
+#' demo(meuse, echo=TRUE)
+#' pr.vars = c("x","y","dist","elev","soil","lead")
+#' df <- as.data.frame(meuse)
+#' smp_size <- floor(0.5 * nrow(df))
+#' set.seed(123)
+#' train_ind <- sample(seq_len(nrow(df)), size = smp_size)
+#' df.tr <- df[train_ind, c("x","y","dist","elev","soil","lead")]
+#' df.ts <- df[-train_ind, c("x","y","dist","elev","soil")]
+#' newdata <-df.ts
+#' tr = eumap::train_spm(df.tr, target.variable = "lead", folds = 5 ,n_evals = 3,#' crs = "+init=epsg:3035")
+#' train_model= tr[[1]]
+#' var.imp = tr[[2]]
+#' summary = tr[[3]]
+#' response = tr[[4]]
+#' vlp = tr[[5]]
+#' target = tr[[6]]
+#' predict.variable = eumap::predict_spm(train_model, newdata)
+#' pred.v = predict.variable[[1]]
+#' valu.imp= predict.variable[[2]]
+#' plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
+#' df.ts$leadp = predict.variable
+#' coordinates(df.ts) <- ~x+y
+#' proj4string(df.ts) <- CRS("+init=epsg:28992")
+#' gridded(df.ts) = TRUE # creat raster output
+#' ## regression grid 
+#' make a map using ensemble machine learning with spatial cross validation for the predicted #' variables (*lead* in this case). 
+#' plot(df.ts[,"leadp"])
+#' points(meuse, pch="+")
+#' 
+
+
 train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 5, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL,  coordinate_names = c("x","y"), ...){
   target = target.variable
   assert_data_frame(df.tr)
