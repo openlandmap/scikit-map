@@ -1,5 +1,3 @@
-
-
 -   [Introduction](#introduction)
 -   [`train_spm`](#train_spm)
 -   [`predict_spm`](#predict_spm)
@@ -489,8 +487,7 @@ Prediction; raster map
     newdata$pred[which(!newdata$pred %in% selg.levs)] <- NA
     newdata$pred <- droplevels(newdata$pred)
     str(summary(newdata$pred, maxsum=length(levels(newdata$pred))))
-
-    plot(x=10,y=100)
+    spplot(newdata$pred)
 
 <img src="README_files/figure-markdown_strict/unnamed-chunk-28-1.png" alt="LC map"  />
 <p class="caption">
