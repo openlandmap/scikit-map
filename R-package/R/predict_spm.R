@@ -1,13 +1,11 @@
 #' predict_spm
 #' @description
 #' prediction on new dataset
-#' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
-#' @param newdata data at new location
-#' @param train.model trained model from `train_spm`
-#' @return y response values
-#' @return vrimp variable importance value
-#' 
+#' @param newdata data at new location,
+#' @param train.model trained model from `train_spm`,
+#' @return 
 #' @export 
+#' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' @example 
 #' \dontrun{
 #' predict.variable = predict_spm(train.model, newdata)

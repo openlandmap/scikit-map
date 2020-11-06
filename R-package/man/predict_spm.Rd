@@ -2,20 +2,23 @@
 % Please edit documentation in R/predict_spm.R
 \name{predict_spm}
 \alias{predict_spm}
-\title{Title}
+\title{predict_spm}
 \usage{
-predict_spm(train_model, newdata, task = NULL)
+predict_spm(train_model, newdata)
 }
 \arguments{
-\item{train_model}{}
+\item{newdata}{data at new location}
 
-\item{newdata}{}
-
-\item{task}{}
+\item{train.model}{trained model from `train_spm`}
 }
 \value{
+y response values
 
+vrimp variable importance value
 }
 \description{
-Title
+prediction on new dataset
+}
+\author{
+\href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 }

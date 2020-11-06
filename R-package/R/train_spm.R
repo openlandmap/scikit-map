@@ -2,20 +2,20 @@
 #' @description
 #' This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and    \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem. 
 #' 
-#' @param df.tr observation data
-#' @param target.variable target.variable response variable
-#' @param parallel parallel processing mode
-#' @param predict_type e.g., response and prob
-#' @param folds sub-item for spcv
-#' @param n_evals number of evaluation process
-#' @param method.list  learning methods
-#' @param var.imp variable importance
-#' @param super.learner super learner
-#' @param crs coordinate reference system, necessary for spcv
+#' @param df.tr observation data,
+#' @param target.variable target.variable response variable,
+#' @param parallel parallel processing mode,
+#' @param predict_type e.g., response and prob,
+#' @param folds sub-item for spcv,
+#' @param n_evals number of evaluation process,
+#' @param method.list  learning methods,
+#' @param var.imp variable importance,
+#' @param super.learner super learner,
+#' @param crs coordinate reference system, necessary for spcv,
 #' @param coordinate_names 
 #' @param ... other arguments that can be passed on to \code{mlr3spatiotempcv::TaskSupervised},
 #'
-#' @return Object of class \code{mlr3}
+#' @return Object of class \code{mlr3},
 #' @export
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @examples 

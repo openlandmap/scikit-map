@@ -17,11 +17,10 @@ pfun <- function(x,y, ...){
 #' @param gtype graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provide partial correlatio plot for the regression matrix. "var.imp" provides a graph of top 10% of the most informative features.
 #' @param gmode graphical mode; in case `gtype=accuracy` gives user five option for representation of the accuracy plot as follwing: c("root","log10","norm","log2","nat"), "root" represent root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,"norm" represent normalized representation of the data
 #' @param aspect default values is aspect = 1 
-#' @param ... 
-#'
+#' @param ... other arguments that can be passed on to \code{hexbin::hexbin},
 #' @return
 #' @export
-#'
+#' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' @examples
 #' \dontrun{
 #' plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")

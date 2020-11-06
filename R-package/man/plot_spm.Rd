@@ -18,23 +18,23 @@ plot_spm(
 )
 }
 \arguments{
-\item{df}{data frame}
+\item{df}{a data frame containing x,y, and z derived from `train_spm` and `predict_spm`,}
 
-\item{main}{}
+\item{main}{Title of the plot,}
 
-\item{palet}{}
+\item{palet}{default values is palet=colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4),}
 
-\item{colorcut}{}
+\item{colorcut}{default value is colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1) ,}
 
-\item{xbins}{}
+\item{xbins}{number of bins, default value is 50,}
 
-\item{gvar_imp}{}
+\item{gvar_imp}{variable importance,}
 
-\item{gtype}{}
+\item{gtype}{graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provide partial correlatio plot for the regression matrix. "var.imp" provides a graph of top 10% of the most informative features.}
 
-\item{gmode}{}
+\item{gmode}{graphical mode; in case `gtype=accuracy` gives user five option for representation of the accuracy plot as follwing: c("root","log10","norm","log2","nat"), "root" represent root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,"norm" represent normalized representation of the data}
 
-\item{aspect}{}
+\item{aspect}{default values is aspect = 1}
 
 \item{...}{}
 }
@@ -42,11 +42,10 @@ plot_spm(
 
 }
 \description{
-Accuracy plot
+Dedicated function to plot diagnostic graphs resulted from `train_spm ` and `predict_spm`,
 }
 \examples{
-
+\dontrun{
+plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 }
-\author{
-\href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 }
