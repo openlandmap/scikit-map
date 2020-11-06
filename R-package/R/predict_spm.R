@@ -8,7 +8,7 @@
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' @example 
 #' \dontrun{
-#' predict.variable = predict_spm(train.model, newdata)
+#' predict.variable = eumap::predict_spm(train.model, newdata)
 #' }
 
 predict_spm = function (train_model, newdata){
