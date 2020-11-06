@@ -18,7 +18,8 @@
 #' @return Object of class \code{mlr3}
 #' @export
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
-#' @examples
+#' @examples 
+#' \dontrun{ 
 #' ## Meuse Demo
 #' library(sp)
 #' library(mlr3verse)
@@ -57,9 +58,7 @@
 #' make a map using ensemble machine learning with spatial cross validation for the predicted #' variables (*lead* in this case). 
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
-#' 
-
-
+#' }
 train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 5, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL,  coordinate_names = c("x","y"), ...){
   target = target.variable
   assert_data_frame(df.tr)
