@@ -14,10 +14,10 @@ pfun <- function(x,y, ...){
 #' @param colorcut default value is colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1) ,
 #' @param xbins number of bins, default value is 50,
 #' @param gvar_imp variable importance,
-#' @param gtype graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provide partial correlatio plot for the regression matrix. "var.imp" provides a graph of top 10% of the most informative features.
-#' @param gmode graphical mode; in case `gtype=accuracy` gives user five option for representation of the accuracy plot as follwing: c("root","log10","norm","log2","nat"), "root" represent root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,"norm" represent normalized representation of the data
-#' @param aspect default values is aspect = 1 
-#' @param ... other arguments that can be passed on to \code{hexbin::hexbin},
+#' @param gtype graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provides partial correlation plot for the regression matrix. "var.imp" provides a graph of top 10 percent of the most informative features,
+#' @param gmode graphical mode; in case `gtype=accuracy` gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,
+#' @param aspect default values is aspect = 1,
+#' @param ... other arguments that can be passed on to \code{hexbin::hexbin}.
 #' @return
 #' @export
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
