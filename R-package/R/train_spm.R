@@ -1,6 +1,6 @@
 #' Train Spatial matrix
 #' @description
-#' This is a function to train (spatial) dataframe \herf{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and {https://mlr3.mlr-org.com/}{mlr3} ecosystem. 
+#' This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and    \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem. 
 #' 
 #' @param df.tr observation data
 #' @param target.variable target.variable response variable
