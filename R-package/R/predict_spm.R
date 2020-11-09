@@ -19,5 +19,5 @@ predict_spm = function (train_model, newdata){
         vrimp = newdata[1:nrow(newdata),vlp]
         y = predict.variable$response
         # measure_test = predict.variable$score()
-        return(list(y, vrimp,measure_test))
+        return(list(y, vrimp))
 }
