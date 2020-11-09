@@ -210,7 +210,7 @@ class LandMapper():
 
 		return result
 
-	def predict(self, dirs_layers:List, fn_result:str, data_type = gdal.GDT_Float32):
+	def predict(self, dirs_layers:List, fn_result:str, data_type = gdal.GDT_Float32, fill_nodata=False):
 		
 		fn_layers = self._find_layers(dirs_layers)
 		input_data = self.read_data(fn_layers)
@@ -218,12 +218,17 @@ class LandMapper():
 		x_size, y_size, n_features = input_data.shape
 		input_data = input_data.reshape(-1, n_features)
 
-		input_data = self.fill_nodata(input_data)
+		if fill_nodata: 
+			input_data = self.fill_nodata(input_data)
+		else:
+			nan_mask = np.any(np.isnan(input_data), axis=1)
+			input_data[nan_mask,:] = 0
 
 		if self.verbose:
 			ttprint(f'Predicing {x_size * y_size} pixels')
 		
 		result = self.estimator.predict(input_data)
+		result[nan_mask] = np.nan
 		result = result.reshape(1, x_size, y_size)
 		
 		if self.verbose:

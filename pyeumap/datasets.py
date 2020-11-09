@@ -1,5 +1,5 @@
 import requests
-import zipfile
+import tarfile
 import tempfile
 import os, sys
 import threading
@@ -11,12 +11,36 @@ from typing import Union, List
 import shutil
 
 DATASETS = [
-    '22497_sweden_landcover_samples.gpkg',
-    '22497_sweden_rasters.zip',
-    '22497_sweden_rasters_gapfilled.zip',
+    '4582_spain_landcover_samples.gpkg',
+    '4582_spain_rasters.tar.gz',
+    '4582_spain_rasters_gapfilled.tar.gz',
+    '5606_greece_landcover_samples.gpkg',
+    '5606_greece_rasters.tar.gz',
+    '5606_greece_rasters_gapfilled.tar.gz',
+    '9326_italy_landcover_samples.gpkg',
+    '9326_italy_rasters.tar.gz',
+    '9326_italy_rasters_gapfilled.tar.gz',
     '9529_croatia_landcover_samples.gpkg',
-    '9529_croatia_rasters.zip',
-    '9529_croatia_rasters_gapfilled.zip',
+    '9529_croatia_rasters.tar.gz',
+    '9529_croatia_rasters_gapfilled.tar.gz',
+    '10636_switzerland_landcover_samples.gpkg',
+    '10636_switzerland_rasters.tar.gz',
+    '10636_switzerland_rasters_gapfilled.tar.gz',
+    '14576_netherlands_landcover_samples.gpkg',
+    '14576_netherlands_rasters.tar.gz',
+    '14576_netherlands_rasters_gapfilled.tar.gz',
+    '14580_netherlands_landcover_samples.gpkg',
+    '14580_netherlands_rasters.tar.gz',
+    '14580_netherlands_rasters_gapfilled.tar.gz',
+    '15560_poland_landcover_samples.gpkg',
+    '15560_poland_rasters.tar.gz',
+    '15560_poland_rasters_gapfilled.tar.gz',
+    '16057_ireland_landcover_samples.gpkg',
+    '16057_ireland_rasters.tar.gz',
+    '16057_ireland_rasters_gapfilled.tar.gz',
+    '22497_sweden_landcover_samples.gpkg',
+    '22497_sweden_rasters.tar.gz',
+    '22497_sweden_rasters_gapfilled.tar.gz',
     'eu_tilling system_30km.gpkg',
 ]
 ALL = DATASETS
@@ -52,7 +76,7 @@ def get_datasets(keywords: Union[str, List[str]]='') -> list:
     )]
 
 def _make_download_request(dataset:str) -> requests.Response:
-    url = f'https://zenodo.org/record/4058447/files/{dataset}?download=1'
+    url = f'https://zenodo.org/record/4265220/files/{dataset}?download=1'
     return requests.get(url, stream=True)
 
 class _DownloadWorker:
@@ -83,8 +107,8 @@ class _DownloadWorker:
             os.makedirs(datapath)
         lock.release()
 
-        if self.dataset.endswith('.zip'):
-            with zipfile.ZipFile(self.tmpfile) as archive:
+        if self.dataset.endswith('tar.gz'):
+            with tarfile.open(self.tmpfile, "r:gz") as archive:
                 archive.extractall(datapath)
             os.remove(self.tmpfile)
         else:
