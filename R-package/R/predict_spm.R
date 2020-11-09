@@ -18,6 +18,11 @@ predict_spm = function (train_model, newdata){
         }
         vrimp = newdata[1:nrow(newdata),vlp]
         y = predict.variable$response
+<<<<<<< HEAD
         # measure_test = predict.variable$score()
         return(list(y, vrimp,measure_test))
+=======
+        #measure_test = predict.variable$score()
+        return(list(y, vrimp))
+>>>>>>> master
 }
