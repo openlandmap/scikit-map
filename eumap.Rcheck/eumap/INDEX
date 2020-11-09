@@ -1,0 +1,7 @@
+extract_tif             Extract points from a GeoTIFF using
+                        spatiotemporal overlay
+plot_spm                Title
+predict_spm             Title
+strip_dates             Strip dates from tifs
+strip_years             Strip dates from tifs
+train_spm               Title

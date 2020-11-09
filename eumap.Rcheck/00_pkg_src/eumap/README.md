@@ -6,12 +6,12 @@
 
 Package provides easier access to EU environmental maps and functions to produce and improve new value-added spatial layers. Key functionality includes:
 
-* `train_spm` --- train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/)) implementation with spatial coordinates and spatial cross-validation,
-* `plot_spm` --- plots predicted vs observed values based on the result of `train_spm`,
+* `train.spm` --- train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/)) implementation with spatial coordinates and spatial cross-validation,
+* `accuracy.plot` --- plots predicted vs observed values based on the result of `train.spm`,
 * `extract_tif` --- extracts points with space-time observations from a list of tifs with different begin / end reference periods,
-* `predict_spm` --- can be used to predict values from a fitted spatial prediction model at new locations,
+* `predict.spm` --- can be used to predict values from a fitted spatial prediction model at new locations,
 
-A general tutorial for `train_spm` is available [here](https://gitlab.com/geoharmonizer_inea/eumap/-/tree/master/demo/spm-tutorial). The eumap package builds up on top of the [mlr3](https://mlr3.mlr-org.com/), [terra](https://github.com/rspatial/terra) and similar packages. As such, it's main purpose is to automate as much as possible Machine Learning and prediction in a scalable system.
+A general tutorial for `train.spm` is available [here](https://gitlab.com/geoharmonizer_inea/eumap/-/tree/master/demo/spm-tutorial). The eumap package builds up on top of the [mlr3](https://mlr3.mlr-org.com/), [terra](https://github.com/rspatial/terra) and similar packages. As such, it's main purpose is to automate as much as possible Machine Learning and prediction in a scalable system.
 
 <img src="../img/spm_general_workflow.png" alt="General workflow eumap package" width="550"/>
 
