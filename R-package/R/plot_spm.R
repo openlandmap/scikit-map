@@ -1,4 +1,3 @@
-
 pfun <- function(x,y, ...){
   panel.xyplot(x, y, ...)
   panel.hexbinplot(x,y, ...)  
@@ -21,8 +20,8 @@ pfun <- function(x,y, ...){
 #' @return
 #' @export
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
-#' @examples
-#' \dontrun{
+#' @example
+#' \donttest{
 #' plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 #' }
 plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gvar_imp = TRUE,gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
