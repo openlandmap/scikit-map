@@ -6,7 +6,7 @@
 
 Package provides easier access to EU environmental maps and functions to produce and improve new value-added spatial layers. Key functionality includes:
 
-* `train_spm` --- train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/)) implementation with spatial coordinates and spatial cross-validation,
+* `train_spm` --- train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/) implementation with spatial coordinates and spatial cross-validation,
 * `plot_spm` --- plots predicted vs observed values based on the result of `train_spm`,
 * `extract_tif` --- extracts points with space-time observations from a list of tifs with different begin / end reference periods,
 * `predict_spm` --- can be used to predict values from a fitted spatial prediction model at new locations,
@@ -22,8 +22,8 @@ Warning: most of functions are optimized to run in parallel by default. This mig
 Install development versions from github:
 
 ```r
-library(devtools)
-install_gitlab("geoharmonizer_inea/eumap/R-package")
+library(remotes)
+remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 ```
 
 Under construction. Use for testing purposes only.
