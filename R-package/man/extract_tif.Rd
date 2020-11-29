@@ -11,7 +11,7 @@ extract_tif(
   date.tif.begin,
   date.tif.end,
   coords = c("x", "y"),
-  crs = "epsg:3035",
+  crs = "+proj=epsg:3035",
   format.date = "\%Y-\%m-\%d"
 )
 }
@@ -45,7 +45,6 @@ Works best if the GeoTIFF are Cloud-Optimized and located on SSD or similar.
 \examples{
 \dontrun{
 library(terra)
-library(rgdal)
 tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
 strip_dates(tif.name, type="begin")
 tif1.lst = list.files("R-sample-tiles/9529", pattern=".tif", full.names=TRUE, recursive=TRUE) 
@@ -56,6 +55,6 @@ df$Date = format.Date(as.Date(paste(df$survey_date), format="\%Y/\%m/\%d"), "\%Y
 df$row.id = 1:nrow(df)
 begin.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="begin")})
 end.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="end")})
-x = extract_tif(tif=tif1.lst[43], df, date="Date", date.tif.begin, date.tif.end, coords))
+x = extract_tif(tif=tif1.lst, df, date="Date", begin=begin, end=end, coords=c("x","y"))
 }
 }

@@ -1,7 +1,7 @@
 pfun <- function(x,y, ...){
-  lattice::panel.xyplot(x, y, ...)
-  hexbin::panel.hexbinplot(x,y, ...)  
-  lattice::panel.abline(coef = c(0,1), col="black", size = 0.25, lwd = 2)
+  panel.xyplot(x, y, ...)
+  panel.hexbinplot(x,y, ...)  
+  panel.abline(coef = c(0,1), col="black", size = 0.25, lwd = 2)
   return(pfun)
 }
 
@@ -16,7 +16,7 @@ pfun <- function(x,y, ...){
 #' @param gtype graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provides partial correlation plot for the regression matrix. "var.imp" provides a graph of top 10 percent of the most informative features,
 #' @param gmode graphical mode; in case `gtype=accuracy` gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,
 #' @param aspect default values is aspect = 1,
-#' @param ... other arguments that can be passed on to \code{hexbin::hexbin}.
+#' @param ... other arguments that can be passed on to \code{hexbin}.
 #' @export
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' @examples
@@ -36,8 +36,8 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
       palet=grDevices::colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4") )
   }
   if(length(x) <= 500 ) {
-    plt <- lattice:: xyplot(x ~ y, asp=1, 
-                   par.settings = list(plot.symbol = list(col=scales::alpha("black", 0.6), fill=scales::alpha("red", 0.6), pch=21, cex=0.6)), 
+    plt <-  xyplot(x ~ y, asp=1, 
+                   par.settings = list(plot.symbol = list(col=alpha("black", 0.6), fill=alpha("red", 0.6), pch=21, cex=0.6)), 
                    scales = list(x=list(log=TRUE, equispaced.log=FALSE), y=list(log=TRUE, equispaced.log=FALSE)),
                    ylab="measured", xlab="predicted")
     print(plt)
@@ -51,13 +51,13 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
       else if(gtype == "accuracy"){
         #get everything from accuracy.plot  here and enjoy!
         if(is.null(main)){
-          CCC <- signif(yardstick:: ccc(data.frame(x,y), x, y)$.estimate, digits=3)
-          RMSE <- signif(yardstick:: rmse(data.frame(x,y), x, y)$.estimate, digits=3)
+          CCC <- signif( ccc(data.frame(x,y), x, y)$.estimate, digits=3)
+          RMSE <- signif( rmse(data.frame(x,y), x, y)$.estimate, digits=3)
           main = paste0(expression(CCC) ,": ",  CCC, "  RMSE: ", RMSE)
         }
         if(gmode == "norm"){
-          df.x =BBmisc:: normalize(x, method = "range", range = c(0, 1))
-          df.y =BBmisc:: normalize(y, method = "range", range = c(0, 1))
+          df.x = normalize(x, method = "range", range = c(0, 1))
+          df.y = normalize(y, method = "range", range = c(0, 1))
           xlab = expression(italic("0~1 measured"))
           ylab = expression(italic("0~1 predicted"))
           xscale.components = xscale.components.logpower
@@ -92,7 +92,7 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
           yscale.components = yscale.components.subticks
         }
       
-        plt <-hexbin:: hexbinplot(
+        plt <- hexbinplot(
           df.x ~ df.y, xbins=xbins, scales = list(x = df.x, y = df.y), 
           xscale.components = xscale.components, yscale.components = yscale.components, 
           mincnt = 1, xlab = xlab , ylab = ylab, inner=0.2, cex.labels=1, colramp = palet, 
@@ -103,12 +103,12 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
         #first we need to find var.imp and related vals <- ok
         #id = strsplit(deparse(target.variable),"\"")[[1]][2] #this was stupid of me
         df.pcor = data.frame(target.variable = df.tr[,target.variable],z = valu.imp)
-        pcorr =ppcor:: pcor(df.pcor)
+        pcorr =pcor(df.pcor)
         main = "Partial correlation"
         #fekri behale namayeshe multiple figure bekon ba fit line mesle naghale
         #now we have 2 varimp see how to generate the maps automatically
         if(length(vlp) == 1){
-          plt <-hexbin:: hexbinplot(df.pcor[,"target.variable"] ~ df.pcor[,2],
+          plt <- hexbinplot(df.pcor[,"target.variable"] ~ df.pcor[,2],
           mincnt = 1,xbins=xbins,xlab=colnames(df.pcor)[2],ylab="target.variable",
           colramp =  palet, main=main, colorcut = colorcut, type="g",panel = pfun) 
         }
@@ -118,7 +118,7 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
           x = df.pcor[,"target.variable"]
           plt <- lapply(1:length(vlp), function(i) {
           # y =  df.pcorr[,i]  
-          hexbin:: hexbinplot(x ~  df.pcorr[,i],
+           hexbinplot(x ~  df.pcorr[,i],
           xlab=colnames(df.pcorr)[i],ylab="target.variable", colramp =  palet,
           main=main, colorcut = colorcut, type="g",panel = pfun) 
           })

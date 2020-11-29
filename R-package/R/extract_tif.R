@@ -21,7 +21,7 @@
 #' library(terra)
 #' tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
 #' strip_dates(tif.name, type="begin")
-#' tif1.lst = list.files("/data/eumap/sample-data/R-sample-tiles/9529", pattern=".tif", full.names=TRUE, recursive=TRUE) 
+#' tif1.lst = list.files("R-sample-tiles/9529", pattern=".tif", full.names=TRUE, recursive=TRUE) 
 #' year.span = c(2000:2020)
 #' df = readOGR("/data/eumap/sample-data/R-sample-tiles/9529_croatia_landcover_samples.gpkg")
 #' df <- as.data.frame(df)
@@ -29,9 +29,9 @@
 #' df$row.id = 1:nrow(df)
 #' begin.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="begin")})
 #' end.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="end")})
-#' x = extract_tif(tif=tif1.lst[43], df, date="Date", date.tif.begin=begin.tif1.lst[43], date.tif.end=end.tif1.lst[43], coords=c("coords.x1","coords.x2"))
+#' x = extract_tif(tif=tif1.lst, df, date="Date", begin=begin, end=end, coords=c("x","y"))
 #' }
-extract_tif <- function(tif, df, date, date.tif.begin, date.tif.end, coords=c("x","y"), crs="+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs", format.date="%Y-%m-%d"){
+extract_tif <- function(tif, df, date, date.tif.begin, date.tif.end, coords=c("x","y"), crs="+proj=epsg:3035", format.date="%Y-%m-%d"){
   if(any(!coords %in% colnames(df))){
     stop(paste("Coordinate columns", coords, "could not be found"))
   }
