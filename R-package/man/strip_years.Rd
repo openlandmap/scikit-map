@@ -28,6 +28,8 @@ strip_years(
 
 \item{timeless}{if timeless then consider the whole time span}
 
+\item{format.date}{y/m/d}
+
 \item{year.type}{date (\code{\%m-\%d}) of the start and the end of year}
 }
 \value{
@@ -37,9 +39,10 @@ character or vector of dates formatted as \code{\%Y-\%m-\%d}.
 Strip dates from tifs
 }
 \examples{
+\dontrun{
 tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
 strip_years(tif.name, type="begin")
 strip_years(tif.name, type="end")
-
+}
 
 }

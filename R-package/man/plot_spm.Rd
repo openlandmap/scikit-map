@@ -36,10 +36,7 @@ plot_spm(
 
 \item{aspect}{default values is aspect = 1,}
 
-\item{...}{other arguments that can be passed on to \code{hexbin::hexbin}.}
-}
-\value{
-
+\item{...}{other arguments that can be passed on to \code{hexbin}.}
 }
 \description{
 Dedicated function to plot diagnostic graphs resulted from `train_spm ` and `predict_spm`,

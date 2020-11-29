@@ -7,15 +7,20 @@
 predict_spm(train_model, newdata)
 }
 \arguments{
-\item{newdata}{data at new location,}
+\item{train_model}{trained model using `train_spm`,}
 
-\item{train.model}{trained model from `train_spm`,}
+\item{newdata}{data at new location,}
 }
 \value{
-
+predicted variables, variable importance
 }
 \description{
 prediction on new dataset
+}
+\examples{
+\dontrun{
+predict.variable = eumap::predict_spm(train_model, newdata)
+}
 }
 \author{
 \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}

@@ -6,16 +6,18 @@
 #' @param begin.seasons date (\code{\%m-\%d}) of the start of season
 #' @param season.name season names as used in the file names
 #' @param timeless if timeless then consider the whole time span
+#' @param format.date y/m/d
 #' @param year.type date (\code{\%m-\%d}) of the start and the end of year
 #' @return character or vector of dates formatted as \code{\%Y-\%m-\%d}.
 #' 
 #' @export 
 #'
-#' @examples
+#' @examples 
+#' \dontrun{
 #' tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
 #' strip_years(tif.name, type="begin")
 #' strip_years(tif.name, type="end")
-#' 
+#' }
 #'
 
 strip_years <- function(tif.name, year.span=c(2000:2020), type=c("begin", "end")[1], begin.seasons=c("12-02", "03-21", "06-25", "09-13", "12-02"), season.name=c("winter", "spring", "summer", "fall"), timeless="timeless",format.date="%Y/%m/%d", year.type=c("01-01","12-31")){

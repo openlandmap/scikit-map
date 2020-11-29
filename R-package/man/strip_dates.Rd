@@ -33,8 +33,9 @@ character or vector of dates formatted as \code{\%Y-\%m-\%d}.
 Strip dates from tifs
 }
 \examples{
+\dontrun{
 tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
 strip_dates(tif.name, type="begin")
 strip_dates(tif.name, type="end")
-
+}
 }

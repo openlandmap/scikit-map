@@ -48,7 +48,7 @@ library(glmnet)
 library(xgboost)
 library(kernlab)
 library(deepnet)
-library(mlr)
+library(mlr3)
 demo(meuse, echo=FALSE)
 ```
 

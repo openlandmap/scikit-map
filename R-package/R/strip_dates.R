@@ -9,10 +9,11 @@
 #' @return character or vector of dates formatted as \code{\%Y-\%m-\%d}.
 #' @export
 #' @examples
+#' \dontrun{
 #' tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
 #' strip_dates(tif.name, type="begin")
 #' strip_dates(tif.name, type="end")
-#' 
+#' }
 strip_dates <- function(tif.name, year.span=c(2000:2020), type=c("begin", "end")[1], begin.seasons=c("12-02", "03-21", "06-25", "09-13", "12-02"), season.name=c("winter", "spring", "summer", "fall"), timeless="timeless"){
   if(length(grep(timeless, tif.name))>0){
     if(type=="begin"){
