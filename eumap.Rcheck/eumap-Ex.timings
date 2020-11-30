@@ -1,0 +1,6 @@
+name	user	system	elapsed
+extract_tif	0.000	0.001	0.001	
+plot_spm	0	0	0	
+strip_dates	0.001	0.000	0.001	
+strip_years	0.001	0.000	0.001	
+train_spm	0	0	0	
