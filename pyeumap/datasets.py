@@ -83,12 +83,14 @@ class _DownloadWorker:
 
     def __init__(self, dataset:str, download_dir: str=_DOWNLOAD_DIR):
         self.done = False
+        self.error = None
         self.dataset = dataset
         self.download_dir = download_dir
         self.progress = 0
         self.downloaded = 0
         self.size = None
-        __, self.tmpfile = tempfile.mkstemp()
+        self.tmp_filepath = os.path.join(download_dir, DATA_ROOT_NAME, f'tmp_{dataset}.part')
+        self._stopped = False
 
     def _unpack(self):
         datapath = os.path.join(self.download_dir, DATA_ROOT_NAME)
@@ -101,40 +103,59 @@ class _DownloadWorker:
         except StopIteration:
             pass
 
-        lock = threading.Lock()
-        lock.acquire()
         if not os.path.isdir(datapath):
             os.makedirs(datapath)
-        lock.release()
 
         if self.dataset.endswith('tar.gz'):
-            with tarfile.open(self.tmpfile, "r:gz") as archive:
+            with tarfile.open(self.tmp_filepath, "r:gz") as archive:
                 archive.extractall(datapath)
-            os.remove(self.tmpfile)
+            os.remove(self.tmp_filepath)
         else:
             shutil.move(
-                self.tmpfile,
+                self.tmp_filepath,
                 os.path.join(datapath, self.dataset)
             )
 
     def _download(self):
-        with _make_download_request(self.dataset) as resp:
-            resp.raise_for_status()
-            self.size = int(resp.headers.get('content-length'))
-            with open(self.tmpfile, 'wb') as dst:
-                for chunk in resp.iter_content(_CHUNK_LENGTH):
-                    dst.write(chunk)
-                    dst.flush()
-                    self.downloaded += _CHUNK_LENGTH
-                    self.progress = (100 * self.downloaded) // self.size
-        self._unpack()
-        self.done = True
+        try:
+            with _make_download_request(self.dataset) as resp:
+                resp.raise_for_status()
+                self.size = int(resp.headers.get('content-length'))
+                with open(self.tmp_filepath, 'wb') as dst:
+                    for chunk in resp.iter_content(_CHUNK_LENGTH):
+                        if self._stopped:
+                            return
+                        dst.write(chunk)
+                        dst.flush()
+                        self.downloaded += _CHUNK_LENGTH
+                        self.progress = (100 * self.downloaded) // self.size
+            self._unpack()
+            self.done = True
+        except Exception as e:
+            self.error = e
+
+    def _clean(self):
+        try:
+            os.remove(self.tmp_filepath)
+        except FileNotFoundError:
+            pass
 
     def start(self):
         self.thread = threading.Thread(target=self._download)
         self.thread.start()
 
+    def stop(self):
+        if not self.done:
+            self._stopped = True
+            self.thread.join()
+            self._clean()
+
 def get_data(datasets: Union[str, list], download_dir: str=_DOWNLOAD_DIR):
+    try:
+        os.makedirs(os.path.join(download_dir, DATA_ROOT_NAME))
+    except FileExistsError:
+        pass
+
     if datasets == 'all':
         datasets = DATASETS
     if isinstance(datasets, str):
@@ -150,31 +171,60 @@ def get_data(datasets: Union[str, list], download_dir: str=_DOWNLOAD_DIR):
         _DownloadWorker(ds, download_dir)
         for ds in datasets
     ]
-    n_workers = len(workers)
     for w in workers:
         w.start()
+    n_downloads = len(workers)
+    n_failed = 0
+    sizes = [None for w in workers]
+    total_size = None
 
-    while True:
-        time.sleep(_PROGRESS_INTERVAL)
-        done = sum((w.done for w in workers)) == n_workers
-        sizes = [w.size for w in workers]
-        if None in sizes:
-            print('Starting downloads...', end='\r')
-            continue
-        total_size = sum(sizes)
-        total_download = sum((w.downloaded for w in workers))
-        total_progress = (100 * total_download) // total_size
-        if total_progress < 100:
-            print(
-                f'{total_progress}% of {n_workers} downloads / ' \
-                f'{round(total_download/2**20, 2)} of {round(total_size/2**20, 2)} MB',
-                end='\r',
-            )
-        else:
-            print(f'{round(total_size/2**20, 2)} MB downloaded, unpacking...' + ' '*20, end='\r')
-        if done:
-            print('\nDownload complete.')
-            break
+    try:
+        while True:
+            time.sleep(_PROGRESS_INTERVAL)
+
+            workers_alive = []
+            for w in workers:
+                if w.error is None:
+                    workers_alive.append(w)
+                else:
+                    print(f'Error downloading {w.dataset}: {w.error}'+' '*20)
+                    n_failed += 1
+                    w.stop()
+            workers = workers_alive
+
+            if None in sizes:
+                sizes = [w.size for w in workers]
+                not_started = sum((s is None for s in sizes))
+                print(f'Starting {not_started} downloads...', end='\r')
+                continue
+            else:
+                total_size = sum(sizes)
+
+            n_done = sum((w.done for w in workers))
+            all_done = n_done == len(workers)
+            total_download = sum((w.downloaded for w in workers))
+            non_failed_total_size = sum((w.size for w in workers))
+            total_progress = (100 * total_download) // non_failed_total_size
+            if total_progress < 100:
+                print(
+                    f'{total_progress}% of {n_downloads} downloads / ' \
+                    f'{round(total_download/2**20, 2)} of {round(total_size/2**20, 2)} MB ' \
+                    f'({n_failed} failed, {n_done} done)'+' '*20,
+                    end='\r',
+                )
+            else:
+                print(
+                    f'{round(total_download/2**20, 2)} of {round(total_download/2**20, 2)} ' \
+                    f'MB downloaded ({n_failed} failed), unpacking...' + ' '*20, end='\r'
+                )
+            if all_done:
+                print('\nDownload complete.')
+                break
+
+    except KeyboardInterrupt as e:
+        for w in workers:
+            w.stop()
+        print('\nInterrupted')
 
 if __name__ == '__main__':
     get_data(DATASETS)

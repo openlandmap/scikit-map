@@ -10,3 +10,4 @@ dist
 eumap_data
 gapfilled
 *.tif
+tmp*
