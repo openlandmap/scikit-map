@@ -21,15 +21,15 @@ from sklearn.model_selection import train_test_split
 
 class LandMapper():
 
-	def __init__(self, points:GeoDataFrame, feat_col_prfxs:List[str], target_col:str, 
-		estimator:BaseEstimator = RandomForestClassifier(n_estimators=100), 
+	def __init__(self, points:GeoDataFrame, feat_col_prfxs:List[str], target_col:str,
+		estimator:BaseEstimator = RandomForestClassifier(n_estimators=100),
 		imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean'),
 		eval_strategy = 'train_val_split', val_samples_pct = 0.2, min_samples_per_class = 0.05,
 		weight_col = None, cv = 5, param_grid = {}, verbose = True):
 
 		if not isinstance(points, gpd.GeoDataFrame):
 			points = gpd.read_file(points)
-				
+
 		self.verbose = verbose
 		self.pts = points
 		self.target_col = target_col
@@ -49,15 +49,15 @@ class LandMapper():
 			self.pts = self.pts[self.rows_to_remove]
 			if self.verbose:
 				ttprint(f'Removing {nrows} sampes due min_samples_per_class condition (< {min_samples_per_class})')
-				
+
 		if self.weight_col is not None:
 			self.feature_cols.append(self.weight_col)
 			self.weight_idx = self.pts[self.feature_cols].columns.get_loc(self.weight_col)
 			print(self.weight_idx)
-				
+
 		self.features = self.pts[self.feature_cols].to_numpy().astype('float16')
 		self.target = self.pts[self.target_col].to_numpy().astype('float16')
-						
+
 		self.cv = cv
 		self.param_grid = param_grid
 
@@ -77,12 +77,12 @@ class LandMapper():
 
 		if (num_nodata_idx > 0):
 			ttprint(f'Filling the missing values ({pct_nodata_idx:.2f}% / {num_nodata_idx} values)...')
-			
+
 			if fit_and_tranform:
 				result = self.imputer.fit_transform(data)
 			else:
 				result = self.imputer.transform(data)
-			
+
 		return result
 
 	def _nodata_idx(self, data):
@@ -90,12 +90,12 @@ class LandMapper():
 			return np.isnan(data)
 		else:
 			return (data == self.imputer.missing_values)
-		
+
 	def _grid_search_cv(self):
-	
+
 		if self.verbose:
 			ttprint('Training and evaluating the model')
-	
+
 		search_cpu_count = 1
 		estimator_cpu_count = self.estimator.n_jobs
 		if estimator_cpu_count != -1:
@@ -106,30 +106,30 @@ class LandMapper():
 			weight = self.features[:,self.weight_idx]
 			ttprint(f'Using {self.weight_col} as weight')
 			self.features = np.delete(self.features, self.weight_idx, 1)
-		
+
 		self.grid_search = GridSearchCV(self.estimator, self.param_grid, cv=self.cv,
 															scoring="accuracy",
 															return_train_score=True,
 															verbose=self.verbose, refit = True,
 															n_jobs=search_cpu_count)
-		
+
 		self.grid_search.fit(self.features, self.target, sample_weight=weight)
 
 	def _train_val_split(self):
 		train_feat, val_feat, train_targ, val_targ = train_test_split(self.features, self.target, test_size=self.val_samples_pct)
-		
+
 		train_feat_weight = None
 		features_weight = None
 		if self.weight_col != None:
 			ttprint(f'Using {self.weight_col} as weight')
-						
+
 			train_feat_weight = train_feat[:,self.weight_idx]
 			train_feat = np.delete(train_feat, self.weight_idx, 1)
 			val_feat = np.delete(val_feat, self.weight_idx, 1)
-						
+
 			features_weight = self.features[:,self.weight_idx]
 			self.features = np.delete(self.features, self.weight_idx, 1)
-						
+
 		if self.verbose:
 			ttprint('Training and evaluating the model')
 		self.estimator.fit(train_feat, train_targ, sample_weight=train_feat_weight)
@@ -155,13 +155,13 @@ class LandMapper():
 		return self.feature_cols.index(fn_layer.stem)
 
 	def _data_to_new_img(self, fn_base_img, fn_new_img, data, data_type = None, img_format = 'GTiff', nodata = 0):
-		
+
 		driver = gdal.GetDriverByName(img_format)
 		base_ds = gdal.Open( str(fn_base_img) )
 
 		x_start, pixel_width, _, y_start, _, pixel_height = base_ds.GetGeoTransform()
 		nbands, y_size, x_size = data.shape
-		
+
 		out_srs = osr.SpatialReference()
 		out_srs.ImportFromWkt(base_ds.GetProjectionRef())
 
@@ -171,7 +171,7 @@ class LandMapper():
 		new_ds = driver.Create(fn_new_img, x_size, y_size, nbands, data_type)
 		new_ds.SetGeoTransform((x_start, pixel_width, 0, y_start, 0, pixel_height))
 		new_ds.SetProjection(out_srs.ExportToWkt())
-		
+
 		for band in range(0, nbands):
 			new_band = new_ds.GetRasterBand((band+1))
 			new_band.WriteArray(data[band,:,:],0,0)
@@ -181,7 +181,7 @@ class LandMapper():
 
 	def _find_layers(self, dirs_layers):
 		fn_layers = []
-		
+
 		for dirs_layer in dirs_layers:
 			for fn_layer in list(Path(dirs_layer).glob('**/*.tif')):
 				if fn_layer.stem in self.feature_cols:
@@ -195,30 +195,31 @@ class LandMapper():
 
 	def read_data(self, fn_layers):
 		result = []
-		
+
 		for fn_layer in fn_layers:
 			if self.verbose:
 				ttprint(f'Reading {fn_layer}')
-			
+
 			ds = gdal.Open(str(fn_layer))
 			nodata = ds.GetRasterBand(1).GetNoDataValue()
 			band_data = ds.GetRasterBand(1).ReadAsArray().astype('Float16')
 			band_data[band_data == nodata] = self.imputer.missing_values
 			result.append(band_data)
-		
+
 		result = np.stack(result, axis=2)
 
 		return result
 
-	def predict(self, dirs_layers:List, fn_result:str, data_type = gdal.GDT_Float32, fill_nodata=False):
-		
+	def predict(self, dirs_layers:List, fn_result:str, data_type = gdal.GDT_Float32, fill_nodata=False, estimate_uncertainty=False):
+
 		fn_layers = self._find_layers(dirs_layers)
 		input_data = self.read_data(fn_layers)
-		
+
 		x_size, y_size, n_features = input_data.shape
 		input_data = input_data.reshape(-1, n_features)
 
-		if fill_nodata: 
+		nan_mask = None
+		if fill_nodata:
 			input_data = self.fill_nodata(input_data)
 		else:
 			nan_mask = np.any(np.isnan(input_data), axis=1)
@@ -226,11 +227,30 @@ class LandMapper():
 
 		if self.verbose:
 			ttprint(f'Predicing {x_size * y_size} pixels')
-		
+
 		result = self.estimator.predict(input_data)
 		result[nan_mask] = np.nan
 		result = result.reshape(1, x_size, y_size)
-		
+
 		if self.verbose:
 			ttprint(f'Saving the result in {fn_result}')
 		self._data_to_new_img(fn_layers[0], fn_result, result, data_type = data_type)
+
+		if estimate_uncertainty:
+			class_proba = self.estimator.predict_proba(input_data)
+			class_proba = np.maximum(class_proba, 1e-15)
+			n_classes = self.pts[self.target_col].unique().size
+
+			relative_entropy = -1 * class_proba * np.log2(class_proba)
+			relative_entropy = 100 * relative_entropy.sum(axis=-1) / np.log2(n_classes)
+			if not fill_nodata:
+				relative_entropy[nan_mask] = 255
+			relative_entropy = relative_entropy.round().astype(np.uint8)
+
+			out_ext = Path(fn_result).suffix
+			fn_uncertainty = fn_result.replace(out_ext, '_uncertainty'+out_ext)
+			self._data_to_new_img(
+				fn_layers[0], fn_uncertainty,
+				relative_entropy.reshape(1, x_size, y_size),
+				data_type=gdal.GDT_Byte, nodata=255
+			)
