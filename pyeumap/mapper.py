@@ -154,7 +154,7 @@ class LandMapper():
 	def _feature_idx(self, fn_layer):
 		return self.feature_cols.index(fn_layer.stem)
 
-	def _data_to_new_img(self, fn_base_img, fn_new_img, data, data_type = None, img_format = 'GTiff', nodata = 0):
+	def _data_to_new_img(self, fn_base_img, fn_new_img, data, data_type = None, img_format = 'GTiff', nodata = 0, options = ["TILED=YES", "COMPRESS=LZW"]):
 		
 		driver = gdal.GetDriverByName(img_format)
 		base_ds = gdal.Open( str(fn_base_img) )
@@ -168,7 +168,7 @@ class LandMapper():
 		if data_type is None:
 			data_type = base_ds.GetRasterBand(1).DataType
 
-		new_ds = driver.Create(fn_new_img, x_size, y_size, nbands, data_type)
+		new_ds = driver.Create(fn_new_img, x_size, y_size, nbands, data_type, options = options)
 		new_ds.SetGeoTransform((x_start, pixel_width, 0, y_start, 0, pixel_height))
 		new_ds.SetProjection(out_srs.ExportToWkt())
 		

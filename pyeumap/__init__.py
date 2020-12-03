@@ -7,5 +7,6 @@ from . import (
     mapper,
     datasets,
     gapfiller,
-    plotter
+    plotter, 
+    tilling
 )
