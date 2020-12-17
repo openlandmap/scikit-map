@@ -1,6 +1,6 @@
 from pyeumap.misc import ttprint
 
-from typing import List
+from typing import List, Union
 
 import multiprocessing
 import geopandas as gpd
@@ -19,13 +19,21 @@ from sklearn.impute import SimpleImputer
 from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
 
+_automl_enabled = False
+try:
+	from autosklearn.classification import AutoSklearnClassifier
+	_automl_enabled = True
+except ImportError:
+	pass
+
 class LandMapper():
 
 	def __init__(self, points:GeoDataFrame, feat_col_prfxs:List[str], target_col:str,
-		estimator:BaseEstimator = RandomForestClassifier(n_estimators=100),
+		estimator:Union[BaseEstimator, None] = None,
 		imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean'),
 		eval_strategy = 'train_val_split', val_samples_pct = 0.2, min_samples_per_class = 0.05,
-		weight_col = None, cv = 5, param_grid = {}, verbose = True):
+		weight_col = None, cv = 5, param_grid = {}, verbose = True,
+		**autosklearn_kwargs):
 
 		if not isinstance(points, gpd.GeoDataFrame):
 			points = gpd.read_file(points)
@@ -33,10 +41,17 @@ class LandMapper():
 		self.verbose = verbose
 		self.pts = points
 		self.target_col = target_col
-		self.estimator = estimator
 		self.imputer = imputer
 		self.weight_col = weight_col
 		self.min_samples_per_class = min_samples_per_class
+
+		if estimator is None:
+			if _automl_enabled:
+				self.estimator = AutoSklearnClassifier(**autosklearn_kwargs)
+			else:
+				self.estimator = RandomForestClassifier(n_estimators=100)
+		else:
+			self.estimator = estimator
 
 		self.feature_cols = []
 		for feat_prfx in feat_col_prfxs:
@@ -132,16 +147,21 @@ class LandMapper():
 
 		if self.verbose:
 			ttprint('Training and evaluating the model')
-		self.estimator.fit(train_feat, train_targ, sample_weight=train_feat_weight)
+
+		if isinstance(self.estimator, AutoSklearnClassifier):
+			self.estimator.fit(train_feat, train_targ)
+		else:
+			self.estimator.fit(train_feat, train_targ, sample_weight=train_feat_weight)
 
 		pred_targ = self.estimator.predict(val_feat)
 		self.cm = confusion_matrix(val_targ, pred_targ)
 		self.overall_acc = accuracy_score(val_targ, pred_targ)
 		self.classification_report = classification_report(val_targ, pred_targ)
 
-		if self.verbose:
-			ttprint('Training the final model using all data')
-		self.estimator.fit(self.features, self.target, sample_weight=features_weight)
+		if not isinstance(self.estimator, AutoSklearnClassifier):
+			if self.verbose:
+				ttprint('Training the final model using all data')
+			self.estimator.fit(self.features, self.target, sample_weight=features_weight)
 
 	def train(self):
 		method_name = '_%s' % (self.eval_strategy)
