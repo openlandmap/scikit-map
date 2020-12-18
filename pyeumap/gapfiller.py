@@ -5,6 +5,7 @@ from itertools import cycle, islice
 import math
 import traceback
 import rasterio
+import threading
 from rasterio.windows import Window
 
 from . import parallel
@@ -17,6 +18,8 @@ import numpy as np
 import gdal
 import osr
 import os
+
+import bottleneck as bc
 
 _OUT_DIR = os.path.join(os.getcwd(), 'gapfilled')
 
@@ -51,7 +54,10 @@ class GapFilledData():
 		return f'{time}_{t1}_{t2}'
 
 	def _calc_nanmedian(self, time, t1, t2):
-		return self._key_from_time(time, t1, t2), np.nanmedian(self.time_data[time][:,:,t1:t2], axis=2)
+		#return self._key_from_time(time, t1, t2), np.nanmedian(self.time_data[time][:,:,t1:t2], axis=2)
+		return self._key_from_time(time, t1, t2), bc.nanmedian(self.time_data[time][:,:,t1:t2], axis=2)
+		#med = nanPercentile(np.transpose(self.time_data[time][:,:,t1:t2], axes=[2, 0, 1]), [50])
+		#return self._key_from_time(time, t1, t2), med[0]
 
 	def _cpu_processing(self, args):
 		for key, data in parallel.ThreadGeneratorLazy(self._calc_nanmedian, iter(args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
@@ -114,7 +120,7 @@ class GapFilledData():
 			ttprint(f'Using GPU engine')
 			self._gpu_processing(args)
 		
-		ttprint(f'Finished')
+		ttprint(f'Possibilities calculated')
 
 	def get(self, time, layer_pos):
 		
@@ -141,13 +147,15 @@ class TimeGapFiller():
 	def __init__(self,
 		fn_times_layers: Dict,
 		time_order: List,
-		time_win_size: int=5,
+		time_win_size: int=8,
 		spatial_win:Window = None,
 		out_dir: str=_OUT_DIR,
+		out_mantain_subdirs: bool=True,
 		root_dir_name: str=DATA_ROOT_NAME,
 		cpu_max_workers:int = multiprocessing.cpu_count(),
 		engine='CPU',
-		gpu_tile_size:int = 250
+		verbose = True,
+		gpu_tile_size:int = 250, 
 	):
 
 		self.fn_times_layers = fn_times_layers
@@ -159,23 +167,31 @@ class TimeGapFiller():
 		self.time_win_size = time_win_size
 		self.spatial_win = spatial_win
 		self.engine = engine
+		self.out_mantain_subdirs = out_mantain_subdirs
 		self.gpu_tile_size = gpu_tile_size
 
 		self.time_data = {}
-
-		for time in time_order:
-			ttprint(f'Reading {len(self.fn_times_layers[time])} layers on {time}')
-			self.time_data[time] = self.read_layers(self.fn_times_layers[time])
+		
+		self.verbose = verbose
+		
+	def read_layers(self):
+		args = [ (time,) for time in self.time_order]
+		for time, data in parallel.ThreadGeneratorLazy(self._get_data, iter(args), max_workers=len(self.time_order), chunk=len(self.time_order)):
+			self.time_data[time] = data
 			time_shape = self.time_data[time].shape
 			if time_shape[2] > self.max_n_layers_per_time:
 				self.max_n_layers_per_time = time_shape[2]
+		
+		if self.verbose:
+			ttprint('Reading process finished')
 
-			ttprint(f'Data shape: {time_shape}')
+	def _get_data(self, time):
+		if self.verbose:
+			ttprint(f'Reading {len(self.fn_times_layers[time])} layers on {time}')
 
-	def read_layers(self, fn_layers):
 		result = []
 
-		for fn_layer in fn_layers:
+		for fn_layer in self.fn_times_layers[time]:
 			with rasterio.open(fn_layer) as ds:
 
 				band_data = ds.read(1, window=self.spatial_win)
@@ -191,21 +207,24 @@ class TimeGapFiller():
 
 		result = np.stack(result, axis=2)
 
-		return result
+		if self.verbose:
+				ttprint(f'Data shape: {result.shape}')
+
+		return time, result
 
 	def _new_image(self, fn_base_img, fn_new_img, data, data_type = None, img_format = 'GTiff', nodata = 0):
 		
 		x_size, y_size, nbands = data.shape
 		
-		if data_type is None:
-			data_type = data.dtype
-
 		with rasterio.open(fn_base_img, 'r') as base_img:
 
+			if data_type is None:
+				data_type = base_img.dtypes[0]
+						
 			transform = base_img.transform
 			if self.spatial_win is not None:
 				transform = rasterio.windows.transform(self.spatial_win, transform)
-
+			
 			return rasterio.open(fn_new_img, 'w', 
 							driver=img_format, 
 							width=x_size, 
@@ -223,7 +242,8 @@ class TimeGapFiller():
 		with self._new_image(fn_base_img, fn_new_img, data, data_type, img_format) as dst:
 			dst.nodata = 0
 			for band in range(0, nbands):
-				dst.write(data[:,:,band], indexes=(band+1))
+				
+				dst.write(data[:,:,band].astype(dst.dtypes[band]), indexes=(band+1))
 
 	def _data_to_new_img2(self, fn_base_img, fn_new_img, data, data_type = None, img_format = 'GTiff', nodata = 0, options = ["TILED=YES", "COMPRESS=LZW"]):
 
@@ -251,7 +271,7 @@ class TimeGapFiller():
 
 		new_ds.FlushCache()
 
-	def get_neib_times(self, time):
+	def _get_neib_times(self, time):
 		
 		total_times = len(self.time_order)
 		i = self.time_order.index(time)
@@ -315,7 +335,7 @@ class TimeGapFiller():
 		end_msg = None
 		_, _, n_layers = self.time_data[time].shape
 
-		for before_times, after_times in self.get_neib_times(time):
+		for before_times, after_times in self._get_neib_times(time):
 
 			before_data = self.gapfilled_data.get(before_times, layer_pos)
 			after_data = self.gapfilled_data.get(after_times, layer_pos)
@@ -350,6 +370,46 @@ class TimeGapFiller():
 			end_msg = self._fill_gaps_all_times(time, layer_pos)
 		
 		return end_msg
+	
+	def _write_data(self, time):
+		fn_base_img = self.fn_times_layers[time][0]
+		_, _, n_layers = self.time_data[time].shape
+
+		for t in range(0, n_layers):
+
+			src_fn = self.fn_times_layers[time][t]
+
+			if self.out_mantain_subdirs:
+				out_dir = os.path.join(self.out_dir, str(src_fn.parent).split(self.root_dir_name)[-1][1:])
+				out_fn_data = os.path.join(out_dir, ('%s.tif' % src_fn.stem))
+				out_fn_flag = os.path.join(out_dir, ('%s_flag.tif' % src_fn.stem))
+			else:
+				out_fn_data = os.path.join(self.out_dir, ('%s.tif' % src_fn.stem))
+				out_fn_flag = os.path.join(self.out_dir, ('%s_flag.tif' % src_fn.stem))
+
+			out_img_dir = os.path.dirname(out_fn_data)
+
+			if not os.path.isdir(out_img_dir):
+				try:
+					os.makedirs(out_img_dir)
+				except:
+					continue
+
+			self._data_to_new_img(fn_base_img, out_fn_data, self.time_data[time][:,:,t:t+1])
+			self._data_to_new_img(fn_base_img, out_fn_flag, self.time_data_gaps[time][:,:,t:t+1])
+		
+		return True
+		
+	def save_to_img(self):
+		if self.verbose:
+			ttprint(f'Saving the results')
+		
+		args = [ (time,) for time in self.time_order]
+		for end_msg in parallel.ThreadGeneratorLazy(self._write_data, iter(args), max_workers=len(self.time_order), chunk=len(self.time_order)):
+			end_msg = True
+
+		if self.verbose:
+			ttprint(f'Saving proces finished')
 
 	def run(self):
 
@@ -368,30 +428,8 @@ class TimeGapFiller():
 
 			for layer_pos in range(0, n_layers):
 				layer_args.append((time, layer_pos))
-
+		
+		if self.verbose:
+			ttprint(f'Filling the gaps')
 		for end_msg in parallel.ThreadGeneratorLazy(self.fill_layer, iter(layer_args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
 			end_msg = True
-		
-		ttprint(f'Saving the results')
-		fn_base_img = self.fn_times_layers[time][0]
-		for time in self.time_order:
-
-			_, _, n_layers = self.time_data[time].shape
-
-			for t in range(0, n_layers):
-				
-				src_fn = self.fn_times_layers[time][t]
-
-				out_dir = os.path.join(self.out_dir, str(src_fn.parent).split(self.root_dir_name)[-1][1:])
-				out_fn_data = os.path.join(out_dir, ('%s.tif' % src_fn.stem))
-				out_fn_flag = os.path.join(out_dir, ('%s_flag.tif' % src_fn.stem))
-
-				out_img_dir = os.path.dirname(out_fn_data)
-				
-				if not os.path.isdir(out_img_dir):
-					os.makedirs(out_img_dir)
-
-				self._data_to_new_img(fn_base_img, out_fn_data, self.time_data[time][:,:,t:t+1])
-				self._data_to_new_img(fn_base_img, out_fn_flag, self.time_data_gaps[time][:,:,t:t+1])
-
-		ttprint(f'Finished')

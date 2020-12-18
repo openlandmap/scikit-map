@@ -8,5 +8,5 @@ from . import (
     datasets,
     gapfiller,
     plotter, 
-    tilling
+    tiling
 )
