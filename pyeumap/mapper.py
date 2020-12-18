@@ -26,8 +26,16 @@ try:
 except ImportError:
 	pass
 
+_automl_enabled = False
+try:
+	from autosklearn.classification import AutoSklearnClassifier
+	_automl_enabled = True
+except ImportError:
+	pass
+
 class LandMapper():
 
+<<<<<<< HEAD
 	def __init__(self, points:GeoDataFrame, 
 				feat_col_prfxs:List[str], 
 				target_col:str, 
@@ -45,6 +53,14 @@ class LandMapper():
 				refit=True,
 				pred_method='predict',
 				verbose = True):
+=======
+	def __init__(self, points:GeoDataFrame, feat_col_prfxs:List[str], target_col:str,
+		estimator:Union[BaseEstimator, None] = None,
+		imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean'),
+		eval_strategy = 'train_val_split', val_samples_pct = 0.2, min_samples_per_class = 0.05,
+		weight_col = None, cv = 5, param_grid = {}, verbose = True,
+		**autosklearn_kwargs):
+>>>>>>> ac2fb86dd0c40e19dfb2cda4a56e9670ee8849fb
 
 		if not isinstance(points, gpd.GeoDataFrame):
 			points = gpd.read_file(points)
@@ -52,13 +68,20 @@ class LandMapper():
 		self.verbose = verbose
 		self.pts = points
 		self.target_col = target_col
-		self.estimator = estimator
 		self.imputer = imputer
 		self.weight_col = weight_col
 		self.group_col = group_col
 		self.pred_method = pred_method
 		self.min_samples_per_class = min_samples_per_class
 		self.refit = refit
+
+		if estimator is None:
+			if _automl_enabled:
+				self.estimator = AutoSklearnClassifier(**autosklearn_kwargs)
+			else:
+				self.estimator = RandomForestClassifier(n_estimators=100)
+		else:
+			self.estimator = estimator
 
 		if estimator is None:
 			if _automl_enabled:
@@ -179,14 +202,31 @@ class LandMapper():
 		else:
 			self.estimator.fit(train_feat, train_targ, sample_weight=train_weight)
 
+<<<<<<< HEAD
 		self.eval_targ = val_targ
 		self.eval_pred = self.estimator.predict(val_feat)
+=======
+		if self.verbose:
+			ttprint('Training and evaluating the model')
+
+		if isinstance(self.estimator, AutoSklearnClassifier):
+			self.estimator.fit(train_feat, train_targ)
+		else:
+			self.estimator.fit(train_feat, train_targ, sample_weight=train_feat_weight)
+>>>>>>> ac2fb86dd0c40e19dfb2cda4a56e9670ee8849fb
 
 	def _cv_kfold(self):
 
+<<<<<<< HEAD
 		self.eval_targ = self.target
 		self.eval_pred = cross_val_predict(self.estimator, self.features, self.target, method=self.pred_method, n_jobs=self._njobs_cv(), \
 			cv=self.cv, groups=self.groups, verbose=self.verbose, fit_params= { 'sample_weight': self.features_weight })
+=======
+		if not isinstance(self.estimator, AutoSklearnClassifier):
+			if self.verbose:
+				ttprint('Training the final model using all data')
+			self.estimator.fit(self.features, self.target, sample_weight=features_weight)
+>>>>>>> ac2fb86dd0c40e19dfb2cda4a56e9670ee8849fb
 
 	def _grid_search_cv(self):
 		if self.verbose:
