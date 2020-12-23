@@ -230,13 +230,9 @@ class ParallelOverlay:
 
 class SpaceOverlay(ParallelOverlay):
 
-		def __init__(self, points, layers:List[str], dir_layers:List[str] = None, max_workers:int = multiprocessing.cpu_count(), regex_layers = '**/*.tif', verbose:bool = True):
+		def __init__(self, points, dir_layers:List[str] = None, max_workers:int = multiprocessing.cpu_count(), regex_layers = '**/*.tif', verbose:bool = True):
 				
-				if dir_layers is not None:
-					fn_layers = list(Path(dir_layers).glob(regex_layers))
-				else:
-					fn_layers = layers
-
+				fn_layers = list(Path(dir_layers).glob(regex_layers))
 				if not isinstance(points, gpd.GeoDataFrame):
 					points = gpd.read_file(points)
 
