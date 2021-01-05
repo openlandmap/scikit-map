@@ -27,7 +27,7 @@ pfun <- function(x,y, ...){
 #' }
 plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gvar_imp = TRUE,gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
   
-  x = df.tr[,target.variable]
+  x = df.tr[,"CHELSA_rainfall"]
   y = pred.v
   z = valu.imp
 
