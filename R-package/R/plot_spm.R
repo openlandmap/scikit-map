@@ -30,7 +30,8 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
   x = df.tr[,target.variable]
   y = pred.v
   z = valu.imp
-
+  df = data.frame(x,y)
+  colnames(df)[2] <- 'y'
   if(is.null(colorcut)){
     colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)  
   }
@@ -51,8 +52,8 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
         }
       if(gtype == "accuracy"){
         if(is.null(main)){
-          CCC <- signif( ccc(data.frame(x,y), x, y)$.estimate, digits=3)
-          RMSE <- signif( rmse(data.frame(x,y), x, y)$.estimate, digits=3)
+          CCC <- signif( ccc(df, x, y)$.estimate, digits=3)
+          RMSE <- signif( rmse(df, x, y)$.estimate, digits=3)
           main = paste0(expression(CCC) ,": ",  CCC, "  RMSE: ", RMSE)
         }
         if(gmode == "norm"){
