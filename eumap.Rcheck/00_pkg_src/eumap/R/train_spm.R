@@ -12,13 +12,13 @@
 #' @param var.imp variable importance,
 #' @param super.learner super learner,
 #' @param crs coordinate reference system, necessary for spcv,
-#' @param coordinate_names 
-#' @param ... other arguments that can be passed on to \code{mlr3spatiotempcv::TaskSupervised},
+#' @param coordinate_names long, lat
+#' @param ... other arguments that can be passed on to \code{TaskSupervised},
 #'
 #' @return Object of class \code{mlr3},
-#' @export
+#' @export 
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
-#' @examples 
+#' @examples
 #' \dontrun{ 
 #' ## Meuse Demo
 #' library(sp)
@@ -26,7 +26,8 @@
 #' library(mlr3spatiotempcv)
 #' library(checkmate)
 #' library(future)
-#' library(progressr)
+#' library(progress)
+#' library(scales)
 #' library(eumap)
 #' demo(meuse, echo=FALSE)
 #' df <- as.data.frame(meuse)
@@ -39,9 +40,9 @@
 #' df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 #' df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
 #' newdata <-df.ts
-#' tr = eumap::train_spm(df.tr, target.variable = "lead", folds = 5 ,n_evals = 3,#' crs = "+init=epsg:3035")
+#' tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
 #' train_model= tr[[1]]
-#' var.imp = tr[[2]]
+#' #var.imp = tr[[2]]
 #' summary = tr[[3]]
 #' response = tr[[4]]
 #' vlp = tr[[5]]
@@ -53,20 +54,17 @@
 #' df.ts$leadp = predict.variable
 #' coordinates(df.ts) <- ~x+y
 #' proj4string(df.ts) <- CRS("+init=epsg:28992")
-#' gridded(df.ts) = TRUE # creat raster output
+#' gridded(df.ts) = TRUE
 #' ## regression grid 
-#' make a map using ensemble machine learning with spatial cross validation for the predicted #' variables (*lead* in this case). 
+#' #make a spatial prediction map 
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
 #' }
 train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 5, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL,  coordinate_names = c("x","y"), ...){
   target = target.variable
-  assert_data_frame(df.tr)
   if( is.null(predict_type)){
     predict_type <- "response"
   }
-  assert_string(predict_type)
-  #defining constant vars
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
   task_type = c("        classification Task  ", "        Regression Task  ")
@@ -85,7 +83,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     paste0(task_type[1],"...", immediate. = TRUE)
     )
     
-    tsk_clf <- mlr3::TaskClassif$new(
+    tsk_clf <- TaskClassif$new(
     id = id, backend = df.tr, target = target.variable
     )
     
@@ -100,33 +98,20 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     at = AutoTuner$new(
       learner = ranger_lrn,
       resampling = cv3,
-      measure = msr("classif.acc"),
+      measure =  msr("classif.acc"),
       search_space = ps_ranger,
       terminator = trm("evals", n_evals = n_evals), 
       tuner = tnr("random_search")
       )
-      #at$store_tuning_instance = TRUE
-      # requireNamespace("lgr")
-      # logger = lgr::get_logger("mlr3")
-      # logger$set_threshold("trace")
-      # lgr::get_logger("mlr3")$set_threshold("warn")
-      # lgr::get_logger("mlr3")$set_threshold("debug")
       message(run_model,resample_method[1], immediate. = TRUE)
-      if (requireNamespace("progress", quietly = TRUE)) {
-        handlers("progress")
-        with_progress({
-          at$train(tsk_clf)
-        })
-      }
-      
+      at$train(tsk_clf)
       at$learner$train(tsk_clf)
       best.model = at$archive$best()
       var.imp = at$learner$importance()
       vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
-      #value.imp = df.trf$data(1:df.trf$nrow,vlp)
       summary = at$learner$state$model
       tr.model = at$learner
-      train.model = tr.model$predict_newdata
+      train_model = tr.model$predict_newdata
       response = tr.model$model$predictions
   }
   ## regr CV ----
@@ -136,7 +121,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     paste0(task_type[2],"...", immediate. = TRUE)
     )   
     
-    tsk_regr <- mlr3::TaskRegr$new(id = id, backend = df.tr, target = target.variable)
+    tsk_regr <- TaskRegr$new(id = id, backend = df.tr, target = target.variable)
     ranger_lrn = lrn("regr.ranger", predict_type = "response",importance ="permutation")
     ps_ranger = ParamSet$new(
       list(
@@ -151,30 +136,19 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       resampling = cv3,
       measure = msr("regr.rmse"),
       search_space = ps_ranger,
-      terminator = trm("evals", n_evals = n_evals), 
-      tuner = tnr("random_search")
+      terminator =  trm("evals", n_evals = n_evals), 
+      tuner =  tnr("random_search")
       )
     at$store_tuning_instance = TRUE
-    # requireNamespace("lgr")
-    # logger = lgr::get_logger("mlr3")
-    # logger$set_threshold("trace")
-    # lgr::get_logger("mlr3")$set_threshold("warn")
-    # lgr::get_logger("mlr3")$set_threshold("debug")
     message(run_model,resample_method[1], immediate. = TRUE)
-    if (requireNamespace("progress", quietly = TRUE)) {
-      handlers("progress")
-      with_progress({
-        at$train(tsk_regr)
-      })
-    }
+    at$train(tsk_regr)
     
     at$learner$train(tsk_regr)
     tr.model = at$learner
     summary = tr.model$model
     var.imp = tr.model$importance()
     vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
-    #value.imp = df.trf$data(1:df.trf$nrow,vlp)
-    train.model = tr.model$predict_newdata
+    train_model = tr.model$predict_newdata
     response = tr.model$model$predictions
   }
   ## classif spcv ----
@@ -189,14 +163,14 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     }
     # task$set_col_role('tile_id', 'group') later for whole eu should be used
     # task$set_col_role('confidence', 'weight')
-    df.trf = mlr3::as_data_backend(df.tr)
+    df.trf = as_data_backend(df.tr)
     tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable,
     extra_args = list( positive = "TRUE", coordinate_names = coordinate_names,
     coords_as_features = FALSE, crs = crs))
     
-    pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
+    pre = po("encode") %>>% po("imputemode") %>>% po("removeconstants")
     g = pre %>>% 
-      gunion(
+     gunion(
         list(
           po("select") %>>% po("learner_cv", id = "kknn", lrn("classif.kknn")),
           po("pca") %>>% po("learner_cv", id = "featureless", lrn("classif.featureless")),
@@ -211,25 +185,17 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       task = tsk_regr, learner = g,
       resampling = resampling_sp
       )
-    
       g$keep_results = "TRUE"
       # plt = g$plot()
       message(run_model,resample_method[2], immediate. = TRUE)
-      if (requireNamespace("progress", quietly = TRUE)) {
-        handlers("progress")
-        with_progress({
-          g$train(tsk_clf)
-        })
-      }
-      
+      g$train(tsk_clf)
       g$predict(tsk_clf)
       conf.mat = g$pipeops$classif.ranger$learner_model$model$confusion.matrix
       var.imp = g$pipeops$classif.ranger$learner_model$model$variable.importance
       vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
-      #value.imp = df.trf$data(1:df.trf$nrow,vlp)
       summary = g$pipeops$classif.ranger$learner_model$model
       tr.model = g$pipeops$classif.ranger$learner$train(tsk_clf)
-      train.model = tr.model$predict_newdata
+      train_model = tr.model$predict_newdata
       response = tr.model$model$predictions
   }
   ## regr spcv ----
@@ -243,7 +209,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       super.learner <- "regr.ranger"
     }
     
-    df.trf = mlr3::as_data_backend(df.tr)
+    df.trf = as_data_backend(df.tr)
     
     tsk_regr = TaskRegrST$new(
     id = id, backend = df.trf, target = target.variable,
@@ -253,9 +219,9 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       )
     )
     
-    pre =  po("encode") %>>%  po("imputemode") %>>% po("removeconstants")
+    pre =  po("encode") %>>% po("imputemode") %>>% po("removeconstants")
     g = pre %>>% 
-      gunion(
+       gunion(
         list(
           po("select") %>>% po("learner_cv", id = "knn", lrn("regr.kknn")),
           po("pca") %>>% po("learner_cv", id = "featureless", lrn("regr.featureless")),
@@ -274,23 +240,15 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     g$keep_results = "TRUE"
     # plt = g$plot()
     message(run_model,resample_method[2], immediate. = TRUE)
-    # lgr::get_logger("bbotk")$set_threshold("warn")
-    # lgr::get_logger("mlr3")$set_threshold("warn")
-    if (requireNamespace("progress", quietly = TRUE)) {
-      handlers("progress")
-      with_progress({
-        g$train(tsk_regr)
-      })
-    }
+    g$train(tsk_regr)
     g$predict(tsk_regr)
     summary = g$pipeops$regr.ranger$learner_model$model
     tr.model = g$pipeops$regr.ranger$learner$train(tsk_regr)
     var.imp = tr.model$importance()
     vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
-    #value.imp = df.trf$data(1:df.trf$nrow,vlp)
     response = tr.model$model$predictions
-    train.model = tr.model$predict_newdata
+    train_model = tr.model$predict_newdata
     response = tr.model$model$predictions
     }
-  return(list(train.model, var.imp, summary, response, vlp, target))
+  return(list(train_model, var.imp, summary, response, vlp, target))
   }

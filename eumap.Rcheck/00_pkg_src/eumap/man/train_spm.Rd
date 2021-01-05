@@ -40,9 +40,9 @@ train_spm(
 
 \item{crs}{coordinate reference system, necessary for spcv,}
 
-\item{coordinate_names}{}
+\item{coordinate_names}{long, lat}
 
-\item{...}{other arguments that can be passed on to \code{mlr3spatiotempcv::TaskSupervised},}
+\item{...}{other arguments that can be passed on to \code{TaskSupervised},}
 }
 \value{
 Object of class \code{mlr3},
@@ -58,7 +58,8 @@ library(mlr3verse)
 library(mlr3spatiotempcv)
 library(checkmate)
 library(future)
-library(progressr)
+library(progress)
+library(scales)
 library(eumap)
 demo(meuse, echo=FALSE)
 df <- as.data.frame(meuse)
@@ -71,9 +72,9 @@ train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
 newdata <-df.ts
-tr = eumap::train_spm(df.tr, target.variable = "lead", folds = 5 ,n_evals = 3,#' crs = "+init=epsg:3035")
+tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
 train_model= tr[[1]]
-var.imp = tr[[2]]
+#var.imp = tr[[2]]
 summary = tr[[3]]
 response = tr[[4]]
 vlp = tr[[5]]
@@ -85,9 +86,9 @@ plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 df.ts$leadp = predict.variable
 coordinates(df.ts) <- ~x+y
 proj4string(df.ts) <- CRS("+init=epsg:28992")
-gridded(df.ts) = TRUE # creat raster output
+gridded(df.ts) = TRUE
 ## regression grid 
-make a map using ensemble machine learning with spatial cross validation for the predicted #' variables (*lead* in this case). 
+#make a spatial prediction map 
 plot(df.ts[,"leadp"])
 points(meuse, pch="+")
 }

@@ -1,3 +1,4 @@
+
 pfun <- function(x,y, ...){
   panel.xyplot(x, y, ...)
   panel.hexbinplot(x,y, ...)  
@@ -7,6 +8,7 @@ pfun <- function(x,y, ...){
 
 #' Accuracy plot
 #' @description Dedicated function to plot diagnostic graphs resulted from `train_spm ` and `predict_spm`,
+#' @Imports: lattice, hexbin
 #' @param df a data frame containing x,y, and z derived from `train_spm` and `predict_spm`,
 #' @param main Title of the plot,
 #' @param palet default values is palet=colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4),
@@ -25,7 +27,7 @@ pfun <- function(x,y, ...){
 #' }
 plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gvar_imp = TRUE,gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
   
-  x = df.tr[,target]
+  x = df.tr[,target.variable]
   y = pred.v
   z = valu.imp
 
@@ -36,20 +38,18 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
       palet=grDevices::colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4") )
   }
   if(length(x) <= 500 ) {
-    plt <-  xyplot(x ~ y, asp=1, 
+    plt <-  lattice:: xyplot(x ~ y, asp=1, 
                    par.settings = list(plot.symbol = list(col=alpha("black", 0.6), fill=alpha("red", 0.6), pch=21, cex=0.6)), 
                    scales = list(x=list(log=TRUE, equispaced.log=FALSE), y=list(log=TRUE, equispaced.log=FALSE)),
                    ylab="measured", xlab="predicted")
     print(plt)
-  #From Tom's book with a slight modification
     } else {
       if(gtype == "var.imp" ){
         plt = raster:: barplot(var.imp, horiz = TRUE, las = 1, col = "black")
         title(main = "variable importance", font.main = 4)
         plt
         }
-      else if(gtype == "accuracy"){
-        #get everything from accuracy.plot  here and enjoy!
+      if(gtype == "accuracy"){
         if(is.null(main)){
           CCC <- signif( ccc(data.frame(x,y), x, y)$.estimate, digits=3)
           RMSE <- signif( rmse(data.frame(x,y), x, y)$.estimate, digits=3)
@@ -96,32 +96,44 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
           df.x ~ df.y, xbins=xbins, scales = list(x = df.x, y = df.y), 
           xscale.components = xscale.components, yscale.components = yscale.components, 
           mincnt = 1, xlab = xlab , ylab = ylab, inner=0.2, cex.labels=1, colramp = palet, 
-          aspect = aspect, main=main[1], colorcut = colorcut, type="g", panel = pfun
-        ) 
+          aspect = aspect, main=main[1], colorcut = colorcut, type="g", panel =  function(x,y){
+            panel.xyplot(x, y)
+            panel.hexbinplot(x,y)
+            panel.abline(coef = c(0,1), col="black", size = 0.25, lwd = 2)
+            }
+          ) 
         print(plt)
-      } else if(gtype == "correlation") {
-        #first we need to find var.imp and related vals <- ok
-        #id = strsplit(deparse(target.variable),"\"")[[1]][2] #this was stupid of me
+      }
+      if(gtype == "correlation") {
         df.pcor = data.frame(target.variable = df.tr[,target.variable],z = valu.imp)
         pcorr =pcor(df.pcor)
         main = "Partial correlation"
-        #fekri behale namayeshe multiple figure bekon ba fit line mesle naghale
         #now we have 2 varimp see how to generate the maps automatically
         if(length(vlp) == 1){
           plt <- hexbinplot(df.pcor[,"target.variable"] ~ df.pcor[,2],
           mincnt = 1,xbins=xbins,xlab=colnames(df.pcor)[2],ylab="target.variable",
-          colramp =  palet, main=main, colorcut = colorcut, type="g",panel = pfun) 
+          colramp =  palet, main=main, colorcut = colorcut, type="g",panel =  function(x,y){
+            panel.xyplot(x, y)
+            panel.hexbinplot(x,y)
+            panel.abline(coef = c(0,1), col="black", size = 0.25, lwd = 2)
+            }
+          ) 
         }
         if(length(vlp) > 1){
           df.pcorr = df.pcor
           df.pcorr[,1] <- NULL
           x = df.pcor[,"target.variable"]
           plt <- lapply(1:length(vlp), function(i) {
-          # y =  df.pcorr[,i]  
            hexbinplot(x ~  df.pcorr[,i],
           xlab=colnames(df.pcorr)[i],ylab="target.variable", colramp =  palet,
-          main=main, colorcut = colorcut, type="g",panel = pfun) 
-          })
+          main=main, colorcut = colorcut, type="g",panel =  function(x,y){
+            panel.xyplot(x, y)
+            panel.hexbinplot(x,y)
+            panel.abline(coef = c(0,1), col="black", size = 0.25, lwd = 2)
+            }
+          ) 
+            }
+          )
           print(do.call(grid.arrange, c(plt, ncol=2)))
         }
     }

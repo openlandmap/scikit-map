@@ -1,5 +1,5 @@
-* using log directory ‘/home/tomislav/Documents/git/eumap/eumap.Rcheck’
-* using R version 4.0.2 (2020-06-22)
+* using log directory ‘/home/msheykhmousa/Documents/gitrepo/geoharmonizer_inea/eumap/eumap.Rcheck’
+* using R version 4.0.3 (2020-10-10)
 * using platform: x86_64-pc-linux-gnu (64-bit)
 * using session charset: UTF-8
 * using options ‘--no-manual --as-cran’
@@ -32,141 +32,24 @@
 * checking whether the namespace can be unloaded cleanly ... OK
 * checking loading without being on the library search path ... OK
 * checking dependencies in R code ... WARNING
-'::' or ':::' import not declared from: ‘scales’
-'loadNamespace' or 'requireNamespace' call not declared from: ‘progress’
+'::' or ':::' import not declared from: ‘lattice’
+double free or corruption (out)
+Aborted (core dumped)
 * checking S3 generic/method consistency ... OK
 * checking replacement functions ... OK
 * checking foreign function calls ... OK
-* checking R code for possible problems ... NOTE
-pfun: no visible global function definition for ‘panel.xyplot’
-pfun: no visible global function definition for ‘panel.hexbinplot’
-pfun: no visible global function definition for ‘panel.abline’
-plot_spm: no visible binding for global variable ‘df.tr’
-plot_spm: no visible binding for global variable ‘target’
-plot_spm: no visible binding for global variable ‘pred.v’
-plot_spm: no visible binding for global variable ‘valu.imp’
-plot_spm: no visible global function definition for ‘colorRampPalette’
-plot_spm: no visible global function definition for ‘xyplot’
-plot_spm: no visible global function definition for ‘barplot’
-plot_spm: no visible binding for global variable ‘var.imp’
-plot_spm: no visible global function definition for ‘title’
-plot_spm: no visible global function definition for ‘ccc’
-plot_spm: no visible global function definition for ‘rmse’
-plot_spm: no visible global function definition for ‘normalize’
-plot_spm: no visible binding for global variable
-  ‘xscale.components.logpower’
-plot_spm: no visible binding for global variable
-  ‘yscale.components.logpower’
-plot_spm: no visible binding for global variable
-  ‘yscale.components.log10ticks’
-plot_spm: no visible binding for global variable
-  ‘xscale.components.log’
-plot_spm: no visible binding for global variable
-  ‘yscale.components.log’
-plot_spm: no visible binding for global variable
-  ‘xscale.components.subticks’
-plot_spm: no visible binding for global variable
-  ‘yscale.components.subticks’
-plot_spm: no visible global function definition for ‘hexbinplot’
-plot_spm: no visible binding for global variable ‘target.variable’
-plot_spm: no visible global function definition for ‘pcor’
-plot_spm: no visible binding for global variable ‘vlp’
-plot_spm : <anonymous>: no visible global function definition for
-  ‘hexbinplot’
-plot_spm: no visible binding for global variable ‘grid.arrange’
-predict_spm: no visible binding for global variable ‘vlp’
-train_spm: no visible global function definition for
-  ‘assert_data_frame’
-train_spm: no visible global function definition for ‘assert_string’
-train_spm: no visible global function definition for ‘rsmp’
-train_spm: no visible global function definition for ‘availableCores’
-train_spm: no visible global function definition for ‘lrn’
-train_spm: no visible binding for global variable ‘ParamSet’
-train_spm: no visible binding for global variable ‘ParamInt’
-train_spm: no visible binding for global variable ‘ParamDbl’
-train_spm: no visible binding for global variable ‘ParamFct’
-train_spm: no visible binding for global variable ‘AutoTuner’
-train_spm: no visible global function definition for ‘msr’
-train_spm: no visible global function definition for ‘trm’
-train_spm: no visible global function definition for ‘tnr’
-train_spm: no visible global function definition for ‘handlers’
-train_spm: no visible global function definition for ‘with_progress’
-train_spm: no visible binding for global variable ‘TaskClassifST’
-train_spm: no visible global function definition for ‘%>>%’
-train_spm: no visible global function definition for ‘po’
-train_spm: no visible global function definition for ‘gunion’
-train_spm: no visible binding for global variable ‘TaskRegrST’
-Undefined global functions or variables:
-  %>>% AutoTuner ParamDbl ParamFct ParamInt ParamSet TaskClassifST
-  TaskRegrST assert_data_frame assert_string availableCores barplot ccc
-  colorRampPalette df.tr grid.arrange gunion handlers hexbinplot lrn
-  msr normalize panel.abline panel.hexbinplot panel.xyplot pcor po
-  pred.v rmse rsmp target target.variable title tnr trm valu.imp
-  var.imp vlp with_progress xscale.components.log
-  xscale.components.logpower xscale.components.subticks xyplot
-  yscale.components.log yscale.components.log10ticks
-  yscale.components.logpower yscale.components.subticks
-Consider adding
-  importFrom("grDevices", "colorRampPalette")
-  importFrom("graphics", "barplot", "title")
-to your NAMESPACE file.
-* checking Rd files ... NOTE
-prepare_Rd: plot_spm.Rd:41-43: Dropping empty section \value
-prepare_Rd: predict_spm.Rd:14-16: Dropping empty section \value
+* checking R code for possible problems ... OK
+* checking Rd files ... OK
 * checking Rd metadata ... OK
-* checking Rd line widths ... NOTE
-Rd file 'extract_tif.Rd':
-  \usage lines wider than 90 characters:
-         crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs",
-  \examples lines wider than 100 characters:
-     tif1.lst = list.files("/data/eumap/sample-data/R-sample-tiles/9529", pattern=".tif", full.names=TRUE, recursive=TRUE) 
-     x = extract_tif(tif=tif1.lst[43], df, date="Date", date.tif.begin=begin.tif1.lst[43], date.tif.end=end.tif1.lst[43], coords=c("coords.x ... [TRUNCATED]
-
-Rd file 'train_spm.Rd':
-  \examples lines wider than 100 characters:
-     tr = eumap::train_spm(df.tr, target.variable = "lead", folds = 5 ,n_evals = 3,#' crs = "+init=epsg:3035")
-     make a map using ensemble machine learning with spatial cross validation for the predicted #' variables (*lead* in this case). 
-
-These lines will be truncated in the PDF manual.
+* checking Rd line widths ... OK
 * checking Rd cross-references ... OK
-* checking for missing documentation entries ... WARNING
-Undocumented code objects:
-  ‘eugrid30km’
-Undocumented data sets:
-  ‘eugrid30km’
-All user-level objects in a package should have documentation entries.
-See chapter ‘Writing R documentation files’ in the ‘Writing R
-Extensions’ manual.
+* checking for missing documentation entries ... OK
 * checking for code/documentation mismatches ... OK
-* checking Rd \usage sections ... WARNING
-Undocumented arguments in documentation object 'predict_spm'
-  ‘train_model’
-Documented arguments not in \usage in documentation object 'predict_spm':
-  ‘train.model’
-
-Undocumented arguments in documentation object 'strip_years'
-  ‘format.date’
-
-Functions with \usage entries need to have the appropriate \alias
-entries, and all their arguments documented.
-The \usage entries must correspond to syntactically valid R code.
-See chapter ‘Writing R documentation files’ in the ‘Writing R
-Extensions’ manual.
-* checking Rd contents ... WARNING
-Argument items with no description in Rd object 'train_spm':
-  ‘coordinate_names’
-
+* checking Rd \usage sections ... OK
+* checking Rd contents ... OK
 * checking for unstated dependencies in examples ... OK
-* checking contents of ‘data’ directory ... OK
-* checking data for non-ASCII characters ... OK
-* checking data for ASCII and uncompressed saves ... WARNING
-  
-  Note: significantly better compression could be obtained
-        by using R CMD build --resave-data
-                 old_size new_size compress
-  eugrid30km.rda    173Kb     57Kb       xz
 * checking examples ... OK
 * checking for non-standard things in the check directory ... OK
 * checking for detritus in the temp directory ... OK
 * DONE
-Status: 5 WARNINGs, 3 NOTEs
+Status: 1 WARNING

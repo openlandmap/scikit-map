@@ -34,7 +34,7 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ##D library(terra)
 ##D tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
 ##D strip_dates(tif.name, type="begin")
-##D tif1.lst = list.files("/data/eumap/sample-data/R-sample-tiles/9529", pattern=".tif", full.names=TRUE, recursive=TRUE) 
+##D tif1.lst = list.files("R-sample-tiles/9529", pattern=".tif", full.names=TRUE, recursive=TRUE) 
 ##D year.span = c(2000:2020)
 ##D df = readOGR("/data/eumap/sample-data/R-sample-tiles/9529_croatia_landcover_samples.gpkg")
 ##D df <- as.data.frame(df)
@@ -42,7 +42,7 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ##D df$row.id = 1:nrow(df)
 ##D begin.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="begin")})
 ##D end.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="end")})
-##D x = extract_tif(tif=tif1.lst[43], df, date="Date", date.tif.begin=begin.tif1.lst[43], date.tif.end=end.tif1.lst[43], coords=c("coords.x1","coords.x2"))
+##D x = extract_tif(tif=tif1.lst, df, date="Date", begin=begin, end=end, coords=c("x","y"))
 ## End(Not run)
 
 
@@ -71,6 +71,27 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 base::assign(".dptime", (proc.time() - get(".ptime", pos = "CheckExEnv")), pos = "CheckExEnv")
 base::cat("plot_spm", base::get(".format_ptime", pos = 'CheckExEnv')(get(".dptime", pos = "CheckExEnv")), "\n", file=base::get(".ExTimings", pos = 'CheckExEnv'), append=TRUE, sep="\t")
 cleanEx()
+nameEx("predict_spm")
+### * predict_spm
+
+flush(stderr()); flush(stdout())
+
+base::assign(".ptime", proc.time(), pos = "CheckExEnv")
+### Name: predict_spm
+### Title: predict_spm
+### Aliases: predict_spm
+
+### ** Examples
+
+## Not run: 
+##D predict.variable = eumap::predict_spm(train_model, newdata)
+## End(Not run)
+
+
+
+base::assign(".dptime", (proc.time() - get(".ptime", pos = "CheckExEnv")), pos = "CheckExEnv")
+base::cat("predict_spm", base::get(".format_ptime", pos = 'CheckExEnv')(get(".dptime", pos = "CheckExEnv")), "\n", file=base::get(".ExTimings", pos = 'CheckExEnv'), append=TRUE, sep="\t")
+cleanEx()
 nameEx("strip_dates")
 ### * strip_dates
 
@@ -83,10 +104,11 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 
 ### ** Examples
 
-tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
-strip_dates(tif.name, type="begin")
-strip_dates(tif.name, type="end")
-
+## Not run: 
+##D tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
+##D strip_dates(tif.name, type="begin")
+##D strip_dates(tif.name, type="end")
+## End(Not run)
 
 
 
@@ -105,10 +127,11 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 
 ### ** Examples
 
-tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
-strip_years(tif.name, type="begin")
-strip_years(tif.name, type="end")
-
+## Not run: 
+##D tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
+##D strip_years(tif.name, type="begin")
+##D strip_years(tif.name, type="end")
+## End(Not run)
 
 
 
@@ -136,7 +159,8 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ##D library(mlr3spatiotempcv)
 ##D library(checkmate)
 ##D library(future)
-##D library(progressr)
+##D library(progress)
+##D library(scales)
 ##D library(eumap)
 ##D demo(meuse, echo=FALSE)
 ##D df <- as.data.frame(meuse)
@@ -149,9 +173,9 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ##D df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 ##D df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
 ##D newdata <-df.ts
-##D tr = eumap::train_spm(df.tr, target.variable = "lead", folds = 5 ,n_evals = 3,#' crs = "+init=epsg:3035")
+##D tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
 ##D train_model= tr[[1]]
-##D var.imp = tr[[2]]
+##D #var.imp = tr[[2]]
 ##D summary = tr[[3]]
 ##D response = tr[[4]]
 ##D vlp = tr[[5]]
@@ -163,9 +187,9 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ##D df.ts$leadp = predict.variable
 ##D coordinates(df.ts) <- ~x+y
 ##D proj4string(df.ts) <- CRS("+init=epsg:28992")
-##D gridded(df.ts) = TRUE # creat raster output
+##D gridded(df.ts) = TRUE
 ##D ## regression grid 
-##D make a map using ensemble machine learning with spatial cross validation for the predicted #' variables (*lead* in this case). 
+##D #make a spatial prediction map 
 ##D plot(df.ts[,"leadp"])
 ##D points(meuse, pch="+")
 ## End(Not run)

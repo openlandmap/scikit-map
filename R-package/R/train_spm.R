@@ -26,7 +26,8 @@
 #' library(mlr3spatiotempcv)
 #' library(checkmate)
 #' library(future)
-#' library(progressr)
+#' library(progress)
+#' library(scales)
 #' library(eumap)
 #' demo(meuse, echo=FALSE)
 #' df <- as.data.frame(meuse)
@@ -61,12 +62,9 @@
 #' }
 train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 5, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL,  coordinate_names = c("x","y"), ...){
   target = target.variable
-  # assert_data_frame(df.tr)
   if( is.null(predict_type)){
     predict_type <- "response"
   }
-  # assert_string(predict_type)
-  #defining constant vars
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
   task_type = c("        classification Task  ", "        Regression Task  ")
@@ -90,7 +88,6 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     )
     
     ranger_lrn = lrn("classif.ranger", predict_type = "response",importance ="permutation")
-    # requireNamespace(mlr3measures::"mlr3measures")
     ps_ranger = 
       ParamSet$new(
       list(ParamInt$new("mtry", lower = 1L, upper = 5L),
@@ -106,19 +103,12 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       terminator = trm("evals", n_evals = n_evals), 
       tuner = tnr("random_search")
       )
-      #at$store_tuning_instance = TRUE
-      # requireNamespace("lgr")
-      # logger = lgr::get_logger("mlr3")
-      # logger$set_threshold("trace")
-      # lgr::get_logger("mlr3")$set_threshold("warn")
-      # lgr::get_logger("mlr3")$set_threshold("debug")
       message(run_model,resample_method[1], immediate. = TRUE)
       at$train(tsk_clf)
       at$learner$train(tsk_clf)
       best.model = at$archive$best()
       var.imp = at$learner$importance()
       vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
-      #value.imp = df.trf$data(1:df.trf$nrow,vlp)
       summary = at$learner$state$model
       tr.model = at$learner
       train_model = tr.model$predict_newdata
@@ -133,7 +123,6 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     
     tsk_regr <- TaskRegr$new(id = id, backend = df.tr, target = target.variable)
     ranger_lrn = lrn("regr.ranger", predict_type = "response",importance ="permutation")
-    # requireNamespace("mlr3measures")
     ps_ranger = ParamSet$new(
       list(
         ParamInt$new("mtry", lower = 1L, upper = 5L),
@@ -151,11 +140,6 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       tuner =  tnr("random_search")
       )
     at$store_tuning_instance = TRUE
-    # requireNamespace("lgr")
-    # logger = lgr::get_logger("mlr3")
-    # logger$set_threshold("trace")
-    # lgr::get_logger("mlr3")$set_threshold("warn")
-    # lgr::get_logger("mlr3")$set_threshold("debug")
     message(run_model,resample_method[1], immediate. = TRUE)
     at$train(tsk_regr)
     
@@ -164,7 +148,6 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     summary = tr.model$model
     var.imp = tr.model$importance()
     vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
-    #value.imp = df.trf$data(1:df.trf$nrow,vlp)
     train_model = tr.model$predict_newdata
     response = tr.model$model$predictions
   }
@@ -210,7 +193,6 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       conf.mat = g$pipeops$classif.ranger$learner_model$model$confusion.matrix
       var.imp = g$pipeops$classif.ranger$learner_model$model$variable.importance
       vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
-      #value.imp = df.trf$data(1:df.trf$nrow,vlp)
       summary = g$pipeops$classif.ranger$learner_model$model
       tr.model = g$pipeops$classif.ranger$learner$train(tsk_clf)
       train_model = tr.model$predict_newdata
@@ -258,15 +240,12 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     g$keep_results = "TRUE"
     # plt = g$plot()
     message(run_model,resample_method[2], immediate. = TRUE)
-    # lgr::get_logger("bbotk")$set_threshold("warn")
-    # lgr::get_logger("mlr3")$set_threshold("warn")
     g$train(tsk_regr)
     g$predict(tsk_regr)
     summary = g$pipeops$regr.ranger$learner_model$model
     tr.model = g$pipeops$regr.ranger$learner$train(tsk_regr)
     var.imp = tr.model$importance()
     vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
-    #value.imp = df.trf$data(1:df.trf$nrow,vlp)
     response = tr.model$model$predictions
     train_model = tr.model$predict_newdata
     response = tr.model$model$predictions
