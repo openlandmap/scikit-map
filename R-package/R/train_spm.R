@@ -1,21 +1,19 @@
-#' Train Spatial matrix
+#' Train a spatial prediction model, from a matrix, using ensemble machine learning.
 #' @description
 #' This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and    \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem. 
-#' 
-#' @param df.tr observation data,
-#' @param target.variable target.variable response variable,
-#' @param parallel parallel processing mode,
-#' @param predict_type e.g., response and prob,
-#' @param folds sub-item for spcv,
-#' @param n_evals number of evaluation process,
-#' @param method.list  learning methods,
-#' @param var.imp variable importance,
-#' @param super.learner super learner,
-#' @param crs coordinate reference system, necessary for spcv,
-#' @param coordinate_names columns names for X and Y coordinates,
+#' @param df.tr Observation data frame,
+#' @param target.variable Target variable or response variable,
+#' @param parallel Parallel processing mode,
+#' @param predict_type Prediction type 'prob' or 'response',
+#' @param folds Sub-item for spcv (see mlr3spatiotempcv),
+#' @param n_evals Number of evaluation process,
+#' @param method.list Learning methods (see mlr3learners),
+#' @param var.imp Variable importance,
+#' @param super.learner Ensemble stacking model usually \code{regr.ranger} for regression tasks,
+#' @param crs Coordinate reference system, necessary for spcv (see mlr3spatiotempcv),
+#' @param coordinate_names Columns names for X and Y coordinates,
 #' @param ... other arguments that can be passed on to \code{TaskSupervised},
-#'
-#' @return Object of class \code{mlr3},
+#' @return List of objects of class \code{mlr3},
 #' @export 
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @examples
