@@ -107,6 +107,7 @@ data(sic1997)
 sic97 <- na.omit(sic1997)
 sic97 <- sic1997$swiss1km[c("CHELSA_rainfall","DEM")]
 df <- data.frame(sic97)
+target.variable = "CHELSA_rainfall"
 #let's create some fake cov
 df$test1 <- log10(df$DEM)*53.656 
 df$test2 <- cos(df$DEM)*-0.13 
@@ -214,7 +215,7 @@ valu.imp
 in case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "correlation", gvar_imp = "TRUE")
+plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "accuracy", gvar_imp = "TRUE")
 ```
 
 
