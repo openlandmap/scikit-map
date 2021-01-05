@@ -107,6 +107,7 @@ if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstu
 ```{r ,results='hide', warning=FALSE}
 #sic97 source data: https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html
 library("landmap")  
+<<<<<<< HEAD:demo/spm-tutorial/README.Rmd
 data(sic1997)
 sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
                    as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
@@ -116,6 +117,14 @@ df <- na.omit(sic1997.df)
 We can create some synthetic covariates, so we can demonstrate that (a) the learner is noise-proof, and (b) that this is visible in the variable importance plots:
 
 ```{r}
+=======
+data(sic1997) 
+sic97 <- na.omit(sic1997)
+sic97 <- sic1997$swiss1km[c("CHELSA_rainfall","DEM")]
+df <- data.frame(sic97)
+target.variable = "CHELSA_rainfall"
+#let's create some fake cov
+>>>>>>> master:demo/spm-tutorial/archive/README.Rmd
 df$test1 <- log10(df$DEM)*53.656 
 df$test2 <- cos(df$DEM)*-0.13 
 df$test3 <- sin(df$DEM)**31 
@@ -231,7 +240,11 @@ valu.imp
 in case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
+<<<<<<< HEAD:demo/spm-tutorial/README.Rmd
 plt = plot_spm(x = df[-train_ind, "rainfall"], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "correlation", gvar_imp = "TRUE")
+=======
+plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "accuracy", gvar_imp = "TRUE")
+>>>>>>> master:demo/spm-tutorial/archive/README.Rmd
 ```
 
 
