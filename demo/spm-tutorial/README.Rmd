@@ -1,6 +1,6 @@
 ---
-title: " demo: eumap Rpackage functionalities"
-author: "Mohammadreza Sheykhmousa (mohammadreza.sheykhmousa@OpenGeoHub.org)"
+title: " demo: eumap R package functionalities"
+author: "Mohammadreza Sheykhmousa (mohammadreza.sheykhmousa@OpenGeoHub.org) and Tom Hengl (tom.hengl@OpenGeoHub.org)"
 date: "Last compiled on: `r format(Sys.time(), '%d %B, %Y')`"
 output: 
    rmarkdown::md_document:
@@ -20,19 +20,16 @@ header-includes:
 Follow me on [![alt text][1.1]][1]
 
 ```{r setup, include=FALSE}
+library(knitr)
 knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 ```
 
-```{r , include=FALSE}
-library(knitr)
-```
+To install the most up-to-date version of eumap please use:
 
-
-```{r ,echo=FALSE}
+```{r, echo=FALSE}
+library(remotes)
 remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 ```
-
-
 
 ```{r, echo=FALSE, warning=FALSE}
 hook_output <- knit_hooks$get("output")
@@ -58,30 +55,37 @@ knit_hooks$set(output = function(x, options) {
 ```
 
 ## Introduction
-`eumap` aims at providing easier access to EU environmental maps.
+`eumap` package aims at providing easier access to EU environmental maps.
 Basic functions train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/), [@mlr3], and related extensions in the [mlr3 ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages) [@casalicchio2017openml; @MichelLang2020mlr3book], 
-which includes spatial prediction using [Ensemble Machine Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r) taking spatial coordinates and spatial cross-validation into account. 
-In a nutshell one can `train` an arbitrary `s3` **(spatial)dataframe** in `mlr3` ecosystem by defining *df* and *target.variable* i.e., response.
-main functions are as the following:
+which includes spatial prediction using [Ensemble Machine Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r), taking spatial coordinates and spatial cross-validation into account. 
+In a nutshell one can `train` an arbitrary `s3` **(spatial)dataframe** in `mlr3` ecosystem by defining *df* and *target.variable* i.e., response. To learn more about the [mlr3 ecosystem](https://mlr3.mlr-org.com/) best refer to the mlr3 book by Becker et al. [@MichelLang2020mlr3book].
+
+
+The main functions in eumap are as following:
 
 ## `train_spm` 
 
 1. `train_spm` will automatically perform `classification` or `regression` tasks and the output is a `train_model` which later can be used to predict `newdata`.It also provides *summary* of the model and *variable importance* and *response*.
 The rest of arguments can be either pass or default values will be passed. `train_spm` provides four scenarios:
 
-  1.1. `classification` task with **non spatial** resampling methods
-  1.2. `regression` task with **non spatial** resampling methods
-  1.3. `classification` task with **spatial** resampling methods
-  1.4. `regression` task with **spatial** resampling methods
+  1.1. `classification` task with **non spatial** resampling methods,
+  1.2. `regression` task with **non spatial** resampling methods,
+  1.3. `classification` task with **spatial** resampling methods,
+  1.4. `regression` task with **spatial** resampling methods,
 
 ## `predict_spm`
 
-1. Prediction on a new dataset using `train_model`,
-2. User needs to set`df.ts = test set` and also pass the `train_model`. 
+Here two arguments are important:
+
+1. `object` used to generate prediction on a new dataset,
+2. `newdata` user needs to set new observations which should be predicted,
 
 ## `plot_spm` 
 
-1. Accuracy plot in case of regression task (don’t use it for classification tasks for obvious reason),
+Here two scenarios are possible:
+
+1. 1:1 accuracy plot predicted vs observed in case of regression task,
+2. Confusion matrix predicted vs observed in the case of classification task,
  
 **Warning:** most of functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
 
@@ -89,11 +93,11 @@ The following examples demonstrates spatial prediction using the `sic97` data se
 
 ## Required packages
 
-```{r , warning=FALSE}
+```{r, warning=FALSE}
 start_time <- Sys.time()
-ls <- c("lattice", "raster", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
+ls <- c("lattice", "raster", "landmap", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
     "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv",  "tidyr", "lubridate", "R.utils", "terra","rgdal",
-    "FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools","gridExtra","yardstick","plotKML", "latticeExtra","devtools","progressr")
+    "FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools", "gridExtra", "yardstick", "latticeExtra", "devtools", "progressr")
 new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
 ```
@@ -103,55 +107,57 @@ if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstu
 ```{r ,results='hide', warning=FALSE}
 #sic97 source data: https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html
 library("landmap")  
-data(sic1997) 
-sic97 <- na.omit(sic1997)
-sic97 <- sic1997$swiss1km[c("CHELSA_rainfall","DEM")]
-df <- data.frame(sic97)
-#let's create some fake cov
+data(sic1997)
+sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
+                   as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
+df <- na.omit(sic1997.df)
+```
+
+We can create some synthetic covariates, so we can demonstrate that (a) the learner is noise-proof, and (b) that this is visible in the variable importance plots:
+
+```{r}
 df$test1 <- log10(df$DEM)*53.656 
 df$test2 <- cos(df$DEM)*-0.13 
 df$test3 <- sin(df$DEM)**31 
 df$test4 <- (df$DEM)**-5.13 
-df$test5 <- runif(1:nrow(df))
-df$test6 <- (df$DEM/2**4)**6 
-df$test7 <- (df$x)**-1
-df$test8 <- (df$y)*3
-df$test9 <- (df$CHELSA_rainfall)**-1
-df$test10 <-((df$CHELSA_rainfall)*13/34)
-df$test11 <- runif(1:nrow(df))/0.54545
-df$test12 <- sqrt(runif(1:nrow(df))) 
+df$test5 <- (df$DEM/2**4)**6 
+df$test6 <- (df$CHELSA_rainfall)**-1
+df$test7 <-((df$CHELSA_rainfall)*13/34)
+df$test8 <- runif(1:nrow(df))/0.54545
+df$test9 <- sqrt(runif(1:nrow(df))) 
 ```
 
-## split training (tr) and test (ts) set  
+where `test9` and `test10` are pure noise.
+
+## split training (tr) and test (ts) set
+
 ```{r }
-smp_size <- floor(0.5 * nrow(df))
+smp_size <- floor(0.8 * nrow(df))
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[train_ind,]
-df.ts <- df[-train_ind, ]
-newdata = df.ts
+newdata <- df[-train_ind, ]
 ```
 
 
 ## Loading required libraries:
 ```{r, message=FALSE, warning=FALSE}
-library("mlr3verse")#
-library("mlr3spatiotempcv")#
-library("sp")#
-library("grid")#
-library("hexbin")#
-library("BBmisc")#
-library("lattice")#
-library("gridExtra")#
+library("mlr3verse")
+library("mlr3spatiotempcv")
+library("sp")
+library("grid")
+library("hexbin")
+library("BBmisc")
+library("lattice")
+library("gridExtra")
 library("MLmetrics")
-library("yardstick")#
-library("latticeExtra")#
+library("yardstick")
+library("latticeExtra")
 library("eumap")
 library("ppcor")
 library("progressr")
 library("checkmate")
 library("future")
-
 ```
 
 ## `train_spm`
@@ -159,7 +165,8 @@ library("future")
 `train_spm` fits multiple models/learners depending on the `class` of the **target.variable** and for returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
 ```{r ,results='hide', warning=FALSE}
-tr = eumap::train_spm(df.tr, target.variable = "CHELSA_rainfall", folds = 5, n_evals = 3, crs = "+init=epsg:4326")
+tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 5, 
+                n_evals = 3, crs = "+init=epsg:4326", coordinate_names = c("X","Y"))
 ```
 
 `train_spm` results:
@@ -169,7 +176,9 @@ tr = eumap::train_spm(df.tr, target.variable = "CHELSA_rainfall", folds = 5, n_e
 ```{r ,results='hide', warning=FALSE}
 train_model= tr[[1]]
 ```
+
 2nd element is the *variable importance*:
+
 ```{r}
 var.imp = tr[[2]]
 var.imp
@@ -183,10 +192,14 @@ summary
 
 4th element is the predicted values of our trained model
 note: here we just show start and the ending values
+
 ```{r , output.lines= -(4:145)}
 response = tr[[4]]
 response
 ```
+
+5th element is 
+
 ```{r}
 vlp = tr[[5]]
 vlp
@@ -195,16 +208,20 @@ vlp
 ## `predict_spm`
 
 prediction on `newdata` set
+
 ```{r}
 predict.variable = eumap::predict_spm(train_model, newdata)
-
 ```
+
 ### predicted values for the *newdata* set:
+
 note: here we just show start and the ending values
+
 ```{r ,output.lines= -(3:3200)}
 pred.v = predict.variable[1]
 pred.v
 ```
+
 ```{r ,results='hide'}
 valu.imp= predict.variable[[2]]
 valu.imp
@@ -214,7 +231,7 @@ valu.imp
 in case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "correlation", gvar_imp = "TRUE")
+plt = plot_spm(x = df[-train_ind, "rainfall"], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "correlation", gvar_imp = "TRUE")
 ```
 
 
@@ -228,7 +245,9 @@ gridded(df.ts) = TRUE
 
 ```
 ## raster grid 
-make a map using ensemble machine learning with spatial cross validation for the predicted variables e.g., *lead* (in this case) 
+
+make a map using ensemble machine learning with spatial cross validation for the predicted variables e.g., *lead* (in this case):
+
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Raster grid"}
 plot(df.ts[,"leadp"])
 points(sic97, pch="+")

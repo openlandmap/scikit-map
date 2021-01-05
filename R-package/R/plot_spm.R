@@ -25,10 +25,10 @@ pfun <- function(x,y, ...){
 #' \dontrun{
 #' plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 #' }
-plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gvar_imp = TRUE,gtype = c("accuracy", "correlation","var.imp") ,gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
+plot_spm <- function(df=NULL, x, y, main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gvar_imp = TRUE,gtype = c("accuracy", "correlation","var.imp"), gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
   
-  x = df.tr[,"CHELSA_rainfall"]
-  y = pred.v
+  if(missing(x)) { x <- df[,-1] }
+  if(missing(y)) { y <- df[,1] }
   z = valu.imp
   df = data.frame(x,y)
   colnames(df)[2] <- 'y'
@@ -141,4 +141,5 @@ plot_spm <- function(df=NULL , main = NULL, palet  = NULL, colorcut = NULL, xbin
   }
   return(plt)
   }
+
 

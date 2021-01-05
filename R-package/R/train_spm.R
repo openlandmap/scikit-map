@@ -12,7 +12,7 @@
 #' @param var.imp variable importance,
 #' @param super.learner super learner,
 #' @param crs coordinate reference system, necessary for spcv,
-#' @param coordinate_names long, lat
+#' @param coordinate_names columns names for X and Y coordinates,
 #' @param ... other arguments that can be passed on to \code{TaskSupervised},
 #'
 #' @return Object of class \code{mlr3},
@@ -60,34 +60,32 @@
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
 #' }
-train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 5, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL,  coordinate_names = c("x","y"), ...){
+train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 5, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
   target = target.variable
   if( is.null(predict_type)){
     predict_type <- "response"
   }
   id = deparse(substitute(df.tr))
   cv3 = rsmp("repeated_cv", folds = folds)
-  task_type = c("        classification Task  ", "        Regression Task  ")
-  ml_method = c( " kknn", " featureless")
-  meta_learner = " Randome Forests"
-  resample_method = c("  resampling method: (non-spatial) repeated_cv ...", "  resampling method: (spatial)repeated_cv by cooridinates ...")
+  task_type = c("classification Task", "Regression Task")
+  ml_method = c("kknn", "featureless")
+  meta_learner = "ranger"
+  resample_method = c("Using resampling method: (non-spatial) repeated_cv...", "Using resampling method: (spatial)repeated_cv by cooridinates...")
   number_cores = paste0(" ncores: ", availableCores())
-  run_model = paste0("           Fitting an ensemble ML using ", ml_method[1]," ", ml_method[2], ", and" , meta_learner," models",  number_cores)
+  message(paste0("Fitting an ensemble ML using ", ml_method[1], " ", ml_method[2], ", and ", meta_learner," models", number_cores), immediate. = TRUE)
   
   ## start running ensemble
   
   ##  classif CV ----
   if(is.factor(df.tr[,target]) & is.null(crs)){
     
-    message( 
-    paste0(task_type[1],"...", immediate. = TRUE)
-    )
+    message(paste0(task_type[1],"..."), immediate. = TRUE)
     
     tsk_clf <- TaskClassif$new(
     id = id, backend = df.tr, target = target.variable
     )
     
-    ranger_lrn = lrn("classif.ranger", predict_type = "response",importance ="permutation")
+    ranger_lrn = lrn("classif.ranger", predict_type = "response", importance ="permutation")
     ps_ranger = 
       ParamSet$new(
       list(ParamInt$new("mtry", lower = 1L, upper = 5L),
@@ -103,7 +101,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       terminator = trm("evals", n_evals = n_evals), 
       tuner = tnr("random_search")
       )
-      message(run_model,resample_method[1], immediate. = TRUE)
+      message(resample_method[1], immediate. = TRUE)
       at$train(tsk_clf)
       at$learner$train(tsk_clf)
       best.model = at$archive$best()
@@ -140,7 +138,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       tuner =  tnr("random_search")
       )
     at$store_tuning_instance = TRUE
-    message(run_model,resample_method[1], immediate. = TRUE)
+    message(resample_method[1], immediate. = TRUE)
     at$train(tsk_regr)
     
     at$learner$train(tsk_regr)
@@ -187,7 +185,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       )
       g$keep_results = "TRUE"
       # plt = g$plot()
-      message(run_model,resample_method[2], immediate. = TRUE)
+      message(resample_method[2], immediate. = TRUE)
       g$train(tsk_clf)
       g$predict(tsk_clf)
       conf.mat = g$pipeops$classif.ranger$learner_model$model$confusion.matrix
@@ -214,7 +212,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     tsk_regr = TaskRegrST$new(
     id = id, backend = df.trf, target = target.variable,
     extra_args = list(
-      positive = "TRUE", coordinate_names = c("x","y"),
+      positive = "TRUE", coordinate_names = coordinate_names,
       coords_as_features = FALSE, crs = crs
       )
     )
@@ -239,7 +237,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       )
     g$keep_results = "TRUE"
     # plt = g$plot()
-    message(run_model,resample_method[2], immediate. = TRUE)
+    message(resample_method[2], immediate. = TRUE)
     g$train(tsk_regr)
     g$predict(tsk_regr)
     summary = g$pipeops$regr.ranger$learner_model$model

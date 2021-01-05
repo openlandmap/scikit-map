@@ -1,18 +1,18 @@
 #' predict_spm
 #' @description
 #' prediction on new dataset
+#' @param object trained model using `train_spm`,
 #' @param newdata data at new location,
-#' @param train_model trained model using `train_spm`,
 #' @return predicted variables, variable importance 
 #' @export 
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' @examples 
 #' \dontrun{
-#' predict.variable = eumap::predict_spm(train_model, newdata)
+#' predict.variable = eumap::predict_spm(object, newdata)
 #' }
 
-predict_spm = function (train_model, newdata){
-        predict.variable = train_model(newdata)
+predict_spm = function (object, newdata){
+        predict.variable = object(newdata)
         if(!is.data.frame(newdata)){
           newdata = as.data.frame(newdata)
         }

@@ -1,6 +1,6 @@
 Package: eumap
 Title: European environmental maps processing and production
-Version: 0.0.2
+Version: 0.0.3
 Authors@R: 
    c(person("Tomislav", "Hengl", email = "tom.hengl@opengeohub.org", role = c("aut", "cre")),
      person("Mohammadreza", "Sheykhmousa", email = "mohammadreza.sheykhmousa@opengeohub.org", role = c("aut")),
