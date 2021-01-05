@@ -150,6 +150,7 @@ library("eumap")
 library("ppcor")
 library("progressr")
 library("checkmate")
+library("future")
 
 ```
 
@@ -158,7 +159,7 @@ library("checkmate")
 `train_spm` fits multiple models/learners depending on the `class` of the **target.variable** and for returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
 ```{r ,results='hide', warning=FALSE}
-tr = eumap::train_spm(df.tr, target.variable = target.variable , folds = folds , n_evals = n_evals , crs = "+init=epsg:28992")
+tr = eumap::train_spm(df.tr, target.variable = "CHELSA_rainfall", folds = 5, n_evals = 3, crs = "+init=epsg:4326")
 ```
 
 `train_spm` results:

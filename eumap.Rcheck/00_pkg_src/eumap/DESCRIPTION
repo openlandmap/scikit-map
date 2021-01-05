@@ -19,7 +19,7 @@ RoxygenNote: 7.1.1
 SystemRequirements: C++11, GDAL (>= 2.0.1), GEOS (>= 3.4.0), PROJ (>=
         4.8.0)
 NeedsCompilation: no
-Packaged: 2021-01-05 13:08:10 UTC; msheykhmousa
+Packaged: 2021-01-05 13:21:26 UTC; msheykhmousa
 Author: Tomislav Hengl [aut, cre],
   Mohammadreza Sheykhmousa [aut],
   Leandro Leal Parente [aut],
