@@ -94,7 +94,7 @@ The following examples demonstrates spatial prediction using the `sic97` data se
 
 ## Required packages
 
-```{r, warning=FALSE}
+```{r, results='hide',warning=FALSE}
 start_time <- Sys.time()
 ls <- c("lattice", "raster", "landmap", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
     "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv",  "tidyr", "lubridate", "R.utils", "terra","rgdal",'MLmetrics',
@@ -131,12 +131,13 @@ df$noise1 <- runif(1:nrow(df))/0.54545
 df$noise2 <- sqrt(runif(1:nrow(df))) 
 ```
 
-where `noise1` and `noise2` are pure noise.
+where `noise1` and `noise2` are pure noises.
 
-## split training (tr) and test (ts) set
+## Split training (tr) and test (ts) set
+Note that we equally split the dataset to have same dimension for visualization later on. 
 
 ```{r }
-smp_size <- floor(0.8 * nrow(df))
+smp_size <- floor(0.5 * nrow(df))
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[train_ind,]
@@ -184,14 +185,11 @@ train_model= tr[[1]]
 2nd element is the *variable importance*:
 
 ```{r}
-var.imp = tr[[2]]
-var.imp
-
+tr[[2]]
 ```
 3rd element of the summary of the *trained model*:
 ```{r}
-summary = tr[[3]]
-summary
+tr[[3]]
 ```
 
 4th element is the predicted values of our trained model
@@ -199,14 +197,11 @@ note: here we just show start and the ending values
 
 ```{r , output.lines= -(4:145)}
 response = tr[[4]]
-response
 ```
 
-5th element is 
 
-```{r}
+```{r, echo=FALSE}
 vlp = tr[[5]]
-vlp
 ```
 
 ## `predict_spm`
@@ -226,20 +221,16 @@ pred.v = predict.variable[1]
 pred.v
 ```
 
-```{r ,results='hide'}
+```{r ,results='hide', echo=FALSE}
 valu.imp= predict.variable[[2]]
-valu.imp
+
 ```
 
 ## `plot_spm` 
 in case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-<<<<<<< HEAD:demo/spm-tutorial/README.Rmd
-plt = plot_spm(x = df[-train_ind, "rainfall"], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "correlation", gvar_imp = "TRUE")
-=======
 plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "accuracy", gvar_imp = "TRUE")
->>>>>>> master:demo/spm-tutorial/archive/README.Rmd
 ```
 
 

@@ -42,7 +42,7 @@ plot_spm <- function(df=NULL, x, y, main = NULL, palet  = NULL, colorcut = NULL,
   }
   if(length(x) <= 500 ) {
     plt <-  lattice:: xyplot(x ~ y, asp=1, 
-                   par.settings = list(plot.symbol = list(col=alpha("black", 0.6), fill=alpha("red", 0.6), pch=21, cex=0.6)), 
+                   par.settings = list(plot.symbol = list(col="black", fill=alpha("red", 0.6), pch=21, cex=0.6)), 
                    scales = list(x=list(log=TRUE, equispaced.log=FALSE), y=list(log=TRUE, equispaced.log=FALSE)),
                    ylab="measured", xlab="predicted")
     print(plt)
