@@ -4,10 +4,10 @@
 \alias{predict_spm}
 \title{predict_spm}
 \usage{
-predict_spm(train_model, newdata)
+predict_spm(object, newdata)
 }
 \arguments{
-\item{train_model}{trained model using `train_spm`,}
+\item{object}{trained model using `train_spm`,}
 
 \item{newdata}{data at new location,}
 }
@@ -19,7 +19,7 @@ prediction on new dataset
 }
 \examples{
 \dontrun{
-predict.variable = eumap::predict_spm(train_model, newdata)
+predict.variable = eumap::predict_spm(object, newdata)
 }
 }
 \author{

@@ -27,13 +27,10 @@ pfun <- function(x,y, ...){
 #' }
 plot_spm <- function(df=NULL, x, y, main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gvar_imp = TRUE,gtype = c("accuracy", "correlation","var.imp"), gmode  = c("root","log10","norm","log2","nat"), aspect = 1, ...){
   
-<<<<<<< HEAD
   if(missing(x)) { x <- df[,-1] }
   if(missing(y)) { y <- df[,1] }
-=======
   x = df.tr[,target.variable]
   y = pred.v
->>>>>>> master
   z = valu.imp
   df = data.frame(x,y)
   colnames(df)[2] <- 'y'

@@ -1,4 +1,4 @@
-#' Train a spatial prediction model, from a matrix, using ensemble machine learning.
+#' Train a spatial prediction model, from a (spatial) matrix, using ensemble machine learning.
 #' @description
 #' This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and    \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem. 
 #' @param df.tr Observation data frame,
@@ -64,7 +64,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     predict_type <- "response"
   }
   id = deparse(substitute(df.tr))
-  cv3 = rsmp("repeated_cv", folds = folds)
+  cv = rsmp("repeated_cv", folds = folds)
   task_type = c("classification Task", "Regression Task")
   ml_method = c("kknn", "featureless")
   meta_learner = "ranger"
@@ -93,7 +93,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       )
     at = AutoTuner$new(
       learner = ranger_lrn,
-      resampling = cv3,
+      resampling = cv,
       measure =  msr("classif.acc"),
       search_space = ps_ranger,
       terminator = trm("evals", n_evals = n_evals), 
@@ -129,7 +129,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       )
     at = AutoTuner$new(
       learner = ranger_lrn,
-      resampling = cv3,
+      resampling = cv,
       measure = msr("regr.rmse"),
       search_space = ps_ranger,
       terminator =  trm("evals", n_evals = n_evals), 

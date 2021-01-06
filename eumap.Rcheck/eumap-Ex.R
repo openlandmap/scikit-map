@@ -1,6 +1,7 @@
 pkgname <- "eumap"
 source(file.path(R.home("share"), "R", "examples-header.R"))
 options(warn = 1)
+options(pager = "console")
 base::assign(".ExTimings", "eumap-Ex.timings", pos = 'CheckExEnv')
 base::cat("name\tuser\tsystem\telapsed\n", file=base::get(".ExTimings", pos = 'CheckExEnv'))
 base::assign(".format_ptime",
@@ -84,7 +85,7 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ### ** Examples
 
 ## Not run: 
-##D predict.variable = eumap::predict_spm(train_model, newdata)
+##D predict.variable = eumap::predict_spm(object, newdata)
 ## End(Not run)
 
 
@@ -146,7 +147,8 @@ flush(stderr()); flush(stdout())
 
 base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ### Name: train_spm
-### Title: Train Spatial matrix
+### Title: Train a spatial prediction model, from a (spatial) matrix, using
+###   ensemble machine learning.
 ### Aliases: train_spm
 
 ### ** Examples

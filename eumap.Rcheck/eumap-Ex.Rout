@@ -1,7 +1,7 @@
 
-R version 4.0.3 (2020-10-10) -- "Bunny-Wunnies Freak Out"
+R version 4.0.2 (2020-06-22) -- "Taking Off Again"
 Copyright (C) 2020 The R Foundation for Statistical Computing
-Platform: x86_64-pc-linux-gnu (64-bit)
+Platform: x86_64-w64-mingw32/x64 (64-bit)
 
 R is free software and comes with ABSOLUTELY NO WARRANTY.
 You are welcome to redistribute it under certain conditions.
@@ -20,6 +20,7 @@ Type 'q()' to quit R.
 > pkgname <- "eumap"
 > source(file.path(R.home("share"), "R", "examples-header.R"))
 > options(warn = 1)
+> options(pager = "console")
 > base::assign(".ExTimings", "eumap-Ex.timings", pos = 'CheckExEnv')
 > base::cat("name\tuser\tsystem\telapsed\n", file=base::get(".ExTimings", pos = 'CheckExEnv'))
 > base::assign(".format_ptime",
@@ -33,7 +34,7 @@ Type 'q()' to quit R.
 > 
 > ### * </HEADER>
 > library('eumap')
-version: 0.0.2
+version: 0.0.3
 > 
 > base::assign(".oldSearch", base::search(), pos = 'CheckExEnv')
 > base::assign(".old_wd", base::getwd(), pos = 'CheckExEnv')
@@ -104,7 +105,7 @@ version: 0.0.2
 > ### ** Examples
 > 
 > ## Not run: 
-> ##D predict.variable = eumap::predict_spm(train_model, newdata)
+> ##D predict.variable = eumap::predict_spm(object, newdata)
 > ## End(Not run)
 > 
 > 
@@ -166,7 +167,8 @@ version: 0.0.2
 > 
 > base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 > ### Name: train_spm
-> ### Title: Train Spatial matrix
+> ### Title: Train a spatial prediction model, from a (spatial) matrix, using
+> ###   ensemble machine learning.
 > ### Aliases: train_spm
 > 
 > ### ** Examples
@@ -223,7 +225,7 @@ version: 0.0.2
 > cleanEx()
 > options(digits = 7L)
 > base::cat("Time elapsed: ", proc.time() - base::get("ptime", pos = 'CheckExEnv'),"\n")
-Time elapsed:  0.275 0.012 0.287 0 0 
+Time elapsed:  0.26 0.03 0.3 NA NA 
 > grDevices::dev.off()
 null device 
           1 

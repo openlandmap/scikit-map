@@ -29,6 +29,7 @@ To install the most up-to-date version of eumap please use:
 ```{r, echo=FALSE}
 library(remotes)
 remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
+
 ```
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -96,18 +97,18 @@ The following examples demonstrates spatial prediction using the `sic97` data se
 ```{r, warning=FALSE}
 start_time <- Sys.time()
 ls <- c("lattice", "raster", "landmap", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
-    "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv",  "tidyr", "lubridate", "R.utils", "terra","rgdal",
+    "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv",  "tidyr", "lubridate", "R.utils", "terra","rgdal",'MLmetrics',
     "FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools", "gridExtra", "yardstick", "latticeExtra", "devtools", "progressr")
 new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
 ```
 
-## sic97 dataset
+## sic1997: The SIC 1997 Data Set
+
+For demonstration we are using daily rainfall dataset from Switzerland used in the Spatial Interpolation Comparison 1997. For more info see [HERE](https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html).
 
 ```{r ,results='hide', warning=FALSE}
-#sic97 source data: https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html
 library("landmap")  
-<<<<<<< HEAD:demo/spm-tutorial/README.Rmd
 data(sic1997)
 sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
                    as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
@@ -117,14 +118,8 @@ df <- na.omit(sic1997.df)
 We can create some synthetic covariates, so we can demonstrate that (a) the learner is noise-proof, and (b) that this is visible in the variable importance plots:
 
 ```{r}
-=======
-data(sic1997) 
-sic97 <- na.omit(sic1997)
-sic97 <- sic1997$swiss1km[c("CHELSA_rainfall","DEM")]
-df <- data.frame(sic97)
-target.variable = "CHELSA_rainfall"
-#let's create some fake cov
->>>>>>> master:demo/spm-tutorial/archive/README.Rmd
+
+target.variable = "rainfall"
 df$test1 <- log10(df$DEM)*53.656 
 df$test2 <- cos(df$DEM)*-0.13 
 df$test3 <- sin(df$DEM)**31 
@@ -132,11 +127,11 @@ df$test4 <- (df$DEM)**-5.13
 df$test5 <- (df$DEM/2**4)**6 
 df$test6 <- (df$CHELSA_rainfall)**-1
 df$test7 <-((df$CHELSA_rainfall)*13/34)
-df$test8 <- runif(1:nrow(df))/0.54545
-df$test9 <- sqrt(runif(1:nrow(df))) 
+df$noise1 <- runif(1:nrow(df))/0.54545
+df$noise2 <- sqrt(runif(1:nrow(df))) 
 ```
 
-where `test9` and `test10` are pure noise.
+where `noise1` and `noise2` are pure noise.
 
 ## split training (tr) and test (ts) set
 

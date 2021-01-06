@@ -6,6 +6,8 @@
 \usage{
 plot_spm(
   df = NULL,
+  x,
+  y,
   main = NULL,
   palet = NULL,
   colorcut = NULL,

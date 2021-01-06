@@ -1,6 +1,6 @@
 Package: eumap
 Title: European environmental maps processing and production
-Version: 0.0.2
+Version: 0.0.3
 Authors@R: 
    c(person("Tomislav", "Hengl", email = "tom.hengl@opengeohub.org", role = c("aut", "cre")),
      person("Mohammadreza", "Sheykhmousa", email = "mohammadreza.sheykhmousa@opengeohub.org", role = c("aut")),
@@ -19,7 +19,7 @@ RoxygenNote: 7.1.1
 SystemRequirements: C++11, GDAL (>= 2.0.1), GEOS (>= 3.4.0), PROJ (>=
         4.8.0)
 NeedsCompilation: no
-Packaged: 2021-01-05 13:21:26 UTC; msheykhmousa
+Packaged: 2021-01-06 07:23:32 UTC; mshey
 Author: Tomislav Hengl [aut, cre],
   Mohammadreza Sheykhmousa [aut],
   Leandro Leal Parente [aut],
