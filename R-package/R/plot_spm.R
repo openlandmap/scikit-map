@@ -28,14 +28,14 @@ pfun <- function(x,y, ...){
 #' plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 #' }
 plot_spm <- function( x = NULL, y = NULL , z = NULL, Vim = NULL, main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gtype = c("accuracy", "correlation","var.imp"), gmode = c("root","log10","norm","log2","nat"), aspect = 1, ...){
+  
   if(gtype == "var.imp" && !is.null(Vim)){
     plt = raster:: barplot(sort((Vim),decreasing = TRUE), horiz = TRUE, las = 1)
     title(main = "variable importance", font.main = 4)
-  }
-   else if(gtype == "var.imp" && is.null(Vim)){
+  } else if(gtype == "var.imp" && is.null(Vim)){
       stop('varibale importance is missing!')
     }
-  if(is.null(x) || is.null(y)) {
+  if(is.null(x) | is.null(y)) {
     stop("x and or y are missing")  #For version eumap 0.0.4 different scenarios for df.tr, x, y will be added.
     # x = df.tr[1]
     # y = df.tr[2]
@@ -45,17 +45,16 @@ plot_spm <- function( x = NULL, y = NULL , z = NULL, Vim = NULL, main = NULL, pa
     colnames(df)[2] <- 'y'
     ccc <- signif( ccc(df, x, y)$.estimate, digits=3)
     RMSE <- signif( rmse(df, x, y)$.estimate, digits=3)
-    # x = as.numeric(df.tr[,target.variable])
-    # y = pred.v[[1]]
-    # z = valu.imp
   }
 
   if(is.null(colorcut)){
     colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)  
   }
+  
   if(is.null(palet)){
     palet=grDevices::colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4") )
   }
+  
   if(length(x) <= 500 ) {
     plt <-  lattice::xyplot(x ~ y, asp = 1, 
                             par.settings = list(plot.symbol = list(alpha(col="black",0.6), fill=alpha("red", 0.6), pch=21, cex=0.6)), 

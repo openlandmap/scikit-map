@@ -27,8 +27,8 @@ knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 To install the most up-to-date version of eumap please use:
 
 ```{r}
-# library(remotes)
-# remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
+library(remotes)
+remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 
 ```
 
@@ -230,12 +230,14 @@ plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy",
 When there is limited number of observation (x < 500) `plot_spm` automatically generates a density plot and ignores all the other graphical arguments.   
 
 ```{r}
-plt = plot_spm(Vim = tr[[2]], gtype = "var.imp")
+plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], Vim = tr[[2]], gtype = "var.imp")
 ```
 
 ### spatial prediction on *rainfall*
 
 ```{r , echo=FALSE, warning=FALSE}
+library("landmap")  
+data(sic1997)
 sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
 as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
 df.tr <- na.omit(sic1997.df)
@@ -243,7 +245,7 @@ colnames(df.tr)[2:3] <- c('x','y')
 df.tr$rainP = pred.v[[1]]
 coordinates(df.tr) <- ~x+y
 proj4string(df.tr) <- CRS("+init=epsg:28992")
-gridded(df.tr) = TRUE
+
 
 ```
 
