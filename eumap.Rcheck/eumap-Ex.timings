@@ -1,7 +1,0 @@
-name	user	system	elapsed
-extract_tif	0	0	0	
-plot_spm	0	0	0	
-predict_spm	0	0	0	
-strip_dates	0	0	0	
-strip_years	0	0	0	
-train_spm	0	0	0	

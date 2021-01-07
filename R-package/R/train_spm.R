@@ -1,6 +1,6 @@
-#' Train a spatial prediction model, from a (spatial) matrix, using ensemble machine learning.
+#' Train a spatial prediction model, from a (spatial) matrix, using ensemble machine learning,
 #' @description
-#' This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and    \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem. 
+#' This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
 #' @param df.tr Observation data frame,
 #' @param target.variable Target variable or response variable,
 #' @param parallel Parallel processing mode,
@@ -13,6 +13,7 @@
 #' @param crs Coordinate reference system, necessary for spcv (see mlr3spatiotempcv),
 #' @param coordinate_names Columns names for X and Y coordinates,
 #' @param ... other arguments that can be passed on to \code{TaskSupervised},
+#'
 #' @return List of objects of class \code{mlr3},
 #' @export 
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
@@ -58,7 +59,7 @@
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
 #' }
-train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = 5, n_evals = 5, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
+train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = NULL, n_evals = NULL, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
   target = target.variable
   if( is.null(predict_type)){
     predict_type <- "response"
@@ -135,7 +136,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       terminator =  trm("evals", n_evals = n_evals), 
       tuner =  tnr("random_search")
       )
-    at$store_tuning_instance = TRUE
+    #at$store_tuning_instance = TRUE
     message(resample_method[1], immediate. = TRUE)
     at$train(tsk_regr)
     
@@ -215,8 +216,8 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       )
     )
     
-    pre =  po("encode") %>>% po("imputemode") %>>% po("removeconstants")
-    g = pre %>>% 
+    # pre =  po("encode") %>>% po("imputemode") %>>% po("removeconstants")
+    g = #pre %>>% 
        gunion(
         list(
           po("select") %>>% po("learner_cv", id = "knn", lrn("regr.kknn")),
@@ -228,13 +229,13 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       po("featureunion") %>>%
       po("learner", lrn("regr.ranger",importance ="permutation"))
     
-    resampling_sp = rsmp("repeated_spcv_coords", folds = folds, repeats = 4)
+    resampling_sp = rsmp("repeated_spcv_coords", folds = folds, repeats = 3)
     rr_sp = rsmp(
       task = tsk_regr, learner = g,
       resampling = resampling_sp
       )
     g$keep_results = "TRUE"
-    # plt = g$plot()
+    plt = g$plot()
     message(resample_method[2], immediate. = TRUE)
     g$train(tsk_regr)
     g$predict(tsk_regr)

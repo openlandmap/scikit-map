@@ -1,9 +1,9 @@
-#' predict_spm
+#' Predict_spm
 #' @description
-#' prediction on new dataset
-#' @param object trained model using `train_spm`,
-#' @param newdata data at new location,
-#' @return predicted variables, variable importance 
+#' Prediction on a new dataset
+#' @param object Trained model using `train_spm`,
+#' @param newdata Data at new location,
+#' @return Predicted variables, variable importance 
 #' @export 
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' @examples 

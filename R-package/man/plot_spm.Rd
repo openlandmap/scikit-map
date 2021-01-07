@@ -5,14 +5,14 @@
 \title{Accuracy plot}
 \usage{
 plot_spm(
-  df = NULL,
-  x,
-  y,
+  x = NULL,
+  y = NULL,
+  z = NULL,
+  Vim = NULL,
   main = NULL,
   palet = NULL,
   colorcut = NULL,
   xbins = 60,
-  gvar_imp = TRUE,
   gtype = c("accuracy", "correlation", "var.imp"),
   gmode = c("root", "log10", "norm", "log2", "nat"),
   aspect = 1,
@@ -20,25 +20,29 @@ plot_spm(
 )
 }
 \arguments{
-\item{df}{a data frame containing x,y, and z derived from `train_spm` and `predict_spm`,}
+\item{x}{Object that contains observational data, if x <= 500 observation, then `plot_spm` generates scatter plot, regardless of the other arguments that is passed.}
+
+\item{y}{Object that contains predicted data,}
+
+\item{z}{Object that contains variable importance data to be used in partial dependency plot,}
+
+\item{Vim}{Object that contains named numeric variable importance,}
 
 \item{main}{Title of the plot,}
 
-\item{palet}{default values is palet=colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4),}
+\item{palet}{Default values is palet=colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4),}
 
-\item{colorcut}{default value is colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1) ,}
+\item{colorcut}{Default value is colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1) ,}
 
-\item{xbins}{number of bins, default value is 50,}
+\item{xbins}{Number of bins, default value is 50,}
 
-\item{gvar_imp}{variable importance,}
+\item{gtype}{Graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provides partial correlation plot for the regression matrix. "var.imp" provides a graph of top 10 percent of the most informative features,}
 
-\item{gtype}{graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provides partial correlation plot for the regression matrix. "var.imp" provides a graph of top 10 percent of the most informative features,}
+\item{gmode}{Graphical mode; in case `gtype=accuracy` gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,}
 
-\item{gmode}{graphical mode; in case `gtype=accuracy` gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,}
+\item{aspect}{Default values is aspect = 1,}
 
-\item{aspect}{default values is aspect = 1,}
-
-\item{...}{other arguments that can be passed on to \code{hexbin}.}
+\item{...}{Other arguments that can be passed on to \code{hexbin}.}
 }
 \description{
 Dedicated function to plot diagnostic graphs resulted from `train_spm ` and `predict_spm`,

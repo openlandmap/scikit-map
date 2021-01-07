@@ -1,12 +1,12 @@
 #' Strip dates from tifs
 #'
-#' @param tif.name input tif file
-#' @param year.span year span begin end
-#' @param type begin or end format
-#' @param begin.seasons date (\code{\%m-\%d}) of the start of season
-#' @param season.name season names as used in the file names
-#' @param timeless if timeless then consider the whole time span
-#' @return character or vector of dates formatted as \code{\%Y-\%m-\%d}.
+#' @param tif.name Input tif file,
+#' @param year.span Year span begin end,
+#' @param type Begin or end format,
+#' @param begin.seasons Date (\code{\%m-\%d}) of the start of season,
+#' @param season.name Season names as used in the file names,
+#' @param timeless If timeless then consider the whole time span,
+#' @return Character or vector of dates formatted as \code{\%Y-\%m-\%d},
 #' @export
 #' @examples
 #' \dontrun{

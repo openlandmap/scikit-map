@@ -18,8 +18,10 @@ Imports:
     utils,
     ranger,
     nnet,
+    lattice,
     glmnet,
-    mlr3
+    mlr3spatiotempcv,
+    mlr3verse
 Suggests: rgdal, parallel, terra, raster, xgboost, matrixStats
 RoxygenNote: 7.1.1
 SystemRequirements: C++11, GDAL (>= 2.0.1), GEOS (>= 3.4.0),

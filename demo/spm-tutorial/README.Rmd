@@ -26,9 +26,9 @@ knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 
 To install the most up-to-date version of eumap please use:
 
-```{r, echo=FALSE}
-library(remotes)
-remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
+```{r}
+# library(remotes)
+# remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 
 ```
 
@@ -105,44 +105,37 @@ if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstu
 
 ## sic1997: The SIC 1997 Data Set
 
-For demonstration we are using daily rainfall dataset from Switzerland used in the Spatial Interpolation Comparison 1997. For more info see [HERE](https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html).
+For demonstration we are using daily rainfall dataset from Switzerland used in the Spatial Interpolation Comparison 1997. For more information about the data set please see [HERE](https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html).
 
 ```{r ,results='hide', warning=FALSE}
 library("landmap")  
 data(sic1997)
 sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
                    as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
-df <- na.omit(sic1997.df)
+df.tr <- na.omit(sic1997.df)
 ```
+
+Note that here we use whole the data to test and train the model, as the dataset is not big (i.e., only 456 observations). In the training part, however, there will be internal sampling that will provide the Out Of Bag Error OOB R square! For mor detailed information see [HERE](https://ieeexplore.ieee.org/abstract/document/9206124).
 
 We can create some synthetic covariates, so we can demonstrate that (a) the learner is noise-proof, and (b) that this is visible in the variable importance plots:
 
 ```{r}
-
 target.variable = "rainfall"
-df$test1 <- log10(df$DEM)*53.656 
-df$test2 <- cos(df$DEM)*-0.13 
-df$test3 <- sin(df$DEM)**31 
-df$test4 <- (df$DEM)**-5.13 
-df$test5 <- (df$DEM/2**4)**6 
-df$test6 <- (df$CHELSA_rainfall)**-1
-df$test7 <-((df$CHELSA_rainfall)*13/34)
-df$noise1 <- runif(1:nrow(df))/0.54545
-df$noise2 <- sqrt(runif(1:nrow(df))) 
+df.tr$test1 <- log10(df.tr$DEM)*53.656
+df.tr$test2 <- cos(df.tr$DEM)*-0.13
+df.tr$test3 <- sin(df.tr$DEM)**31
+df.tr$test4 <- (df.tr$DEM)**-5.13
+df.tr$test5 <- (df.tr$DEM/2**4)**6
+df.tr$test6 <- (df.tr$CHELSA_rainfall)**-1
+df.tr$test7 <-((df.tr$CHELSA_rainfall)*13/34)
+df.tr$noise1 <- runif(1:nrow(df.tr))/0.54545
+df.tr$noise2 <- sqrt(runif(1:nrow(df.tr)))
+df.tr$border <- NULL
+df.tr$X <- NULL
+df.tr$Y <- NULL
 ```
 
-where `noise1` and `noise2` are pure noises.
-
-## Split training (tr) and test (ts) set
-Note that we equally split the dataset to have same dimension for visualization later on. 
-
-```{r }
-smp_size <- floor(0.5 * nrow(df))
-set.seed(123)
-train_ind <- sample(seq_len(nrow(df)), size = smp_size)
-df.tr <- df[train_ind,]
-newdata <- df[-train_ind, ]
-```
+where *noise1* and *noise2* are pure noises. Note that we shouldn't use non-numeric covariates in `train_spm` for regression tasks; in this case *border*.
 
 
 ## Loading required libraries:
@@ -163,15 +156,15 @@ library("ppcor")
 library("progressr")
 library("checkmate")
 library("future")
+library("scales")
 ```
 
 ## `train_spm`
 
-`train_spm` fits multiple models/learners depending on the `class` of the **target.variable** and for returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
+`train_spm` fits multiple models/learners (depending on the `class` of the **target.variable**) and automatically tune all the underlying hyperparameters using `AutoTuner` from [mlr3](https://mlr3book.mlr-org.com/pipe-nonlinear.html) and returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
 ```{r ,results='hide', warning=FALSE}
-tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 5, 
-                n_evals = 3, crs = "+init=epsg:4326", coordinate_names = c("X","Y"))
+tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 5, n_evals = 15)
 ```
 
 `train_spm` results:
@@ -187,7 +180,8 @@ train_model= tr[[1]]
 ```{r}
 tr[[2]]
 ```
-3rd element of the summary of the *trained model*:
+3rd element is the summary of the *trained model*. Note that the *R squared (OOB)* is shows performance evaluation of the model during training which sample fraction for different batches varies from 50% to 70%.
+
 ```{r}
 tr[[3]]
 ```
@@ -206,17 +200,17 @@ vlp = tr[[5]]
 
 ## `predict_spm`
 
-prediction on `newdata` set
+Prediction on `newdata` data set (in this case df.tr).
 
 ```{r}
-predict.variable = eumap::predict_spm(train_model, newdata)
+predict.variable = eumap::predict_spm(train_model, df.tr)
 ```
 
-### predicted values for the *newdata* set:
+### Predicted values for the *newdata* set (in this case df.tr):
 
-note: here we just show start and the ending values
+Note: here we just show start and the ending values.
 
-```{r ,output.lines= -(3:3200)}
+```{r ,output.lines= -(3:300)}
 pred.v = predict.variable[1]
 pred.v
 ```
@@ -227,180 +221,39 @@ valu.imp= predict.variable[[2]]
 ```
 
 ## `plot_spm` 
-in case of regression task,
+In case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], z = valu.imp, gmode  = "root" , gtype = "accuracy", gvar_imp = "TRUE")
+plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy", gmode  = "norm" )
 ```
 
+When there is limited number of observation (x < 500) `plot_spm` automatically generates a density plot and ignores all the other graphical arguments.   
+
+```{r}
+plt = plot_spm(Vim = tr[[2]], gtype = "var.imp")
+```
+
+### spatial prediction on *rainfall*
 
 ```{r , echo=FALSE, warning=FALSE}
-
-df.ts$leadp = predict.variable
-coordinates(df.ts) <- ~x+y
-proj4string(df.ts) <- CRS("+init=epsg:28992")
-# creat raster out of output
-gridded(df.ts) = TRUE
+sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
+as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
+df.tr <- na.omit(sic1997.df)
+colnames(df.tr)[2:3] <- c('x','y')
+df.tr$rainP = pred.v[[1]]
+coordinates(df.tr) <- ~x+y
+proj4string(df.tr) <- CRS("+init=epsg:28992")
+gridded(df.tr) = TRUE
 
 ```
-## raster grid 
-
-make a map using ensemble machine learning with spatial cross validation for the predicted variables e.g., *lead* (in this case):
-
-```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Raster grid"}
-plot(df.ts[,"leadp"])
-points(sic97, pch="+")
-```
-
-## Croatia tile
-
-### Overlay Demonstration
-
-we will use the eumap package to overlay all the points of a vector layer (geopackage file) on several raster layers (geotiff files), using the SpaceOverlay and SpaceTimeOverlay classes to handle with timeless and temporal layers, respectively. In our dataset the elevation and slope, based on digital terrain model, are timeless and the landsat composites (7 spectral bands, 4 seasons and 3 percentiles) and night light (VIIRS Night Band) layers are temporal (from 2000 to 2020).
-
-### reading Croatia data
-Our dataset refers to 1 tile, located in Croatia, extracted from a tiling system created for European Union (7,042 tiles) by [GeoHarmonizer Project](https://opendatascience.eu/).
 
 ```{r}
-tif1.lst = list.files("/data/eumap/sample-data/R-sample-tiles/9529", pattern=".tif", full.names=TRUE, recursive=TRUE) 
-df = readOGR("/data/eumap/sample-data/R-sample-tiles/9529_croatia_landcover_samples.gpkg")
-df <- as.data.frame(df)
-df$Date = format.Date(as.Date(paste(df$survey_date), format="%Y/%m/%d"), "%Y-%m-%d")
-df$row.id = 1:nrow(df)
+plot(df.tr[,"rainP"])
 ```
 
-### `stripe_years`
-
-```{r}
-begin.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="begin")})
-end.tif1.lst = sapply(tif1.lst, function(i){strip_years(i, type="end")})
-unique(end.tif1.lst)
-```
-
-### `extract_tif` 
-
-```{r}
-cores = ifelse(parallel::detectCores()<length(tif1.lst), parallel::detectCores(), length(tif1.lst))
-ov.pnts <- parallel::mclapply(1:length(tif1.lst), function(i){ eumap::extract_tif(tif=tif1.lst[i], df, date="Date", date.tif.begin=begin.tif1.lst[i], date.tif.end=end.tif1.lst[i], coords=c("coords.x1","coords.x2")) }, mc.cores=cores)
-gc()
-ov.pnts = ov.pnts[!sapply(ov.pnts, is.null)]
-```
-```{r}
-str(ov.pnts[1:6])
-```
-
-## Space-Time Overlay
-
-For the temporal layers, the points should be filtered by year and overlayed on the right raster files. The SpaceTimeOverlay class implements this approach using the parameter:
-- timeless_data: The result of SpaceOverlay (GeoPandas DataFrame) - col_date: The column that contains the date information (2018-09-13)
-- dir_temporal_layers: The directory where the temporal raster files are stored, organized by year
-```{r, results='hide', warning=FALSE}
-library(data.table)
-commcols <- Reduce(intersect, lapply(ov.pnts, names))
-L.dt <- lapply(ov.pnts, function(x) setkeyv(data.table(x), commcols))
-cmt <- do.call(cbind, L.dt) 
-uq.lst <- unique(colnames(cmt))
-cm.tif <- cmt[, .SD, .SDcols = unique(names(cmt))]
-df <- as.data.table(df)
-cm <- Reduce(merge,list(df,cm.tif))
-tt = cbind(cm,df$year)
-saveRDS(tt, "/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
-```
-
-
-```{r}
-str(tt)
-```
-
-## pre-processing Croatia data
-
-```{r}
-cm.croatia <- readRDS("/data/eumap/sample-data/R-sample-tiles/9529/9529_croatia_samples.rds")
-
-str(cm.croatia)
-df <-  cm.croatia
-df$lc_class <- as.factor(df$lc_class)
-crs = "+init=epsg:3035"
-target.variable = "lc_class"
-df <- df %>% group_by_if(is.character, as.factor)
-df$row.id <- NULL
-df$survey_date <- NULL
-df$lucas <- NULL
-df$Date <- NULL
-df$id <- NULL
-df$year <- NULL
-df$tile_id <- NULL
-df$confidence <- NULL
-df$V2 <- NULL
-df$coords.x1 <- NULL
-df$coords.x2 <- NULL
-colnames(df)
-# colnames(df)[4] <- "x"
-# colnames(df)[5] <- "y"
-coordinate_names = c("x","y")
-smp_size <- floor(0.5 * nrow(df))
-set.seed(123)
-train_ind <- sample(seq_len(nrow(df)), size = smp_size)
-df.tr <- df[train_ind, ]
-df.ts <- df[ -train_ind,]
-folds = 5  #you can change the number to get a better result
-n_evals = 5  #you can change the number to get a better result
-newdata = df.ts
- 
-```
-
-## train_spm
-```{r, output.lines= -(4:145)}
-tr = eumap::train_spm(df.tr, target.variable = target.variable , folds = folds , n_evals = n_evals)
-train_model= tr[[1]]
-var.imp = tr[[2]]
-length(var.imp )
-summary = tr[[3]]
-summary
-pred.model = tr[[4]]
-pred.model
-```
-
-## predict_spm
-Prediction; raster map
-
-```{r , eval=F, echo=T}
-year.span = c(2000:2020)
-#
-aq =c("/data/eumap/sample-data/R-sample-tiles/9529/timeless/dtm_elevation.tif" ,"/data/eumap/sample-data/R-sample-tiles/9529/timeless/dtm_slope.tif")
-for (i in 1:2) {
-  tif1.lst = list.files(paste0('/data/eumap/sample-data/R-sample-tiles/9529/',year.span[i]), pattern=".tif", full.names=TRUE, recursive=TRUE)
-  tif1.lst <- append(tif1.lst, aq)
-  out.tif <- paste0("/data/eumap/img/R/","land_cover_9529_croatia_",year.span[i],".tif")
-  br01 = stack(tif1.lst)
-  newdata = as(br01, "SpatialGridDataFrame")
-  predict.ts = predict_spm(train_model, newdata@data)
-  newdata$pred = predict.ts
-  newdataa <- newdata ## copy and make new raster object
-  newdataa@data$pred <- as.numeric(levels(newdataa@data$pred))[newdataa@data$pred]
-  writeGDAL(newdataa["pred"], out.tif, drivername="GTiff", type="Int16", mvFlag = -32768 ,options=c("COMPRESS=DEFLATE"))
-}
-```
-
-### get ride of small classess in prediction
-optional
-
-```{r , eval=F, echo=T}
-
-xg <- summary(newdata$pred, maxsum=(1+length(levels(newdata$pred))))
-str(xg)
-selg.levs <- attr(xg, "names")[xg > 5]  
-attr(xg, "names")[xg <= 5] #drop classes with less than 5 pixels
-newdata$pred[which(!newdata$pred %in% selg.levs)] <- NA
-newdata$pred <- droplevels(newdata$pred)
-str(summary(newdata$pred, maxsum=length(levels(newdata$pred))))
-
-
-```
-
-```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="LC map"}
-plot(runif(10,1,10),runif(10,100,1e6))
-```
+We made a spatial prediction map using ensemble machine learning with spatial cross validation
+for the predicted variable e.g., *rainfall* (in this case).
+Ranger shows that it is a noise proof classifier.
 
 
 

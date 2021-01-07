@@ -1,15 +1,15 @@
 #' Extract points from a GeoTIFF using spatiotemporal overlay
 #'
-#' @param tif filename,
-#' @param df data frame with coordinates and dates,
-#' @param date date column in \code{df},
-#' @param date.tif.begin reference begin date for the tif filename,
-#' @param date.tif.end reference end date for the tif filename,
-#' @param coords coordinate columns e.g. \code{"x", "y"},
-#' @param crs projection system for the coordinates,
-#' @param format.date default formatting date,
+#' @param tif Filename,
+#' @param df Data frame with coordinates and dates,
+#' @param date Date column in \code{df},
+#' @param date.tif.begin Reference begin date for the tif filename,
+#' @param date.tif.end Reference end date for the tif filename,
+#' @param coords Coordinate columns e.g. \code{"x", "y"},
+#' @param crs Projection system for the coordinates,
+#' @param format.date Default formatting date,
 #'
-#' @return list of data frames with row.ids and results of overlay
+#' @return List of data frames with row.ids and results of overlay
 #' 
 #' @details Extends the \code{terra::extract} functionality. 
 #' Works best if the GeoTIFF are Cloud-Optimized and located on SSD or similar.
