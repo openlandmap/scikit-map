@@ -1,5 +1,3 @@
-
-
 -   [Introduction](#introduction)
 -   [`train_spm`](#train_spm)
 -   [`predict_spm`](#predict_spm)
@@ -263,7 +261,7 @@ graphical arguments.
 
     plot(df.tr[,"rainP"])
 
-![](README_files/figure-markdown_strict/unnamed-chunk-19-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-15-1.png)
 
 We made a spatial prediction map using ensemble machine learning with
 spatial cross validation for the predicted variable e.g., *rainfall* (in
