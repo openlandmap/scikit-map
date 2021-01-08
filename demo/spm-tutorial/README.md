@@ -198,18 +198,18 @@ training which sample fraction for different batches varies from 50% to
     Ranger result
 
     Call:
-     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 2L, sample.fraction = 0.600770418648608, num.trees = 338L) 
+     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 2L, sample.fraction = 0.520616314723156, num.trees = 453L) 
 
     Type:                             Regression 
-    Number of trees:                  338 
+    Number of trees:                  453 
     Sample size:                      456 
     Number of independent variables:  11 
     Mtry:                             2 
     Target node size:                 5 
     Variable importance mode:         impurity 
     Splitrule:                        variance 
-    OOB prediction error (MSE):       11114.4 
-    R squared (OOB):                  0.1257299 
+    OOB prediction error (MSE):       11010.54 
+    R squared (OOB):                  0.133899 
 
 4th element is the predicted values of our trained model note: here we
 just show start and the ending values
@@ -232,13 +232,13 @@ Note: here we just show the start and the ending values.
 
     ...
     [[1]]
-      [1] 171.82140 158.32544 166.81849 168.05671 157.13037 162.66144 178.31395
+      [1] 187.24444 160.76133 168.70350 156.69893 155.41678 173.20445 169.73311
     ...
 
 `plot_spm`
 ----------
 
-In case of regression task,
+In the case of regression task:
 
     plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy", gmode  = "norm" )
 
@@ -255,12 +255,27 @@ When there is limited number of observation (x &lt; 500) `plot_spm`
 automatically generates a density plot and ignores all the other
 graphical arguments.
 
-    plt = plot_spm(Vim = tr[[2]], gtype = "var.imp") #x = df.tr[,target.variable], y = pred.v[[1]],
+Variable importance:
 
-![](README_files/figure-markdown_strict/unnamed-chunk-17-1.png)
+    plt = plot_spm(Vim = tr[[2]], gtype = "var.imp") 
+
+![](README_files/figure-markdown_strict/unnamed-chunk-17-1.png) 
+
+As graph shows *noise1* and *noise2* are among the least important features.
 
 ### spatial prediction on *rainfall*
-
+    
+    
+    library("landmap")
+    data(sic1997)
+    sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
+    as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
+    df.tr <- na.omit(sic1997.df)
+    colnames(df.tr)[2:3] <- c('x','y')
+    df.tr$rainP = pred.v[[1]]
+    coordinates(df.tr) <- ~x+y
+    proj4string(df.tr) <- CRS("+init=epsg:28992")
+    gridded(df.tr) <- TRUE
     plot(df.tr[,"rainP"])
 
 ![](README_files/figure-markdown_strict/unnamed-chunk-19-1.png)
