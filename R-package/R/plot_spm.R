@@ -10,7 +10,7 @@ pfun <- function(x,y, ...){
 #' @description Dedicated function to plot diagnostic graphs resulted from `train_spm ` and `predict_spm`,
 #' @param x Object that contains observational data, if x <= 500 observation, then `plot_spm` generates a density plot, regardless of the other arguments that is passed,
 #' @param y Object that contains predicted data,
-#' @param z Object that contains variable importance data to be used in partial dependency plot,
+#' @param z Object that contains top variable importance values to be used in partial dependency plot,
 #' @param Vim Object that contains named numeric variable importance,
 #' @param main Title of the plot,
 #' @param palet Default values is palet=colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4),
@@ -29,24 +29,6 @@ pfun <- function(x,y, ...){
 #' }
 plot_spm <- function( x = NULL, y = NULL , z = NULL, Vim = NULL, main = NULL, palet  = NULL, colorcut = NULL, xbins = 60 , gtype = c("accuracy", "correlation","var.imp"), gmode = c("root","log10","norm","log2","nat"), aspect = 1, ...){
   
-  if(gtype == "var.imp" && !is.null(Vim)){
-    plt = raster:: barplot(sort((Vim),decreasing = TRUE), horiz = TRUE, las = 1)
-    title(main = "variable importance", font.main = 4)
-  } else if(gtype == "var.imp" && is.null(Vim)){
-      stop('varibale importance is missing!')
-    }
-  if(is.null(x) | is.null(y)) {
-    stop("x and or y are missing")  #For version eumap 0.0.4 different scenarios for df.tr, x, y will be added.
-    # x = df.tr[1]
-    # y = df.tr[2]
-    # message('x and y are missing, first and second columns of data frame is used as x and y')
-  } else{
-    df = data.frame(x,y)
-    colnames(df)[2] <- 'y'
-    ccc <- signif( ccc(df, x, y)$.estimate, digits=3)
-    RMSE <- signif( rmse(df, x, y)$.estimate, digits=3)
-  }
-
   if(is.null(colorcut)){
     colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)  
   }
@@ -55,20 +37,39 @@ plot_spm <- function( x = NULL, y = NULL , z = NULL, Vim = NULL, main = NULL, pa
     palet=grDevices::colorRampPalette(c("wheat2","yellow" ,"red","red3","orchid","orchid4") )
   }
   
-  if(length(x) <= 500 ) {
+  if(gtype == "var.imp" ){
+    
+    plt = raster:: barplot(Vim , horiz = TRUE, las = 1)
+    title(main = "variable importance", font.main = 4)
+  }
+    
+  if(gtype == "var.imp" & is.null(Vim)){
+      message('Vim is missing!')
+  }
+    
+  if(gtype != "var.imp" & is.null(x) & is.null(y)){
+    stop('x and or y are missing!')
+    #For version eumap 0.0.4 different scenarios for df.tr, x, y will be added.
+    # x = df.tr[1]
+    # y = df.tr[2]
+    # message('x and y are missing, first and second columns of data frame is used as x and y')
+  } else if(gtype != "var.imp" & !is.null(x) & !is.null(y)) {
+    dff = data.frame(x,y)
+    #colnames(dff)[1:2] <- c('x','y')
+    CCC <- signif(ccc(dff, x, y)$.estimate, digits=3)
+    RMSE <- signif( rmse(dff, x, y)$.estimate, digits=3)
+    main = paste0(expression(CCC) ,": ",  CCC, "  RMSE: ", RMSE)
+}
+  if(gtype != "var.imp" & length(x) <= 500 ) {
     plt <-  lattice::xyplot(x ~ y, asp = 1, 
-                            par.settings = list(plot.symbol = list(alpha(col="black",0.6), fill=alpha("red", 0.6), pch=21, cex=0.6)), 
-                            scales = list(x=list(log=TRUE, equispaced.log=FALSE), y=list(log=TRUE, equispaced.log=FALSE)), main = paste0(expression(ccc) ,": ",  ccc, "  RMSE: ", RMSE)
-                            , ylab="measured", xlab="predicted")
-    plt
-    print(plt)
+                            par.settings = list(plot.symbol = list(alpha(col="black",0.6), fill=alpha("red", 0.6), pch=21, cex=0.6)), main = main
+                            , ylab="measured", xlab="predicted")# scales = list(x=list(log=TRUE, equispaced.log=FALSE), y=list(log=TRUE, equispaced.log=FALSE)),
+    # plt
+    # print(plt)
     message('Because of the LOW number of observations a density plot is displayed.')
   } else {
     if(gtype == "accuracy"){
-      if(is.null(main)){
-        main = paste0(expression(ccc) ,": ",  ccc, "  RMSE: ", RMSE)
-      }
-      if(gmode == "norm" | missing(gmode) | is.null(gmode) ){
+        if(gmode == "norm" | missing(gmode) | is.null(gmode) ){
         df.x = normalize(x, method = "range", range = c(0, 1))
         df.y = normalize(y, method = "range", range = c(0, 1))
         xlab = expression(italic("0~1 measured"))

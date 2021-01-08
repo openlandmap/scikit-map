@@ -21,28 +21,8 @@ text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitt
 
 To install the most up-to-date version of eumap please use:
 
-    library(remotes)
-
-    Warning: package 'remotes' was built under R version 4.0.3
-
-    remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
-
-    Downloading git repo https://gitlab.com/geoharmonizer_inea/eumap.git
-
-    Skipping 1 packages not available: mlr3spatiotempcv
-
-    Skipping 40 packages ahead of CRAN: R6, data.table, backports, mlr3misc, ps, processx, callr, rstudioapi, rprojroot, pkgbuild, colorspace, vctrs, pillar, magrittr, cli, labeling, testthat, withr, tibble, rlang, isoband, glue, digest, ggplot2, globals, future, mlr3measures, future.apply, paradox, mlr3, lgr, mlr3data, mlr3viz, mlr3tuning, mlr3pipelines, mlr3learners, mlr3filters, shape, foreach, RcppEigen
-
-          v  checking for file 'C:\Users\mshey\AppData\Local\Temp\RtmpiizOKJ\file87c2fba44b5\R-package/DESCRIPTION' (364ms)
-          -  preparing 'eumap':
-       checking DESCRIPTION meta-information ...     checking DESCRIPTION meta-information ...   v  checking DESCRIPTION meta-information
-          -  checking for LF line-endings in source and make files and shell scripts
-          -  checking for empty or unneeded directories
-          -  building 'eumap_0.0.3.tar.gz'
-         
-
-    Installing package into 'C:/Users/mshey/OneDrive/Documents/R/win-library/4.0'
-    (as 'lib' is unspecified)
+    # library(remotes)
+    # remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 
 Introduction
 ------------
@@ -124,7 +104,7 @@ about the data set please see
 
     library("landmap")  
 
-    version: 0.0.6
+    version: 0.0.3
 
     data(sic1997)
     sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
@@ -192,7 +172,7 @@ variables. `trained model` later can predict a `newdata` set.
 
     tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 5, n_evals = 15)
 
-    Fitting an ensemble ML using kknn featureless, and ranger models ncores: 8TRUE
+    Fitting an ensemble ML using kknn featureless, and ranger models ncores: 32TRUE
 
     Regression Task...TRUE
 
@@ -206,17 +186,10 @@ variables. `trained model` later can predict a `newdata` set.
 
 2nd element is the *variable importance*:
 
-    tr[[2]]
-
-             noise2 CHELSA_rainfall           test6           test7             DEM 
-           269791.6        265755.2        264841.3        260498.8        234647.7 
-              test4           test5           test1          noise1           test2 
-           233553.7        230159.5        227000.1        218423.1        215777.7 
-              test3 
-           214723.5 
+    Vim = tr[[2]]
 
 3rd element is the summary of the *trained model*. Note that the *R
-squared (OOB)* is shows performance evaluation of the model during
+squared (OOB)* shows the performance evaluation of the model during
 training which sample fraction for different batches varies from 50% to
 70%.
 
@@ -225,18 +198,18 @@ training which sample fraction for different batches varies from 50% to
     Ranger result
 
     Call:
-     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 3L, sample.fraction = 0.507163078174926, num.trees = 492L) 
+     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 2L, sample.fraction = 0.600770418648608, num.trees = 338L) 
 
     Type:                             Regression 
-    Number of trees:                  492 
+    Number of trees:                  338 
     Sample size:                      456 
     Number of independent variables:  11 
-    Mtry:                             3 
+    Mtry:                             2 
     Target node size:                 5 
     Variable importance mode:         impurity 
     Splitrule:                        variance 
-    OOB prediction error (MSE):       11041.37 
-    R squared (OOB):                  0.1314739 
+    OOB prediction error (MSE):       11114.4 
+    R squared (OOB):                  0.1257299 
 
 4th element is the predicted values of our trained model note: here we
 just show start and the ending values
@@ -252,14 +225,14 @@ Prediction on `newdata` data set (in this case df.tr).
 
 ### Predicted values for the *newdata* set (in this case df.tr):
 
-Note: here we just show start and the ending values.
+Note: here we just show the start and the ending values.
 
     pred.v = predict.variable[1]
     pred.v
 
     ...
     [[1]]
-      [1] 186.09807 162.01697 169.86054 164.13394 160.36826 158.28476 186.39482
+      [1] 171.82140 158.32544 166.81849 168.05671 157.13037 162.66144 178.31395
     ...
 
 `plot_spm`
@@ -271,6 +244,8 @@ In case of regression task,
 
     Because of the LOW number of observations a density plot is displayed.
 
+    plt
+
 <img src="README_files/figure-markdown_strict/unnamed-chunk-16-1.png" alt="Accuracy plot"  />
 <p class="caption">
 Accuracy plot
@@ -280,13 +255,9 @@ When there is limited number of observation (x &lt; 500) `plot_spm`
 automatically generates a density plot and ignores all the other
 graphical arguments.
 
-    plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], Vim = tr[[2]], gtype = "var.imp")
+    plt = plot_spm(Vim = tr[[2]], gtype = "var.imp") #x = df.tr[,target.variable], y = pred.v[[1]],
 
 ![](README_files/figure-markdown_strict/unnamed-chunk-17-1.png)
-
-    Because of the LOW number of observations a density plot is displayed.
-
-![](README_files/figure-markdown_strict/unnamed-chunk-17-2.png)
 
 ### spatial prediction on *rainfall*
 
