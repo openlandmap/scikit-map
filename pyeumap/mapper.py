@@ -1,6 +1,7 @@
 from pyeumap.misc import ttprint
 
 from typing import List, Union
+import joblib
 
 import multiprocessing
 import geopandas as gpd
@@ -8,10 +9,18 @@ import numpy as np
 import gdal
 import osr
 import math
+import rasterio
+import re
 
+from . import parallel
 from pathlib import Path
 from geopandas import GeoDataFrame
 
+import gc
+import concurrent.futures
+from concurrent.futures import as_completed
+
+import uuid
 from sklearn.model_selection import GridSearchCV
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
@@ -59,14 +68,9 @@ class LandMapper():
 		self.min_samples_per_class = min_samples_per_class
 		self.refit = refit
 
-		if estimator is None:
-			if _automl_enabled:
-				self.estimator = AutoSklearnClassifier(**autosklearn_kwargs)
-			else:
-				self.estimator = RandomForestClassifier(n_estimators=100)
-		else:
-			self.estimator = estimator
-
+		if eval_strategy is None:
+			self.refit = True    
+        
 		if estimator is None:
 			if _automl_enabled:
 				self.estimator = AutoSklearnClassifier(**autosklearn_kwargs)
@@ -78,9 +82,6 @@ class LandMapper():
 		self.feature_cols = []
 		for feat_prfx in feat_col_prfxs:
 			self.feature_cols += list(self.pts.columns[self.pts.columns.str.startswith(feat_prfx)])
-
-		if self.verbose:
-			ttprint(f'Using {len(self.feature_cols)} features from dataset')
 		
 		classes_pct = (self.pts[self.target_col].value_counts() / self.pts[target_col].count())
 		self.rows_to_remove = self.pts[self.target_col].isin(classes_pct[classes_pct >= min_samples_per_class].axes[0])
@@ -116,10 +117,28 @@ class LandMapper():
 
 		if self.weight_idx is not None:
 			self.features_weight = self.features[:, self.weight_idx]
+			self.feature_cols.remove(self.weight_col)
+			self.features = np.delete(self.features, self.weight_idx, 1)
 		
 		if fill_nodata:
 			self.features = self._fill_nodata(self.features, fit_and_tranform = True)
+	
+	@staticmethod
+	def load_instance(fn_joblib):
+		return joblib.load(fn_joblib)
+
+	def save_instance(self, fn_joblib, no_train_data = False, compress='lz4'):
+		if no_train_data:
+			prop_to_del = [ 'pts', 'features', 'target', 'features_raw', \
+											'features_weight', 'weight_idx', \
+											'groups', 'scoring', 'rows_to_remove']
+			for prop in prop_to_del:
+				if self.verbose:
+					ttprint(f'Removing {prop} attribute')
+				delattr(self, prop)
 		
+		return joblib.dump(self, fn_joblib, compress=compress)
+
 	def _fill_nodata(self, data, fit_and_tranform = False):
 		nodata_idx = self._nodata_idx(data)
 		num_nodata_idx = np.sum(nodata_idx)
@@ -166,20 +185,24 @@ class LandMapper():
 	
 	def _train_val_split(self):
 		
+		if self.weight_idx != None:
+			_, new_weight_idx = self.features.shape
+			self.features = np.insert(self.features)
+
 		train_feat, val_feat, train_targ, val_targ = train_test_split(self.features, self.target, test_size=self.val_samples_pct)
 		train_weight = None
 		
-		if self.weight_col != None:
+		if self.weight_idx != None:
 			
-			train_weight_idx = train_feat[self.feature_cols].columns.get_loc(self.weight_col)
-			train_weight = train_feat[:, train_weight_idx]
-			train_feat = np.delete(train_feat, train_weight_idx, 1)
+			#train_weight_idx = train_feat[self.feature_cols].columns.get_loc(self.weight_col)
+			train_weight = train_feat[:, new_weight_idx]
+			train_feat = np.delete(train_feat, new_weight_idx, 1)
 			
-			val_weight_idx = val_feat[self.feature_cols].columns.get_loc(self.weight_col)
-			val_weight = val_feat[:, val_weight_idx]
-			val_feat = np.delete(val_feat, val_weight_idx, 1)
+			#val_weight_idx = val_feat[self.feature_cols].columns.get_loc(self.weight_col)
+			val_weight = val_feat[:, new_weight_idx]
+			val_feat = np.delete(val_feat, new_weight_idx, 1)
 			
-			self.features = np.delete(self.features, self.weight_idx, 1)
+			self.features = np.delete(self.features, new_weight_idx, 1)
 			
 		if _automl_enabled and isinstance(self.estimator, AutoSklearnClassifier):
 			self.estimator.fit(train_feat, train_targ)
@@ -279,15 +302,16 @@ class LandMapper():
 	
 	def train(self):
 		method_name = '_%s' % (self.eval_strategy)
-		if hasattr(self, method_name):
+		if self.eval_strategy is None or hasattr(self, method_name):
 			
-			if self.verbose:
-				ttprint('Training and evaluating the model')
+			if self.eval_strategy is not None:
+				if self.verbose:
+					ttprint('Training and evaluating the model')
 			
-			train_method = getattr(self, method_name)
-			train_method()
+				train_method = getattr(self, method_name)
+				train_method()
 			
-			self._estimator_metrics()
+				self._estimator_metrics()
 			
 			if self.refit:
 				if self.verbose:
@@ -304,31 +328,40 @@ class LandMapper():
 	def _feature_idx(self, fn_layer):
 		return self.feature_cols.index(fn_layer.stem)
 
-	def _data_to_new_img(self, fn_base_img, fn_new_img, data, data_type = None, img_format = 'GTiff', nodata = 0):
+	def _new_image(self, fn_base_img, fn_new_img, data, spatial_win = None, data_type = None, img_format = 'GTiff', nodata = 0):
 		
-		driver = gdal.GetDriverByName(img_format)
-		base_ds = gdal.Open( str(fn_base_img) )
-
-		x_start, pixel_width, _, y_start, _, pixel_height = base_ds.GetGeoTransform()
-		nbands, y_size, x_size = data.shape
+		x_size, y_size, nbands = data.shape
 		
-		out_srs = osr.SpatialReference()
-		out_srs.ImportFromWkt(base_ds.GetProjectionRef())
+		with rasterio.open(fn_base_img, 'r') as base_img:
 
-		if data_type is None:
-			data_type = base_ds.GetRasterBand(1).DataType
+			if data_type is None:
+				data_type = base_img.dtypes[0]
+						
+			transform = base_img.transform
+			
+			if spatial_win is not None:
+				transform = rasterio.windows.transform(spatial_win, transform)
+				
+			return rasterio.open(fn_new_img, 'w', 
+							driver=img_format, 
+							width=x_size, 
+							height=y_size, 
+							count=nbands,
+							dtype=data_type, 
+							crs=base_img.crs,
+							compress='LZW',
+							transform=transform)
 
-		new_ds = driver.Create(fn_new_img, x_size, y_size, nbands, data_type)
-		new_ds.SetGeoTransform((x_start, pixel_width, 0, y_start, 0, pixel_height))
-		new_ds.SetProjection(out_srs.ExportToWkt())
-		
-		for band in range(0, nbands):
-			new_band = new_ds.GetRasterBand((band+1))
-			new_band.WriteArray(data[band,:,:],0,0)
-			new_band.SetNoDataValue(nodata)
+	def _data_to_new_img(self, fn_base_img, fn_new_img, data, spatial_win = None, data_type = None, img_format = 'GTiff', nodata = 0):
 
-		new_ds.FlushCache()
+		_, _, nbands = data.shape
 
+		with self._new_image(fn_base_img, fn_new_img, data, spatial_win, data_type, img_format) as dst:
+			dst.nodata = 0
+			for band in range(0, nbands):
+				
+				dst.write(data[:,:,band].astype(dst.dtypes[band]), indexes=(band+1))
+	
 	def _find_layers(self, dirs_layers):
 		fn_layers = []
 		
@@ -343,23 +376,69 @@ class LandMapper():
 
 		return fn_layers
 
-	def read_data(self, fn_layers):
+	def _get_data(self, fn_layer, spatial_win):
+		if self.verbose:
+			ttprint(f'Reading {fn_layer}')
+		
+		band_data = None
+		with rasterio.open(fn_layer) as ds:
+
+			if 'tile' in str(fn_layer):
+				band_data = ds.read(1)
+			else:
+				band_data = ds.read(1, window=spatial_win)
+		
+		return fn_layer, band_data, ds.nodatavals[0]
+
+	def _read_layers(self, fn_layers, spatial_win, inmem_calc_func, dict_layers_newnames):
 		result = []
 		
-		for fn_layer in fn_layers:
-			if self.verbose:
-				ttprint(f'Reading {fn_layer}')
+		max_workers = math.ceil(multiprocessing.cpu_count()/2)
+		
+		args = [ (fn_layer,spatial_win) for fn_layer in fn_layers]
+		
+		fn_layers = []
+		for fn_layer, band_data, nodata in parallel.ThreadGeneratorLazy(self._get_data, iter(args), max_workers=max_workers, chunk=max_workers*2):
+			if (isinstance(band_data, np.ndarray)):
+				band_data = band_data.astype('Float16')
+				band_data[band_data == nodata] = np.nan
+				if (np.isnan(np.min(band_data))):
+					ttprint(f'Layer {fn_layer} has NA values (nodata={nodata})')
+			else:
+				ttprint(f'Layer {fn_layer} not found')
 			
-			ds = gdal.Open(str(fn_layer))
-			nodata = ds.GetRasterBand(1).GetNoDataValue()
-			band_data = ds.GetRasterBand(1).ReadAsArray().astype('Float16')
-			band_data[band_data == nodata] = self.imputer.missing_values
+			fn_layers.append(fn_layer)
 			result.append(band_data)
 		
-		result = np.stack(result, axis=2)
+		input_data = np.stack(result, axis=2)
+		
+		if inmem_calc_func is not None:
+			fn_layers, input_data = inmem_calc_func(fn_layers, input_data, spatial_win)
+		
+		return self._reorder_data(fn_layers, dict_layers_newnames, input_data)
 
-		return result
-
+	def _reorder_data(self, fn_layers, dict_layers_newnames, input_data ):
+		feature_cols_set = set(self.feature_cols)
+		layernames = []
+		
+		for fn_layer in fn_layers:
+			layername = fn_layer.stem
+			for newname in dict_layers_newnames.keys():
+				layername = re.sub(dict_layers_newnames[newname], newname, layername)
+			if layername not in feature_cols_set:
+				raise Exception(f"Layer {layername} does not exist as feature_cols.\nUse dict_layers_newnames param to match their names")
+			layernames.append(layername)
+		
+		sorted_input_data = []
+		for feature_col in self.feature_cols:
+			try:
+				idx = layernames.index(feature_col)
+				sorted_input_data.append(input_data[:,:,idx])
+			except:
+				raise Exception(f"The feature {feature_col} was not provided")
+		
+		return np.stack(sorted_input_data, axis=2)
+	
 	def predict_points(self, input_points):
 		
 		input_feat = np.ascontiguousarray(input_points[self.feature_cols].to_numpy(), dtype=np.float32)
@@ -370,12 +449,104 @@ class LandMapper():
 			ttprint(f'Predicing {n_points} points')
 		
 		return self.estimator.predict(input_feat)
+	
+	def predict_multi(self, fn_layers_list:List = None, fn_result_list:List = None, spatial_win = None, \
+		data_type = 'float32', fill_nodata=False, estimate_uncertainty=False, inmem_calc_func = None, dict_layers_newnames_list:list = []):
 		
-	def predict(self, dirs_layers:List, fn_result:str, data_type = gdal.GDT_Float32, fill_nodata=False, estimate_uncertainty=False):
+		data_pool = {}
+		result_pool = {}
+		
+		reading_futures = []
+		processing_futures = []
+		writing_futures = []
+		
+		def reading_fn(i):
+			ttprint(f'reading {i}')
+			fn_layers = fn_layers_list[i]
+			dict_layers_newnames = dict_layers_newnames_list[i]
+			
+			input_data = self._read_layers(fn_layers, spatial_win, inmem_calc_func, dict_layers_newnames)
+			
+			input_data_key = str(uuid.uuid4())
+			data_pool[input_data_key] = input_data
+			processing_futures.append(processing_pool.submit(processing_fn, i, input_data_key))
+			
+		def processing_fn(i, input_data_key):
+			ttprint(f'procesing {i}')
+			
+			input_data = data_pool[input_data_key]
+			x_size, y_size, n_features = input_data.shape
+			input_data = input_data.reshape(-1, n_features)
+			
+			if self.verbose:
+				ttprint(f'Predicing {x_size * y_size} pixels')
 
-		fn_layers = self._find_layers(dirs_layers)
-		input_data = self.read_data(fn_layers)
+			result = self.estimator.predict_proba(input_data)
+			_, n_classes = result.shape
 
+			del data_pool[input_data_key]
+			gc.collect()
+			
+			nan_mask = np.any(np.isnan(input_data), axis=1)
+			input_data[nan_mask,:] = 0
+			result[nan_mask] = np.nan
+			result = result.reshape(x_size, y_size, n_classes)
+			result = (result * 100).astype('int8')
+			
+			result_pool[input_data_key] = result
+			writing_futures.append(writting_pool.submit(wrinting_fn, i, input_data_key))
+		
+		def wrinting_fn(i, input_data_key):
+			
+			result = result_pool[input_data_key]
+			fn_result = fn_result_list[i]
+			fn_layers = fn_layers_list[i]
+			
+			if self.verbose:
+				ttprint(f'Saving the result in {fn_result}')
+			
+			self._data_to_new_img(fn_layers[0], fn_result, result, spatial_win = spatial_win)
+			
+			del result_pool[input_data_key]
+			gc.collect()
+			return Path(fn_result)
+		
+		reading_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+		processing_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+		writting_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+		
+		for i in range(0, len(fn_layers_list)):
+			reading_futures.append(reading_pool.submit(reading_fn, (i)))
+		
+		for future in as_completed(reading_futures):
+			print(future.result())
+
+		for future in as_completed(processing_futures):
+			print(future.result())
+		
+		output_fn_files = []
+		
+		for future in as_completed(writing_futures):
+			output_fn_files.append(future.result())
+
+		reading_pool.shutdown(wait=False)
+		processing_pool.shutdown(wait=False)
+		writting_pool.shutdown(wait=False)
+		
+		return output_fn_files
+		
+	def predict(self, dirs_layers:List = None, fn_layers:List = None, fn_result:str = None, spatial_win = None, \
+		data_type = 'float32', fill_nodata=False, estimate_uncertainty=False, inmem_calc_func = None, dict_layers_newnames={}):
+
+		if dirs_layers is None and fn_layers is None:
+			ttprint(f'Please, inform dirs_layers or fn_layers')
+			return
+
+		if fn_layers is None:
+			fn_layers = self._find_layers(dirs_layers)
+		
+		input_data = self._read_layers(fn_layers, spatial_win, inmem_calc_func, dict_layers_newnames)
+		
 		x_size, y_size, n_features = input_data.shape
 		input_data = input_data.reshape(-1, n_features)
 
@@ -389,20 +560,25 @@ class LandMapper():
 		if self.verbose:
 			ttprint(f'Predicing {x_size * y_size} pixels')
 
-		result = self.estimator.predict(input_data)
+		result = self.estimator.predict_proba(input_data)
+		_, n_classes = result.shape
+		
 		result[nan_mask] = np.nan
-		result = result.reshape(1, x_size, y_size)
-
+		result = result.reshape(x_size, y_size, n_classes)
+		result = (result * 100).astype('int8')
+		
 		if self.verbose:
 			ttprint(f'Saving the result in {fn_result}')
-		self._data_to_new_img(fn_layers[0], fn_result, result, data_type = data_type)
+		self._data_to_new_img(fn_layers[0], fn_result, result, spatial_win = spatial_win)
 
 		if estimate_uncertainty:
-			class_proba = self.estimator.predict_proba(input_data)
-			class_proba = np.maximum(class_proba, 1e-15)
-			n_classes = self.pts[self.target_col].unique().size
+			#result = self.estimator.predict_proba(input_data)
+			#result = np.maximum(class_proba, 1e-15)
+			#n_classes = self.pts[self.target_col].unique().size
 
-			relative_entropy = -1 * class_proba * np.log2(class_proba)
+			result = np.maximum(result, 1e-15)
+			
+			relative_entropy = -1 * result * np.log2(result)
 			relative_entropy = 100 * relative_entropy.sum(axis=-1) / np.log2(n_classes)
 			if not fill_nodata:
 				relative_entropy[nan_mask] = 255
@@ -412,6 +588,7 @@ class LandMapper():
 			fn_uncertainty = fn_result.replace(out_ext, '_uncertainty'+out_ext)
 			self._data_to_new_img(
 				fn_layers[0], fn_uncertainty,
-				relative_entropy.reshape(1, x_size, y_size),
-				data_type=gdal.GDT_Byte, nodata=255
+				relative_entropy.reshape(x_size, y_size, 1),
+				spatial_win = spatial_win,
+				data_type='byte', nodata=255
 			)

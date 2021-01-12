@@ -58,10 +58,8 @@ class TilingProcessing():
 		for idx in idx_list:
 			tile = self.tiles.iloc[idx]
 			
-			xoff = tile[self.col_xoff]
-			yoff = tile[self.col_yoff]
-			
-			window = Window(xoff, yoff, self.xsize, self.ysize)
+			left, bottom, right, top = tile.geometry.bounds
+			window = from_bounds(left, bottom, right, top, self.base_raster.transform)
 			
 			args.append((idx, tile, window))
 		
