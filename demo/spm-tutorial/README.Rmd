@@ -26,9 +26,10 @@ knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 
 To install the most up-to-date version of eumap please use:
 
-```{r}
+```{r, warning=FALSE}
 # library(remotes)
 # remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
+
 ```
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -68,6 +69,7 @@ The main functions in eumap are as following:
 1. `train_spm` will automatically perform `classification` or `regression` tasks and the output is a `train_model` which later can be used to predict `newdata`.It also provides *summary* of the model and *variable importance* and *response*.
 The rest of arguments can be either pass or default values will be passed. `train_spm` provides four scenarios:
 
+
   1.1. `classification` task with **non spatial** resampling methods,
   1.2. `regression` task with **non spatial** resampling methods,
   1.3. `classification` task with **spatial** resampling methods,
@@ -84,7 +86,7 @@ Here two arguments are important:
 
 Here two scenarios are possible:
 
-1. 1:1 accuracy plot predicted vs observed in case of regression task,
+1. Accuracy plot predicted vs observed in case of regression task,
 2. Confusion matrix predicted vs observed in the case of classification task,
  
 **Warning:** most of functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
@@ -94,7 +96,7 @@ The following examples demonstrates spatial prediction using the `sic97` data se
 ## Required packages
 
 ```{r, results='hide',warning=FALSE}
-start_time <- Sys.time()
+
 ls <- c("lattice", "raster", "landmap", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
     "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv",  "tidyr", "lubridate", "R.utils", "terra","rgdal",'MLmetrics',
     "FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools", "gridExtra", "yardstick", "latticeExtra", "devtools", "progressr")
@@ -114,7 +116,7 @@ sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall),
 df.tr <- na.omit(sic1997.df)
 ```
 
-Note that here we use whole the data to test and train the model, as the dataset is not big (i.e., only 456 observations). In the training part, however, there will be internal sampling that will provide the Out Of Bag Error OOB R square! For mor detailed information see [HERE](https://ieeexplore.ieee.org/abstract/document/9206124).
+Note that here we use whole the data to test and train the model, as the dataset is not large enough (i.e., only 456 observations). In the training part, however, there will be internal sampling that will provide the Out Of Bag sampling and OOB rsquare. For mor detailed information on OOB please see [HERE](https://ieeexplore.ieee.org/abstract/document/9206124).
 
 We can create some synthetic covariates, so we can demonstrate that (a) the learner is noise-proof, and (b) that this is visible in the variable importance plots:
 
@@ -134,7 +136,7 @@ df.tr$X <- NULL
 df.tr$Y <- NULL
 ```
 
-where *noise1* and *noise2* are pure noises. Note that we shouldn't use non-numeric covariates in `train_spm` for regression tasks; in this case *border*.
+where *noise1* and *noise2* are pure noises. Note that we shouldn't use non-numeric covariates in `train_spm` for regression tasks; in this case *border*. X and Y also removed to avoid bias in training the model.
 
 
 ## Loading required libraries:
@@ -160,10 +162,10 @@ library("scales")
 
 ## `train_spm`
 
-`train_spm` fits multiple models/learners (depending on the `class` of the **target.variable**) and automatically tune all the underlying hyperparameters using `AutoTuner` from [mlr3](https://mlr3book.mlr-org.com/pipe-nonlinear.html) and returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
+`train_spm` fits multiple models/learners (depending on the *class* of the **target.variable**) and automatically tune all the underlying hyperparameters using `AutoTuner` powered by [mlr3](https://mlr3book.mlr-org.com/pipe-nonlinear.html) and returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
 ```{r ,results='hide', warning=FALSE}
-tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 5, n_evals = 15)
+tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 50)
 ```
 
 `train_spm` results:
@@ -179,7 +181,7 @@ train_model= tr[[1]]
 ```{r}
 Vim = tr[[2]]
 ```
-3rd element is the summary of the *trained model*. Note that the *R squared (OOB)* shows the performance evaluation of the model during training which sample fraction for different batches varies from 50% to 70%.
+3rd element is the summary of the *trained model*. Note that the *R squared (OOB)* shows performance evaluation of the model during training in which sample fraction for different batches varies from 50% to 70%.
 
 ```{r}
 tr[[3]]
@@ -205,9 +207,9 @@ Prediction on `newdata` data set (in this case df.tr).
 predict.variable = eumap::predict_spm(train_model, df.tr)
 ```
 
-### Predicted values for the *newdata* set (in this case df.tr):
+Predicted values for the *newdata* set (in this case df.tr):
 
-Note: here we just show the start and the ending values.
+Note: here we just show start and the ending values.
 
 ```{r ,output.lines= -(3:300)}
 pred.v = predict.variable[1]
@@ -220,22 +222,22 @@ valu.imp= predict.variable[[2]]
 ```
 
 ## `plot_spm` 
-In the case of regression task:
+
+First we demonstrate the variable importance using:
+```{r}
+plot_spm( Vim = Vim, gtype = "var.imp") 
+```
+
+As we can see noisy data has given almost the least importance which suggests that `train_spm` is noise proof.
+
+In case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
 plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy", gmode  = "norm" )
-plt
 ```
 
 When there is limited number of observation (x < 500) `plot_spm` automatically generates a density plot and ignores all the other graphical arguments.   
 
-
-Variable importance:
-
-```{r}
-plt = plot_spm(Vim = tr[[2]], gtype = "var.imp") 
-```
-As graph shows *noise1* and *noise2* are among the least important features.
 
 ### spatial prediction on *rainfall*
 
@@ -249,7 +251,8 @@ colnames(df.tr)[2:3] <- c('x','y')
 df.tr$rainP = pred.v[[1]]
 coordinates(df.tr) <- ~x+y
 proj4string(df.tr) <- CRS("+init=epsg:28992")
-#gridded(df.tr) <- TRUE
+
+
 ```
 
 ```{r}
