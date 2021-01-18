@@ -234,7 +234,8 @@ As we can see noisy data has given almost the least importance which suggests th
 In case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
-plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy", gmode  = "norm" )
+plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy")
+
 ```
 
 When there is limited number of observation (x < 500) `plot_spm` automatically generates a density plot and ignores all the other graphical arguments.   

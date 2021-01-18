@@ -32,16 +32,16 @@ plot_spm <- function(x = NULL, y = NULL , z = NULL, Vim = NULL, main = NULL, pal
   
   if (gtype == "cm") {
     # extract the confusion matrix values as data.frame: The code is a modified version of [THIS LINK](https://stackoverflow.com/questions/23891140/r-how-to-visualize-confusion-matrix-using-the-caret-package/60150826#60150826)
-    cm = caret::confusionMatrix(x, y)
+    cm = confusionMatrix(x, y) #caret::
     cm_d <- as.data.frame(cm$table)
     cm_d$diag <- cm_d$Prediction == cm_d$Reference # Get the Diagonal
     cm_d$ndiag <- cm_d$Prediction != cm_d$Reference # Off Diagonal     
     cm_d[cm_d == 0] <- NA # Replace 0 with NA for white tiles
-    cm_d$Reference <-  likert::reverse.levels(cm_d$Reference) # diagonal starts at top left
+    cm_d$Reference <-  reverse.levels(cm_d$Reference) # diagonal starts at top left likert::
     cm_d$ref_freq <- cm_d$Freq * ifelse(is.na(cm_d$diag),-1,1)
     
     # plotting the matrix
-    plt <-  ggplot2::ggplot(data = cm_d, aes(x = Prediction , y =  Reference, fill = Freq)) +
+    plt <-  ggplot(data = cm_d, aes(x = Prediction , y =  Reference, fill = Freq)) + #ggplot2::
       scale_x_discrete(position = "top") +
       geom_tile( data = cm_d,aes(fill = ref_freq)) +
       scale_fill_gradient2(guide = FALSE,low = "red3",high = "orchid4", midpoint = 0,na.value = 'white') +
@@ -86,9 +86,9 @@ plot_spm <- function(x = NULL, y = NULL , z = NULL, Vim = NULL, main = NULL, pal
     }
     if (gtype != "var.imp" & length(x) <= 500 ) {
       plt <-  lattice::xyplot(x ~ y, asp = 1, 
-                              par.settings = list(plot.symbol = list(alpha(col="black",0.6), fill = alpha("red", 0.6), pch = 21, cex = 0.6)), main = main
+                              par.settings = list(plot.symbol = list(alpha(col = "black", 0.6), fill = alpha("red", 0.6), pch = 21, cex = 0.6)), main = main
                               , ylab = "measured", xlab = "predicted")# scales = list(x=list(log=TRUE, equispaced.log=FALSE), y=list(log=TRUE, equispaced.log=FALSE)),
-      # plt
+      # print(plt)
       # print(plt)
       message('Because of the LOW number of observations a density plot is displayed.')
     } else {

@@ -1,6 +1,6 @@
 Package: eumap
 Title: European environmental maps processing and production
-Version: 0.0.3
+Version: 0.0.4
 Authors@R: 
    c(person("Tomislav", "Hengl", email = "tom.hengl@opengeohub.org", role = c("aut", "cre")),
      person("Mohammadreza", "Sheykhmousa", email = "mohammadreza.sheykhmousa@opengeohub.org", role = c("aut")),
@@ -21,6 +21,8 @@ Imports:
     lattice,
     glmnet,
     mlr3spatiotempcv,
+    caret,
+    ggplot2,
     mlr3verse
 Suggests: rgdal, parallel, terra, raster, xgboost, matrixStats
 RoxygenNote: 7.1.1

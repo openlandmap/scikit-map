@@ -15,7 +15,7 @@ A general tutorial for `train_spm` is available [here](https://gitlab.com/geohar
 
 <img src="../img/spm_general_workflow.png" alt="General workflow eumap package" width="550"/>
 
-Warning: most of functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
+Warning: most of functions are optimized to run in parallel by default.
 
 ## Installing
 

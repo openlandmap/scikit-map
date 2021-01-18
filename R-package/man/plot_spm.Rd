@@ -13,7 +13,7 @@ plot_spm(
   palet = NULL,
   colorcut = NULL,
   xbins = 60,
-  gtype = c("accuracy", "correlation", "var.imp"),
+  gtype = c("accuracy", "correlation", "var.imp", "cm"),
   gmode = c("root", "log10", "norm", "log2", "nat"),
   aspect = 1,
   ...
@@ -38,7 +38,7 @@ plot_spm(
 
 \item{gtype}{Graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provides partial correlation plot for the regression matrix. "var.imp" provides a graph of top 10 percent of the most informative features,}
 
-\item{gmode}{Graphical mode; in case `gtype=accuracy` gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data,}
+\item{gmode}{Graphical mode; in case `gtype = accuracy` gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data. If `gtype = cm`; function for plotting confusion matrix. `plot_spm` returns an annotated heat map inputs are `pred` and `truth`; normally comes as an output of classification models,}
 
 \item{aspect}{Default values is aspect = 1,}
 
