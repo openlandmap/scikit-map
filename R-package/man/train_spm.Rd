@@ -2,15 +2,15 @@
 % Please edit documentation in R/train_spm.R
 \name{train_spm}
 \alias{train_spm}
-\title{Train Spatial matrix}
+\title{Train a spatial prediction model, from a (spatial) matrix, using ensemble machine learning,}
 \usage{
 train_spm(
   df.tr,
   target.variable,
   parallel = TRUE,
   predict_type = NULL,
-  folds = 5,
-  n_evals = 5,
+  folds = NULL,
+  n_evals = NULL,
   method.list = NULL,
   var.imp = NULL,
   super.learner = NULL,
@@ -20,35 +20,35 @@ train_spm(
 )
 }
 \arguments{
-\item{df.tr}{observation data,}
+\item{df.tr}{Observation data frame,}
 
-\item{target.variable}{target.variable response variable,}
+\item{target.variable}{Target variable or response variable,}
 
-\item{parallel}{parallel processing mode,}
+\item{parallel}{Parallel processing mode,}
 
-\item{predict_type}{e.g., response and prob,}
+\item{predict_type}{Prediction type 'prob' or 'response',}
 
-\item{folds}{sub-item for spcv,}
+\item{folds}{Sub-item for spcv (see mlr3spatiotempcv),}
 
-\item{n_evals}{number of evaluation process,}
+\item{n_evals}{Number of evaluation process,}
 
-\item{method.list}{learning methods,}
+\item{method.list}{Learning methods (see mlr3learners),}
 
-\item{var.imp}{variable importance,}
+\item{var.imp}{Variable importance,}
 
-\item{super.learner}{super learner,}
+\item{super.learner}{Ensemble stacking model usually \code{regr.ranger} for regression tasks,}
 
-\item{crs}{coordinate reference system, necessary for spcv,}
+\item{crs}{Coordinate reference system, necessary for spcv (see mlr3spatiotempcv),}
 
-\item{coordinate_names}{}
+\item{coordinate_names}{Columns names for X and Y coordinates,}
 
-\item{...}{other arguments that can be passed on to \code{mlr3spatiotempcv::TaskSupervised},}
+\item{...}{other arguments that can be passed on to \code{TaskSupervised},}
 }
 \value{
-Object of class \code{mlr3},
+List of objects of class \code{mlr3},
 }
 \description{
-This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and    \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem.
+This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
 }
 \examples{
 \dontrun{ 
@@ -58,7 +58,8 @@ library(mlr3verse)
 library(mlr3spatiotempcv)
 library(checkmate)
 library(future)
-library(progressr)
+library(progress)
+library(scales)
 library(eumap)
 demo(meuse, echo=FALSE)
 df <- as.data.frame(meuse)
@@ -71,9 +72,9 @@ train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
 newdata <-df.ts
-tr = eumap::train_spm(df.tr, target.variable = "lead", folds = 5 ,n_evals = 3,#' crs = "+init=epsg:3035")
+tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
 train_model= tr[[1]]
-var.imp = tr[[2]]
+#var.imp = tr[[2]]
 summary = tr[[3]]
 response = tr[[4]]
 vlp = tr[[5]]
@@ -85,9 +86,9 @@ plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 df.ts$leadp = predict.variable
 coordinates(df.ts) <- ~x+y
 proj4string(df.ts) <- CRS("+init=epsg:28992")
-gridded(df.ts) = TRUE # creat raster output
+gridded(df.ts) = TRUE
 ## regression grid 
-make a map using ensemble machine learning with spatial cross validation for the predicted #' variables (*lead* in this case). 
+#make a spatial prediction map 
 plot(df.ts[,"leadp"])
 points(meuse, pch="+")
 }

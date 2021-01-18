@@ -32,70 +32,32 @@
 * checking whether the namespace can be unloaded cleanly ... OK
 * checking loading without being on the library search path ... OK
 * checking dependencies in R code ... WARNING
-'::' or ':::' import not declared from: ‘mlr3’
-'loadNamespace' or 'requireNamespace' call not declared from: ‘progress’
-munmap_chunk(): invalid pointer
+'::' or ':::' imports not declared from:
+  ‘Likert’ ‘ggplot2’
+double free or corruption (out)
 Aborted (core dumped)
 * checking S3 generic/method consistency ... OK
 * checking replacement functions ... OK
 * checking foreign function calls ... OK
 * checking R code for possible problems ... NOTE
-plot_cm: no visible global function definition for ‘reverse.levels’
-plot_cm: no visible global function definition for ‘ggplot’
-plot_cm: no visible global function definition for ‘aes’
 plot_cm: no visible binding for global variable ‘Prediction’
 plot_cm: no visible binding for global variable ‘Reference’
 plot_cm: no visible binding for global variable ‘Freq’
 plot_cm: no visible global function definition for ‘scale_x_discrete’
-plot_cm: no visible global function definition for ‘geom_tile’
 plot_cm: no visible binding for global variable ‘ref_freq’
-plot_cm: no visible global function definition for
-  ‘scale_fill_gradient2’
-plot_cm: no visible global function definition for ‘geom_text’
-plot_cm: no visible global function definition for ‘theme_light’
-plot_cm: no visible global function definition for ‘theme’
-plot_cm: no visible global function definition for ‘element_blank’
-train_spm: no visible global function definition for
-  ‘assert_data_frame’
-train_spm: no visible global function definition for ‘assert_string’
-train_spm: no visible global function definition for ‘handlers’
-train_spm: no visible global function definition for ‘with_progress’
 Undefined global functions or variables:
-  Freq Prediction Reference aes assert_data_frame assert_string
-  element_blank geom_text geom_tile ggplot handlers ref_freq
-  reverse.levels scale_fill_gradient2 scale_x_discrete theme
-  theme_light with_progress
-* checking Rd files ... NOTE
-prepare_Rd: predict_spm.Rd:14-16: Dropping empty section \value
+  Freq Prediction Reference ref_freq scale_x_discrete
+* checking Rd files ... OK
 * checking Rd metadata ... OK
-* checking Rd line widths ... NOTE
-Rd file 'train_spm.Rd':
-  \examples lines wider than 100 characters:
-     tr = eumap::train_spm(df.tr, target.variable = "lead", folds = 5 ,n_evals = 3,#' crs = "+init=epsg:3035")
-     make a map using ensemble machine learning with spatial cross validation for the predicted #' variables (*lead* in this case). 
-
-These lines will be truncated in the PDF manual.
+* checking Rd line widths ... OK
 * checking Rd cross-references ... OK
 * checking for missing documentation entries ... OK
 * checking for code/documentation mismatches ... OK
-* checking Rd \usage sections ... WARNING
-Undocumented arguments in documentation object 'predict_spm'
-  ‘train_model’
-Documented arguments not in \usage in documentation object 'predict_spm':
-  ‘train.model’
-
-Functions with \usage entries need to have the appropriate \alias
-entries, and all their arguments documented.
-The \usage entries must correspond to syntactically valid R code.
-See chapter ‘Writing R documentation files’ in the ‘Writing R
-Extensions’ manual.
-* checking Rd contents ... WARNING
-Argument items with no description in Rd object 'train_spm':
-  ‘coordinate_names’
-
+* checking Rd \usage sections ... OK
+* checking Rd contents ... OK
 * checking for unstated dependencies in examples ... OK
 * checking examples ... OK
 * checking for non-standard things in the check directory ... OK
 * checking for detritus in the temp directory ... OK
 * DONE
-Status: 3 WARNINGs, 3 NOTEs
+Status: 1 WARNING, 1 NOTE

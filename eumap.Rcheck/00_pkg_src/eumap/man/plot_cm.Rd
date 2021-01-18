@@ -10,7 +10,7 @@ plot_cm(cm)
 \item{cm}{A data frame that consist of prediction and truth; normally comes as an output of classification models.}
 }
 \value{
-heat map annotated plot of CM
+Annotated heat map for CM
 }
 \description{
 The code is a modified version of [THIS LINK](https://stackoverflow.com/questions/23891140/r-how-to-visualize-confusion-matrix-using-the-caret-package/60150826#60150826)

@@ -98,6 +98,27 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 base::assign(".dptime", (proc.time() - get(".ptime", pos = "CheckExEnv")), pos = "CheckExEnv")
 base::cat("plot_spm", base::get(".format_ptime", pos = 'CheckExEnv')(get(".dptime", pos = "CheckExEnv")), "\n", file=base::get(".ExTimings", pos = 'CheckExEnv'), append=TRUE, sep="\t")
 cleanEx()
+nameEx("predict_spm")
+### * predict_spm
+
+flush(stderr()); flush(stdout())
+
+base::assign(".ptime", proc.time(), pos = "CheckExEnv")
+### Name: predict_spm
+### Title: Predict_spm
+### Aliases: predict_spm
+
+### ** Examples
+
+## Not run: 
+##D predict.variable = eumap::predict_spm(object, newdata)
+## End(Not run)
+
+
+
+base::assign(".dptime", (proc.time() - get(".ptime", pos = "CheckExEnv")), pos = "CheckExEnv")
+base::cat("predict_spm", base::get(".format_ptime", pos = 'CheckExEnv')(get(".dptime", pos = "CheckExEnv")), "\n", file=base::get(".ExTimings", pos = 'CheckExEnv'), append=TRUE, sep="\t")
+cleanEx()
 nameEx("strip_dates")
 ### * strip_dates
 
@@ -152,7 +173,8 @@ flush(stderr()); flush(stdout())
 
 base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ### Name: train_spm
-### Title: Train Spatial matrix
+### Title: Train a spatial prediction model, from a (spatial) matrix, using
+###   ensemble machine learning,
 ### Aliases: train_spm
 
 ### ** Examples
@@ -165,7 +187,8 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ##D library(mlr3spatiotempcv)
 ##D library(checkmate)
 ##D library(future)
-##D library(progressr)
+##D library(progress)
+##D library(scales)
 ##D library(eumap)
 ##D demo(meuse, echo=FALSE)
 ##D df <- as.data.frame(meuse)
@@ -178,9 +201,9 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ##D df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 ##D df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
 ##D newdata <-df.ts
-##D tr = eumap::train_spm(df.tr, target.variable = "lead", folds = 5 ,n_evals = 3,#' crs = "+init=epsg:3035")
+##D tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
 ##D train_model= tr[[1]]
-##D var.imp = tr[[2]]
+##D #var.imp = tr[[2]]
 ##D summary = tr[[3]]
 ##D response = tr[[4]]
 ##D vlp = tr[[5]]
@@ -192,9 +215,9 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 ##D df.ts$leadp = predict.variable
 ##D coordinates(df.ts) <- ~x+y
 ##D proj4string(df.ts) <- CRS("+init=epsg:28992")
-##D gridded(df.ts) = TRUE # creat raster output
+##D gridded(df.ts) = TRUE
 ##D ## regression grid 
-##D make a map using ensemble machine learning with spatial cross validation for the predicted #' variables (*lead* in this case). 
+##D #make a spatial prediction map 
 ##D plot(df.ts[,"leadp"])
 ##D points(meuse, pch="+")
 ## End(Not run)

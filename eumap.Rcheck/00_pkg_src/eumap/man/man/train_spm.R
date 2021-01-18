@@ -61,7 +61,7 @@
 #' }
 train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = NULL, n_evals = NULL, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
   target = target.variable
-  if ( is.null(predict_type)) {
+  if( is.null(predict_type)){
     predict_type <- "response"
   }
   id = deparse(substitute(df.tr))
@@ -76,7 +76,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
   ## start running ensemble
   
   ##  classif CV ----
-  if (is.factor(df.tr[,target]) & is.null(crs)) {
+  if(is.factor(df.tr[,target]) & is.null(crs)){
     
     message(paste0(task_type[1],"..."), immediate. = TRUE)
     
@@ -84,7 +84,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     id = id, backend = df.tr, target = target.variable
     )
     
-    ranger_lrn = lrn("classif.ranger", predict_type = "response", importance = "permutation")
+    ranger_lrn = lrn("classif.ranger", predict_type = "response", importance ="permutation")
     ps_ranger = 
       ParamSet$new(
       list(ParamInt$new("mtry", lower = 1L, upper = 5L),
@@ -102,14 +102,10 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       )
       message(resample_method[1], immediate. = TRUE)
       at$train(tsk_clf)
-      at $
-        train(tsk_clf) $
-        predict(tsk_clf) $
-        score(msr('classif.acc'))
       at$learner$train(tsk_clf)
       best.model = at$archive$best()
       var.imp = at$learner$importance()
-      vlp = names(var.imp[1:(round(length(var.imp)*0.1) + 1)])
+      vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
       summary = at$learner$state$model
       tr.model = at$learner
       train_model = tr.model$predict_newdata
@@ -123,7 +119,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     )   
     
     tsk_regr <- TaskRegr$new(id = id, backend = df.tr, target = target.variable)
-    ranger_lrn = lrn("regr.ranger", predict_type = "response",importance = "permutation")
+    ranger_lrn = lrn("regr.ranger", predict_type = "response",importance ="permutation")
     ps_ranger = ParamSet$new(
       list(
         ParamInt$new("mtry", lower = 1L, upper = 5L),
@@ -143,25 +139,22 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     #at$store_tuning_instance = TRUE
     message(resample_method[1], immediate. = TRUE)
     at$train(tsk_regr)
-    at $
-      train(tsk_regr) $
-      predict(tsk_regr) $
-      score(msr('regr.rmse'))
+    
     at$learner$train(tsk_regr)
     tr.model = at$learner
     summary = tr.model$model
     var.imp = tr.model$importance()
-    vlp = names(var.imp[1:(round(length(var.imp)*0.1) + 1)])
+    vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
     train_model = tr.model$predict_newdata
     response = tr.model$model$predictions
   }
   ## classif spcv ----
-  else if (is.factor(df.tr[,target.variable]) & crs == crs) { 
+  else if (is.factor(df.tr[,target.variable]) & crs == crs){ 
     
     message( 
       paste0(task_type[1],"...", immediate. = TRUE)
     ) 
-    if (is.null(method.list) & is.null(super.learner)) {
+    if(is.null(method.list) & is.null(super.learner)){
     method.list <- c("classif.kknn", "classif.featureless", "classif.rpart")
     super.learner = "classif.ranger"
     }
@@ -179,10 +172,11 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
           po("select") %>>% po("learner_cv", id = "kknn", lrn("classif.kknn")),
           po("pca") %>>% po("learner_cv", id = "featureless", lrn("classif.featureless")),
           po("subsample") %>>% po("learner_cv", id = "rpart", lrn("classif.rpart"))
+          
           )
         ) %>>%
       po("featureunion") %>>%
-      po("learner", lrn("classif.ranger",importance = "permutation")) 
+      po("learner", lrn("classif.ranger",importance ="permutation")) 
       resampling_sp = rsmp("repeated_spcv_coords", folds = folds, repeats = 4)
       rr_sp = rsmp(
       task = tsk_regr, learner = g,
@@ -191,25 +185,23 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       g$keep_results = "TRUE"
       # plt = g$plot()
       message(resample_method[2], immediate. = TRUE)
-      g $
-        train(tsk_clf)$
-        predict(tsk_clf)$
-        score(msr('classif.acc'))
+      g$train(tsk_clf)
+      g$predict(tsk_clf)
       conf.mat = g$pipeops$classif.ranger$learner_model$model$confusion.matrix
       var.imp = g$pipeops$classif.ranger$learner_model$model$variable.importance
-      vlp = names(var.imp[1:(round(length(var.imp)*0.1) + 1)])
+      vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
       summary = g$pipeops$classif.ranger$learner_model$model
       tr.model = g$pipeops$classif.ranger$learner$train(tsk_clf)
       train_model = tr.model$predict_newdata
       response = tr.model$model$predictions
   }
   ## regr spcv ----
-  else if (is.numeric(df.tr[,target.variable]) & crs == crs) {
+  else if(is.numeric(df.tr[,target.variable]) & crs == crs){
     
     message( 
     paste0(task_type[2],"...", immediate. = TRUE)
     ) 
-    if (is.null(method.list) & is.null(super.learner)) {
+    if(is.null(method.list) & is.null(super.learner)){
       method.list <- c("regr.kknn", "regr.featureless", "regr.rpart")
       super.learner <- "regr.ranger"
     }
@@ -235,7 +227,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
           )
         ) %>>%
       po("featureunion") %>>%
-      po("learner", lrn("regr.ranger",importance = "permutation"))
+      po("learner", lrn("regr.ranger",importance ="permutation"))
     
     resampling_sp = rsmp("repeated_spcv_coords", folds = folds, repeats = 3)
     rr_sp = rsmp(
@@ -245,14 +237,12 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     g$keep_results = "TRUE"
     plt = g$plot()
     message(resample_method[2], immediate. = TRUE)
-    g $
-      train(tsk_regr)$
-      predict(tsk_regr)$
-      score(msr('regr.rmse'))
+    g$train(tsk_regr)
+    g$predict(tsk_regr)
     summary = g$pipeops$regr.ranger$learner_model$model
     tr.model = g$pipeops$regr.ranger$learner$train(tsk_regr)
     var.imp = tr.model$importance()
-    vlp = names(var.imp[1:(round(length(var.imp)*0.1) + 1)])
+    vlp = names(var.imp[1:(round(length(var.imp)*0.1)+1)])
     response = tr.model$model$predictions
     train_model = tr.model$predict_newdata
     response = tr.model$model$predictions

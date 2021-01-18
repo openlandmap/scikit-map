@@ -158,6 +158,7 @@ library("progressr")
 library("checkmate")
 library("future")
 library("scales")
+library("caret")
 ```
 
 ## `train_spm`
@@ -165,7 +166,7 @@ library("scales")
 `train_spm` fits multiple models/learners (depending on the *class* of the **target.variable**) and automatically tune all the underlying hyperparameters using `AutoTuner` powered by [mlr3](https://mlr3book.mlr-org.com/pipe-nonlinear.html) and returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
 ```{r ,results='hide', warning=FALSE}
-tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 50)
+tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
 ```
 
 `train_spm` results:
@@ -217,7 +218,7 @@ pred.v
 ```
 
 ```{r ,results='hide', echo=FALSE}
-valu.imp= predict.variable[[2]]
+valu.imp = predict.variable[[2]]
 
 ```
 

@@ -11,12 +11,12 @@
 #' predict.variable = eumap::predict_spm(object, newdata)
 #' }
 
-predict_spm = function(object, newdata){
+predict_spm = function (object, newdata){
         predict.variable = object(newdata)
-        if (!is.data.frame(newdata)) {
+        if(!is.data.frame(newdata)){
           newdata = as.data.frame(newdata)
         }
-        vrimp = newdata[1:nrow(newdata), vlp]
+        vrimp = newdata[1:nrow(newdata),vlp]
         y = predict.variable$response
         # measure_test = predict.variable$score()
         return(list(y, vrimp))

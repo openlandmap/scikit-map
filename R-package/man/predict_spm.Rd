@@ -2,20 +2,25 @@
 % Please edit documentation in R/predict_spm.R
 \name{predict_spm}
 \alias{predict_spm}
-\title{predict_spm}
+\title{Predict_spm}
 \usage{
-predict_spm(train_model, newdata)
+predict_spm(object, newdata)
 }
 \arguments{
-\item{newdata}{data at new location,}
+\item{object}{Trained model using `train_spm`,}
 
-\item{train.model}{trained model from `train_spm`,}
+\item{newdata}{Data at new location,}
 }
 \value{
-
+Predicted variables, variable importance
 }
 \description{
-prediction on new dataset
+Prediction on a new dataset
+}
+\examples{
+\dontrun{
+predict.variable = eumap::predict_spm(object, newdata)
+}
 }
 \author{
 \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}

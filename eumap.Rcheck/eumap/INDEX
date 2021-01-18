@@ -2,7 +2,9 @@ extract_tif             Extract points from a GeoTIFF using
                         spatiotemporal overlay
 plot_cm                 Function for plotting confusion matrices
 plot_spm                Plot Spatial Matrix,
-predict_spm             predict_spm
+predict_spm             Predict_spm
 strip_dates             Strip dates from tifs
 strip_years             Strip dates from tifs
-train_spm               Train Spatial matrix
+train_spm               Train a spatial prediction model, from a
+                        (spatial) matrix, using ensemble machine
+                        learning,
