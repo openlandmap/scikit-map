@@ -33,7 +33,7 @@ plot_spm <- function(x = NULL, y = NULL , z = NULL, Vim = NULL, main = NULL, pal
   if (gtype == "cm") {
     # extract the confusion matrix values as data.frame: The code is a modified version of [THIS LINK](https://stackoverflow.com/questions/23891140/r-how-to-visualize-confusion-matrix-using-the-caret-package/60150826#60150826)
     cm = confusionMatrix(x, y) #caret::
-    cm_d <- as.data.frame(cm$table)
+    cm_d <- data.frame(cm$table)
     cm_d$diag <- cm_d$Prediction == cm_d$Reference # Get the Diagonal
     cm_d$ndiag <- cm_d$Prediction != cm_d$Reference # Off Diagonal     
     cm_d[cm_d == 0] <- NA # Replace 0 with NA for white tiles

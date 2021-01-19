@@ -101,10 +101,10 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       tuner = tnr("random_search")
       )
       message(resample_method[1], immediate. = TRUE)
-      at$train(tsk_clf)
-      at $
-        train(tsk_clf) $
-        predict(tsk_clf) $
+      # at$train(tsk_clf)
+      at$
+        train(tsk_clf)$
+        predict(tsk_clf)$
         score(msr('classif.acc'))
       at$learner$train(tsk_clf)
       best.model = at$archive$best()
@@ -142,10 +142,10 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       )
     #at$store_tuning_instance = TRUE
     message(resample_method[1], immediate. = TRUE)
-    at$train(tsk_regr)
-    at $
-      train(tsk_regr) $
-      predict(tsk_regr) $
+    # at$train(tsk_regr)
+    at$
+      train(tsk_regr)$
+      predict(tsk_regr)$
       score(msr('regr.rmse'))
     at$learner$train(tsk_regr)
     tr.model = at$learner
@@ -191,7 +191,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       g$keep_results = "TRUE"
       # plt = g$plot()
       message(resample_method[2], immediate. = TRUE)
-      g $
+      g$
         train(tsk_clf)$
         predict(tsk_clf)$
         score(msr('classif.acc'))
@@ -245,7 +245,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     g$keep_results = "TRUE"
     plt = g$plot()
     message(resample_method[2], immediate. = TRUE)
-    g $
+    g$
       train(tsk_regr)$
       predict(tsk_regr)$
       score(msr('regr.rmse'))
