@@ -1,4 +1,15 @@
 
+<img src=img/ODS_logo_450px.png width=135/>  eumap library
+===========
+[![GitLab license](img/apache2.svg)](./LICENSE)
+[![CRAN Status Badge](http://www.r-pkg.org/badges/version/eumap)](http://cran.r-project.org/web/packages/eumap)
+[![PyPI version](https://badge.fury.io/py/eumap.svg)](https://pypi.python.org/pypi/eumap/)
+[![Zenodo dataset](https://zenodo.org/badge/DOI/10.5281/zenodo.4058447.svg)](http://doi.org/10.5281/zenodo.4058447)
+
+[Community](https://opendatascience.eu) |
+[Documentation](https://eumap.readthedocs.org) |
+[Resources](demo/README.md) |
+[Release Notes](NEWS.md)
 
 -   [Introduction](#introduction)
 -   [`train_spm`](#train_spm)
@@ -284,8 +295,28 @@ We made a spatial prediction map using ensemble machine learning with
 spatial cross validation for the predicted variable e.g., *rainfall* (in
 this case). Ranger shows that it is a noise proof classifier.
 
-References
-----------
+License
+-------
+© Contributors, 2020. Licensed under an [Apache-2](https://gitlab.com/geoharmonizer_inea/eumap/blob/master/LICENSE) license.
+
+Contribute to eumap
+---------------------
+eumap has been developed and used by a group of active community members. Your help is very valuable to make the package better for everyone. Refer to the [Community Page](https://opendatascience.eu).
+
+Reference
+---------
+- _Publication is pending_
+- eumap is one of the deliverables of the GeoHarmonizer INEA project.
+
+Funding
+--------
+This work has received funding from the European Union's the Innovation and Networks Executive Agency (INEA) under Grant Agreement [Connecting Europe Facility (CEF) Telecom project 2018-EU-IA-0095](https://ec.europa.eu/inea/en/connecting-europe-facility/cef-telecom/2018-eu-ia-0095).
+
+<img src=img/CEF_programme_logo_650px.png width=650/>
+
+
+References within demo
+----------------------
 
 Casalicchio, G., Bossek, J., Lang, M., Kirchhoff, D., Kerschke, P.,
 Hofner, B., … Bischl, B. (2017). OpenML: An R package to connect to the
