@@ -1,6 +1,10 @@
 pkgname <- "eumap"
 source(file.path(R.home("share"), "R", "examples-header.R"))
 options(warn = 1)
+<<<<<<< Updated upstream
+=======
+options(pager = "console")
+>>>>>>> Stashed changes
 base::assign(".ExTimings", "eumap-Ex.timings", pos = 'CheckExEnv')
 base::cat("name\tuser\tsystem\telapsed\n", file=base::get(".ExTimings", pos = 'CheckExEnv'))
 base::assign(".format_ptime",
@@ -85,7 +89,11 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 
 ## Not run: 
 ##D predict.variable = eumap::predict_spm(object, newdata)
+<<<<<<< Updated upstream
 ## End(Not run) 
+=======
+## End(Not run)
+>>>>>>> Stashed changes
 
 
 
@@ -152,16 +160,24 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 
 ### ** Examples
 
+<<<<<<< Updated upstream
 ## Meuse Demo
+=======
+>>>>>>> Stashed changes
 library(sp)
 library(mlr3verse)
 library(mlr3spatiotempcv)
 library(checkmate)
 library(future)
+<<<<<<< Updated upstream
 library(progress)
 library(scales)
 library(eumap)
 demo(meuse, echo=FALSE)
+=======
+library(scales)
+library(eumap)
+>>>>>>> Stashed changes
 df <- as.data.frame(meuse)
 df.grid <- as.data.frame(meuse.grid)
 df = na.omit(df[,])
@@ -171,14 +187,22 @@ set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
+<<<<<<< Updated upstream
 newdata <-df.ts
 tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
 train_model= tr[[1]]
 #var.imp = tr[[2]]
+=======
+newdata = df.ts
+tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2 )
+train_model= tr[[1]]
+Vim = tr[[2]]
+>>>>>>> Stashed changes
 summary = tr[[3]]
 response = tr[[4]]
 vlp = tr[[5]]
 target = tr[[6]]
+<<<<<<< Updated upstream
 predict.variable = eumap::predict_spm(train_model, newdata)
 pred.v = predict.variable[[1]]
 valu.imp= predict.variable[[2]]
@@ -189,11 +213,25 @@ proj4string(df.ts) <- CRS("+init=epsg:28992")
 gridded(df.ts) = TRUE
 ## regression grid 
 #make a spatial prediction map 
+=======
+predict.variable = predict_spm(train_model, newdata)
+pred.v = predict.variable[[1]]
+valu.imp= predict.variable[[2]]
+plt = plot_spm(Vim = Vim , gtype = "var.imp")
+df.ts$leadp = pred.v
+coordinates(df.ts) <- ~x+y
+proj4string(df.ts) <- CRS("+init=epsg:28992")
+gridded(df.ts) = TRUE
+>>>>>>> Stashed changes
 plot(df.ts[,"leadp"])
 points(meuse, pch="+")
 
 
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 base::assign(".dptime", (proc.time() - get(".ptime", pos = "CheckExEnv")), pos = "CheckExEnv")
 base::cat("train_spm", base::get(".format_ptime", pos = 'CheckExEnv')(get(".dptime", pos = "CheckExEnv")), "\n", file=base::get(".ExTimings", pos = 'CheckExEnv'), append=TRUE, sep="\t")
 ### * <FOOTER>

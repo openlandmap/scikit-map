@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 * installing *source* package ‘eumap’ ...
+=======
+* installing *source* package 'eumap' ...
+>>>>>>> Stashed changes
 ** using staged installation
 ** R
 ** byte-compile and prepare package for lazy loading
@@ -6,6 +10,14 @@
 *** installing help indices
 ** building package indices
 ** testing if installed package can be loaded from temporary location
+<<<<<<< Updated upstream
 ** testing if installed package can be loaded from final location
+=======
+*** arch - i386
+*** arch - x64
+** testing if installed package can be loaded from final location
+*** arch - i386
+*** arch - x64
+>>>>>>> Stashed changes
 ** testing if installed package keeps a record of temporary installation path
 * DONE (eumap)

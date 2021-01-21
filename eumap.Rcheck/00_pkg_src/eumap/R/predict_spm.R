@@ -9,7 +9,11 @@
 #' @examples 
 #' \dontrun{
 #' predict.variable = eumap::predict_spm(object, newdata)
+<<<<<<< Updated upstream
 #' } 
+=======
+#' }
+>>>>>>> Stashed changes
 
 predict_spm = function(object, newdata){
         predict.variable = object(newdata)

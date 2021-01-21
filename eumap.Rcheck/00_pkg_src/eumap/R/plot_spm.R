@@ -52,6 +52,10 @@ plot_spm <- function(x = NULL, y = NULL , z = NULL, Vim = NULL, main = NULL, pal
             panel.border = element_blank(),
             plot.background = element_blank(),
             axis.line = element_blank())
+<<<<<<< Updated upstream
+=======
+    print(plt)
+>>>>>>> Stashed changes
   } else if (gtype != "cm") {
     if (is.null(colorcut)) {
       colorcut = c(0,0.01,0.03,0.07,0.15,0.25,0.5,0.75,1)  

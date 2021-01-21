@@ -18,16 +18,15 @@
 #' @export 
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @examples
+#' \dontrun{
 #' ## Meuse Demo
 #' library(sp)
 #' library(mlr3verse)
 #' library(mlr3spatiotempcv)
 #' library(checkmate)
 #' library(future)
-#' library(progress)
 #' library(scales)
 #' library(eumap)
-#' demo(meuse, echo=FALSE)
 #' df <- as.data.frame(meuse)
 #' df.grid <- as.data.frame(meuse.grid)
 #' df = na.omit(df[,])
@@ -37,26 +36,25 @@
 #' train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 #' df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 #' df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
-#' newdata <-df.ts
-#' tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
+#' newdata = df.ts
+#' tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2 )
 #' train_model= tr[[1]]
-#' #var.imp = tr[[2]]
+#' Vim = tr[[2]]
 #' summary = tr[[3]]
 #' response = tr[[4]]
 #' vlp = tr[[5]]
 #' target = tr[[6]]
-#' predict.variable = eumap::predict_spm(train_model, newdata)
+#' predict.variable = predict_spm(train_model, newdata)
 #' pred.v = predict.variable[[1]]
 #' valu.imp= predict.variable[[2]]
-#' plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
-#' df.ts$leadp = predict.variable
+#' plt = plot_spm(Vim = Vim , gtype = "var.imp")
+#' df.ts$leadp = pred.v
 #' coordinates(df.ts) <- ~x+y
 #' proj4string(df.ts) <- CRS("+init=epsg:28992")
 #' gridded(df.ts) = TRUE
-#' ## regression grid 
-#' #make a spatial prediction map 
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
+#' }
 train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = NULL, n_evals = NULL, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
   target = target.variable
   if ( is.null(predict_type)) {

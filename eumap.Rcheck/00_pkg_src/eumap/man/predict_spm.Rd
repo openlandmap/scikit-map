@@ -20,7 +20,11 @@ Prediction on a new dataset
 \examples{
 \dontrun{
 predict.variable = eumap::predict_spm(object, newdata)
+<<<<<<< Updated upstream
 } 
+=======
+}
+>>>>>>> Stashed changes
 }
 \author{
 \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}

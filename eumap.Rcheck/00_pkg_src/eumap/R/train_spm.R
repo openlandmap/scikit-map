@@ -18,16 +18,24 @@
 #' @export 
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @examples
+<<<<<<< Updated upstream
 #' ## Meuse Demo
+=======
+>>>>>>> Stashed changes
 #' library(sp)
 #' library(mlr3verse)
 #' library(mlr3spatiotempcv)
 #' library(checkmate)
 #' library(future)
+<<<<<<< Updated upstream
 #' library(progress)
 #' library(scales)
 #' library(eumap)
 #' demo(meuse, echo=FALSE)
+=======
+#' library(scales)
+#' library(eumap)
+>>>>>>> Stashed changes
 #' df <- as.data.frame(meuse)
 #' df.grid <- as.data.frame(meuse.grid)
 #' df = na.omit(df[,])
@@ -37,14 +45,22 @@
 #' train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 #' df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 #' df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
+<<<<<<< Updated upstream
 #' newdata <-df.ts
 #' tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
 #' train_model= tr[[1]]
 #' #var.imp = tr[[2]]
+=======
+#' newdata = df.ts
+#' tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2 )
+#' train_model= tr[[1]]
+#' Vim = tr[[2]]
+>>>>>>> Stashed changes
 #' summary = tr[[3]]
 #' response = tr[[4]]
 #' vlp = tr[[5]]
 #' target = tr[[6]]
+<<<<<<< Updated upstream
 #' predict.variable = eumap::predict_spm(train_model, newdata)
 #' pred.v = predict.variable[[1]]
 #' valu.imp= predict.variable[[2]]
@@ -57,13 +73,30 @@
 #' #make a spatial prediction map 
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
+=======
+#' predict.variable = predict_spm(train_model, newdata)
+#' pred.v = predict.variable[[1]]
+#' valu.imp= predict.variable[[2]]
+#' plt = plot_spm(Vim = Vim , gtype = "var.imp")
+#' df.ts$leadp = pred.v
+#' coordinates(df.ts) <- ~x+y
+#' proj4string(df.ts) <- CRS("+init=epsg:28992")
+#' gridded(df.ts) = TRUE
+#' plot(df.ts[,"leadp"])
+#' points(meuse, pch="+")
+#' 
+>>>>>>> Stashed changes
 train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = NULL, n_evals = NULL, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
   target = target.variable
   if ( is.null(predict_type)) {
     predict_type <- "response"
   }
   id = deparse(substitute(df.tr))
+<<<<<<< Updated upstream
   cv = mlr3::rsmp("repeated_cv", folds = folds)
+=======
+  cv = rsmp("repeated_cv", folds = folds)
+>>>>>>> Stashed changes
   task_type = c("classification Task", "Regression Task")
   ml_method = c("kknn", "featureless")
   meta_learner = "ranger"

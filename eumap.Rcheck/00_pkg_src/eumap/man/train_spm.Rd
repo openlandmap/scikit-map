@@ -51,16 +51,24 @@ List of objects of class \code{mlr3},
 This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
 }
 \examples{
+<<<<<<< Updated upstream
 ## Meuse Demo
+=======
+>>>>>>> Stashed changes
 library(sp)
 library(mlr3verse)
 library(mlr3spatiotempcv)
 library(checkmate)
 library(future)
+<<<<<<< Updated upstream
 library(progress)
 library(scales)
 library(eumap)
 demo(meuse, echo=FALSE)
+=======
+library(scales)
+library(eumap)
+>>>>>>> Stashed changes
 df <- as.data.frame(meuse)
 df.grid <- as.data.frame(meuse.grid)
 df = na.omit(df[,])
@@ -70,14 +78,22 @@ set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
+<<<<<<< Updated upstream
 newdata <-df.ts
 tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
 train_model= tr[[1]]
 #var.imp = tr[[2]]
+=======
+newdata = df.ts
+tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2 )
+train_model= tr[[1]]
+Vim = tr[[2]]
+>>>>>>> Stashed changes
 summary = tr[[3]]
 response = tr[[4]]
 vlp = tr[[5]]
 target = tr[[6]]
+<<<<<<< Updated upstream
 predict.variable = eumap::predict_spm(train_model, newdata)
 pred.v = predict.variable[[1]]
 valu.imp= predict.variable[[2]]
@@ -90,6 +106,19 @@ gridded(df.ts) = TRUE
 #make a spatial prediction map 
 plot(df.ts[,"leadp"])
 points(meuse, pch="+")
+=======
+predict.variable = predict_spm(train_model, newdata)
+pred.v = predict.variable[[1]]
+valu.imp= predict.variable[[2]]
+plt = plot_spm(Vim = Vim , gtype = "var.imp")
+df.ts$leadp = pred.v
+coordinates(df.ts) <- ~x+y
+proj4string(df.ts) <- CRS("+init=epsg:28992")
+gridded(df.ts) = TRUE
+plot(df.ts[,"leadp"])
+points(meuse, pch="+")
+
+>>>>>>> Stashed changes
 }
 \author{
 \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}

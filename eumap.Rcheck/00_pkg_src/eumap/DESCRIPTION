@@ -15,13 +15,21 @@ URL: https://gitlab.com/geoharmonizer_inea/eumap
 BugReports: https://gitlab.com/geoharmonizer_inea/eumap/issues/
 Imports: methods, utils, ranger, nnet, lattice, glmnet,
         mlr3spatiotempcv, caret, ggplot2, mlr3verse
+<<<<<<< Updated upstream
 Suggests: rgdal, progress, checkmate, future, scales, sp, parallel,
         terra, raster, xgboost, matrixStats
+=======
+Suggests: rgdal, parallel, terra, raster, xgboost, matrixStats
+>>>>>>> Stashed changes
 RoxygenNote: 7.1.1
 SystemRequirements: C++11, GDAL (>= 2.0.1), GEOS (>= 3.4.0), PROJ (>=
         4.8.0)
 NeedsCompilation: no
+<<<<<<< Updated upstream
 Packaged: 2021-01-21 16:16:08 UTC; tomislav
+=======
+Packaged: 2021-01-21 22:33:56 UTC; mohammad-reza
+>>>>>>> Stashed changes
 Author: Tomislav Hengl [aut, cre],
   Mohammadreza Sheykhmousa [aut],
   Leandro Leal Parente [aut],

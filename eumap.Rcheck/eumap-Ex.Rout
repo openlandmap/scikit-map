@@ -1,7 +1,11 @@
 
 R version 4.0.2 (2020-06-22) -- "Taking Off Again"
 Copyright (C) 2020 The R Foundation for Statistical Computing
+<<<<<<< Updated upstream
 Platform: x86_64-pc-linux-gnu (64-bit)
+=======
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+>>>>>>> Stashed changes
 
 R is free software and comes with ABSOLUTELY NO WARRANTY.
 You are welcome to redistribute it under certain conditions.
@@ -20,6 +24,10 @@ Type 'q()' to quit R.
 > pkgname <- "eumap"
 > source(file.path(R.home("share"), "R", "examples-header.R"))
 > options(warn = 1)
+<<<<<<< Updated upstream
+=======
+> options(pager = "console")
+>>>>>>> Stashed changes
 > base::assign(".ExTimings", "eumap-Ex.timings", pos = 'CheckExEnv')
 > base::cat("name\tuser\tsystem\telapsed\n", file=base::get(".ExTimings", pos = 'CheckExEnv'))
 > base::assign(".format_ptime",
@@ -105,7 +113,11 @@ version: 0.0.4
 > 
 > ## Not run: 
 > ##D predict.variable = eumap::predict_spm(object, newdata)
+<<<<<<< Updated upstream
 > ## End(Not run) 
+=======
+> ## End(Not run)
+>>>>>>> Stashed changes
 > 
 > 
 > 
@@ -172,6 +184,7 @@ version: 0.0.4
 > 
 > ### ** Examples
 > 
+<<<<<<< Updated upstream
 > ## Meuse Demo
 > library(sp)
 > library(mlr3verse)
@@ -205,4 +218,33 @@ Warning in showSRID(uprojargs, format = "PROJ", multiline = "NO", prefer_proj = 
 Error in self$assert(xs) : 
   Assertion on 'xs' failed: folds: Must be of type 'single integerish value', not 'NULL'.
 Calls: <Anonymous> ... <Anonymous> -> .__ParamSet__assert -> makeAssertion -> mstop
+=======
+> library(sp)
+> library(mlr3verse)
+Warning: package 'mlr3verse' was built under R version 4.0.3
+Loading required package: mlr3
+Warning: package 'mlr3' was built under R version 4.0.3
+Loading required package: mlr3filters
+Warning: package 'mlr3filters' was built under R version 4.0.3
+Loading required package: mlr3learners
+Warning: package 'mlr3learners' was built under R version 4.0.3
+Loading required package: mlr3pipelines
+Warning: package 'mlr3pipelines' was built under R version 4.0.3
+Loading required package: mlr3tuning
+Warning: package 'mlr3tuning' was built under R version 4.0.3
+Loading required package: mlr3viz
+Warning: package 'mlr3viz' was built under R version 4.0.3
+Warning: replacing previous import 'vctrs::data_frame' by 'tibble::data_frame' when loading 'dplyr'
+Loading required package: paradox
+Warning: package 'paradox' was built under R version 4.0.3
+> library(mlr3spatiotempcv)
+> library(checkmate)
+> library(future)
+Warning: package 'future' was built under R version 4.0.3
+> library(scales)
+Warning: package 'scales' was built under R version 4.0.3
+> library(eumap)
+> df <- as.data.frame(meuse)
+Error in as.data.frame(meuse) : object 'meuse' not found
+>>>>>>> Stashed changes
 Execution halted

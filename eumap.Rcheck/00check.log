@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 * using log directory ‘/home/tomislav/Documents/git/eumap/eumap.Rcheck’
 * using R version 4.0.2 (2020-06-22)
 * using platform: x86_64-pc-linux-gnu (64-bit)
@@ -5,6 +6,15 @@
 * using options ‘--no-manual --as-cran’
 * checking for file ‘eumap/DESCRIPTION’ ... OK
 * this is package ‘eumap’ version ‘0.0.4’
+=======
+* using log directory 'C:/Enter/gitrepo/eumap/eumap.Rcheck'
+* using R version 4.0.2 (2020-06-22)
+* using platform: x86_64-w64-mingw32 (64-bit)
+* using session charset: ISO8859-1
+* using options '--no-manual --as-cran'
+* checking for file 'eumap/DESCRIPTION' ... OK
+* this is package 'eumap' version '0.0.4'
+>>>>>>> Stashed changes
 * package encoding: UTF-8
 * checking package namespace information ... OK
 * checking package dependencies ... OK
@@ -13,15 +23,23 @@
 * checking for executable files ... OK
 * checking for hidden files and directories ... OK
 * checking for portable file names ... OK
+<<<<<<< Updated upstream
 * checking for sufficient/correct file permissions ... OK
 * checking whether package ‘eumap’ can be installed ... OK
+=======
+* checking whether package 'eumap' can be installed ... OK
+>>>>>>> Stashed changes
 * checking installed package size ... OK
 * checking package directory ... OK
 * checking for future file timestamps ... OK
 * checking DESCRIPTION meta-information ... OK
 * checking top-level files ... NOTE
 Non-standard file/directory found at top level:
+<<<<<<< Updated upstream
   ‘README.html’
+=======
+  'README.html'
+>>>>>>> Stashed changes
 * checking for left-over files ... OK
 * checking index information ... OK
 * checking package subdirectories ... OK
@@ -33,8 +51,12 @@ Non-standard file/directory found at top level:
 * checking whether the namespace can be loaded with stated dependencies ... OK
 * checking whether the namespace can be unloaded cleanly ... OK
 * checking loading without being on the library search path ... OK
+<<<<<<< Updated upstream
 * checking dependencies in R code ... WARNING
 '::' or ':::' import not declared from: ‘mlr3’
+=======
+* checking dependencies in R code ... OK
+>>>>>>> Stashed changes
 * checking S3 generic/method consistency ... OK
 * checking replacement functions ... OK
 * checking foreign function calls ... OK
@@ -47,9 +69,17 @@ Non-standard file/directory found at top level:
 * checking for code/documentation mismatches ... OK
 * checking Rd \usage sections ... OK
 * checking Rd contents ... OK
+<<<<<<< Updated upstream
 * checking for unstated dependencies in examples ... OK
 * checking examples ... ERROR
 Running examples in ‘eumap-Ex.R’ failed
+=======
+* checking for unstated dependencies in examples ... WARNING
+'library' or 'require' calls not declared from:
+  'checkmate' 'future' 'scales' 'sp'
+* checking examples ... ERROR
+Running examples in 'eumap-Ex.R' failed
+>>>>>>> Stashed changes
 The error most likely occurred in:
 
 > base::assign(".ptime", proc.time(), pos = "CheckExEnv")
@@ -60,6 +90,7 @@ The error most likely occurred in:
 > 
 > ### ** Examples
 > 
+<<<<<<< Updated upstream
 > ## Meuse Demo
 > library(sp)
 > library(mlr3verse)
@@ -93,6 +124,35 @@ Warning in showSRID(uprojargs, format = "PROJ", multiline = "NO", prefer_proj = 
 Error in self$assert(xs) : 
   Assertion on 'xs' failed: folds: Must be of type 'single integerish value', not 'NULL'.
 Calls: <Anonymous> ... <Anonymous> -> .__ParamSet__assert -> makeAssertion -> mstop
+=======
+> library(sp)
+> library(mlr3verse)
+Warning: package 'mlr3verse' was built under R version 4.0.3
+Loading required package: mlr3
+Warning: package 'mlr3' was built under R version 4.0.3
+Loading required package: mlr3filters
+Warning: package 'mlr3filters' was built under R version 4.0.3
+Loading required package: mlr3learners
+Warning: package 'mlr3learners' was built under R version 4.0.3
+Loading required package: mlr3pipelines
+Warning: package 'mlr3pipelines' was built under R version 4.0.3
+Loading required package: mlr3tuning
+Warning: package 'mlr3tuning' was built under R version 4.0.3
+Loading required package: mlr3viz
+Warning: package 'mlr3viz' was built under R version 4.0.3
+Warning: replacing previous import 'vctrs::data_frame' by 'tibble::data_frame' when loading 'dplyr'
+Loading required package: paradox
+Warning: package 'paradox' was built under R version 4.0.3
+> library(mlr3spatiotempcv)
+> library(checkmate)
+> library(future)
+Warning: package 'future' was built under R version 4.0.3
+> library(scales)
+Warning: package 'scales' was built under R version 4.0.3
+> library(eumap)
+> df <- as.data.frame(meuse)
+Error in as.data.frame(meuse) : object 'meuse' not found
+>>>>>>> Stashed changes
 Execution halted
 * checking for non-standard things in the check directory ... OK
 * checking for detritus in the temp directory ... OK
