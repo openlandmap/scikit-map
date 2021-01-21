@@ -61,7 +61,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     predict_type <- "response"
   }
   id = deparse(substitute(df.tr))
-  cv = mlr3::rsmp("repeated_cv", folds = folds)
+  cv = rsmp("repeated_cv", folds = folds)
   task_type = c("classification Task", "Regression Task")
   ml_method = c("kknn", "featureless")
   meta_learner = "ranger"

@@ -51,10 +51,8 @@ List of objects of class \code{mlr3},
 This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
 }
 \examples{
-<<<<<<< Updated upstream
+\dontrun{
 ## Meuse Demo
-=======
->>>>>>> Stashed changes
 library(sp)
 library(mlr3verse)
 library(mlr3spatiotempcv)
@@ -89,10 +87,7 @@ proj4string(df.ts) <- CRS("+init=epsg:28992")
 gridded(df.ts) = TRUE
 plot(df.ts[,"leadp"])
 points(meuse, pch="+")
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
+}
 }
 \author{
 \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
