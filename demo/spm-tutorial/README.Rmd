@@ -121,8 +121,7 @@ if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstu
 For demonstration we are using daily rainfall dataset from Switzerland used in the Spatial Interpolation Comparison 1997. For more information about the data set please see [HERE](https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html).
 
 ```{r ,results='hide', warning=FALSE}
-library("landmap")  
-data(sic1997)
+sic1997.df = load('C:/Users/mohammad-reza/Downloads/sic1997.rda')
 sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
                    as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
 df.tr <- na.omit(sic1997.df)
@@ -177,8 +176,13 @@ library("scales")
 
 `train_spm` fits multiple models/learners (depending on the *class* of the **target.variable**) and automatically tune all the underlying hyperparameters using `AutoTuner` powered by [mlr3](https://mlr3book.mlr-org.com/pipe-nonlinear.html) and returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
+<<<<<<< Updated upstream
 ```{r, results='hide', warning=FALSE}
 tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
+=======
+```{r ,results='hide', warning=FALSE}
+tr = train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
+>>>>>>> Stashed changes
 ```
 
 `train_spm` results:
@@ -217,7 +221,7 @@ vlp = tr[[5]]
 Prediction on `newdata` data set (in this case df.tr).
 
 ```{r}
-predict.variable = eumap::predict_spm(train_model, df.tr)
+predict.variable = predict_spm(train_model, df.tr)
 ```
 
 Predicted values for the *newdata* set (in this case df.tr):
@@ -255,8 +259,7 @@ When there is limited number of observation (x < 500) `plot_spm` automatically g
 ### spatial prediction on *rainfall*
 
 ```{r , echo=FALSE, warning=FALSE}
-library("landmap")  
-data(sic1997)
+sic1997.df = load('C:/Users/mohammad-reza/Downloads/sic1997.rda')
 sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
 as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
 df.tr <- na.omit(sic1997.df)
