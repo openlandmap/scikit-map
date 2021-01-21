@@ -7,7 +7,9 @@
 #' @export 
 #' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' @examples 
+#' \dontrun{
 #' predict.variable = eumap::predict_spm(object, newdata)
+#' } 
 
 predict_spm = function(object, newdata){
         predict.variable = object(newdata)

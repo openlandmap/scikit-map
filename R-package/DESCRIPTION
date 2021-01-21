@@ -24,7 +24,7 @@ Imports:
     caret,
     ggplot2,
     mlr3verse
-Suggests: rgdal, parallel, terra, raster, xgboost, matrixStats
+Suggests: rgdal, progress, checkmate, future, scales, sp, parallel, terra, raster, xgboost, matrixStats
 RoxygenNote: 7.1.1
 SystemRequirements: C++11, GDAL (>= 2.0.1), GEOS (>= 3.4.0),
     PROJ (>= 4.8.0)

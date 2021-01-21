@@ -18,7 +18,9 @@ Predicted variables, variable importance
 Prediction on a new dataset
 }
 \examples{
+\dontrun{
 predict.variable = eumap::predict_spm(object, newdata)
+} 
 }
 \author{
 \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}

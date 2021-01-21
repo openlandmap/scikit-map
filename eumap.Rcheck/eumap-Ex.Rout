@@ -103,6 +103,106 @@ version: 0.0.4
 > 
 > ### ** Examples
 > 
-> predict.variable = eumap::predict_spm(object, newdata)
-Error in eumap::predict_spm(object, newdata) : object 'object' not found
+> ## Not run: 
+> ##D predict.variable = eumap::predict_spm(object, newdata)
+> ## End(Not run) 
+> 
+> 
+> 
+> base::assign(".dptime", (proc.time() - get(".ptime", pos = "CheckExEnv")), pos = "CheckExEnv")
+> base::cat("predict_spm", base::get(".format_ptime", pos = 'CheckExEnv')(get(".dptime", pos = "CheckExEnv")), "\n", file=base::get(".ExTimings", pos = 'CheckExEnv'), append=TRUE, sep="\t")
+> cleanEx()
+> nameEx("strip_dates")
+> ### * strip_dates
+> 
+> flush(stderr()); flush(stdout())
+> 
+> base::assign(".ptime", proc.time(), pos = "CheckExEnv")
+> ### Name: strip_dates
+> ### Title: Strip dates from tifs
+> ### Aliases: strip_dates
+> 
+> ### ** Examples
+> 
+> ## Not run: 
+> ##D tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
+> ##D strip_dates(tif.name, type="begin")
+> ##D strip_dates(tif.name, type="end")
+> ## End(Not run)
+> 
+> 
+> 
+> base::assign(".dptime", (proc.time() - get(".ptime", pos = "CheckExEnv")), pos = "CheckExEnv")
+> base::cat("strip_dates", base::get(".format_ptime", pos = 'CheckExEnv')(get(".dptime", pos = "CheckExEnv")), "\n", file=base::get(".ExTimings", pos = 'CheckExEnv'), append=TRUE, sep="\t")
+> cleanEx()
+> nameEx("strip_years")
+> ### * strip_years
+> 
+> flush(stderr()); flush(stdout())
+> 
+> base::assign(".ptime", proc.time(), pos = "CheckExEnv")
+> ### Name: strip_years
+> ### Title: Strip dates from tifs
+> ### Aliases: strip_years
+> 
+> ### ** Examples
+> 
+> ## Not run: 
+> ##D tif.name = "R-sample-tiles/9529/2000/landsat_ard_fall_blue_p50.tif"
+> ##D strip_years(tif.name, type="begin")
+> ##D strip_years(tif.name, type="end")
+> ## End(Not run)
+> 
+> 
+> 
+> 
+> base::assign(".dptime", (proc.time() - get(".ptime", pos = "CheckExEnv")), pos = "CheckExEnv")
+> base::cat("strip_years", base::get(".format_ptime", pos = 'CheckExEnv')(get(".dptime", pos = "CheckExEnv")), "\n", file=base::get(".ExTimings", pos = 'CheckExEnv'), append=TRUE, sep="\t")
+> cleanEx()
+> nameEx("train_spm")
+> ### * train_spm
+> 
+> flush(stderr()); flush(stdout())
+> 
+> base::assign(".ptime", proc.time(), pos = "CheckExEnv")
+> ### Name: train_spm
+> ### Title: Train a spatial prediction model, from a (spatial) matrix, using
+> ###   ensemble machine learning,
+> ### Aliases: train_spm
+> 
+> ### ** Examples
+> 
+> ## Meuse Demo
+> library(sp)
+> library(mlr3verse)
+Loading required package: mlr3
+Loading required package: mlr3filters
+Loading required package: mlr3learners
+Loading required package: mlr3pipelines
+Loading required package: mlr3tuning
+Loading required package: mlr3viz
+Loading required package: paradox
+> library(mlr3spatiotempcv)
+> library(checkmate)
+> library(future)
+> library(progress)
+> library(scales)
+> library(eumap)
+> demo(meuse, echo=FALSE)
+Warning in showSRID(uprojargs, format = "PROJ", multiline = "NO", prefer_proj = prefer_proj) :
+  Discarded datum Amersfoort in CRS definition
+> df <- as.data.frame(meuse)
+> df.grid <- as.data.frame(meuse.grid)
+> df = na.omit(df[,])
+> df.grid = na.omit(df.grid[,])
+> smp_size <- floor(0.8 * nrow(df))
+> set.seed(123)
+> train_ind <- sample(seq_len(nrow(df)), size = smp_size)
+> df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
+> df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
+> newdata <-df.ts
+> tr = eumap::train_spm(df.tr, target.variable = "lead",crs )
+Error in self$assert(xs) : 
+  Assertion on 'xs' failed: folds: Must be of type 'single integerish value', not 'NULL'.
+Calls: <Anonymous> ... <Anonymous> -> .__ParamSet__assert -> makeAssertion -> mstop
 Execution halted

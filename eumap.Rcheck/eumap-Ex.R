@@ -83,7 +83,9 @@ base::assign(".ptime", proc.time(), pos = "CheckExEnv")
 
 ### ** Examples
 
-predict.variable = eumap::predict_spm(object, newdata)
+## Not run: 
+##D predict.variable = eumap::predict_spm(object, newdata)
+## End(Not run) 
 
 
 
