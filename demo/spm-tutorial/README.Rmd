@@ -1,5 +1,5 @@
 ---
-title: " demo: eumap R package functionalities"
+title: "Tutorial: Automated Spatial Modeling and Prediction using mlr3 and eumap"
 author: "Mohammadreza Sheykhmousa (mohammadreza.sheykhmousa@OpenGeoHub.org) and Tom Hengl (tom.hengl@OpenGeoHub.org)"
 date: "Last compiled on: `r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -15,9 +15,21 @@ header-includes:
 - \usepackage{caption}
 ---
 
+[<img src="tex/opengeohub_logo_ml.png" alt="OpenGeoHub logo" width="250"/>](https://opendatascience.eu/)
+
+[<img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/88x31.png" />](http://creativecommons.org/licenses/by-sa/4.0/)
+
+This work is licensed under a [Creative Commons Attribution-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-sa/4.0/).
+
 [1.1]: http://i.imgur.com/tXSoThF.png (twitter icon with padding)
 [1]: https://twitter.com/sheykhmousa
 Follow me on [![alt text][1.1]][1]
+
+Part of: [eumap package](https://gitlab.com/geoharmonizer_inea/eumap/)  
+Project: [Geo-harmonizer](https://opendatascience.eu)  
+Last update:  `r Sys.Date()`  
+
+## Installing eumap
 
 ```{r setup, include=FALSE}
 library(knitr)
@@ -26,10 +38,9 @@ knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 
 To install the most up-to-date version of eumap please use:
 
-```{r, warning=FALSE}
-# library(remotes)
-# remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
-
+```{r, eval=FALSE, warning=FALSE}
+library(remotes)
+remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 ```
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -56,6 +67,7 @@ knit_hooks$set(output = function(x, options) {
 ```
 
 ## Introduction
+
 `eumap` package aims at providing easier access to EU environmental maps.
 Basic functions train a spatial prediction model using [mlr3 package](https://mlr3.mlr-org.com/), [@mlr3], and related extensions in the [mlr3 ecosystem](https://github.com/mlr-org/mlr3/wiki/Extension-Packages) [@casalicchio2017openml; @MichelLang2020mlr3book], 
 which includes spatial prediction using [Ensemble Machine Learning](https://koalaverse.github.io/machine-learning-in-R/stacking.html#stacking-software-in-r), taking spatial coordinates and spatial cross-validation into account. 
@@ -140,6 +152,7 @@ where *noise1* and *noise2* are pure noises. Note that we shouldn't use non-nume
 
 
 ## Loading required libraries:
+
 ```{r, message=FALSE, warning=FALSE}
 library("mlr3verse")
 library("mlr3spatiotempcv")
@@ -164,7 +177,7 @@ library("scales")
 
 `train_spm` fits multiple models/learners (depending on the *class* of the **target.variable**) and automatically tune all the underlying hyperparameters using `AutoTuner` powered by [mlr3](https://mlr3book.mlr-org.com/pipe-nonlinear.html) and returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
-```{r ,results='hide', warning=FALSE}
+```{r, results='hide', warning=FALSE}
 tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
 ```
 

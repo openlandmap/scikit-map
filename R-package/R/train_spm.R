@@ -18,7 +18,6 @@
 #' @export 
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @examples
-#' \dontrun{ 
 #' ## Meuse Demo
 #' library(sp)
 #' library(mlr3verse)
@@ -58,7 +57,6 @@
 #' #make a spatial prediction map 
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
-#' }
 train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = NULL, n_evals = NULL, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
   target = target.variable
   if ( is.null(predict_type)) {
