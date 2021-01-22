@@ -1,5 +1,5 @@
 ---
-title: "Tutorial: Automated Spatial Modeling and Prediction using mlr3 and eumap"
+title: 'Tutorial on Automated Spatial Modeling, Prediction, and visualizations.'
 author: "Mohammadreza Sheykhmousa (mohammadreza.sheykhmousa@OpenGeoHub.org) and Tom Hengl (tom.hengl@OpenGeoHub.org)"
 date: "Last compiled on: `r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -15,6 +15,7 @@ header-includes:
 - \usepackage{caption}
 ---
 
+
 [<img src="tex/opengeohub_logo_ml.png" alt="OpenGeoHub logo" width="250"/>](https://opendatascience.eu/)
 
 [<img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/88x31.png" />](http://creativecommons.org/licenses/by-sa/4.0/)
@@ -29,6 +30,8 @@ Part of: [eumap package](https://gitlab.com/geoharmonizer_inea/eumap/)
 Project: [Geo-harmonizer](https://opendatascience.eu)  
 Last update:  `r Sys.Date()`  
 
+## eumap package for R
+
 ## Installing eumap
 
 ```{r setup, include=FALSE}
@@ -39,7 +42,7 @@ knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 To install the most up-to-date version of eumap please use:
 
 ```{r, eval=FALSE, warning=FALSE}
-library(remotes)
+
 remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 ```
 
@@ -52,7 +55,7 @@ knit_hooks$set(output = function(x, options) {
    }
    x <- unlist(strsplit(x, "\n"))
    more <- "..."
-   if (length(lines)==1) {        # first n lines
+   if (length(lines) == 1) {        # first n lines
      if (length(x) > lines) {
        # truncate the output, but add ....
        x <- c(head(x, lines), more)
@@ -65,6 +68,7 @@ knit_hooks$set(output = function(x, options) {
    hook_output(x, options)
  })
 ```
+
 
 ## Introduction
 
@@ -107,13 +111,46 @@ The following examples demonstrates spatial prediction using the `sic97` data se
 
 ## Required packages
 
-```{r, results='hide',warning=FALSE}
+```{r, results='hide', warning=FALSE, message=FALSE}
 
-ls <- c("lattice", "raster", "landmap", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
-    "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv",  "tidyr", "lubridate", "R.utils", "terra","rgdal",'MLmetrics',
-    "FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools", "gridExtra", "yardstick", "latticeExtra", "devtools", "progressr")
+ls <- c(
+   "lattice", "mlr3verse", "BBmisc", "devtools", 
+   "hexbin", "sp", "mlr3spatiotempcv", 'MLmetrics',
+   "FSelectorRcpp", "future", "future.apply", "grid",
+   "gridExtra", "yardstick", "latticeExtra"
+   )
 new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
+
+if (length(new.packages)) install.packages(new.packages, repos = "https://cran.rstudio.com", force = TRUE)
+
+# core libraries###
+library(mlr3verse)
+library(mlr3tuning)
+library(mlr3spatiotempcv)
+library(future)
+library(checkmate)
+
+# graphical libraries###
+library(likert)
+library(cvms)
+library(broom)    
+library(tibble)   
+library(ggimage)   
+library(rsvg)   
+library(grid)
+library(hexbin)
+library(BBmisc)
+library(lattice)
+library(gridExtra)
+library(latticeExtra)
+
+# mathematical and geospatial libraries###
+library(sp)
+library(caret)
+library(MLmetrics)
+library(yardstick)
+library(ppcor)
+library(scales)
 ```
 
 ## sic1997: The SIC 1997 Data Set
@@ -121,7 +158,10 @@ if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstu
 For demonstration we are using daily rainfall dataset from Switzerland used in the Spatial Interpolation Comparison 1997. For more information about the data set please see [HERE](https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html).
 
 ```{r ,results='hide', warning=FALSE}
-sic1997.df = load('C:/Users/mohammad-reza/Downloads/sic1997.rda')
+library(devtools)
+install_github("envirometrix/landmap")
+library(landmap)
+data("sic1997")
 sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
                    as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
 df.tr <- na.omit(sic1997.df)
@@ -139,7 +179,7 @@ df.tr$test3 <- sin(df.tr$DEM)**31
 df.tr$test4 <- (df.tr$DEM)**-5.13
 df.tr$test5 <- (df.tr$DEM/2**4)**6
 df.tr$test6 <- (df.tr$CHELSA_rainfall)**-1
-df.tr$test7 <-((df.tr$CHELSA_rainfall)*13/34)
+df.tr$test7 <- ((df.tr$CHELSA_rainfall)*13/34)
 df.tr$noise1 <- runif(1:nrow(df.tr))/0.54545
 df.tr$noise2 <- sqrt(runif(1:nrow(df.tr)))
 df.tr$border <- NULL
@@ -166,7 +206,6 @@ library("yardstick")
 library("latticeExtra")
 library("eumap")
 library("ppcor")
-library("progressr")
 library("checkmate")
 library("future")
 library("scales")
@@ -176,18 +215,9 @@ library("scales")
 
 `train_spm` fits multiple models/learners (depending on the *class* of the **target.variable**) and automatically tune all the underlying hyperparameters using `AutoTuner` powered by [mlr3](https://mlr3book.mlr-org.com/pipe-nonlinear.html) and returns a `trained model`, **var.imp**, **summary** of the model, and **response** variables. `trained model` later can predict a `newdata` set. 
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 ```{r, results='hide', warning=FALSE}
 tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
-=======
-```{r ,results='hide', warning=FALSE}
-tr = train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
->>>>>>> Stashed changes
-=======
-```{r ,results='hide', warning=FALSE}
-tr = train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
->>>>>>> Stashed changes
+
 ```
 
 `train_spm` results:
@@ -256,6 +286,7 @@ In case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
 plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy", gmode  = "norm" )
+plt
 ```
 
 When there is limited number of observation (x < 500) `plot_spm` automatically generates a density plot and ignores all the other graphical arguments.   
@@ -264,7 +295,7 @@ When there is limited number of observation (x < 500) `plot_spm` automatically g
 ### spatial prediction on *rainfall*
 
 ```{r , echo=FALSE, warning=FALSE}
-sic1997.df = load('C:/Users/mohammad-reza/Downloads/sic1997.rda')
+data("sic1997")
 sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
 as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
 df.tr <- na.omit(sic1997.df)
@@ -272,8 +303,8 @@ colnames(df.tr)[2:3] <- c('x','y')
 df.tr$rainP = pred.v[[1]]
 coordinates(df.tr) <- ~x+y
 proj4string(df.tr) <- CRS("+init=epsg:28992")
-
-
+# gridded(df.tr) 
+# plot(df.tr[,"rainP"])
 ```
 
 ```{r}

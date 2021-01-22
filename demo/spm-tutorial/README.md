@@ -1,5 +1,6 @@
 
-
+# Tutorial on Automated Spatial Modeling, Prediction, and visualizations.
+-   [Installing eumap](#installing-eumap)
 -   [Introduction](#introduction)
 -   [`train_spm`](#train_spm)
 -   [`predict_spm`](#predict_spm)
@@ -14,13 +15,28 @@
         *rainfall*](#spatial-prediction-on-rainfall)
 -   [References](#references)
 
+[<img src="tex/opengeohub_logo_ml.png" alt="OpenGeoHub logo" width="250"/>](https://opendatascience.eu/)
+
+[<img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/88x31.png" />](http://creativecommons.org/licenses/by-sa/4.0/)
+
+This work is licensed under a [Creative Commons Attribution-ShareAlike
+4.0 International
+License](http://creativecommons.org/licenses/by-sa/4.0/).
+
 Follow me on [![alt
 text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitter.com/sheykhmousa)
 
+Part of: [eumap package](https://gitlab.com/geoharmonizer_inea/eumap/)  
+Project: [Geo-harmonizer](https://opendatascience.eu)  
+Last update: 2021-01-22  
+\#\# eumap package for R
+
+Installing eumap
+----------------
+
 To install the most up-to-date version of eumap please use:
 
-    # library(remotes)
-    # remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
+    remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 
 Introduction
 ------------
@@ -85,14 +101,44 @@ data set:
 Required packages
 -----------------
 
-    ls <- c("lattice", "raster", "landmap", "plotKML", "ranger", "mlr3verse", "BBmisc", "knitr", "bbotk",
-        "hexbin", "stringr", "magrittr", "sp", "ggplot2", "mlr3fselect", "mlr3spatiotempcv",  "tidyr", "lubridate", "R.utils", "terra","rgdal",'MLmetrics',
-        "FSelectorRcpp", "future", "future.apply", "mlr3filters", "EnvStats", "grid", "mltools", "gridExtra", "yardstick", "latticeExtra", "devtools", "progressr")
+    ls <- c(
+       "lattice", "mlr3verse", "BBmisc", "devtools", 
+       "hexbin", "sp", "mlr3spatiotempcv", 'MLmetrics',
+       "FSelectorRcpp", "future", "future.apply", "grid",
+       "gridExtra", "yardstick", "latticeExtra"
+       )
     new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
-    if(length(new.packages)) install.packages(new.packages, repos="https://cran.rstudio.com", force=TRUE)
 
-    Installing package into 'C:/Users/mohammad-reza/Documents/R/win-library/4.0'
-    (as 'lib' is unspecified)
+    if (length(new.packages)) install.packages(new.packages, repos = "https://cran.rstudio.com", force = TRUE)
+
+    # core libraries###
+    library(mlr3verse)
+    library(mlr3tuning)
+    library(mlr3spatiotempcv)
+    library(future)
+    library(checkmate)
+
+    # graphical libraries###
+    library(likert)
+    library(cvms)
+    library(broom)    
+    library(tibble)   
+    library(ggimage)   
+    library(rsvg)   
+    library(grid)
+    library(hexbin)
+    library(BBmisc)
+    library(lattice)
+    library(gridExtra)
+    library(latticeExtra)
+
+    # mathematical and geospatial libraries###
+    library(sp)
+    library(caret)
+    library(MLmetrics)
+    library(yardstick)
+    library(ppcor)
+    library(scales)
 
 sic1997: The SIC 1997 Data Set
 ------------------------------
@@ -102,12 +148,22 @@ used in the Spatial Interpolation Comparison 1997. For more information
 about the data set please see
 [HERE](https://rdrr.io/github/Envirometrix/landmap/man/sic1997.html).
 
-    sic1997.df = load('C:/Users/mohammad-reza/Downloads/sic1997.rda')
+    library(devtools)
+
+    Loading required package: usethis
+
+    install_github("envirometrix/landmap")
+
+    Skipping install of 'landmap' from a github remote, the SHA1 (30e85f9e) has not changed since last install.
+      Use `force = TRUE` to force installation
+
+    library(landmap)
+
+    version: 0.0.7
+
+    data("sic1997")
     sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
                        as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
-
-    Loading required package: sp
-
     df.tr <- na.omit(sic1997.df)
 
 Note that here we use whole the data to test and train the model, as the
@@ -128,7 +184,7 @@ importance plots:
     df.tr$test4 <- (df.tr$DEM)**-5.13
     df.tr$test5 <- (df.tr$DEM/2**4)**6
     df.tr$test6 <- (df.tr$CHELSA_rainfall)**-1
-    df.tr$test7 <-((df.tr$CHELSA_rainfall)*13/34)
+    df.tr$test7 <- ((df.tr$CHELSA_rainfall)*13/34)
     df.tr$noise1 <- runif(1:nrow(df.tr))/0.54545
     df.tr$noise2 <- sqrt(runif(1:nrow(df.tr)))
     df.tr$border <- NULL
@@ -155,7 +211,6 @@ Loading required libraries:
     library("latticeExtra")
     library("eumap")
     library("ppcor")
-    library("progressr")
     library("checkmate")
     library("future")
     library("scales")
@@ -170,9 +225,9 @@ hyperparameters using `AutoTuner` powered by
 `trained model`, **var.imp**, **summary** of the model, and **response**
 variables. `trained model` later can predict a `newdata` set.
 
-    tr = train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
+    tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
 
-    Fitting an ensemble ML using kknn featureless, and ranger models ncores: 8TRUE
+    Fitting an ensemble ML using kknn featureless, and ranger models ncores: 8 TRUE
 
     Regression Task...TRUE
 
@@ -197,18 +252,18 @@ in which sample fraction for different batches varies from 50% to 70%.
     Ranger result
 
     Call:
-     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 2L, sample.fraction = 0.710690766456537, num.trees = 322L) 
+     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 3L, sample.fraction = 0.550582022522576, num.trees = 317L) 
 
     Type:                             Regression 
-    Number of trees:                  322 
+    Number of trees:                  317 
     Sample size:                      456 
     Number of independent variables:  11 
-    Mtry:                             2 
+    Mtry:                             3 
     Target node size:                 5 
     Variable importance mode:         impurity 
     Splitrule:                        variance 
-    OOB prediction error (MSE):       11094 
-    R squared (OOB):                  0.127334 
+    OOB prediction error (MSE):       10822.97 
+    R squared (OOB):                  0.1486538 
 
 4th element is the predicted values of our trained model note: here we
 just show start and the ending values
@@ -231,7 +286,7 @@ Note: here we just show start and the ending values.
 
     ...
     [[1]]
-      [1] 183.40492 171.83318 162.02588 154.53131 144.42422 159.29674 178.35088
+      [1] 198.24169 167.11851 156.27150 166.95494 148.54963 149.53954 178.11220
     ...
 
 `plot_spm`
@@ -264,6 +319,13 @@ In case of regression task,
     plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy", gmode  = "norm" )
 
     Because of the LOW number of observations a density plot is displayed.
+
+    plt
+
+<img src="README_files/figure-markdown_strict/unnamed-chunk-17-1.png" alt="Accuracy plot"  />
+<p class="caption">
+Accuracy plot
+</p>
 
 When there is limited number of observation (x &lt; 500) `plot_spm`
 automatically generates a density plot and ignores all the other
