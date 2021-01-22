@@ -109,6 +109,7 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
       tr.model = at$learner
       train_model = tr.model$predict_newdata
       response = tr.model$model$predictions
+      rm(ps_ranger)
   }
   ## regr CV ----
   else if (is.numeric(df.tr[, target.variable]) & is.null(crs)) {
@@ -150,6 +151,7 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
     vlp = names(var.imp[1:(round(length(var.imp)*0.1) + 1)])
     train_model = tr.model$predict_newdata
     response = tr.model$model$predictions
+    rm(ps_ranger)
   }
   ## classif spcv ----
   else if (is.factor(df.tr[,target.variable]) & crs == crs) { 
