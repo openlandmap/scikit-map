@@ -55,39 +55,38 @@
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
 #' }
-train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NULL, folds = NULL, n_evals = NULL, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
-  target = target.variable
+train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_type = NULL, folds = NULL, n_evals = NULL, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
   if ( is.null(predict_type)) {
     predict_type <- "response"
   }
   id = deparse(substitute(df.tr))
-  cv = rsmp("repeated_cv", folds = folds)
   task_type = c("classification Task", "Regression Task")
   ml_method = c("kknn", "featureless")
   meta_learner = "ranger"
   resample_method = c("Using resampling method: (non-spatial) repeated_cv...", "Using resampling method: (spatial)repeated_cv by cooridinates...")
   number_cores = paste0(" ncores: ", availableCores())
-  message(paste0("Fitting an ensemble ML using ", ml_method[1], " ", ml_method[2], ", and ", meta_learner," models", number_cores), immediate. = TRUE)
+  message(paste0("Fitting an ensemble ML using ", ml_method[1], " ", ml_method[2], ", and ", meta_learner," models", number_cores,' '), immediate. = TRUE)
   
   ## start running ensemble
   
   ##  classif CV ----
-  if (is.factor(df.tr[,target]) & is.null(crs)) {
+  if (is.factor(df.tr[, target.variable]) & is.null(crs)) {
     
     message(paste0(task_type[1],"..."), immediate. = TRUE)
     
     tsk_clf <- TaskClassif$new(
-    id = id, backend = df.tr, target = target.variable
+    id = id, backend = df.tr, target.variable 
     )
     
     ranger_lrn = lrn("classif.ranger", predict_type = "response", importance = "permutation")
     ps_ranger = 
       ParamSet$new(
-      list(ParamInt$new("mtry", lower = 1L, upper = 5L),
+      list(ParamInt$new("mtry", lower = 1L, upper = as.double(round(ncol(df.tr)/2))),
       ParamDbl$new("sample.fraction", lower = 0.5, upper = 1),
       ParamInt$new("num.trees", lower = 50L, upper = 500L),
       ParamFct$new("importance", "permutation"))
       )
+    cv = rsmp("repeated_cv", folds = folds)
     at = AutoTuner$new(
       learner = ranger_lrn,
       resampling = cv,
@@ -112,22 +111,23 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
       response = tr.model$model$predictions
   }
   ## regr CV ----
-  else if (is.numeric(df.tr[,target.variable]) & is.null(crs)) {
+  else if (is.numeric(df.tr[, target.variable]) & is.null(crs)) {
       
     message( 
     paste0(task_type[2],"...", immediate. = TRUE)
     )   
     
-    tsk_regr <- TaskRegr$new(id = id, backend = df.tr, target = target.variable)
+    tsk_regr <- TaskRegr$new(id = id, backend = df.tr, target.variable )
     ranger_lrn = lrn("regr.ranger", predict_type = "response",importance = "permutation")
     ps_ranger = ParamSet$new(
       list(
-        ParamInt$new("mtry", lower = 1L, upper = 5L),
+        ParamInt$new("mtry", lower = 1L, upper = as.double(round(ncol(df.tr)/2))),
         ParamDbl$new("sample.fraction", lower = 0.5, upper = 1),
         ParamInt$new("num.trees", lower = 50L, upper = 500L),
         ParamFct$new("importance", "impurity")
         )
       )
+    cv = rsmp("repeated_cv", folds = folds)
     at = AutoTuner$new(
       learner = ranger_lrn,
       resampling = cv,
@@ -164,7 +164,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     # task$set_col_role('tile_id', 'group') later for whole eu should be used
     # task$set_col_role('confidence', 'weight')
     df.trf = as_data_backend(df.tr)
-    tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target = target.variable,
+    tsk_clf = TaskClassifST$new(id = id, backend = df.trf, target.variable ,
     extra_args = list( positive = "TRUE", coordinate_names = coordinate_names,
     coords_as_features = FALSE, crs = crs))
     
@@ -213,7 +213,7 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     df.trf = as_data_backend(df.tr)
     
     tsk_regr = TaskRegrST$new(
-    id = id, backend = df.trf, target = target.variable,
+    id = id, backend = df.trf, target.variable ,
     extra_args = list(
       positive = "TRUE", coordinate_names = coordinate_names,
       coords_as_features = FALSE, crs = crs
@@ -253,5 +253,5 @@ train_spm = function(df.tr, target.variable, parallel = TRUE, predict_type = NUL
     train_model = tr.model$predict_newdata
     response = tr.model$model$predictions
     }
-  return(list(train_model, var.imp, summary, response, vlp, target))
+  return(list(train_model, var.imp, summary, response, vlp))
   }
