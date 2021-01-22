@@ -6,7 +6,7 @@
 \usage{
 train_spm(
   df.tr,
-  target.variable,
+  target.variable = NULL,
   parallel = TRUE,
   predict_type = NULL,
   folds = NULL,
@@ -51,7 +51,6 @@ List of objects of class \code{mlr3},
 This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
 }
 \examples{
-\dontrun{
 ## Meuse Demo
 library(sp)
 library(mlr3verse)
@@ -60,6 +59,8 @@ library(checkmate)
 library(future)
 library(scales)
 library(eumap)
+data(meuse)
+data(meuse.grid)
 df <- as.data.frame(meuse)
 df.grid <- as.data.frame(meuse.grid)
 df = na.omit(df[,])
@@ -76,7 +77,6 @@ Vim = tr[[2]]
 summary = tr[[3]]
 response = tr[[4]]
 vlp = tr[[5]]
-target = tr[[6]]
 predict.variable = predict_spm(train_model, newdata)
 pred.v = predict.variable[[1]]
 valu.imp= predict.variable[[2]]
@@ -87,7 +87,7 @@ proj4string(df.ts) <- CRS("+init=epsg:28992")
 gridded(df.ts) = TRUE
 plot(df.ts[,"leadp"])
 points(meuse, pch="+")
-}
+
 }
 \author{
 \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}

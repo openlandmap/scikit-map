@@ -18,7 +18,6 @@
 #' @export 
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @examples
-#' \dontrun{
 #' ## Meuse Demo
 #' library(sp)
 #' library(mlr3verse)
@@ -27,6 +26,8 @@
 #' library(future)
 #' library(scales)
 #' library(eumap)
+#' data(meuse)
+#' data(meuse.grid)
 #' df <- as.data.frame(meuse)
 #' df.grid <- as.data.frame(meuse.grid)
 #' df = na.omit(df[,])
@@ -43,7 +44,6 @@
 #' summary = tr[[3]]
 #' response = tr[[4]]
 #' vlp = tr[[5]]
-#' target = tr[[6]]
 #' predict.variable = predict_spm(train_model, newdata)
 #' pred.v = predict.variable[[1]]
 #' valu.imp= predict.variable[[2]]
@@ -54,7 +54,7 @@
 #' gridded(df.ts) = TRUE
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
-#' }
+#' 
 train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_type = NULL, folds = NULL, n_evals = NULL, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
   if ( is.null(predict_type)) {
     predict_type <- "response"
