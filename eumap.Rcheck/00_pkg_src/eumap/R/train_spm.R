@@ -74,7 +74,9 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
     
     message(paste0(task_type[1],"..."), immediate. = TRUE)
     
-    tsk_clf <- mlr3::TaskClassif$new(id = id, backend = df.tr, target.variable)
+    tsk_clf <- TaskClassif$new(
+    id = id, backend = df.tr, target.variable 
+    )
     
     ranger_lrn = lrn("classif.ranger", predict_type = "response", importance = "permutation")
     ps_ranger = 

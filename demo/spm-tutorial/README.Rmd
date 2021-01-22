@@ -1,5 +1,5 @@
 ---
-title: 'Tutorial on Automated Spatial Modeling, Prediction, and visualizations.'
+title: "Tutorial on Automated Spatial Modeling, Prediction and Visualizations"
 author: "Mohammadreza Sheykhmousa (mohammadreza.sheykhmousa@OpenGeoHub.org) and Tom Hengl (tom.hengl@OpenGeoHub.org)"
 date: "Last compiled on: `r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -30,7 +30,7 @@ Part of: [eumap package](https://gitlab.com/geoharmonizer_inea/eumap/)
 Project: [Geo-harmonizer](https://opendatascience.eu)  
 Last update:  `r Sys.Date()`  
 
-## eumap package for R
+## Starting eumap package
 
 ## Installing eumap
 
@@ -42,7 +42,6 @@ knitr::opts_chunk$set(echo = TRUE, comment = '', fig.width = 6, fig.height = 6)
 To install the most up-to-date version of eumap please use:
 
 ```{r, eval=FALSE, warning=FALSE}
-
 remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
 ```
 
@@ -168,7 +167,7 @@ sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall),
 df.tr <- na.omit(sic1997.df)
 ```
 
-Note that here we use whole the data to test and train the model, as the dataset is not large enough (i.e., only 456 observations). In the training part, however, there will be internal sampling that will provide the Out Of Bag sampling and OOB rsquare. For mor detailed information on OOB please see [HERE](https://ieeexplore.ieee.org/abstract/document/9206124).
+Note that here we use whole the data to test and train the model, as the dataset is not large enough (i.e., only 456 observations). In the training part, however, there will be internal sampling that will provide the Out Of Bag sampling and OOB R-square [@sheykhmousa2020support].
 
 We can create some synthetic covariates, so we can demonstrate that (a) the learner is noise-proof, and (b) that this is visible in the variable importance plots:
 

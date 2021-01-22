@@ -1,0 +1,6 @@
+extract_tif	extract_tif
+plot_spm	plot_spm
+predict_spm	predict_spm
+strip_dates	strip_dates
+strip_years	strip_years
+train_spm	train_spm
