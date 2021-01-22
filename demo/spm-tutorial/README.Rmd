@@ -124,6 +124,7 @@ new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 if (length(new.packages)) install.packages(new.packages, repos = "https://cran.rstudio.com", force = TRUE)
 
 # core libraries###
+library(eumap)
 library(mlr3verse)
 library(mlr3tuning)
 library(mlr3spatiotempcv)
@@ -189,27 +190,6 @@ df.tr$Y <- NULL
 
 where *noise1* and *noise2* are pure noises. Note that we shouldn't use non-numeric covariates in `train_spm` for regression tasks; in this case *border*. X and Y also removed to avoid bias in training the model.
 
-
-## Loading required libraries:
-
-```{r, message=FALSE, warning=FALSE}
-library("mlr3verse")
-library("mlr3spatiotempcv")
-library("sp")
-library("grid")
-library("hexbin")
-library("BBmisc")
-library("lattice")
-library("gridExtra")
-library("MLmetrics")
-library("yardstick")
-library("latticeExtra")
-library("eumap")
-library("ppcor")
-library("checkmate")
-library("future")
-library("scales")
-```
 
 ## `train_spm`
 

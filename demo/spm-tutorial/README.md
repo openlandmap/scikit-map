@@ -1,5 +1,6 @@
+# eumap package
 
-# Tutorial on Automated Spatial Modeling, Prediction, and visualizations.
+-   [eumap package for R](#eumap-package-for-r)
 -   [Installing eumap](#installing-eumap)
 -   [Introduction](#introduction)
 -   [`train_spm`](#train_spm)
@@ -7,7 +8,6 @@
 -   [`plot_spm`](#plot_spm)
 -   [Required packages](#required-packages)
 -   [sic1997: The SIC 1997 Data Set](#sic1997-the-sic-1997-data-set)
--   [Loading required libraries:](#loading-required-libraries)
 -   [`train_spm`](#train_spm-1)
 -   [`predict_spm`](#predict_spm-1)
 -   [`plot_spm`](#plot_spm-1)
@@ -28,8 +28,10 @@ text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitt
 
 Part of: [eumap package](https://gitlab.com/geoharmonizer_inea/eumap/)  
 Project: [Geo-harmonizer](https://opendatascience.eu)  
-Last update: 2021-01-22  
-\#\# eumap package for R
+Last update: 2021-01-22
+
+eumap package for R
+-------------------
 
 Installing eumap
 ----------------
@@ -112,6 +114,7 @@ Required packages
     if (length(new.packages)) install.packages(new.packages, repos = "https://cran.rstudio.com", force = TRUE)
 
     # core libraries###
+    library(eumap)
     library(mlr3verse)
     library(mlr3tuning)
     library(mlr3spatiotempcv)
@@ -195,26 +198,6 @@ where *noise1* and *noise2* are pure noises. Note that we shouldn’t use
 non-numeric covariates in `train_spm` for regression tasks; in this case
 *border*. X and Y also removed to avoid bias in training the model.
 
-Loading required libraries:
----------------------------
-
-    library("mlr3verse")
-    library("mlr3spatiotempcv")
-    library("sp")
-    library("grid")
-    library("hexbin")
-    library("BBmisc")
-    library("lattice")
-    library("gridExtra")
-    library("MLmetrics")
-    library("yardstick")
-    library("latticeExtra")
-    library("eumap")
-    library("ppcor")
-    library("checkmate")
-    library("future")
-    library("scales")
-
 `train_spm`
 -----------
 
@@ -252,18 +235,18 @@ in which sample fraction for different batches varies from 50% to 70%.
     Ranger result
 
     Call:
-     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 3L, sample.fraction = 0.550582022522576, num.trees = 317L) 
+     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 2L, sample.fraction = 0.587019245140254, num.trees = 188L) 
 
     Type:                             Regression 
-    Number of trees:                  317 
+    Number of trees:                  188 
     Sample size:                      456 
     Number of independent variables:  11 
-    Mtry:                             3 
+    Mtry:                             2 
     Target node size:                 5 
     Variable importance mode:         impurity 
     Splitrule:                        variance 
-    OOB prediction error (MSE):       10822.97 
-    R squared (OOB):                  0.1486538 
+    OOB prediction error (MSE):       11139.53 
+    R squared (OOB):                  0.1237525 
 
 4th element is the predicted values of our trained model note: here we
 just show start and the ending values
@@ -286,7 +269,7 @@ Note: here we just show start and the ending values.
 
     ...
     [[1]]
-      [1] 198.24169 167.11851 156.27150 166.95494 148.54963 149.53954 178.11220
+      [1] 181.90532 175.73901 168.51312 170.49734 154.22207 149.31037 161.65284
     ...
 
 `plot_spm`
@@ -296,7 +279,7 @@ First we demonstrate the variable importance using:
 
     plot_spm( Vim = Vim, gtype = "var.imp") 
 
-![](README_files/figure-markdown_strict/unnamed-chunk-16-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-15-1.png)
 
           [,1]
      [1,]  0.7
@@ -322,7 +305,7 @@ In case of regression task,
 
     plt
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-17-1.png" alt="Accuracy plot"  />
+<img src="README_files/figure-markdown_strict/unnamed-chunk-16-1.png" alt="Accuracy plot"  />
 <p class="caption">
 Accuracy plot
 </p>
@@ -335,7 +318,7 @@ graphical arguments.
 
     plot(df.tr[,"rainP"])
 
-![](README_files/figure-markdown_strict/unnamed-chunk-19-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-18-1.png)
 
 We made a spatial prediction map using ensemble machine learning with
 spatial cross validation for the predicted variable e.g., *rainfall* (in
