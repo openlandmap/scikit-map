@@ -1,4 +1,4 @@
-#' Strip dates from tifs
+#' @title Strip dates from tifs
 #'
 #' @param tif.name Input tif file,
 #' @param year.span Year span begin end,

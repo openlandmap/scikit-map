@@ -43,6 +43,7 @@ To install the most up-to-date version of eumap please use:
 
 ```{r, eval=FALSE, warning=FALSE}
 remotes::install_git("https://gitlab.com/geoharmonizer_inea/eumap.git", subdir = 'R-package')
+
 ```
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -104,7 +105,7 @@ Here two scenarios are possible:
 1. Accuracy plot predicted vs observed in case of regression task,
 2. Confusion matrix predicted vs observed in the case of classification task,
  
-**Warning:** most of functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
+**Warning:** some functions are optimized to run in parallel by default. This might result in high RAM and CPU usage.
 
 The following examples demonstrates spatial prediction using the `sic97` data set:
 
@@ -172,7 +173,7 @@ Note that here we use whole the data to test and train the model, as the dataset
 We can create some synthetic covariates, so we can demonstrate that (a) the learner is noise-proof, and (b) that this is visible in the variable importance plots:
 
 ```{r}
-target.variable = "rainfall"
+target.variable = "Species"
 df.tr$test1 <- log10(df.tr$DEM)*53.656
 df.tr$test2 <- cos(df.tr$DEM)*-0.13
 df.tr$test3 <- sin(df.tr$DEM)**31

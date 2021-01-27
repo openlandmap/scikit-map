@@ -1,4 +1,4 @@
-#' Extract points from a GeoTIFF using spatiotemporal overlay
+#' @title Extract points from a GeoTIFF using spatiotemporal overlay
 #'
 #' @param tif Filename,
 #' @param df Data frame with coordinates and dates,

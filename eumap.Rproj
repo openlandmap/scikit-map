@@ -16,4 +16,5 @@ BuildType: Package
 PackageUseDevtools: Yes
 PackagePath: R-package
 PackageInstallArgs: --no-multiarch --with-keep.source
+PackageCheckArgs: --as-cran
 PackageRoxygenize: vignette

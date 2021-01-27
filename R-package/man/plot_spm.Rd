@@ -20,7 +20,7 @@ plot_spm(
 )
 }
 \arguments{
-\item{x}{Object that contains observational data, if x <= 500 observation, then `plot_spm` generates a density plot, regardless of the other arguments that is passed,}
+\item{x}{Object that contains observational data, if x <= 500 observation, then \code{plot_spm} generates a density plot, regardless of the other arguments that is passed,}
 
 \item{y}{Object that contains predicted data,}
 
@@ -38,19 +38,22 @@ plot_spm(
 
 \item{gtype}{Graphical type; user can choose among: gtype = c("accuracy", "correlation","var.imp")."accuracy" provides accuracy plot for a regression matrix. "correlation" provides partial correlation plot for the regression matrix. "var.imp" provides a graph of top 10 percent of the most informative features,}
 
-\item{gmode}{Graphical mode; in case `gtype = accuracy` gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data. If `gtype = cm`; function for plotting confusion matrix. `plot_spm` returns an annotated heat map inputs are `pred` and `truth`; normally comes as an output of classification models,}
+\item{gmode}{Graphical mode; in case \code{gtype = accuracy} gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data. If \code{gtype = cm}; function for plotting confusion matrix. \code{plot_spm} returns an annotated heat map inputs are \code{pred} and \code{truth}; normally comes as an output of classification models,}
 
 \item{aspect}{Default values is aspect = 1,}
 
 \item{...}{Other arguments that can be passed on to \code{hexbin}.}
 }
 \description{
-Dedicated function to plot diagnostic graphs resulted from `train_spm ` and `predict_spm`,
+Dedicated function to plot diagnostic graphs resulted from \code{train_spm } and \code{predict_spm},
 }
 \examples{
 \dontrun{
 plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 }
+}
+\seealso{
+\code{\link[lattice]{xyplot}} for details.
 }
 \author{
 \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}

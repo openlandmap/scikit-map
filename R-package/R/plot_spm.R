@@ -6,9 +6,9 @@ pfun <- function(x,y, ...){
   return(pfun)
 }
 
-#' Plot Spatial Matrix,
+#' @title Plot Spatial Matrix,
 #' @description Dedicated function to plot diagnostic graphs resulted from `train_spm ` and `predict_spm`,
-#'
+#' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
 #' @param x Object that contains observational data, if x <= 500 observation, then `plot_spm` generates a density plot, regardless of the other arguments that is passed,
 #' @param y Object that contains predicted data,
 #' @param z Object that contains top variable importance values to be used in partial dependency plot,
@@ -21,13 +21,12 @@ pfun <- function(x,y, ...){
 #' @param gmode Graphical mode; in case `gtype = accuracy` gives user five options for representation of the accuracy plot as following: c("root","log10","norm","log2","nat"). "root" shows root square representation of the data,"norm" represent normalized representation of the data, "nat" represent natural  representation of the data. If `gtype = cm`; function for plotting confusion matrix. `plot_spm` returns an annotated heat map inputs are `pred` and `truth`; normally comes as an output of classification models,
 #' @param aspect Default values is aspect = 1,
 #' @param ... Other arguments that can be passed on to \code{hexbin}.
-#' 
-#' @export
-#' @author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa}
+#' @seealso  \code{\link[lattice]{xyplot}} for details.
 #' @examples
 #' \dontrun{
 #' plt = eumap::plot_spm(df, gmode  = "norm" , gtype = "var.imp")
 #' }
+#' @export
 plot_spm <- function(x = NULL, y = NULL , z = NULL, Vim = NULL, main = NULL, palet  = NULL, colorcut = NULL, xbins = 60, gtype = c("accuracy", "correlation", "var.imp", "cm"), gmode = c("root","log10","norm","log2","nat"), aspect = 1, ...){
   
   if (gtype == "cm") {

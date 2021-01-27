@@ -2,7 +2,7 @@
 % Please edit documentation in R/train_spm.R
 \name{train_spm}
 \alias{train_spm}
-\title{Train a spatial prediction model, from a (spatial) matrix, using ensemble machine learning,}
+\title{Train a (spatial) prediction model}
 \usage{
 train_spm(
   df.tr,
@@ -48,17 +48,17 @@ train_spm(
 List of objects of class \code{mlr3},
 }
 \description{
-This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
+A function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
 }
 \examples{
+\donttest{
 ## Meuse Demo
-library(sp)
-library(mlr3verse)
-library(mlr3spatiotempcv)
-library(checkmate)
-library(future)
-library(scales)
 library(eumap)
+library(sp)
+library(mlr3)
+library(mlr3learners)
+library(paradox)
+library(mlr3tuning)
 data(meuse)
 data(meuse.grid)
 df <- as.data.frame(meuse)
@@ -71,7 +71,8 @@ train_ind <- sample(seq_len(nrow(df)), size = smp_size)
 df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
 newdata = df.ts
-tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2 )
+target.variable = "lead"
+tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2)
 train_model= tr[[1]]
 Vim = tr[[2]]
 summary = tr[[3]]
@@ -83,11 +84,11 @@ valu.imp= predict.variable[[2]]
 plt = plot_spm(Vim = Vim , gtype = "var.imp")
 df.ts$leadp = pred.v
 coordinates(df.ts) <- ~x+y
-proj4string(df.ts) <- CRS("+init=epsg:28992")
-gridded(df.ts) = TRUE
+sp::proj4string(df.ts) <- CRS("+init=epsg:28992")
+sp::gridded(df.ts) = TRUE
 plot(df.ts[,"leadp"])
 points(meuse, pch="+")
-
+}
 }
 \author{
 \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}

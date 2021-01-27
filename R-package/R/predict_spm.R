@@ -1,4 +1,4 @@
-#' Predict_spm
+#' @title Predict_spm
 #' @description
 #' Prediction on a new dataset
 #' @param object Trained model using `train_spm`,

@@ -1,6 +1,7 @@
-#' Train a spatial prediction model, from a (spatial) matrix, using ensemble machine learning,
+#' @title Train a (spatial) prediction model
 #' @description
-#' This is a function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
+#' 
+#' A function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
 #' @param df.tr Observation data frame,
 #' @param target.variable Target variable or response variable,
 #' @param parallel Parallel processing mode,
@@ -13,19 +14,20 @@
 #' @param crs Coordinate reference system, necessary for spcv (see mlr3spatiotempcv),
 #' @param coordinate_names Columns names for X and Y coordinates,
 #' @param ... other arguments that can be passed on to \code{TaskSupervised},
-#'
+#' @importFrom graphics title
+#' @import ranger
 #' @return List of objects of class \code{mlr3},
 #' @export 
 #'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @examples
+#' \donttest{
 #' ## Meuse Demo
-#' library(sp)
-#' library(mlr3verse)
-#' library(mlr3spatiotempcv)
-#' library(checkmate)
-#' library(future)
-#' library(scales)
 #' library(eumap)
+#' library(sp)
+#' library(mlr3)
+#' library(mlr3learners)
+#' library(paradox)
+#' library(mlr3tuning)
 #' data(meuse)
 #' data(meuse.grid)
 #' df <- as.data.frame(meuse)
@@ -38,7 +40,8 @@
 #' df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
 #' df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
 #' newdata = df.ts
-#' tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2 )
+#' target.variable = "lead"
+#' tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2)
 #' train_model= tr[[1]]
 #' Vim = tr[[2]]
 #' summary = tr[[3]]
@@ -50,21 +53,22 @@
 #' plt = plot_spm(Vim = Vim , gtype = "var.imp")
 #' df.ts$leadp = pred.v
 #' coordinates(df.ts) <- ~x+y
-#' proj4string(df.ts) <- CRS("+init=epsg:28992")
-#' gridded(df.ts) = TRUE
+#' sp::proj4string(df.ts) <- CRS("+init=epsg:28992")
+#' sp::gridded(df.ts) = TRUE
 #' plot(df.ts[,"leadp"])
 #' points(meuse, pch="+")
-#' 
+#' }
 train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_type = NULL, folds = NULL, n_evals = NULL, method.list = NULL, var.imp = NULL, super.learner = NULL, crs = NULL, coordinate_names = c("x","y"), ...){
   if ( is.null(predict_type)) {
     predict_type <- "response"
   }
   id = deparse(substitute(df.tr))
-  task_type = c("classification Task", "Regression Task")
+  task_type = c("classification Task",
+                "Regression Task")
   ml_method = c("kknn", "featureless")
   meta_learner = "ranger"
   resample_method = c("Using resampling method: (non-spatial) repeated_cv...", "Using resampling method: (spatial)repeated_cv by cooridinates...")
-  number_cores = paste0(" ncores: ", availableCores())
+  number_cores = paste0(" ncores: ", future::availableCores())
   message(paste0("Fitting an ensemble ML using ", ml_method[1], " ", ml_method[2], ", and ", meta_learner," models", number_cores,' '), immediate. = TRUE)
   
   ## start running ensemble
@@ -72,7 +76,7 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
   ##  classif CV ----
   if (is.factor(df.tr[, target.variable]) & is.null(crs)) {
     
-    message(paste0(task_type[1],"..."), immediate. = TRUE)
+    message(paste0(task_type[1]," ..."), immediate. = TRUE)
     
     tsk_clf <- mlr3::TaskClassif$new(id = id, backend = df.tr, target.variable)
     
@@ -95,10 +99,8 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
       )
       message(resample_method[1], immediate. = TRUE)
       # at$train(tsk_clf)
-      at$
-        train(tsk_clf)$
-        predict(tsk_clf)$
-        score(msr('classif.acc'))
+      at$train(tsk_clf)
+      at$predict(tsk_clf)
       at$learner$train(tsk_clf)
       best.model = at$archive$best()
       var.imp = at$learner$importance()
@@ -113,11 +115,11 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
   else if (is.numeric(df.tr[, target.variable]) & is.null(crs)) {
       
     message( 
-    paste0(task_type[2],"...", immediate. = TRUE)
+    paste0(task_type[2],"....", immediate. = TRUE)
     )   
     
-    tsk_regr <- TaskRegr$new(id = id, backend = df.tr, target.variable )
-    ranger_lrn = lrn("regr.ranger", predict_type = "response",importance = "permutation")
+    tsk_regr = mlr3::TaskRegr$new(id = id, backend = df.tr, target.variable )
+    ranger_lrn = mlr3::lrn(.key = "regr.ranger", importance = "impurity")
     ps_ranger = ParamSet$new(
       list(
         ParamInt$new("mtry", lower = 1L, upper = as.double(round(ncol(df.tr)/2))),
@@ -137,11 +139,8 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
       )
     #at$store_tuning_instance = TRUE
     message(resample_method[1], immediate. = TRUE)
-    # at$train(tsk_regr)
-    at$
-      train(tsk_regr)$
-      predict(tsk_regr)$
-      score(msr('regr.rmse'))
+    at$train(tsk_regr)
+    at$predict(tsk_regr)
     at$learner$train(tsk_regr)
     tr.model = at$learner
     summary = tr.model$model
@@ -203,7 +202,7 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
   else if (is.numeric(df.tr[,target.variable]) & crs == crs) {
     
     message( 
-    paste0(task_type[2],"...", immediate. = TRUE)
+    paste0(task_type[2]," spcv...", immediate. = TRUE)
     ) 
     if (is.null(method.list) & is.null(super.learner)) {
       method.list <- c("regr.kknn", "regr.featureless", "regr.rpart")
@@ -212,7 +211,7 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
     
     df.trf = as_data_backend(df.tr)
     
-    tsk_regr = TaskRegrST$new(
+    tsk_regr = mlr3spatiotempcv::TaskRegrST$new(
     id = id, backend = df.trf, target.variable ,
     extra_args = list(
       positive = "TRUE", coordinate_names = coordinate_names,
@@ -231,7 +230,7 @@ train_spm = function(df.tr, target.variable = NULL, parallel = TRUE, predict_typ
           )
         ) %>>%
       po("featureunion") %>>%
-      po("learner", lrn("regr.ranger",importance = "permutation"))
+      po("learner", mlr3::lrn(.key = "regr.ranger",importance = "permutation"))
     
     resampling_sp = rsmp("repeated_spcv_coords", folds = folds, repeats = 3)
     rr_sp = rsmp(

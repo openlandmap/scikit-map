@@ -39,7 +39,7 @@ List of data frames with row.ids and results of overlay
 Extract points from a GeoTIFF using spatiotemporal overlay
 }
 \details{
-Extends the \code{terra::extract} functionality. 
+Extends the \code{terra::extract} functionality.
 Works best if the GeoTIFF are Cloud-Optimized and located on SSD or similar.
 }
 \examples{

@@ -7,7 +7,7 @@
 predict_spm(object, newdata)
 }
 \arguments{
-\item{object}{Trained model using `train_spm`,}
+\item{object}{Trained model using \code{train_spm},}
 
 \item{newdata}{Data at new location,}
 }
