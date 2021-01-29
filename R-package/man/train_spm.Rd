@@ -51,7 +51,6 @@ List of objects of class \code{mlr3},
 A function to train (spatial) dataframe   \href{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169748}{using Ensemble Machine Learning} and \href{https://mlr3.mlr-org.com/}{mlr3} ecosystem,
 }
 \examples{
-\donttest{
 ## Meuse Demo
 library(eumap)
 library(sp)
@@ -63,8 +62,8 @@ data(meuse)
 data(meuse.grid)
 df <- as.data.frame(meuse)
 df.grid <- as.data.frame(meuse.grid)
-df = na.omit(df[,])
-df.grid = na.omit(df.grid[,])
+df = na.omit(df)
+df.grid = na.omit(df.grid)
 smp_size <- floor(0.8 * nrow(df))
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df)), size = smp_size)
@@ -73,6 +72,7 @@ df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
 newdata = df.ts
 target.variable = "lead"
 tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2)
+\donttest{
 train_model= tr[[1]]
 Vim = tr[[2]]
 summary = tr[[3]]
@@ -91,5 +91,5 @@ points(meuse, pch="+")
 }
 }
 \author{
-\href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
+\href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 }

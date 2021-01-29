@@ -27,7 +27,7 @@ Suggests:
     Matrix,
     mlr3,
     mlr3learners,
-    mlr3tuning,
+    mlr3tuning (>= 0.6),
     mlr3measures,
     mlr3pipelines,
     methods,

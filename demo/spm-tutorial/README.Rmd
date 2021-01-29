@@ -1,10 +1,9 @@
 ---
-title: 'eumap'
-Title: "Tutorial on Automated Spatial Modeling, Prediction and Visualizations"
+title: "Tutorial on Automated Spatial Modeling, Prediction and Visualizations"
 author: "Mohammadreza Sheykhmousa (mohammadreza.sheykhmousa@OpenGeoHub.org) and Tom Hengl (tom.hengl@OpenGeoHub.org)"
 date: "Last compiled on: `r format(Sys.time(), '%d %B, %Y')`"
 output: 
-   rmarkdown::md_document:
+   github_document:
     toc: true
     toc_depth: 3
 bibliography: ./tex/refs.bib
@@ -259,6 +258,7 @@ valu.imp = predict.variable[[2]]
 ## `plot_spm` 
 
 First we demonstrate the variable importance using:
+
 ```{r}
 plot_spm( Vim = Vim, gtype = "var.imp") 
 ```
@@ -303,14 +303,13 @@ coordinates(df.ts) <- ~x+y
 proj4string(df.ts) <- CRS("+init=epsg:28992")
 gridded(df.ts) = TRUE
 plot(df.ts[,"rainP"],
-     main = "prediction_spm", axes = FALSE, box = FALSE)
+     main = "prediction_spm", axes = FALSE)
+points(sic1997$daily.rainfall, pch="+")
 ```
-
 
 We made a spatial prediction map using ensemble machine learning with spatial cross validation
 for the predicted variable e.g., *rainfall* (in this case).
-Ranger shows that it is a noise proof classifier.
-
+Ranger shows that it is a noise-proof learner (regression).
 
 
 ## References

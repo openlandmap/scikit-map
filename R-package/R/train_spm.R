@@ -18,9 +18,8 @@
 #' @import ranger
 #' @return List of objects of class \code{mlr3},
 #' @export 
-#'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and  \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
+#'@author  \href{https://opengeohub.org/people/mohammadreza-sheykhmousa}{Mohammadreza Sheykhmousa} and \href{https://opengeohub.org/people/tom-hengl}{Tom Hengl}
 #' @examples
-#' \donttest{
 #' ## Meuse Demo
 #' library(eumap)
 #' library(sp)
@@ -32,16 +31,19 @@
 #' data(meuse.grid)
 #' df <- as.data.frame(meuse)
 #' df.grid <- as.data.frame(meuse.grid)
-#' df = na.omit(df[,])
-#' df.grid = na.omit(df.grid[,])
+#' df = na.omit(df)
+#' df.grid = na.omit(df.grid)
 #' smp_size <- floor(0.8 * nrow(df))
 #' set.seed(123)
 #' train_ind <- sample(seq_len(nrow(df)), size = smp_size)
-#' df.tr <- df[, c("x","y","dist","ffreq","soil","lead")]
-#' df.ts <- df.grid[, c("x","y","dist","ffreq","soil")]
+#' cov.lst = c("x","y","dist","ffreq","soil")
+#' df.tr <- df[, c(cov.lst, "lead")]
+#' df.ts <- df.grid[, cov.lst]
 #' newdata = df.ts
 #' target.variable = "lead"
-#' tr = train_spm(df.tr = df.tr, target.variable = "lead", folds = 2, n_evals = 2)
+#' tr = train_spm(df.tr, target.variable, folds = 2, n_evals = 2)
+#' ## regr.rmse = 75.78619
+#' \donttest{
 #' train_model= tr[[1]]
 #' Vim = tr[[2]]
 #' summary = tr[[3]]

@@ -1,3 +1,11 @@
+Tutorial on Automated Spatial Modeling, Prediction and Visualizations
+================
+Mohammadreza Sheykhmousa
+(<a href="mailto:mohammadreza.sheykhmousa@OpenGeoHub.org" class="email">mohammadreza.sheykhmousa@OpenGeoHub.org</a>)
+and Tom Hengl
+(<a href="mailto:tom.hengl@OpenGeoHub.org" class="email">tom.hengl@OpenGeoHub.org</a>)
+Last compiled on: 29 January, 2021
+
 
 
 -   [Starting eumap package](#starting-eumap-package)
@@ -159,7 +167,14 @@ about the data set please see
     #install_github("envirometrix/landmap")
     library(landmap)
 
-    version: 0.0.7
+    version: 0.0.8
+
+
+    Attaching package: 'landmap'
+
+    The following object is masked from 'package:mlr3spatiotempcv':
+
+        cookfarm
 
     data("sic1997")
     df = cbind(as.data.frame(sic1997$daily.rainfall), 
@@ -206,7 +221,7 @@ variables. `trained model` later can predict a `newdata` set.
 
     tr = eumap::train_spm(df.tr, target.variable = "rainfall", folds = 3, n_evals = 5)
 
-    Fitting an ensemble ML using kknn featureless, and ranger models ncores: 8 TRUE
+    Fitting an ensemble ML using kknn featureless, and ranger models ncores: 32 TRUE
 
     Regression Task....TRUE
 
@@ -231,18 +246,18 @@ in which sample fraction for different batches varies from 50% to 70%.
     Ranger result
 
     Call:
-     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 4L, sample.fraction = 0.544945102650672, num.trees = 106L) 
+     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 1L, sample.fraction = 0.704856620635837, num.trees = 176L) 
 
     Type:                             Regression 
-    Number of trees:                  106 
+    Number of trees:                  176 
     Sample size:                      456 
     Number of independent variables:  11 
-    Mtry:                             4 
+    Mtry:                             1 
     Target node size:                 5 
     Variable importance mode:         impurity 
     Splitrule:                        variance 
-    OOB prediction error (MSE):       11218.62 
-    R squared (OOB):                  0.1175316 
+    OOB prediction error (MSE):       11155.38 
+    R squared (OOB):                  0.1225063 
 
 4th element is the predicted values of our trained model note: here we
 just show start and the ending values
@@ -265,7 +280,7 @@ Note: here we just show start and the ending values.
 
     ...
     [[1]]
-      [1] 167.18601 167.62893 181.65472 174.98868 169.69528 145.17233 172.93145
+      [1] 168.97045 162.40341 171.61752 167.49375 142.69735 179.22045 159.21326
     ...
 
 `plot_spm`
@@ -275,7 +290,7 @@ First we demonstrate the variable importance using:
 
     plot_spm( Vim = Vim, gtype = "var.imp") 
 
-![](README_files/figure-markdown_strict/unnamed-chunk-15-1.png)
+![](README_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
           [,1]
      [1,]  0.7
@@ -302,10 +317,14 @@ In case of regression task,
 
     plt
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-16-1.png" alt="Accuracy plot"  />
+<div class="figure" style="text-align: center">
+
+<img src="README_files/figure-gfm/unnamed-chunk-16-1.png" alt="Accuracy plot"  />
 <p class="caption">
 Accuracy plot
 </p>
+
+</div>
 
 When there is limited number of observation (x &lt; 500) `plot_spm`
 automatically generates a density plot and ignores all the other
@@ -316,36 +335,49 @@ graphical arguments.
     df.ts$rainP = pred[[1]]
     coordinates(df.ts) <- ~x+y
     proj4string(df.ts) <- CRS("+init=epsg:28992")
-
-    Warning in showSRID(uprojargs, format = "PROJ", multiline = "NO", prefer_proj =
-    prefer_proj): Discarded datum Amersfoort in Proj4 definition
-
     gridded(df.ts) = TRUE
     plot(df.ts[,"rainP"],
-         main = "prediction_spm", axes = FALSE, box = FALSE)
+         main = "prediction_spm", axes = FALSE)
+    points(sic1997$daily.rainfall, pch="+")
 
-<img src="README_files/figure-markdown_strict/unnamed-chunk-18-1.png" style="display: block; margin: auto;" />
+<img src="README_files/figure-gfm/unnamed-chunk-18-1.png" style="display: block; margin: auto;" />
 
 We made a spatial prediction map using ensemble machine learning with
 spatial cross validation for the predicted variable e.g., *rainfall* (in
-this case). Ranger shows that it is a noise proof classifier.
+this case). Ranger shows that it is a noise-proof learner (regression).
 
 References
 ----------
+
+<div id="refs" class="references hanging-indent">
+
+<div id="ref-casalicchio2017openml">
 
 Casalicchio, G., Bossek, J., Lang, M., Kirchhoff, D., Kerschke, P.,
 Hofner, B., … Bischl, B. (2017). OpenML: An R package to connect to the
 machine learning platform OpenML. *Computational Statistics*, 1–15.
 doi:[10.1007/s00180-017-0742-2](https://doi.org/10.1007/s00180-017-0742-2)
 
+</div>
+
+<div id="ref-mlr3">
+
 Lang, M., Binder, M., Richter, J., Schratz, P., Pfisterer, F., Coors,
 S., … Bischl, B. (2019). mlr3: A modern object-oriented machine learning
 framework in R. *Journal of Open Source Software*.
 doi:[10.21105/joss.01903](https://doi.org/10.21105/joss.01903)
 
+</div>
+
+<div id="ref-MichelLang2020mlr3book">
+
 Lang, M., Schratz, P., Binder, M., Pfisterer, F., Richter, J., Reich, N.
 G., & Bischl, B. (2020, September 9). mlr3 book. Retrieved from
 <https://mlr3book.mlr-org.com>
+
+</div>
+
+<div id="ref-sheykhmousa2020support">
 
 Sheykhmousa, M., Mahdianpari, M., Ghanbari, H., Mohammadimanesh, F.,
 Ghamisi, P., & Homayouni, S. (2020). Support vector machine vs. Random
@@ -353,3 +385,7 @@ forest for remote sensing image classification: A meta-analysis and
 systematic review. *IEEE Journal of Selected Topics in Applied Earth
 Observations and Remote Sensing*.
 doi:[https://doi.org/10.1109/JSTARS.2020.3026724](https://doi.org/https://doi.org/10.1109/JSTARS.2020.3026724)
+
+</div>
+
+</div>
