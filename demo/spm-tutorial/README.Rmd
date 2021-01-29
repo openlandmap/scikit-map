@@ -1,5 +1,6 @@
 ---
-title: "Tutorial on Automated Spatial Modeling, Prediction and Visualizations"
+title: 'eumap'
+Title: "Tutorial on Automated Spatial Modeling, Prediction and Visualizations"
 author: "Mohammadreza Sheykhmousa (mohammadreza.sheykhmousa@OpenGeoHub.org) and Tom Hengl (tom.hengl@OpenGeoHub.org)"
 date: "Last compiled on: `r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -117,7 +118,7 @@ ls <- c(
    "lattice", "mlr3verse", "BBmisc", "devtools", 
    "hexbin", "sp", "mlr3spatiotempcv", 'MLmetrics',
    "FSelectorRcpp", "future", "future.apply", "grid",
-   "gridExtra", "yardstick", "latticeExtra", "bbotk"
+   "gridExtra", "yardstick", "latticeExtra", "bbotk", "bbotk"
    )
 new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 
@@ -161,12 +162,12 @@ For demonstration we are using daily rainfall dataset from Switzerland used in t
 
 ```{r ,results='hide', warning=FALSE}
 library(devtools)
-install_github("envirometrix/landmap")
+#install_github("envirometrix/landmap")
 library(landmap)
 data("sic1997")
-sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
+df = cbind(as.data.frame(sic1997$daily.rainfall), 
                    as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
-df.tr <- na.omit(sic1997.df)
+df.tr <- na.omit(df)
 ```
 
 Note that here we use whole the data to test and train the model, as the dataset is not large enough (i.e., only 456 observations). In the training part, however, there will be internal sampling that will provide the Out Of Bag sampling and OOB R-square [@sheykhmousa2020support].
@@ -174,7 +175,7 @@ Note that here we use whole the data to test and train the model, as the dataset
 We can create some synthetic covariates, so we can demonstrate that (a) the learner is noise-proof, and (b) that this is visible in the variable importance plots:
 
 ```{r}
-target.variable = "Species"
+target.variable = "rainfall"
 df.tr$test1 <- log10(df.tr$DEM)*53.656
 df.tr$test2 <- cos(df.tr$DEM)*-0.13
 df.tr$test3 <- sin(df.tr$DEM)**31
@@ -234,10 +235,11 @@ vlp = tr[[5]]
 
 ## `predict_spm`
 
-Prediction on `newdata` data set (in this case df.tr).
+Prediction on `newdata` data set (in this case df.ts).
 
 ```{r}
-predict.variable = predict_spm(train_model, df.tr)
+
+predict.variable = predict_spm(object =  train_model, newdata =  df.tr)
 ```
 
 Predicted values for the *newdata* set (in this case df.tr):
@@ -266,6 +268,7 @@ As we can see noisy data has given almost the least importance which suggests th
 In case of regression task,
 
 ```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Accuracy plot"}
+target.variable = "rainfall"
 plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy", gmode  = "norm" )
 plt
 ```
@@ -274,23 +277,35 @@ When there is limited number of observation (x < 500) `plot_spm` automatically g
 
 
 ### spatial prediction on *rainfall*
-
-```{r , echo=FALSE, warning=FALSE}
+```{r, warning= FALSE, echo= FALSE}
 data("sic1997")
-sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
-as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
-df.tr <- na.omit(sic1997.df)
-colnames(df.tr)[2:3] <- c('x','y')
-df.tr$rainP = pred.v[[1]]
-coordinates(df.tr) <- ~x+y
-proj4string(df.tr) <- CRS("+init=epsg:28992")
-# gridded(df.tr) 
-# plot(df.tr[,"rainP"])
+df.ts <- sic1997$swiss1km[c("CHELSA_rainfall","DEM")]
+df.ts = as.data.frame(df.ts)
+df.ts$test1 <- log10(df.ts$DEM)*53.656
+df.ts$test2 <- cos(df.ts$DEM)*-0.13
+df.ts$test3 <- sin(df.ts$DEM)**31
+df.ts$test4 <- (df.ts$DEM)**-5.13
+df.ts$test5 <- (df.ts$DEM/2**4)**6
+df.ts$test6 <- (df.ts$CHELSA_rainfall)**-1
+df.ts$test7 <- ((df.ts$CHELSA_rainfall)*13/34)
+df.ts$noise1 <- runif(1:nrow(df.ts))/0.54545
+df.ts$noise2 <- sqrt(runif(1:nrow(df.ts)))
+df.ts$border <- NULL
+df.ts$X <- NULL
+df.ts$Y <- NULL
+pred = predict_spm(object =  train_model, newdata =  df.ts)
 ```
 
-```{r}
-plot(df.tr[,"rainP"])
+
+```{r, fig.align="center", fig.width=6, fig.height=6}
+df.ts$rainP = pred[[1]]
+coordinates(df.ts) <- ~x+y
+proj4string(df.ts) <- CRS("+init=epsg:28992")
+gridded(df.ts) = TRUE
+plot(df.ts[,"rainP"],
+     main = "prediction_spm", axes = FALSE, box = FALSE)
 ```
+
 
 We made a spatial prediction map using ensemble machine learning with spatial cross validation
 for the predicted variable e.g., *rainfall* (in this case).

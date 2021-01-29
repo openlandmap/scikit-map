@@ -1,6 +1,6 @@
-# eumap package
 
--   [eumap package for R](#eumap-package-for-r)
+
+-   [Starting eumap package](#starting-eumap-package)
 -   [Installing eumap](#installing-eumap)
 -   [Introduction](#introduction)
 -   [`train_spm`](#train_spm)
@@ -28,10 +28,10 @@ text](http://i.imgur.com/tXSoThF.png "twitter icon with padding")](https://twitt
 
 Part of: [eumap package](https://gitlab.com/geoharmonizer_inea/eumap/)  
 Project: [Geo-harmonizer](https://opendatascience.eu)  
-Last update: 2021-01-22
+Last update: 2021-01-29
 
-eumap package for R
--------------------
+Starting eumap package
+----------------------
 
 Installing eumap
 ----------------
@@ -94,8 +94,8 @@ Here two scenarios are possible:
 2.  Confusion matrix predicted vs observed in the case of classification
     task,
 
-**Warning:** most of functions are optimized to run in parallel by
-default. This might result in high RAM and CPU usage.
+**Warning:** some functions are optimized to run in parallel by default.
+This might result in high RAM and CPU usage.
 
 The following examples demonstrates spatial prediction using the `sic97`
 data set:
@@ -107,7 +107,7 @@ Required packages
        "lattice", "mlr3verse", "BBmisc", "devtools", 
        "hexbin", "sp", "mlr3spatiotempcv", 'MLmetrics',
        "FSelectorRcpp", "future", "future.apply", "grid",
-       "gridExtra", "yardstick", "latticeExtra"
+       "gridExtra", "yardstick", "latticeExtra", "bbotk", "bbotk"
        )
     new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 
@@ -142,6 +142,7 @@ Required packages
     library(yardstick)
     library(ppcor)
     library(scales)
+    library(bbotk)
 
 sic1997: The SIC 1997 Data Set
 ------------------------------
@@ -155,26 +156,21 @@ about the data set please see
 
     Loading required package: usethis
 
-    install_github("envirometrix/landmap")
-
-    Skipping install of 'landmap' from a github remote, the SHA1 (30e85f9e) has not changed since last install.
-      Use `force = TRUE` to force installation
-
+    #install_github("envirometrix/landmap")
     library(landmap)
 
     version: 0.0.7
 
     data("sic1997")
-    sic1997.df = cbind(as.data.frame(sic1997$daily.rainfall), 
+    df = cbind(as.data.frame(sic1997$daily.rainfall), 
                        as.data.frame(sp::over(sic1997$daily.rainfall, sic1997$swiss1km)))
-    df.tr <- na.omit(sic1997.df)
+    df.tr <- na.omit(df)
 
 Note that here we use whole the data to test and train the model, as the
 dataset is not large enough (i.e., only 456 observations). In the
 training part, however, there will be internal sampling that will
-provide the Out Of Bag sampling and OOB rsquare. For mor detailed
-information on OOB please see
-[HERE](https://ieeexplore.ieee.org/abstract/document/9206124).
+provide the Out Of Bag sampling and OOB R-square (Sheykhmousa et al.,
+[2020](#ref-sheykhmousa2020support)).
 
 We can create some synthetic covariates, so we can demonstrate that (a)
 the learner is noise-proof, and (b) that this is visible in the variable
@@ -212,7 +208,7 @@ variables. `trained model` later can predict a `newdata` set.
 
     Fitting an ensemble ML using kknn featureless, and ranger models ncores: 8 TRUE
 
-    Regression Task...TRUE
+    Regression Task....TRUE
 
     Using resampling method: (non-spatial) repeated_cv...TRUE
 
@@ -235,18 +231,18 @@ in which sample fraction for different batches varies from 50% to 70%.
     Ranger result
 
     Call:
-     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 2L, sample.fraction = 0.587019245140254, num.trees = 188L) 
+     ranger::ranger(dependent.variable.name = task$target_names, data = task$data(),      case.weights = task$weights$weight, importance = "impurity",      mtry = 4L, sample.fraction = 0.544945102650672, num.trees = 106L) 
 
     Type:                             Regression 
-    Number of trees:                  188 
+    Number of trees:                  106 
     Sample size:                      456 
     Number of independent variables:  11 
-    Mtry:                             2 
+    Mtry:                             4 
     Target node size:                 5 
     Variable importance mode:         impurity 
     Splitrule:                        variance 
-    OOB prediction error (MSE):       11139.53 
-    R squared (OOB):                  0.1237525 
+    OOB prediction error (MSE):       11218.62 
+    R squared (OOB):                  0.1175316 
 
 4th element is the predicted values of our trained model note: here we
 just show start and the ending values
@@ -256,9 +252,9 @@ just show start and the ending values
 `predict_spm`
 -------------
 
-Prediction on `newdata` data set (in this case df.tr).
+Prediction on `newdata` data set (in this case df.ts).
 
-    predict.variable = predict_spm(train_model, df.tr)
+    predict.variable = predict_spm(object =  train_model, newdata =  df.tr)
 
 Predicted values for the *newdata* set (in this case df.tr):
 
@@ -269,7 +265,7 @@ Note: here we just show start and the ending values.
 
     ...
     [[1]]
-      [1] 181.90532 175.73901 168.51312 170.49734 154.22207 149.31037 161.65284
+      [1] 167.18601 167.62893 181.65472 174.98868 169.69528 145.17233 172.93145
     ...
 
 `plot_spm`
@@ -299,6 +295,7 @@ suggests that `train_spm` is noise proof.
 
 In case of regression task,
 
+    target.variable = "rainfall"
     plt = plot_spm(x = df.tr[,target.variable], y = pred.v[[1]], gtype = "accuracy", gmode  = "norm" )
 
     Because of the LOW number of observations a density plot is displayed.
@@ -316,9 +313,18 @@ graphical arguments.
 
 ### spatial prediction on *rainfall*
 
-    plot(df.tr[,"rainP"])
+    df.ts$rainP = pred[[1]]
+    coordinates(df.ts) <- ~x+y
+    proj4string(df.ts) <- CRS("+init=epsg:28992")
 
-![](README_files/figure-markdown_strict/unnamed-chunk-18-1.png)
+    Warning in showSRID(uprojargs, format = "PROJ", multiline = "NO", prefer_proj =
+    prefer_proj): Discarded datum Amersfoort in Proj4 definition
+
+    gridded(df.ts) = TRUE
+    plot(df.ts[,"rainP"],
+         main = "prediction_spm", axes = FALSE, box = FALSE)
+
+<img src="README_files/figure-markdown_strict/unnamed-chunk-18-1.png" style="display: block; margin: auto;" />
 
 We made a spatial prediction map using ensemble machine learning with
 spatial cross validation for the predicted variable e.g., *rainfall* (in
@@ -340,3 +346,10 @@ doi:[10.21105/joss.01903](https://doi.org/10.21105/joss.01903)
 Lang, M., Schratz, P., Binder, M., Pfisterer, F., Richter, J., Reich, N.
 G., & Bischl, B. (2020, September 9). mlr3 book. Retrieved from
 <https://mlr3book.mlr-org.com>
+
+Sheykhmousa, M., Mahdianpari, M., Ghanbari, H., Mohammadimanesh, F.,
+Ghamisi, P., & Homayouni, S. (2020). Support vector machine vs. Random
+forest for remote sensing image classification: A meta-analysis and
+systematic review. *IEEE Journal of Selected Topics in Applied Earth
+Observations and Remote Sensing*.
+doi:[https://doi.org/10.1109/JSTARS.2020.3026724](https://doi.org/https://doi.org/10.1109/JSTARS.2020.3026724)
