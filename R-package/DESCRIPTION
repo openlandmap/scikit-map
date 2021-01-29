@@ -20,7 +20,7 @@ Imports:
     utils,
     terra
 Suggests: 
-    bboatk,
+    bbotk,
     rgdal,
     mlr3verse,
     mlr3misc,

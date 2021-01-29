@@ -117,7 +117,7 @@ ls <- c(
    "lattice", "mlr3verse", "BBmisc", "devtools", 
    "hexbin", "sp", "mlr3spatiotempcv", 'MLmetrics',
    "FSelectorRcpp", "future", "future.apply", "grid",
-   "gridExtra", "yardstick", "latticeExtra"
+   "gridExtra", "yardstick", "latticeExtra", "bbotk"
    )
 new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
 
@@ -152,6 +152,7 @@ library(MLmetrics)
 library(yardstick)
 library(ppcor)
 library(scales)
+library(bbotk)
 ```
 
 ## sic1997: The SIC 1997 Data Set
