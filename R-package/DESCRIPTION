@@ -20,6 +20,7 @@ Imports:
     utils,
     terra
 Suggests: 
+    bboatk,
     rgdal,
     mlr3verse,
     mlr3misc,
@@ -28,6 +29,7 @@ Suggests:
     mlr3learners,
     mlr3tuning,
     mlr3measures,
+    mlr3pipelines,
     methods,
     matrixStats,
     glmnet,
