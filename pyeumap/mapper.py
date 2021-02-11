@@ -5,8 +5,8 @@ from typing import List, Union
 import multiprocessing
 import geopandas as gpd
 import numpy as np
-import gdal
-import osr
+from osgeo import gdal
+from osgeo import osr
 import math
 
 from pathlib import Path
