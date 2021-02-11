@@ -15,8 +15,8 @@ from typing import List, Dict
 
 from itertools import chain
 import numpy as np
-import gdal
-import osr
+from osgeo import gdal
+from osgeo import osr
 import os
 
 import bottleneck as bc

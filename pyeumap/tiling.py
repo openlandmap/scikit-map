@@ -2,7 +2,7 @@ from pyeumap import datasets
 from pyeumap.parallel import ThreadGeneratorLazy, ProcessGeneratorLazy
 import geopandas as gpd
 import multiprocessing
-import osr
+from osgeo import osr
 import rasterio
 from rasterio.windows import Window, from_bounds
 import os.path
