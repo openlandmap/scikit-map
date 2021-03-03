@@ -35,7 +35,7 @@ class TilingProcessing():
 		base_raster_srs = osr.SpatialReference()
 		base_raster_srs.ImportFromProj4(self.base_raster.crs.to_proj4())
 		
-		if (base_raster_srs.IsSame(tiles_srs) == 0):
+		if not (tiles_srs.ExportToProj4() == base_raster_srs.ExportToProj4()):
 			raise Exception('Different SpatialReference' +
 						f'\n tiling_system_fn ({tiles_srs.ExportToProj4()})'+
 						f'\n base_raster_fn ({base_raster_srs.ExportToProj4()})')
