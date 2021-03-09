@@ -3,6 +3,7 @@ from pyeumap.parallel import ThreadGeneratorLazy, ProcessGeneratorLazy
 import geopandas as gpd
 import multiprocessing
 import osr
+import math
 import rasterio
 from rasterio.windows import Window, from_bounds
 import os.path
@@ -15,6 +16,7 @@ class TilingProcessing():
 	
 	def __init__(self, tiling_system_fn = None, 
 				 base_raster_fn = None,
+				 pixel_precision = 6,
 				 verbose:bool = True):
 		
 		if tiling_system_fn is None:
@@ -26,6 +28,7 @@ class TilingProcessing():
 			if not os.path.isfile(tiling_system_fn):
 				datasets.get_data(EUMAP_TILING_SYSTEM_FN)
 
+		self.pixel_precision = pixel_precision
 		self.tiles = gpd.read_file(tiling_system_fn)
 		self.num_tiles = self.tiles.shape[0]
 		self.base_raster = rasterio.open(base_raster_fn)
@@ -46,8 +49,11 @@ class TilingProcessing():
 		
 		tile = self.tiles.iloc[idx]
 		left, bottom, right, top = tile.geometry.bounds
-		window = from_bounds(left, bottom, right, top, self.base_raster.transform)
-				
+		
+		# Pay attetion here, because it can change the size of the tile
+		window = from_bounds(left, bottom, right, top, self.base_raster.transform) \
+							.round_lengths(op='floor', pixel_precision=self.pixel_precision)
+		
 		return func(idx, tile, window, *func_args)
 	
 	def process_multiple(self, idx_list, func, func_args = (), 
@@ -57,16 +63,18 @@ class TilingProcessing():
 		args = []
 		for idx in idx_list:
 			tile = self.tiles.iloc[idx]
-			
 			left, bottom, right, top = tile.geometry.bounds
-			window = from_bounds(left, bottom, right, top, self.base_raster.transform)
 			
-			args.append((idx, tile, window))
+			# Pay attetion here, because it can change the size of the tile
+			window = from_bounds(left, bottom, right, top, self.base_raster.transform) \
+								.round_lengths(op='floor', pixel_precision=self.pixel_precision)
+			
+			args.append((idx, tile, window, *func_args))
 		
 		WorkerPool = (ThreadGeneratorLazy if use_threads else ProcessGeneratorLazy)
 
 		results = []
-		for r in WorkerPool(func, iter(args), fixed_args=func_args, max_workers=max_workers, chunk=max_workers*2):
+		for r in WorkerPool(func, iter(args), max_workers=max_workers, chunk=max_workers*2):
 			results.append(r)
 
 		return results

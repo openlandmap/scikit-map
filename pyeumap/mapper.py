@@ -1,4 +1,4 @@
-from pyeumap.misc import ttprint
+from pyeumap.misc import ttprint, data_to_new_img
 
 from typing import List, Union
 import joblib
@@ -8,25 +8,38 @@ import geopandas as gpd
 import numpy as np
 import gdal
 import osr
+import os
 import math
 import rasterio
 import re
+import time
 
-from . import parallel
+from pyeumap import parallel
 from pathlib import Path
+
 from geopandas import GeoDataFrame
+from pandas import DataFrame
 
 import gc
 import concurrent.futures
 from concurrent.futures import as_completed
 
 import uuid
+from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import load_model
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
+from sklearn import preprocessing
 from sklearn import metrics
-from sklearn.model_selection import train_test_split, cross_val_predict
+from sklearn.model_selection import KFold,BaseCrossValidator
+from sklearn.model_selection import cross_val_predict
+
+
 
 _automl_enabled = False
 try:
@@ -35,204 +48,164 @@ try:
 except ImportError:
 	pass
 
+DEFAULT = {
+	'META_ESTIMATOR': LogisticRegression(),
+	'ESTIMATOR': RandomForestClassifier(),
+	'CV': KFold(5)
+}
+
+#imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean')
+
 class LandMapper():
 
-	def __init__(self, points:GeoDataFrame, 
+	def __init__(self, 
+				points:Union[DataFrame, Path], 
 				feat_col_prfxs:List[str], 
-				target_col:str, 
-				estimator:Union[BaseEstimator, None] = None,
-				imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean'),
-				eval_strategy = 'train_val_split', 
-				val_samples_pct = 0.2, 
-				min_samples_per_class = 0.05,
-				scoring = None, 
-				weight_col = None, 
-				cv = 5, 
-				param_grid = {}, 
-				group_col = None, 
-				fill_nodata=True, 
-				refit=True,
-				pred_method='predict',
-				verbose = True):
+				target_col:str,
+				weight_col:Union[str, None] = None, 
+				nodata_imputer:Union[BaseEstimator, None] = None,
+				estimator:Union[BaseEstimator, None] = DEFAULT['ESTIMATOR'],
+				estimator_list:Union[List[BaseEstimator], None] = None,
+				meta_estimator:BaseEstimator = DEFAULT['META_ESTIMATOR'],
+				hyperpar_selection:Union[BaseEstimator, None] = None,
+				hyperpar_selection_list:Union[BaseEstimator, None] = None,
+				hyperpar_selection_meta:Union[List[BaseEstimator], None] = None,
+				feature_selection:Union[BaseEstimator, None] = None,
+				feature_selections_list:Union[BaseEstimator, None] = None,
+				cv:BaseCrossValidator = DEFAULT['CV'],
+				cv_njobs:int = 1,
+				cv_group_col:str = None,
+				min_samples_per_class:float = 0.05,
+				pred_method:str = 'predict',
+				verbose:bool = True):
 
-		if not isinstance(points, gpd.GeoDataFrame):
-			points = gpd.read_file(points)
-				
 		self.verbose = verbose
-		self.pts = points
+		self.pts = self._pts(points)
 		self.target_col = target_col
-		self.imputer = imputer
-		self.weight_col = weight_col
-		self.group_col = group_col
-		self.pred_method = pred_method
-		self.min_samples_per_class = min_samples_per_class
-		self.refit = refit
-
-		if eval_strategy is None:
-			self.refit = True    
-        
-		if estimator is None:
-			if _automl_enabled:
-				self.estimator = AutoSklearnClassifier(**autosklearn_kwargs)
-			else:
-				self.estimator = RandomForestClassifier(n_estimators=100)
-		else:
-			self.estimator = estimator
-
-		self.feature_cols = []
-		for feat_prfx in feat_col_prfxs:
-			self.feature_cols += list(self.pts.columns[self.pts.columns.str.startswith(feat_prfx)])
 		
-		classes_pct = (self.pts[self.target_col].value_counts() / self.pts[target_col].count())
-		self.rows_to_remove = self.pts[self.target_col].isin(classes_pct[classes_pct >= min_samples_per_class].axes[0])
-		nrows, _ = self.pts[~self.rows_to_remove].shape
-		if nrows > 0:
-			self.pts = self.pts[self.rows_to_remove]
-			if self.verbose:
-				ttprint(f'Removing {nrows} sampes due min_samples_per_class condition (< {min_samples_per_class})')
-				
-		self.features_weight = None
-		self.weight_idx = None
-		if self.weight_col is not None:
-			if self.verbose:
-				ttprint(f'Using {self.weight_col} as weight')
-			
-			self.feature_cols.append(self.weight_col)
-			self.weight_idx = self.pts[self.feature_cols].columns.get_loc(self.weight_col)
-			
-		self.groups = None
-		if self.group_col is not None:
-			self.groups = self.pts[self.group_col]
+		self.feature_cols = self._feature_cols(feat_col_prfxs)
+		self.samples_weight = self._get_column_if_exists(weight_col, 'weight_col')
 
-		self.scoring = scoring
+		self.nodata_imputer = nodata_imputer
+		self.estimator_list = self._set_list(estimator, estimator_list, 'estimator')
+		self.hyperpar_selection_list = self._set_list(hyperpar_selection, hyperpar_selection_list)
+		self.feature_selections_list = self._set_list(feature_selection, feature_selections_list)
+		self.meta_estimator, self.meta_features = self._meta_estimator(meta_estimator)
+		self.hyperpar_selection_meta = hyperpar_selection_meta
+
 		self.cv = cv
-		self.param_grid = param_grid
+		self.cv_njobs = cv_njobs
+		self.cv_groups = self._get_column_if_exists(cv_group_col, 'cv_group_col')
 
-		self.eval_strategy = eval_strategy
-		self.val_samples_pct = val_samples_pct
+		self.pred_method = self._pred_method(pred_method)
+      
+		#if _automl_enabled:
+		#	self.estimator_list = [ AutoSklearnClassifier(**autosklearn_kwargs) ]
 
+		self._min_samples_restriction(min_samples_per_class)
 		self.features = np.ascontiguousarray(self.pts[self.feature_cols].to_numpy(), dtype=np.float32)
 		self.target = np.ascontiguousarray(self.pts[self.target_col].to_numpy(), dtype=np.float32)
-		self.features_raw = self.features
 
-		if self.weight_idx is not None:
-			self.features_weight = self.features[:, self.weight_idx]
-			self.feature_cols.remove(self.weight_col)
-			self.features = np.delete(self.features, self.weight_idx, 1)
-		
-		if fill_nodata:
-			self.features = self._fill_nodata(self.features, fit_and_tranform = True)
+		if self.nodata_imputer is not None:
+			self.features = self._impute_nodata(self.features, fit_and_tranform = True)
 	
-	@staticmethod
-	def load_instance(fn_joblib):
-		return joblib.load(fn_joblib)
+	def _pts(self, points):
+		if isinstance(points, Path):
+			suffix = points.suffix
+			if suffix == '.csv':
+				return gpd.read_csv(points)
+			elif suffix == '.gz':
+				return gpd.read_csv(points, compression='gzip')
+			else:
+				return gpd.read_file(points)
+		elif isinstance(points, DataFrame):
+			return points
+		else:
+			return points
 
-	def save_instance(self, fn_joblib, no_train_data = False, compress='lz4'):
-		if no_train_data:
-			prop_to_del = [ 'pts', 'features', 'target', 'features_raw', \
-											'features_weight', 'weight_idx', \
-											'groups', 'scoring', 'rows_to_remove']
-			for prop in prop_to_del:
-				if self.verbose:
-					ttprint(f'Removing {prop} attribute')
-				delattr(self, prop)
-		
-		return joblib.dump(self, fn_joblib, compress=compress)
+	def _feature_cols(self, feat_col_prfxs):
+		feature_cols = []
+		for feat_prfx in feat_col_prfxs:
+			feature_cols += list(self.pts.columns[self.pts.columns.str.startswith(feat_prfx)])
+		return feature_cols
 
-	def _fill_nodata(self, data, fit_and_tranform = False):
+	def _get_column_if_exists(self, column_name, param_name):
+		if column_name is not None:
+			if column_name in self.pts.columns:
+				return self.pts[self.column_name]
+			else:	
+				self._verbose(f'Ignoring {param_name}, because {column_name} column not exists.')
+		else:
+			return None
+			 # features_weight
+
+	def _set_list(self, obj, obj_list, var_name = None):
+		empty_obj = (obj is None)
+		empty_list = (obj_list is None or len(obj_list) == 0)
+		if not empty_list:
+			return obj_list
+		elif not empty_obj and empty_list:
+			return [obj]
+		elif var_name is not None:
+			raise Exception(f'You should provide at least one of these: {var_name} or {var_name}_list.')
+		else:
+			return []
+
+	def _meta_estimator(self, meta_estimator):
+		if len(self.estimator_list) > 1:
+			return meta_estimator, []
+		else:
+			return None, None
+
+	def _pred_method(self, pred_method):
+		if self.meta_estimator is not None:
+			return 'predict_proba'
+		else:
+			return pred_method
+
+	def _min_samples_restriction(self, min_samples_per_class):
+		classes_pct = (self.pts[self.target_col].value_counts() / self.pts[self.target_col].count())
+		rows_to_remove = self.pts[self.target_col].isin(classes_pct[classes_pct >= min_samples_per_class].axes[0])
+		nrows, _ = self.pts[~rows_to_remove].shape
+		if nrows > 0:
+			self.pts = self.pts[rows_to_remove]
+			self._verbose(f'Removing {nrows} samples due min_samples_per_class condition (< {min_samples_per_class})')
+
+	def _impute_nodata(self, data, fit_and_tranform = False):
 		nodata_idx = self._nodata_idx(data)
 		num_nodata_idx = np.sum(nodata_idx)
 		pct_nodata_idx = num_nodata_idx / data.size * 100
 
-		result = data
-
 		if (num_nodata_idx > 0):
-			ttprint(f'Filling the missing values ({pct_nodata_idx:.2f}% / {num_nodata_idx} values)...')
+			self._verbose(f'Filling the missing values ({pct_nodata_idx:.2f}% / {num_nodata_idx} values)...')
 			
 			if fit_and_tranform:
-				result = self.imputer.fit_transform(data)
+				data = self.nodata_imputer.fit_transform(data)
 			else:
-				result = self.imputer.transform(data)
+				data = self.nodata_imputer.transform(data)
 			
-		return result
+		return data
 
 	def _nodata_idx(self, data):
-		if np.isnan(self.imputer.missing_values):
+		if np.isnan(self.nodata_imputer.missing_values):
 			return np.isnan(data)
 		else:
-			return (data == self.imputer.missing_values)
-	
-	def _njobs_cv(self):
-		njobs_cv = 1
-		if self.estimator.n_jobs != -1:
-			njobs_cv = math.ceil(multiprocessing.cpu_count() / self.estimator.n_jobs)
-		
+			return (data == self.nodata_imputer.missing_values)
+
+	def _verbose(self, *args, **kwargs):
 		if self.verbose:
-			ttprint(f'Using {njobs_cv} jobs for cross validation')
+			ttprint(*args, **kwargs)
+
+	def _best_params(self, hyperpar_selection):
 			
-		return njobs_cv
-	
-	def _best_params(self):
-		if self.verbose:
-			ttprint('Hyperparameter optimization result:')
-			means = self.grid_search.cv_results_['mean_test_score']*-1
-			stds = self.grid_search.cv_results_['std_test_score']
-			for mean, std, params in zip(means, stds, self.grid_search.cv_results_['params']):
-				ttprint(f" {mean:.5f} (+/-{2*std:.05f}) from {params}")
-			ttprint(f'Best: {self.grid_search.best_score_:.5f} using {self.grid_search.best_params_}')
-			
-		return self.grid_search.best_params_
-	
-	def _train_val_split(self):
+		means = hyperpar_selection.cv_results_['mean_test_score']*-1
+		stds = hyperpar_selection.cv_results_['std_test_score']
 		
-		if self.weight_idx != None:
-			_, new_weight_idx = self.features.shape
-			self.features = np.insert(self.features)
-
-		train_feat, val_feat, train_targ, val_targ = train_test_split(self.features, self.target, test_size=self.val_samples_pct)
-		train_weight = None
-		
-		if self.weight_idx != None:
+		for mean, std, params in zip(means, stds, hyperpar_selection.cv_results_['params']):
+			self._verbose(f" {mean:.5f} (+/-{2*std:.05f}) from {params}")
+		self._verbose(f'Best: {hyperpar_selection.best_score_:.5f} using {hyperpar_selection.best_params_}')
 			
-			#train_weight_idx = train_feat[self.feature_cols].columns.get_loc(self.weight_col)
-			train_weight = train_feat[:, new_weight_idx]
-			train_feat = np.delete(train_feat, new_weight_idx, 1)
-			
-			#val_weight_idx = val_feat[self.feature_cols].columns.get_loc(self.weight_col)
-			val_weight = val_feat[:, new_weight_idx]
-			val_feat = np.delete(val_feat, new_weight_idx, 1)
-			
-			self.features = np.delete(self.features, new_weight_idx, 1)
-			
-		if _automl_enabled and isinstance(self.estimator, AutoSklearnClassifier):
-			self.estimator.fit(train_feat, train_targ)
-		else:
-			self.estimator.fit(train_feat, train_targ, sample_weight=train_weight)
-
-		self.eval_targ = val_targ
-		self.eval_pred = self.estimator.predict(val_feat)
-
-	def _cv_kfold(self):
-
-		self.eval_targ = self.target
-		self.eval_pred = cross_val_predict(self.estimator, self.features, self.target, method=self.pred_method, n_jobs=self._njobs_cv(), \
-			cv=self.cv, groups=self.groups, verbose=self.verbose, fit_params= { 'sample_weight': self.features_weight })
-
-	def _grid_search_cv(self):
-		if self.verbose:
-			ttprint(f'Finding the best hyperparameters {self.param_grid.keys()}')
-	
-		self.grid_search = GridSearchCV(self.estimator, self.param_grid, 
-											cv=self.cv,
-											scoring=self.scoring,
-											verbose=self.verbose, 
-											refit = False,
-											n_jobs= self._njobs_cv()
-											)
-		self.grid_search.fit(self.features, self.target, groups=self.groups, sample_weight=self.features_weight)
-		self.estimator.set_params(**self._best_params())
-		
-		self._cv_kfold()
+		return hyperpar_selection.best_params_
 
 	def _class_optimal_th(self, curv_precision, curv_recall, curv_th):
 		# Removing elements where the precision or recall are zero
@@ -241,7 +214,7 @@ class LandMapper():
 		return curv_recall[optimal_idx], curv_precision[optimal_idx], curv_th[optimal_idx]
 
 	def _classification_report_prob(self):
-		classes, cnt = np.unique(self.eval_targ, return_counts=True)
+		classes, cnt = np.unique(self.target, return_counts=True)
 
 		me = {
 			'log_loss': {},
@@ -256,13 +229,13 @@ class LandMapper():
 		}
 
 		for c in classes:
-				c_mask = (self.eval_targ == c)
-				me['log_loss'][c] = metrics.log_loss(self.eval_targ[c_mask], self.eval_pred[c_mask], labels=classes)
+				c_mask = (self.target == c)
+				me['log_loss'][c] = metrics.log_loss(self.target[c_mask], self.eval_pred[c_mask], labels=classes)
 
 		for c_idx, c in enumerate(classes):
 			me['support'][c] = cnt[c_idx]
 
-			c_targ = (self.eval_targ == c).astype(int)
+			c_targ = (self.target == c).astype(int)
 			c_pred = self.eval_pred[:, c_idx]
 
 			curv_precision, curv_recall, curv_th = metrics.precision_recall_curve(c_targ,c_pred)
@@ -290,77 +263,121 @@ class LandMapper():
 		self.prob_metrics = me
 
 		return report
-
-	def _estimator_metrics(self):
-		if self.pred_method == 'predict':
-			self.cm = metrics.confusion_matrix(self.eval_targ, self.eval_pred)
-			self.overall_acc = metrics.accuracy_score(self.eval_targ, self.eval_pred)
-			self.classification_report = metrics.classification_report(self.eval_targ, self.eval_pred)
-		elif self.pred_method == 'predict_proba':
-			self.log_loss = metrics.log_loss(self.eval_targ, self.eval_pred)
-			self.classification_report = self._classification_report_prob()
 	
-	def train(self):
-		method_name = '_%s' % (self.eval_strategy)
-		if self.eval_strategy is None or hasattr(self, method_name):
-			
-			if self.eval_strategy is not None:
-				if self.verbose:
-					ttprint('Training and evaluating the model')
-			
-				train_method = getattr(self, method_name)
-				train_method()
-			
-				self._estimator_metrics()
-			
-			if self.refit:
-				if self.verbose:
-					ttprint('Training the final model using all data')
+	def _calc_eval_metrics(self):
+		
+		self.eval_metrics = {}
 
-				if _automl_enabled and isinstance(self.estimator, AutoSklearnClassifier):
-					self.estimator.fit(self.features, self.target)
-				else:
-					self.estimator.fit(self.features, self.target, sample_weight=self.features_weight)
+		if self.pred_method == 'predict':
+			self.eval_metrics['confusion_matrix'] = metrics.confusion_matrix(self.target, self.eval_pred)
+			self.eval_metrics['overall_acc'] = metrics.accuracy_score(self.target, self.eval_pred)
+			self.eval_report = metrics.classification_report(self.target, self.eval_pred)
+		elif self.pred_method == 'predict_proba':
+			self.eval_metrics['log_loss'] = metrics.log_loss(self.target, self.eval_pred)
+			self.eval_report = self._classification_report_prob()
 
+	def _fit_params(self, estimator):
+		if isinstance(estimator, Pipeline):
+			return {'estimator__sample_weight': self.samples_weight}
 		else:
-			ttprint(f'{self.eval_strategy} is a invalid validation strategy')
+			return {'sample_weight': self.samples_weight}
+
+	def _is_keras_classifier(self, estimator):
+		return isinstance(estimator, Pipeline) and isinstance(estimator['estimator'], KerasClassifier)
+
+	def _binarizer_target_if_needed(self, estimator):
+		if 	self.pred_method == 'predict_proba' and self._is_keras_classifier(estimator):
+			le = preprocessing.LabelBinarizer()
+			target = le.fit_transform(self.target)
+			return target
+		else:
+			return self.target
+
+	def _do_hyperpar_selection(self, hyperpar_selection, estimator, features):
+		
+		estimator_name = type(estimator).__name__
+		self._verbose(f'Optimizing hyperparameters for {estimator_name}')
+
+		cv_njobs = self.cv_njobs
+		if isinstance(self.cv, int):
+			cv_njobs = self.cv
+		elif isinstance(self.cv, BaseCrossValidator):
+			cv_njobs = self.cv.n_splits
+
+		hyperpar_selection.set_params(
+			cv = self.cv,
+			refit = False,
+			n_jobs = self.cv_njobs
+		)
+		
+		hyperpar_selection.fit(features, self.target, groups=self.cv_groups, **self._fit_params(estimator))
+		estimator.set_params(**self._best_params(hyperpar_selection))
+
+	def _do_cv_prediction(self, estimator, features):
+
+		target = self.target
+		cv_njobs = self.cv_njobs
+
+		target = self._binarizer_target_if_needed(estimator)
+
+		if isinstance(self.cv, int):
+			cv_njobs = self.cv
+		elif isinstance(self.cv, BaseCrossValidator):
+			cv_njobs = self.cv.n_splits
+
+		return cross_val_predict(estimator, features, target, method=self.pred_method, n_jobs=self.cv_njobs, \
+													cv=self.cv, groups=self.cv_groups, verbose=self.verbose, fit_params = self._fit_params(estimator))
+
+	def _do_cv_evaluation(self):
+		self._verbose(f'Calculating evaluation metrics')
+
+		if self.meta_estimator is not None:
+			self.eval_pred = self._do_cv_prediction(self.meta_estimator, self.meta_features)
+		else:
+			self.eval_pred = self._do_cv_prediction(self.estimator_list[0], self.features)
+
+		self._calc_eval_metrics()
+
+	def _calc_meta_features(self):
+		self._verbose(f'Calculating meta-features')
+
+		for estimator in self.estimator_list:
+			self.meta_features.append(self._do_cv_prediction(estimator, self.features))
+
+		self.meta_features = np.concatenate(self.meta_features, axis=1)
+		self._verbose(f' Meta-features shape: {self.meta_features.shape}')
+
+	def train(self):
+
+		# Hyperparameter optization for all estimators
+		for hyperpar_selection, estimator in zip(self.hyperpar_selection_list, self.estimator_list):
+			self._do_hyperpar_selection(hyperpar_selection, estimator, self.features)
+
+		# Meta-features calculation to feed the meta-estimator
+		if self.meta_estimator is not None:
+			self._calc_meta_features()
+
+		# Hyperparameter optization for the meta-estimator
+		if self.hyperpar_selection_meta is not None:
+			self._do_hyperpar_selection(self.hyperpar_selection_meta, self.meta_estimator, self.meta_features)
+
+		# CV calculation using the final estimator
+		self._do_cv_evaluation()
+
+		# Training the final estimators
+		for estimator in self.estimator_list:
+			estimator_name = type(estimator).__name__
+			self._verbose(f'Training {estimator_name} using all samples')
+
+			target = self._binarizer_target_if_needed(estimator)
+			estimator.fit(self.features, target, **self._fit_params(estimator))
+
+		# Training the final meta-estimator
+		self._verbose(f'Training meta-estimator using all samples')
+		self.meta_estimator.fit(self.meta_features, self.target, **self._fit_params(self.meta_estimator))
 
 	def _feature_idx(self, fn_layer):
 		return self.feature_cols.index(fn_layer.stem)
-
-	def _new_image(self, fn_base_img, fn_new_img, data, spatial_win = None, data_type = None, img_format = 'GTiff', nodata = 0):
-		
-		x_size, y_size, nbands = data.shape
-		
-		with rasterio.open(fn_base_img, 'r') as base_img:
-
-			if data_type is None:
-				data_type = base_img.dtypes[0]
-						
-			transform = base_img.transform
-			
-			if spatial_win is not None:
-				transform = rasterio.windows.transform(spatial_win, transform)
-				
-			return rasterio.open(fn_new_img, 'w', 
-							driver=img_format, 
-							width=x_size, 
-							height=y_size, 
-							count=nbands,
-							dtype=data_type, 
-							crs=base_img.crs,
-							compress='LZW',
-							transform=transform)
-
-	def _data_to_new_img(self, fn_base_img, fn_new_img, data, spatial_win = None, data_type = None, img_format = 'GTiff', nodata = 0):
-
-		_, _, nbands = data.shape
-
-		with self._new_image(fn_base_img, fn_new_img, data, spatial_win, data_type, img_format) as dst:
-			dst.nodata = 0
-			for band in range(0, nbands):
-				
-				dst.write(data[:,:,band].astype(dst.dtypes[band]), indexes=(band+1))
 	
 	def _find_layers(self, dirs_layers):
 		fn_layers = []
@@ -383,17 +400,30 @@ class LandMapper():
 		band_data = None
 		with rasterio.open(fn_layer) as ds:
 
-			if 'tile' in str(fn_layer):
-				band_data = ds.read(1)
-			else:
-				band_data = ds.read(1, window=spatial_win)
-		
+			try:
+				if 'tile' in str(fn_layer):
+					band_data = ds.read(1)
+				else:
+					band_data = ds.read(1, window=spatial_win)
+			except:
+					band_data = None
+					ttprint(f'ERROR: Failed to read {fn_layer} window {spatial_win}.')
+					band_data = np.empty((int(spatial_win.width), int(spatial_win.height)))
+					band_data[:] = np.nan
+			
+			if (band_data.shape[0] != band_data.shape[1]):
+				pad_dif = band_data.shape[0] - band_data.shape[1]
+				band_data_pad = np.pad(band_data, pad_width=(pad_dif,pad_dif), mode='edge')
+				band_data_pad = band_data_pad[0:spatial_win.width, 0:spatial_win.height]
+				ttprint(f'WARNING: Inconsistent block size {fn_layer}, padding the boundaries.')
+				band_data = band_data_pad
+			
 		return fn_layer, band_data, ds.nodatavals[0]
 
-	def _read_layers(self, fn_layers, spatial_win, inmem_calc_func, dict_layers_newnames):
+	def _read_layers(self, fn_layers, spatial_win, inmem_calc_func, dict_layers_newnames, allow_aditional_layers=False):
 		result = []
 		
-		max_workers = math.ceil(multiprocessing.cpu_count()/2)
+		max_workers = 5
 		
 		args = [ (fn_layer,spatial_win) for fn_layer in fn_layers]
 		
@@ -402,32 +432,37 @@ class LandMapper():
 			if (isinstance(band_data, np.ndarray)):
 				band_data = band_data.astype('Float16')
 				band_data[band_data == nodata] = np.nan
+				
 				if (np.isnan(np.min(band_data))):
+					# Slope layer hack
 					ttprint(f'Layer {fn_layer} has NA values (nodata={nodata})')
+					if fn_layer.name == 'dtm_slope.percent_gedi.eml_m_30m_0..0cm_2000..2018_eumap_epsg3035_v0.2.tif':
+						ttprint(f'Layer {fn_layer} filling nodata=100')
+						band_data[np.isnan(band_data)] = 100
 			else:
 				ttprint(f'Layer {fn_layer} not found')
 			
 			fn_layers.append(fn_layer)
 			result.append(band_data)
 		
-		input_data = np.stack(result, axis=2)
+		input_data = np.ascontiguousarray(np.stack(result, axis=2))
 		
-		if inmem_calc_func is not None:
-			fn_layers, input_data = inmem_calc_func(fn_layers, input_data, spatial_win)
-		
-		return self._reorder_data(fn_layers, dict_layers_newnames, input_data)
-
-	def _reorder_data(self, fn_layers, dict_layers_newnames, input_data ):
 		feature_cols_set = set(self.feature_cols)
 		layernames = []
-		
 		for fn_layer in fn_layers:
 			layername = fn_layer.stem
 			for newname in dict_layers_newnames.keys():
 				layername = re.sub(dict_layers_newnames[newname], newname, layername)
-			if layername not in feature_cols_set:
+			if not allow_aditional_layers and layername not in feature_cols_set:
 				raise Exception(f"Layer {layername} does not exist as feature_cols.\nUse dict_layers_newnames param to match their names")
 			layernames.append(layername)
+
+		if inmem_calc_func is not None:
+			layernames, input_data = inmem_calc_func(layernames, input_data, spatial_win)
+		
+		return self._reorder_data(layernames, dict_layers_newnames, input_data)
+
+	def _reorder_data(self, layernames, dict_layers_newnames, input_data ):
 		
 		sorted_input_data = []
 		for feature_col in self.feature_cols:
@@ -439,19 +474,78 @@ class LandMapper():
 		
 		return np.stack(sorted_input_data, axis=2)
 	
+	def _predict(self, input_data):
+		if self.meta_estimator is None:
+			if self.pred_method == 'predict':
+				return self.estimators[0].predict(input_data)
+			else:
+				return self.estimators[0].predict_proba(input_data)
+		else:
+			estimators_pred = []
+			for i in range(0, len(self.estimators)):
+
+				start = time.time()
+				estimator = self.estimators[i]
+				
+				if hasattr(self, 'estimators_col_list') and len(self.estimators_col_list) > 0:
+					estimator_cols = self.estimators_col_list[i]
+				else:
+					estimator_cols = self.feature_cols
+
+				idx = [self.feature_cols.index(x) for x in estimator_cols]
+
+				estimator_input = input_data[:,idx]
+				
+				#uncertainty_pred = np.empty((estimator_input.shape[0],33,3))
+				#meta_input_data = np.empty((estimator_input.shape[0],99))
+				#meta_input_data = []
+
+				if self.verbose:
+					estimator_name = type(estimator).__name__
+					ttprint(f'Running {estimator_name} using {len(idx)} features')
+				if "predict_proba" in dir(estimator):
+					estimator_output = estimator.predict_proba(estimator_input)
+				else:
+					estimator_output =  estimator.predict(estimator_input)
+
+				estimators_pred.append(estimator_output)
+				#uncertainty_pred[:,:,i] = estimator_output
+				#meta_input_data[:,33*i:(33*i)+33] = estimator_output
+
+				ttprint(f'## Benchmark ## {estimator_name} time: {time.time() - start}')
+
+			start = time.time()
+			uncertainty_pred = np.std(np.stack(estimators_pred, axis=2), axis=2)
+			meta_input_data = np.concatenate(estimators_pred, axis=1)
+			ttprint(f'## Benchmark ## meta_input time: {time.time() - start}')
+
+			if self.verbose:
+				estimator_name = type(self.meta_estimator).__name__
+				ttprint(f'Running {estimator_name}')
+
+			start = time.time()
+			if "predict_proba" in dir(self.meta_estimator):
+				meta_estimator_pred = self.meta_estimator.predict_proba(meta_input_data)
+			else:
+				meta_estimator_pred = self.meta_estimator.predict(meta_input_data)
+			ttprint(f'## Benchmark ## meta_estimator time: {time.time() - start}')
+
+			return meta_estimator_pred, uncertainty_pred 
+
 	def predict_points(self, input_points):
 		
-		input_feat = np.ascontiguousarray(input_points[self.feature_cols].to_numpy(), dtype=np.float32)
+		input_data = np.ascontiguousarray(input_points[self.feature_cols].to_numpy(), dtype=np.float32)
 
-		n_points, n_features = input_feat.shape
+		n_points, n_features = input_data.shape
 
 		if self.verbose:
 			ttprint(f'Predicing {n_points} points')
 		
-		return self.estimator.predict(input_feat)
+		return self._predict(input_data)
 	
 	def predict_multi(self, fn_layers_list:List = None, fn_result_list:List = None, spatial_win = None, \
-		data_type = 'float32', fill_nodata=False, estimate_uncertainty=False, inmem_calc_func = None, dict_layers_newnames_list:list = []):
+		data_type = 'float32', fill_nodata=False, estimate_uncertainty=False, inmem_calc_func = None, dict_layers_newnames_list:list = [],
+		allow_aditional_layers=False, hard_classes=True):
 		
 		data_pool = {}
 		result_pool = {}
@@ -465,8 +559,10 @@ class LandMapper():
 			fn_layers = fn_layers_list[i]
 			dict_layers_newnames = dict_layers_newnames_list[i]
 			
-			input_data = self._read_layers(fn_layers, spatial_win, inmem_calc_func, dict_layers_newnames)
-			
+			start = time.time()
+			input_data = self._read_layers(fn_layers, spatial_win, inmem_calc_func, dict_layers_newnames, allow_aditional_layers)
+			ttprint(f'## Benchmark ## Reading time: {time.time() - start}')
+
 			input_data_key = str(uuid.uuid4())
 			data_pool[input_data_key] = input_data
 			processing_futures.append(processing_pool.submit(processing_fn, i, input_data_key))
@@ -481,38 +577,90 @@ class LandMapper():
 			if self.verbose:
 				ttprint(f'Predicing {x_size * y_size} pixels')
 
-			result = self.estimator.predict_proba(input_data)
+			# Invalid spectral_indices values
+			#input_data[~np.isfinite(input_data)] = 0
+			#~np.isfinite(input_data)
+			nan_mask = np.isnan(input_data)#np.logical_or(np.isnan(input_data), ~np.isfinite(input_data))
+			input_data[nan_mask] = 0
+
+			start = time.time()
+			result, uncert = self._predict(input_data)
+			ttprint(f'## Benchmark ## Processing time: {time.time() - start}')
+
 			_, n_classes = result.shape
 
 			del data_pool[input_data_key]
 			gc.collect()
 			
-			nan_mask = np.any(np.isnan(input_data), axis=1)
+			nan_mask = np.any(nan_mask, axis=1)
 			input_data[nan_mask,:] = 0
+			
 			result[nan_mask] = np.nan
 			result = result.reshape(x_size, y_size, n_classes)
-			result = (result * 100).astype('int8')
+			result = (result * 100).round().astype('int8')
+
+			uncert[nan_mask] = np.nan
+			uncert = uncert.reshape(x_size, y_size, n_classes)
+			uncert = (uncert * 100).round().astype('int8')
 			
-			result_pool[input_data_key] = result
+			result_pool[input_data_key] = (result, uncert)
 			writing_futures.append(writting_pool.submit(wrinting_fn, i, input_data_key))
 		
 		def wrinting_fn(i, input_data_key):
 			
-			result = result_pool[input_data_key]
+			result, uncert = result_pool[input_data_key]
 			fn_result = fn_result_list[i]
 			fn_layers = fn_layers_list[i]
 			
+			out_files = []
+
 			if self.verbose:
 				ttprint(f'Saving the result in {fn_result}')
+			start = time.time()
+			if hard_classes:
+				namask = np.all((result == 0), axis=2)
+				argmax = np.argmax(result, axis=2)
+				
+				result_hcl_uncert = np.take_along_axis(uncert, np.stack([argmax], axis=2), axis=2)
+				result_hcl_prob = np.take_along_axis(result, np.stack([argmax], axis=2), axis=2)
+				
+				result_hcl = argmax + 1
+				result_hcl[namask] = 0
+				result_hcl_uncert[namask] = 0
+				result_hcl_prob[namask] = 0
+
+				fn_hardclasses = fn_result.replace('.tif', '_hcl.tif')
+				fn_hardclasses_uncer = fn_result.replace('.tif', '_hcl_uncertainty.tif')
+				fn_hardclasses_prob = fn_result.replace('.tif', '_hcl_prob.tif')
+
+				_data_to_new_img(fn_layers[0], fn_hardclasses, np.stack([result_hcl], axis=2), spatial_win = spatial_win)
+				_data_to_new_img(fn_layers[0], fn_hardclasses_uncer, result_hcl_uncert, spatial_win = spatial_win)
+				_data_to_new_img(fn_layers[0], fn_hardclasses_prob, result_hcl_prob, spatial_win = spatial_win)
+
+				out_files.append(Path(fn_hardclasses))
+				out_files.append(Path(fn_hardclasses_uncer))
+
+			fn_uncertainty = fn_result.replace('.tif', '_uncertainty.tif')
+
+			for b in range(0, result.shape[2]):
+
+				fn_result_b = fn_result.replace('.tif', f'_b{b}.tif')
+				fn_hardclasses_uncer_b = fn_result.replace('.tif', f'_b{b}_uncertainty.tif')
+
+				_data_to_new_img(fn_layers[0], fn_result_b, result[:,:,b:b+1], spatial_win = spatial_win)
+				_data_to_new_img(fn_layers[0], fn_hardclasses_uncer_b, uncert[:,:,b:b+1], spatial_win = spatial_win)
 			
-			self._data_to_new_img(fn_layers[0], fn_result, result, spatial_win = spatial_win)
-			
+				out_files.append(Path(fn_result_b))
+				out_files.append(Path(fn_hardclasses_uncer_b))
+
+			ttprint(f'## Benchmark ## Saving time: {time.time() - start}')
 			del result_pool[input_data_key]
 			gc.collect()
-			return Path(fn_result)
+			
+			return out_files
 		
 		reading_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-		processing_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+		processing_pool = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 		writting_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 		
 		for i in range(0, len(fn_layers_list)):
@@ -527,12 +675,12 @@ class LandMapper():
 		output_fn_files = []
 		
 		for future in as_completed(writing_futures):
-			output_fn_files.append(future.result())
+			output_fn_files += future.result()
 
 		reading_pool.shutdown(wait=False)
 		processing_pool.shutdown(wait=False)
 		writting_pool.shutdown(wait=False)
-		
+
 		return output_fn_files
 		
 	def predict(self, dirs_layers:List = None, fn_layers:List = None, fn_result:str = None, spatial_win = None, \
@@ -557,10 +705,14 @@ class LandMapper():
 			nan_mask = np.any(np.isnan(input_data), axis=1)
 			input_data[nan_mask,:] = 0
 
-		if self.verbose:
-			ttprint(f'Predicing {x_size * y_size} pixels')
+		#if self.verbose:
+		#	ttprint(f'Predicing {x_size * y_size} pixels')
 
-		result = self.estimator.predict_proba(input_data)
+		print(input_data.shape)
+
+		return
+
+		result = self._predict(input_data)
 		_, n_classes = result.shape
 		
 		result[nan_mask] = np.nan
@@ -569,7 +721,7 @@ class LandMapper():
 		
 		if self.verbose:
 			ttprint(f'Saving the result in {fn_result}')
-		self._data_to_new_img(fn_layers[0], fn_result, result, spatial_win = spatial_win)
+		_data_to_new_img(fn_layers[0], fn_result, result, spatial_win = spatial_win)
 
 		if estimate_uncertainty:
 			#result = self.estimator.predict_proba(input_data)
@@ -586,9 +738,42 @@ class LandMapper():
 
 			out_ext = Path(fn_result).suffix
 			fn_uncertainty = fn_result.replace(out_ext, '_uncertainty'+out_ext)
-			self._data_to_new_img(
+			_data_to_new_img(
 				fn_layers[0], fn_uncertainty,
 				relative_entropy.reshape(x_size, y_size, 1),
 				spatial_win = spatial_win,
 				data_type='byte', nodata=255
 			)
+
+	@staticmethod
+	def load_instance(fn_joblib):
+		if not isinstance(fn_joblib, Path):
+			fn_joblib = Path(fn_joblib)
+
+		landmapper = joblib.load(fn_joblib)
+		for estimator in landmapper.estimator_list:
+			if landmapper._is_keras_classifier(estimator):
+				fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
+				estimator['estimator'].model = load_model(fn_keras)
+		
+		return landmapper
+
+	def save_instance(self, fn_joblib, no_train_data = False, compress='lz4'):
+		if not isinstance(fn_joblib, Path):
+			fn_joblib = Path(fn_joblib)
+
+		if no_train_data:
+			prop_to_del = [ 'pts', 'features', 'target', 'samples_weight', 'cv_groups']
+			for prop in prop_to_del:
+				if self.verbose:
+					ttprint(f'Removing {prop} attribute')
+				delattr(self, prop)
+		
+		for estimator in self.estimator_list:
+			if self._is_keras_classifier(estimator):
+				basedir = fn_joblib.parent
+				fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
+				estimator['estimator'].model.save(fn_keras)
+				estimator['estimator'].model = None
+
+		return joblib.dump(self, fn_joblib, compress=compress)

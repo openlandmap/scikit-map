@@ -20,6 +20,8 @@ import osr
 import os
 
 import bottleneck as bc
+from .misc import ttprint
+from .misc import data_to_new_img, data_from_img
 
 _OUT_DIR = os.path.join(os.getcwd(), 'gapfilled')
 
@@ -192,18 +194,7 @@ class TimeGapFiller():
 		result = []
 
 		for fn_layer in self.fn_times_layers[time]:
-			with rasterio.open(fn_layer) as ds:
-
-				band_data = ds.read(1, window=self.spatial_win)
-				
-				if (isinstance(band_data, np.ndarray)):
-					nodata = ds.nodatavals[0]
-					band_data = band_data.astype('Float32')
-					band_data[band_data == nodata] = np.nan
-				else:
-					band_data = np.empty((self.spatial_win.width, self.spatial_win.height))
-					band_data[:] = np.nan
-				result.append(band_data)
+			result.append(data_from_img(fn_layer))
 
 		result = np.stack(result, axis=2)
 
@@ -211,65 +202,6 @@ class TimeGapFiller():
 				ttprint(f'Data shape: {result.shape}')
 
 		return time, result
-
-	def _new_image(self, fn_base_img, fn_new_img, data, data_type = None, img_format = 'GTiff', nodata = 0):
-		
-		x_size, y_size, nbands = data.shape
-		
-		with rasterio.open(fn_base_img, 'r') as base_img:
-
-			if data_type is None:
-				data_type = base_img.dtypes[0]
-						
-			transform = base_img.transform
-			if self.spatial_win is not None:
-				transform = rasterio.windows.transform(self.spatial_win, transform)
-			
-			return rasterio.open(fn_new_img, 'w', 
-							driver=img_format, 
-							width=x_size, 
-							height=y_size, 
-							count=nbands,
-							dtype=data_type, 
-							crs=base_img.crs,
-							compress='LZW',
-							transform=transform)
-
-	def _data_to_new_img(self, fn_base_img, fn_new_img, data, data_type = None, img_format = 'GTiff', nodata = 0):
-
-		_, _, nbands = data.shape
-
-		with self._new_image(fn_base_img, fn_new_img, data, data_type, img_format) as dst:
-			dst.nodata = 0
-			for band in range(0, nbands):
-				
-				dst.write(data[:,:,band].astype(dst.dtypes[band]), indexes=(band+1))
-
-	def _data_to_new_img2(self, fn_base_img, fn_new_img, data, data_type = None, img_format = 'GTiff', nodata = 0, options = ["TILED=YES", "COMPRESS=LZW"]):
-
-		driver = gdal.GetDriverByName(img_format)
-		base_ds = gdal.Open( str(fn_base_img) )
-
-		self.window
-		x_start, pixel_width, _, y_start, _, pixel_height = base_ds.GetGeoTransform()
-		x_size, y_size, nbands = data.shape
-
-		out_srs = osr.SpatialReference()
-		out_srs.ImportFromWkt(base_ds.GetProjectionRef())
-
-		if data_type is None:
-			data_type = base_ds.GetRasterBand(1).DataType
-
-		new_ds = driver.Create(fn_new_img, x_size, y_size, nbands, data_type, options = options)
-		new_ds.SetGeoTransform((x_start, pixel_width, 0, y_start, 0, pixel_height))
-		new_ds.SetProjection(out_srs.ExportToWkt())
-
-		for band in range(0, nbands):
-			new_band = new_ds.GetRasterBand((band+1))
-			new_band.WriteArray(data[:,:,band],0,0)
-			new_band.SetNoDataValue(nodata)
-
-		new_ds.FlushCache()
 
 	def _get_neib_times(self, time):
 		
@@ -395,8 +327,8 @@ class TimeGapFiller():
 				except:
 					continue
 
-			self._data_to_new_img(fn_base_img, out_fn_data, self.time_data[time][:,:,t:t+1])
-			self._data_to_new_img(fn_base_img, out_fn_flag, self.time_data_gaps[time][:,:,t:t+1])
+			data_to_new_img(fn_base_img, out_fn_data, self.time_data[time][:,:,t:t+1])
+			data_to_new_img(fn_base_img, out_fn_flag, self.time_data_gaps[time][:,:,t:t+1])
 		
 		return True
 		
