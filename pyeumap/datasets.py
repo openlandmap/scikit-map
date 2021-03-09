@@ -177,4 +177,9 @@ def get_data(datasets: Union[str, list], download_dir: str=_DOWNLOAD_DIR):
             break
 
 if __name__ == '__main__':
-    get_data(DATASETS)
+    query = sys.argv[1:]
+    if not query:
+        query = DATASETS
+    else:
+        query = get_datasets(query)
+    get_data(query)
