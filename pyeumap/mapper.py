@@ -39,8 +39,6 @@ from sklearn import metrics
 from sklearn.model_selection import KFold,BaseCrossValidator
 from sklearn.model_selection import cross_val_predict
 
-
-
 _automl_enabled = False
 try:
 	from autosklearn.classification import AutoSklearnClassifier
@@ -475,71 +473,62 @@ class LandMapper():
 		return np.stack(sorted_input_data, axis=2)
 	
 	def _predict(self, input_data):
+		
+		estimators_pred = []
+
+		for estimator in self.estimator_list:
+			
+			start = time.time()
+			estimator_name = type(estimator).__name__
+			self._verbose(f'Executing {estimator_name}')
+			
+			if self._is_keras_classifier(estimator):
+				
+				n_elements, _ = input_data.shape
+				pred_batch_size = int(n_elements/2)
+				
+				self._verbose(f'batch_size={pred_batch_size}')
+				estimator['estimator'].set_params(batch_size=pred_batch_size)
+
+			estimator_pred_method = getattr(estimator, self.pred_method)
+			estimators_pred.append(estimator_pred_method(input_data))
+			self._verbose(f'{estimator_name} prediction time: {time.time() - start}')
+
 		if self.meta_estimator is None:
-			if self.pred_method == 'predict':
-				return self.estimators[0].predict(input_data)
-			else:
-				return self.estimators[0].predict_proba(input_data)
+			
+			estimator_pred = estimators_pred[0]
+			relative_entropy_pred = None
+
+			if self.pred_method == 'predict_proba':
+				_, n_classes = estimator_pred.shape
+				classes_proba = np.maximum(estimator_pred, 1e-15)
+			
+				relative_entropy_pred = -1 * classes_proba * np.log2(classes_proba)
+				relative_entropy_pred = relative_entropy_pred.sum(axis=1) / np.log2(n_classes)
+
+			return estimator_pred, relative_entropy_pred
+
 		else:
-			estimators_pred = []
-			for i in range(0, len(self.estimators)):
-
-				start = time.time()
-				estimator = self.estimators[i]
-				
-				if hasattr(self, 'estimators_col_list') and len(self.estimators_col_list) > 0:
-					estimator_cols = self.estimators_col_list[i]
-				else:
-					estimator_cols = self.feature_cols
-
-				idx = [self.feature_cols.index(x) for x in estimator_cols]
-
-				estimator_input = input_data[:,idx]
-				
-				#uncertainty_pred = np.empty((estimator_input.shape[0],33,3))
-				#meta_input_data = np.empty((estimator_input.shape[0],99))
-				#meta_input_data = []
-
-				if self.verbose:
-					estimator_name = type(estimator).__name__
-					ttprint(f'Running {estimator_name} using {len(idx)} features')
-				if "predict_proba" in dir(estimator):
-					estimator_output = estimator.predict_proba(estimator_input)
-				else:
-					estimator_output =  estimator.predict(estimator_input)
-
-				estimators_pred.append(estimator_output)
-				#uncertainty_pred[:,:,i] = estimator_output
-				#meta_input_data[:,33*i:(33*i)+33] = estimator_output
-
-				ttprint(f'## Benchmark ## {estimator_name} time: {time.time() - start}')
-
+			
 			start = time.time()
-			uncertainty_pred = np.std(np.stack(estimators_pred, axis=2), axis=2)
-			meta_input_data = np.concatenate(estimators_pred, axis=1)
-			ttprint(f'## Benchmark ## meta_input time: {time.time() - start}')
+			meta_estimator_name = type(self.meta_estimator).__name__
+			self._verbose(f'Executing {meta_estimator_name}')
 
-			if self.verbose:
-				estimator_name = type(self.meta_estimator).__name__
-				ttprint(f'Running {estimator_name}')
+			input_meta_features = np.concatenate(estimators_pred, axis=1)
+			std_meta_features = np.std(np.stack(estimators_pred, axis=2), axis=2)
 
-			start = time.time()
-			if "predict_proba" in dir(self.meta_estimator):
-				meta_estimator_pred = self.meta_estimator.predict_proba(meta_input_data)
-			else:
-				meta_estimator_pred = self.meta_estimator.predict(meta_input_data)
-			ttprint(f'## Benchmark ## meta_estimator time: {time.time() - start}')
+			meta_estimator_pred_method = getattr(self.meta_estimator, self.pred_method)
+			meta_estimator_pred = meta_estimator_pred_method(input_meta_features)
+			self._verbose(f'{meta_estimator_name} prediction time: {time.time() - start}')
 
-			return meta_estimator_pred, uncertainty_pred 
+			return meta_estimator_pred, std_meta_features 
 
 	def predict_points(self, input_points):
 		
 		input_data = np.ascontiguousarray(input_points[self.feature_cols].to_numpy(), dtype=np.float32)
 
-		n_points, n_features = input_data.shape
-
-		if self.verbose:
-			ttprint(f'Predicing {n_points} points')
+		n_points, _ = input_data.shape
+		self._verbose(f'Predicting {n_points} points')
 		
 		return self._predict(input_data)
 	
@@ -633,9 +622,9 @@ class LandMapper():
 				fn_hardclasses_uncer = fn_result.replace('.tif', '_hcl_uncertainty.tif')
 				fn_hardclasses_prob = fn_result.replace('.tif', '_hcl_prob.tif')
 
-				_data_to_new_img(fn_layers[0], fn_hardclasses, np.stack([result_hcl], axis=2), spatial_win = spatial_win)
-				_data_to_new_img(fn_layers[0], fn_hardclasses_uncer, result_hcl_uncert, spatial_win = spatial_win)
-				_data_to_new_img(fn_layers[0], fn_hardclasses_prob, result_hcl_prob, spatial_win = spatial_win)
+				data_to_new_img(fn_layers[0], fn_hardclasses, np.stack([result_hcl], axis=2), spatial_win = spatial_win)
+				data_to_new_img(fn_layers[0], fn_hardclasses_uncer, result_hcl_uncert, spatial_win = spatial_win)
+				data_to_new_img(fn_layers[0], fn_hardclasses_prob, result_hcl_prob, spatial_win = spatial_win)
 
 				out_files.append(Path(fn_hardclasses))
 				out_files.append(Path(fn_hardclasses_uncer))
@@ -647,8 +636,8 @@ class LandMapper():
 				fn_result_b = fn_result.replace('.tif', f'_b{b}.tif')
 				fn_hardclasses_uncer_b = fn_result.replace('.tif', f'_b{b}_uncertainty.tif')
 
-				_data_to_new_img(fn_layers[0], fn_result_b, result[:,:,b:b+1], spatial_win = spatial_win)
-				_data_to_new_img(fn_layers[0], fn_hardclasses_uncer_b, uncert[:,:,b:b+1], spatial_win = spatial_win)
+				data_to_new_img(fn_layers[0], fn_result_b, result[:,:,b:b+1], spatial_win = spatial_win)
+				data_to_new_img(fn_layers[0], fn_hardclasses_uncer_b, uncert[:,:,b:b+1], spatial_win = spatial_win)
 			
 				out_files.append(Path(fn_result_b))
 				out_files.append(Path(fn_hardclasses_uncer_b))
@@ -687,7 +676,7 @@ class LandMapper():
 		data_type = 'float32', fill_nodata=False, estimate_uncertainty=False, inmem_calc_func = None, dict_layers_newnames={}):
 
 		if dirs_layers is None and fn_layers is None:
-			ttprint(f'Please, inform dirs_layers or fn_layers')
+			self._verbose(f'Please, inform dirs_layers or fn_layers')
 			return
 
 		if fn_layers is None:
@@ -705,45 +694,29 @@ class LandMapper():
 			nan_mask = np.any(np.isnan(input_data), axis=1)
 			input_data[nan_mask,:] = 0
 
-		#if self.verbose:
-		#	ttprint(f'Predicing {x_size * y_size} pixels')
+		pred_result, pred_uncer = self._predict(input_data)
 
-		print(input_data.shape)
+		_, n_classes = pred_result.shape
 
-		return
+		pred_result[nan_mask] = np.nan
+		pred_result = pred_result.reshape(x_size, y_size, n_classes)
+		pred_result = (pred_result * 100).astype('int8')
+		data_to_new_img(fn_layers[0], fn_result, pred_result, spatial_win = spatial_win)
 
-		result = self._predict(input_data)
-		_, n_classes = result.shape
-		
-		result[nan_mask] = np.nan
-		result = result.reshape(x_size, y_size, n_classes)
-		result = (result * 100).astype('int8')
-		
-		if self.verbose:
-			ttprint(f'Saving the result in {fn_result}')
-		_data_to_new_img(fn_layers[0], fn_result, result, spatial_win = spatial_win)
+		output_fn_files = [fn_result]
 
-		if estimate_uncertainty:
-			#result = self.estimator.predict_proba(input_data)
-			#result = np.maximum(class_proba, 1e-15)
-			#n_classes = self.pts[self.target_col].unique().size
-
-			result = np.maximum(result, 1e-15)
+		if pred_uncer is not None:
+			pred_uncer[nan_mask] = np.nan
+			pred_uncer = pred_uncer.reshape(x_size, y_size, n_classes)
+			pred_uncer = (pred_uncer * 100).astype('int8')
 			
-			relative_entropy = -1 * result * np.log2(result)
-			relative_entropy = 100 * relative_entropy.sum(axis=-1) / np.log2(n_classes)
-			if not fill_nodata:
-				relative_entropy[nan_mask] = 255
-			relative_entropy = relative_entropy.round().astype(np.uint8)
-
 			out_ext = Path(fn_result).suffix
-			fn_uncertainty = fn_result.replace(out_ext, '_uncertainty'+out_ext)
-			_data_to_new_img(
-				fn_layers[0], fn_uncertainty,
-				relative_entropy.reshape(x_size, y_size, 1),
-				spatial_win = spatial_win,
-				data_type='byte', nodata=255
-			)
+			fn_uncertainty = fn_result.replace(out_ext, '_uncertainty' + out_ext)
+			
+			data_to_new_img(fn_layers[0], fn_uncertainty, pred_uncer, spatial_win = spatial_win)
+			output_fn_files.append(fn_uncertainty)
+
+		return output_fn_files
 
 	@staticmethod
 	def load_instance(fn_joblib):
