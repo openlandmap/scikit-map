@@ -21,7 +21,7 @@ import os
 
 import bottleneck as bc
 from .misc import ttprint
-from .misc import data_to_new_img, data_from_img
+#from .misc import data_to_new_img, data_from_img
 
 _OUT_DIR = os.path.join(os.getcwd(), 'gapfilled')
 
