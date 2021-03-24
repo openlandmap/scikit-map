@@ -21,7 +21,7 @@ import os
 
 import bottleneck as bc
 from .misc import ttprint
-#from .misc import data_to_new_img, data_from_img
+from pyeumap.raster import read_rasters, write_new_raster
 
 _OUT_DIR = os.path.join(os.getcwd(), 'gapfilled')
 
@@ -177,31 +177,16 @@ class TimeGapFiller():
 		self.verbose = verbose
 		
 	def read_layers(self):
-		args = [ (time,) for time in self.time_order]
-		for time, data in parallel.ThreadGeneratorLazy(self._get_data, iter(args), max_workers=len(self.time_order), chunk=len(self.time_order)):
-			self.time_data[time] = data
+		for time in self.time_order:
+			self.time_data[time], _ = read_rasters(raster_files = self.fn_times_layers[time], verbose=self.verbose)
+			if self.verbose:
+				ttprint(f'{time} data shape: {self.time_data[time].shape}')
 			time_shape = self.time_data[time].shape
 			if time_shape[2] > self.max_n_layers_per_time:
 				self.max_n_layers_per_time = time_shape[2]
-		
+
 		if self.verbose:
 			ttprint('Reading process finished')
-
-	def _get_data(self, time):
-		if self.verbose:
-			ttprint(f'Reading {len(self.fn_times_layers[time])} layers on {time}')
-
-		result = []
-
-		for fn_layer in self.fn_times_layers[time]:
-			result.append(data_from_img(fn_layer))
-
-		result = np.stack(result, axis=2)
-
-		if self.verbose:
-				ttprint(f'Data shape: {result.shape}')
-
-		return time, result
 
 	def _get_neib_times(self, time):
 		
@@ -327,8 +312,8 @@ class TimeGapFiller():
 				except:
 					continue
 
-			data_to_new_img(fn_base_img, out_fn_data, self.time_data[time][:,:,t:t+1])
-			data_to_new_img(fn_base_img, out_fn_flag, self.time_data_gaps[time][:,:,t:t+1])
+			write_new_raster(fn_base_img, out_fn_data, self.time_data[time][:,:,t:t+1], data_type='uint8')
+			write_new_raster(fn_base_img, out_fn_flag, self.time_data_gaps[time][:,:,t:t+1], data_type='uint8')
 		
 		return True
 		

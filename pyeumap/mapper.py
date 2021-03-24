@@ -89,7 +89,6 @@ class LandMapper():
     self.target_col = target_col
     
     self.feature_cols = self._feature_cols(feat_col_prfxs)
-    self.samples_weight = self._get_column_if_exists(weight_col, 'weight_col')
 
     self.nodata_imputer = nodata_imputer
     self.estimator_list = self._set_list(estimator, estimator_list, 'estimator')
@@ -100,7 +99,6 @@ class LandMapper():
 
     self.cv = cv
     self.cv_njobs = cv_njobs
-    self.cv_groups = self._get_column_if_exists(cv_group_col, 'cv_group_col')
 
     self.pred_method = self._pred_method(pred_method)
       
@@ -109,11 +107,16 @@ class LandMapper():
 
     self._min_samples_restriction(min_samples_per_class)
     self.features = np.ascontiguousarray(self.pts[self.feature_cols].to_numpy(), dtype=np.float32)
-    self.target = np.ascontiguousarray(self.pts[self.target_col].to_numpy(), dtype=np.float32)
+    self.target = target = np.ascontiguousarray(self.pts[self.target_col].to_numpy(), dtype=np.float32)
+
+    self._target_transformation()
+
+    self.samples_weight = self._get_column_if_exists(weight_col, 'weight_col')
+    self.cv_groups = self._get_column_if_exists(cv_group_col, 'cv_group_col')
 
     if self.nodata_imputer is not None:
       self.features = self._impute_nodata(self.features, fit_and_tranform = True)
-  
+    
   def _pts(self, points):
     if isinstance(points, Path):
       suffix = points.suffix
@@ -137,7 +140,7 @@ class LandMapper():
   def _get_column_if_exists(self, column_name, param_name):
     if column_name is not None:
       if column_name in self.pts.columns:
-        return self.pts[self.column_name]
+        return self.pts[column_name]
       else: 
         self._verbose(f'Ignoring {param_name}, because {column_name} column not exists.')
     else:
@@ -175,6 +178,21 @@ class LandMapper():
     if nrows > 0:
       self.pts = self.pts[rows_to_remove]
       self._verbose(f'Removing {nrows} samples due min_samples_per_class condition (< {min_samples_per_class})')
+
+  def _target_transformation(self):
+  
+    self._verbose(f"Transforming {self.target_col}:")
+
+    self.target_le = preprocessing.LabelEncoder()
+    self.target = self.target_le.fit_transform(self.target)
+    
+    self.target_classes = {
+      'original': self.target_le.classes_,
+      'transformed': self.target_le.transform(self.target_le.classes_)
+    }
+
+    self._verbose(f" -Original classes: {self.target_classes['original']}")
+    self._verbose(f" -Transformed classes: {self.target_classes['transformed']}")
 
   def _impute_nodata(self, data, fit_and_tranform = False):
     nodata_idx = self._nodata_idx(data)
@@ -437,38 +455,43 @@ class LandMapper():
 
     fn_out_files = []
 
+    if self.pred_method != 'predict_proba':
+      separate_probs = False
+
     fn_pred_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_result, nan_mask, 
       separate_probs = separate_probs, spatial_win = spatial_win, scale=100)
     fn_out_files += fn_pred_files
 
-    if pred_uncer is not None:
-      
-      fn_uncer_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_uncer, nan_mask, 
-        separate_probs = separate_probs, spatial_win = spatial_win, scale=100, new_suffix = '_uncertainty')
-      fn_out_files += fn_uncer_files
-
-    if hard_class:
-      
-      pred_argmax = np.argmax(pred_result, axis=1)
-    
-      pred_argmax_prob = np.take_along_axis(pred_result, np.stack([pred_argmax], axis=1), axis=1)
-      if pred_uncer is not None:
-        pred_argmax_uncer = np.take_along_axis(pred_uncer, np.stack([pred_argmax], axis=1), axis=1)
-
-      pred_argmax += 1
-
-      fn_hcl_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax, nan_mask, 
-        separate_probs = False, spatial_win = spatial_win, new_suffix = '_hcl')
-      fn_out_files += fn_hcl_file
-
-      fn_hcl_prob_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_prob, nan_mask, 
-        separate_probs = False, spatial_win = spatial_win, scale=100, new_suffix = '_hcl_prob')
-      fn_out_files += fn_hcl_prob_files
+    if self.pred_method == 'predict_proba':
 
       if pred_uncer is not None:
-        fn_hcl_uncer_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_uncer, nan_mask, 
-          separate_probs = False, spatial_win = spatial_win, scale=100, new_suffix = '_hcl_uncertainty')
-        fn_out_files += fn_hcl_uncer_file
+        
+        fn_uncer_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_uncer, nan_mask, 
+          separate_probs = separate_probs, spatial_win = spatial_win, scale=100, new_suffix = '_uncertainty')
+        fn_out_files += fn_uncer_files
+
+      if hard_class:
+
+        pred_argmax = np.argmax(pred_result, axis=1)
+        pred_argmax_prob = np.take_along_axis(pred_result, np.stack([pred_argmax], axis=1), axis=1)
+        
+        if pred_uncer is not None and pred_uncer.ndim > 2:
+          pred_argmax_uncer = np.take_along_axis(pred_uncer, np.stack([pred_argmax], axis=1), axis=1)
+
+        pred_argmax += 1
+
+        fn_hcl_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax, nan_mask, 
+          separate_probs = False, spatial_win = spatial_win, new_suffix = '_hcl')
+        fn_out_files += fn_hcl_file
+
+        fn_hcl_prob_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_prob, nan_mask, 
+          separate_probs = False, spatial_win = spatial_win, scale=100, new_suffix = '_hcl_prob')
+        fn_out_files += fn_hcl_prob_files
+
+        if pred_uncer is not None and pred_uncer.ndim > 2:
+          fn_hcl_uncer_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_uncer, nan_mask, 
+            separate_probs = False, spatial_win = spatial_win, scale=100, new_suffix = '_hcl_uncertainty')
+          fn_out_files += fn_hcl_uncer_file
 
     return fn_out_files
 
@@ -498,11 +521,12 @@ class LandMapper():
       estimator.fit(self.features, target, **self._fit_params(estimator))
 
     # Training the final meta-estimator
-    self._verbose(f'Training meta-estimator using all samples')
-    self.meta_estimator.fit(self.meta_features, self.target, **self._fit_params(self.meta_estimator))
+    if self.meta_estimator is not None:
+      self._verbose(f'Training meta-estimator using all samples')
+      self.meta_estimator.fit(self.meta_features, self.target, **self._fit_params(self.meta_estimator))
 
   def _relative_entropy(self, pred_result):
-    _, n_classes = estimator_pred.shape
+    _, n_classes = pred_result.shape
 
     classes_proba = np.maximum(pred_result, 1e-15)
       
@@ -538,10 +562,13 @@ class LandMapper():
       estimator_pred = estimators_pred[0]
       relative_entropy_pred = None
 
-      if self.pred_method == 'predict_proba':
-        relative_entropy_pred = self._relative_entropy(estimator_pred)
+      #Produce almost the same data of the invese of the
+      #highest probability (hcl_prob.tif)
+      #if self.pred_method == 'predict_proba':
+      #  relative_entropy_pred = self._relative_entropy(estimator_pred)
+      #  relative_entropy_pred = relative_entropy_pred.astype('float32')
 
-      return estimator_pred.astype('float32'), relative_entropy_pred.astype('float32')
+      return estimator_pred.astype('float32'), relative_entropy_pred
 
     else:
       
@@ -595,6 +622,8 @@ class LandMapper():
     fn_out_files = self._write_layers(fn_base_layer, fn_output, input_data_shape, pred_result, \
       pred_uncer, nan_mask, spatial_win, separate_probs, hard_class)
     
+    fn_out_files.sort()
+
     return fn_out_files
 
   def predict_multi(self, dirs_layers_list:List = [], fn_layers_list:List = [], fn_output_list:List = [], spatial_win = None,
@@ -798,6 +827,8 @@ class EagerLoadPrediction(PredictionStrategy):
     self.reading_pool.shutdown(wait=False)
     self.writing_pool.shutdown(wait=False)
 
+    output_fn_files.sort()
+
     return output_fn_files
 
 class LazyLoadPrediction(PredictionStrategy):
@@ -917,5 +948,7 @@ class LazyLoadPrediction(PredictionStrategy):
     self.reading_pool.shutdown(wait=False)
     self.processing_pool.shutdown(wait=False)
     self.writing_pool.shutdown(wait=False)
+
+    output_fn_files.sort()
 
     return output_fn_files

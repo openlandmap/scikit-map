@@ -6,25 +6,6 @@ from pyeumap import parallel
 
 import rasterio
 
-def read_raster(
-									raster_file,
-									spatial_win = None
-								):
-	
-	band_data = None
-	
-	with rasterio.open(raster_file) as raster_ds:
-		
-		try:
-			band_data = raster_ds.read(1, window=spatial_win)
-		except:
-			if spatial_win is not None:
-				ttprint(f'ERROR: Failed to read {raster_file} window {spatial_win}.')
-				band_data = np.empty((int(spatial_win.width), int(spatial_win.height)))
-				band_data[:] = np.nan
-		
-	return raster_file, band_data, raster_ds.nodatavals[0]
-
 def read_rasters(	
 									raster_dirs:List = [], 
 									raster_files:List = [], 
@@ -43,13 +24,30 @@ def read_rasters(
 	if verbose:
 		ttprint(f'Reading {len(raster_files)} raster files')
 
-	args = [ (raster_file, spatial_win) for raster_file in raster_files]
+	def _read_raster(raster_pos):
 	
-	raster_data = []
-	raster_files_ = []
+		raster_file = raster_files[raster_pos]
+		band_data = None
 
-	for raster_file, band_data, nodata in parallel.ThreadGeneratorLazy(read_raster, iter(args), max_workers=n_jobs, chunk=n_jobs*2):
+		with rasterio.open(raster_file) as raster_ds:
+			
+			try:
+				band_data = raster_ds.read(1, window=spatial_win)
+			except:
+				if spatial_win is not None:
+					ttprint(f'ERROR: Failed to read {raster_file} window {spatial_win}.')
+					band_data = np.empty((int(spatial_win.width), int(spatial_win.height)))
+					band_data[:] = np.nan
+			
+		return raster_pos, band_data, raster_ds.nodatavals[0]
+	
+	raster_data = {}
+	args = [ (raster_pos,) for raster_pos in range(0,len(raster_files)) ]
+
+	for raster_pos, band_data, nodata in parallel.ThreadGeneratorLazy(_read_raster, iter(args), max_workers=n_jobs, chunk=n_jobs*2):
 		
+		raster_file = raster_files[raster_pos]
+
 		if (isinstance(band_data, np.ndarray)):
 			
 			band_data = band_data.astype(dtype)
@@ -61,13 +59,12 @@ def read_rasters(
 		else:
 			raise Exception(f'The raster {raster_file} was not found.')
 		
-
-		raster_files_.append(raster_file)
-		raster_data.append(band_data)
+		raster_data[raster_pos] = band_data
 	
+	raster_data = [raster_data[i] for i in range(0,len(raster_files))]
 	raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
 	
-	return raster_data, raster_files_
+	return raster_data, raster_files
 
 def create_raster(
 										fn_base_raster, 

@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import skimage.exposure as exposure
+from matplotlib.colors import ListedColormap
 from typing import Union, List, Tuple
 import rasterio as rio
 import numpy as np
@@ -34,7 +35,7 @@ def plot_rasters(
 	else:
 		rasters = list(rasters)
 
-	if isinstance(cmaps, str):
+	if isinstance(cmaps, (str, ListedColormap)):
 		cmaps = [cmaps] * len(rasters)
 
 	if nodata is None or isinstance(nodata, (int, float)):
