@@ -499,7 +499,8 @@ class LandMapper():
 
     # Hyperparameter optization for all estimators
     for hyperpar_selection, estimator in zip(self.hyperpar_selection_list, self.estimator_list):
-      self._do_hyperpar_selection(hyperpar_selection, estimator, self.features)
+      if hyperpar_selection is not None:
+        self._do_hyperpar_selection(hyperpar_selection, estimator, self.features)
 
     # Meta-features calculation to feed the meta-estimator
     if self.meta_estimator is not None:
@@ -672,7 +673,12 @@ class LandMapper():
         estimator['estimator'].model.save(fn_keras)
         estimator['estimator'].model = None
 
-    return joblib.dump(self, fn_joblib, compress=compress)
+    result = joblib.dump(self, fn_joblib, compress=compress)
+  
+    for estimator in self.estimator_list:
+      if self._is_keras_classifier(estimator):
+        fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
+        estimator['estimator'].model = load_model(fn_keras)
 
 class PredictionStrategy(ABC):
 
