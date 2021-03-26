@@ -28,6 +28,8 @@ def plot_rasters(
 	titles: List[str]=[],
 	dpi: int=150,
 	nodata: List[Union[int, float]]=None,
+	vmin: List[Union[int, float]]=None,
+	vmax: List[Union[int, float]]=None,
 ):
 	if isinstance(rasters, (str, Path, np.ndarray)):
 		rasters = [rasters]
@@ -36,6 +38,12 @@ def plot_rasters(
 
 	if isinstance(cmaps, str):
 		cmaps = [cmaps] * len(rasters)
+
+	if vmin is None or isinstance(vmin, (int, float)):
+		vmin = [vmin] * len(rasters)
+
+	if vmax is None or isinstance(vmax, (int, float)):
+		vmax = [vmax] * len(rasters)
 
 	if nodata is None or isinstance(nodata, (int, float)):
 		nodata = [nodata] * len(rasters)
@@ -71,13 +79,20 @@ def plot_rasters(
 	fig.patch.set_alpha(0)
 	if len(rasters) == 1:
 		axes = [axes]
-	for i, (ax, arr, cmap, nd) in enumerate(zip(axes, rasters, cmaps, nodata)):
+	for i, (ax, arr, cmap, nd, _vmin, _vmax) in enumerate(zip(
+		axes,
+		rasters,
+		cmaps,
+		nodata,
+		vmin,
+		vmax,
+	)):
 		if nd is None:
 			alpha = None
 		else:
 			alpha = np.full_like(arr, 1, dtype=type(nd))
 			alpha[arr==nd] = 0
-		ax.imshow(arr, alpha=alpha, cmap=cmap)
+		ax.imshow(arr, alpha=alpha, cmap=cmap, vmin=_vmin, vmax=_vmax)
 		ax.axis('off')
 		if titles:
 			if vertical_layout:
