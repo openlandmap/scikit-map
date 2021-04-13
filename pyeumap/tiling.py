@@ -7,6 +7,8 @@ import math
 import rasterio
 from rasterio.windows import Window, from_bounds
 import os.path
+from pqdm.processes import pqdm as ppqdm
+from pqdm.threads import pqdm as tpqdm
 
 from .misc import ttprint
 
@@ -38,7 +40,7 @@ class TilingProcessing():
 		base_raster_srs = osr.SpatialReference()
 		base_raster_srs.ImportFromProj4(self.base_raster.crs.to_proj4())
 		
-		if (base_raster_srs.IsSame(tiles_srs) == 0):
+		if base_raster_srs.ImportFromProj4(self.base_raster.crs.to_proj4()) != tiles_srs.ImportFromProj4(self.tiles.crs.to_proj4()):
 			raise Exception('Different SpatialReference' +
 						f'\n tiling_system_fn ({tiles_srs.ExportToProj4()})'+
 						f'\n base_raster_fn ({base_raster_srs.ExportToProj4()})')
@@ -58,24 +60,29 @@ class TilingProcessing():
 	
 	def process_multiple(self, idx_list, func, func_args = (), 
 		max_workers:int = multiprocessing.cpu_count(),
-		use_threads:bool = True):
-		
+		use_threads:bool = True,
+		progress_bar:bool = True):
+		print(f"func_args: {func_args}")
 		args = []
 		for idx in idx_list:
 			tile = self.tiles.iloc[idx]
 			left, bottom, right, top = tile.geometry.bounds
 			
-			# Pay attetion here, because it can change the size of the tile
+			# Pay attention here, because it can change the size of the tile
 			window = from_bounds(left, bottom, right, top, self.base_raster.transform) \
 								.round_lengths(op='floor', pixel_precision=self.pixel_precision)
 			
 			args.append((idx, tile, window, *func_args))
+		if progress_bar:
+			pqdm = (tpqdm if use_threads else ppqdm)
+			results = pqdm(args,func,n_jobs=max_workers,argument_type='args')
 		
-		WorkerPool = (ThreadGeneratorLazy if use_threads else ProcessGeneratorLazy)
+		else:
+			WorkerPool = (ThreadGeneratorLazy if use_threads else ProcessGeneratorLazy)
 
-		results = []
-		for r in WorkerPool(func, iter(args), max_workers=max_workers, chunk=max_workers*2):
-			results.append(r)
+			results = []
+			for r in WorkerPool(func, iter(args), max_workers=max_workers, chunk=max_workers*2):
+				results.append(r)
 
 		return results
 
