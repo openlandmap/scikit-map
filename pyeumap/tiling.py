@@ -3,9 +3,12 @@ from pyeumap.parallel import ThreadGeneratorLazy, ProcessGeneratorLazy
 import geopandas as gpd
 import multiprocessing
 from osgeo import osr
+import math
 import rasterio
 from rasterio.windows import Window, from_bounds
 import os.path
+from pqdm.processes import pqdm as ppqdm
+from pqdm.threads import pqdm as tpqdm
 
 from .misc import ttprint
 
@@ -15,6 +18,7 @@ class TilingProcessing():
 	
 	def __init__(self, tiling_system_fn = None, 
 				 base_raster_fn = None,
+				 pixel_precision = 6,
 				 verbose:bool = True):
 		
 		if tiling_system_fn is None:
@@ -26,6 +30,7 @@ class TilingProcessing():
 			if not os.path.isfile(tiling_system_fn):
 				datasets.get_data(EUMAP_TILING_SYSTEM_FN)
 
+		self.pixel_precision = pixel_precision
 		self.tiles = gpd.read_file(tiling_system_fn)
 		self.num_tiles = self.tiles.shape[0]
 		self.base_raster = rasterio.open(base_raster_fn)
@@ -35,7 +40,7 @@ class TilingProcessing():
 		base_raster_srs = osr.SpatialReference()
 		base_raster_srs.ImportFromProj4(self.base_raster.crs.to_proj4())
 		
-		if (base_raster_srs.IsSame(tiles_srs) == 0):
+		if base_raster_srs.ImportFromProj4(self.base_raster.crs.to_proj4()) != tiles_srs.ImportFromProj4(self.tiles.crs.to_proj4()):
 			raise Exception('Different SpatialReference' +
 						f'\n tiling_system_fn ({tiles_srs.ExportToProj4()})'+
 						f'\n base_raster_fn ({base_raster_srs.ExportToProj4()})')
@@ -46,30 +51,38 @@ class TilingProcessing():
 		
 		tile = self.tiles.iloc[idx]
 		left, bottom, right, top = tile.geometry.bounds
-		window = from_bounds(left, bottom, right, top, self.base_raster.transform)
-				
+		
+		# Pay attetion here, because it can change the size of the tile
+		window = from_bounds(left, bottom, right, top, self.base_raster.transform) \
+							.round_lengths(op='floor', pixel_precision=self.pixel_precision)
+		
 		return func(idx, tile, window, *func_args)
 	
 	def process_multiple(self, idx_list, func, func_args = (), 
 		max_workers:int = multiprocessing.cpu_count(),
-		use_threads:bool = True):
-		
+		use_threads:bool = True,
+		progress_bar:bool = True):
+		print(f"func_args: {func_args}")
 		args = []
 		for idx in idx_list:
 			tile = self.tiles.iloc[idx]
+			left, bottom, right, top = tile.geometry.bounds
 			
-			xoff = tile[self.col_xoff]
-			yoff = tile[self.col_yoff]
+			# Pay attention here, because it can change the size of the tile
+			window = from_bounds(left, bottom, right, top, self.base_raster.transform) \
+								.round_lengths(op='floor', pixel_precision=self.pixel_precision)
 			
-			window = Window(xoff, yoff, self.xsize, self.ysize)
-			
-			args.append((idx, tile, window))
+			args.append((idx, tile, window, *func_args))
+		if progress_bar:
+			pqdm = (tpqdm if use_threads else ppqdm)
+			results = pqdm(args,func,n_jobs=max_workers,argument_type='args')
 		
-		WorkerPool = (ThreadGeneratorLazy if use_threads else ProcessGeneratorLazy)
+		else:
+			WorkerPool = (ThreadGeneratorLazy if use_threads else ProcessGeneratorLazy)
 
-		results = []
-		for r in WorkerPool(func, iter(args), fixed_args=func_args, max_workers=max_workers, chunk=max_workers*2):
-			results.append(r)
+			results = []
+			for r in WorkerPool(func, iter(args), max_workers=max_workers, chunk=max_workers*2):
+				results.append(r)
 
 		return results
 
