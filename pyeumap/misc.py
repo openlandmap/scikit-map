@@ -30,6 +30,8 @@ def find_files(dir_list, dir_pattern = '*.*'):
 		for file in list(Path(_dir).glob(glob_pattern)):
 			files.append(file)
 
+	files = sorted(files)
+
 	return files
 
 def build_ann(input_shape, output_shape, n_layers = 3, n_neurons = 32, 
