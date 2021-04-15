@@ -23,7 +23,7 @@ def read_rasters(
 		raster_files = find_files(raster_dirs, f'*.{raster_ext}')
 
 	if verbose:
-		ttprint(f'Reading {len(raster_files)} raster files')
+		ttprint(f'Reading {len(raster_files)} raster files using {n_jobs} workers')
 
 	def _read_raster(raster_pos):
 		raster_file = raster_files[raster_pos]
