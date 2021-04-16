@@ -1,6 +1,7 @@
 from .misc import ttprint
 from .datasets import DATA_ROOT_NAME
 import multiprocessing
+import math
 from itertools import cycle, islice
 import math
 import traceback
@@ -29,6 +30,102 @@ from pyeumap.raster import read_rasters, write_new_raster
 
 CPU_COUNT = multiprocessing.cpu_count()
 _OUT_DIR = os.path.join(os.getcwd(), 'gapfilled')
+
+class ImageGapfill(ABC):
+  
+  def __init__(self,
+    fn_files:List = None ,
+    data:np.array = None, 
+    verbose = True,
+  ):
+
+    if data is None and fn_files is None:
+      raise Exception(f'You should provide at least one of these: data or fn_files')
+
+    n_jobs_read = CPU_COUNT
+    if n_jobs_read > 10:
+      n_jobs_read = 10 
+
+    if data is None:
+      self.fn_files = fn_files
+      self.data, _ = read_rasters(raster_files=fn_files, verbose=verbose, n_jobs=n_jobs_read)
+    else:
+      self.data = data
+
+    self.verbose = verbose
+
+  def _verbose(self, *args, **kwargs):
+    if self.verbose:
+      ttprint(*args, **kwargs)
+
+  def n_gaps(self, data = None):
+    if data is None:
+      data = self.data
+
+    return np.sum(np.isnan(data).astype('int'))
+
+  def perc_gaps(self, gapfilled_data):
+    
+    data_nan = np.isnan(self.data)
+    n_nan = np.sum(data_nan.astype('int'))
+    n_gapfilled = np.sum(data_nan[~np.isnan(gapfilled_data)].astype('int'))
+    
+    return n_gapfilled / n_nan
+
+  def run(self):
+    self._verbose(f'There are {self.n_gaps()} gaps in {self.data.shape}')
+
+    start = time.time()
+    self.gapfilled_data = self._gapfill()
+    
+    gaps_perc = self.perc_gaps(self.gapfilled_data)
+    self._verbose(f'{gaps_perc*100:.2f}% of the gaps filled in {(time.time() - start):.2f} segs')
+
+    if gaps_perc < 1:
+      self._verbose(f'Remained gaps: {self.n_gaps(self.gapfilled_data)}')
+
+    return self.gapfilled_data
+
+  @abstractmethod
+  def _gapfill(self):
+    pass
+
+  def save_rasters(self, out_dir, data_type = None, out_mantain_subdirs = True, 
+    root_dir_name = DATA_ROOT_NAME, fn_files = None):
+    
+    if fn_files is not None:
+      self.fn_files = fn_files
+
+    if self.fn_files is None:
+      raise Exception(f'To use save_rasters you should provide a fn_files list')
+
+    fn_base_img = self.fn_files[0]
+    n_files = len(self.fn_files)
+    n_data = self.gapfilled_data.shape[2]
+
+    if n_files != n_data:
+      raise Exception(f'The fn_files incompatible with gapfilled_data shape ({self.gapfilled_data.shape})')
+
+    out_dir = Path(out_dir)
+    fn_result = []
+
+    for i in range(0,n_files):
+
+      src_fn = Path(self.fn_files[i])
+
+      if out_mantain_subdirs:
+        cur_out_dir = out_dir.joinpath(str(src_fn.parent).split(root_dir_name)[-1][1:])
+        fn_gapfilled_data = cur_out_dir.joinpath('%s.tif' % src_fn.stem)
+      else:
+        fn_gapfilled_data = out_dir.joinpath('%s.tif' % src_fn.stem)
+
+      fn_gapfilled_data.parent.mkdir(parents=True, exist_ok=True)
+
+      write_new_raster(fn_base_img, fn_gapfilled_data, self.gapfilled_data[:,:,i], data_type = data_type)
+      fn_result.append(fn_gapfilled_data)
+
+    self._verbose(f'Number of files saved in {out_dir}: {len(fn_result)}')
+    return fn_result
 
 class TMWMData():
 
@@ -149,112 +246,47 @@ class TMWMData():
 
     return result
 
-class ImageGapfill(ABC):
-  
+# Temporal Moving Window Median
+class TMWM(ImageGapfill):
+
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None, 
-    verbose = True,
-  ):
-
-    if data is None and fn_files is None:
-      raise Exception(f'You should provide at least one of these: data or fn_files')
-
-    n_jobs_read = CPU_COUNT
-    if n_jobs_read > 10:
-      n_jobs_read = 10 
-
-    if data is None:
-      self.fn_files = fn_files
-      self.data, _ = read_rasters(raster_files=fn_files, verbose=verbose, n_jobs=n_jobs_read)
-    else:
-      self.data = data
-
-    self.verbose = verbose
-
-  def _verbose(self, *args, **kwargs):
-    if self.verbose:
-      ttprint(*args, **kwargs)
-
-  @abstractmethod
-  def run(self):
-    pass
-
-  def save_rasters(self, out_dir, data_type = None, out_mantain_subdirs = True, 
-    root_dir_name = DATA_ROOT_NAME):
-    
-    if self.fn_files is None:
-      raise Exception(f'To use save_rasters method you should provide have a defined fn_files')
-
-    out_dir = Path(out_dir)
-
-    fn_base_img = self.fn_files[0]
-    n_files = len(self.fn_files)
-
-    fn_result = []
-
-    for i in range(0,n_files):
-
-      src_fn = Path(self.fn_files[i])
-
-      if out_mantain_subdirs:
-        cur_out_dir = out_dir.joinpath(str(src_fn.parent).split(root_dir_name)[-1][1:])
-        fn_gapfilled_data = cur_out_dir.joinpath('%s.tif' % src_fn.stem)
-      else:
-        fn_gapfilled_data = out_dir.joinpath('%s.tif' % src_fn.stem)
-
-      fn_gapfilled_data.parent.mkdir(parents=True, exist_ok=True)
-
-      write_new_raster(fn_base_img, fn_gapfilled_data, self.gapfilled_data[:,:,i], data_type = data_type)
-      fn_result.append(fn_gapfilled_data)
-
-    self._verbose(f'Number of files saved in {out_dir}: {len(fn_result)}')
-    return fn_result
-
-# Temporal Moving Window Median
-class TMWM():
-
-  def __init__(self,
-    fn_times_layers: Dict,
-    time_order: List,
+    yearly_temporal_resolution = None,
     time_win_size: int=8,
-    spatial_win:Window = None,
-    out_dir: str=_OUT_DIR,
-    out_mantain_subdirs: bool=True,
-    root_dir_name: str=DATA_ROOT_NAME,
     cpu_max_workers:int = multiprocessing.cpu_count(),
     engine='CPU',
-    verbose = True,
     gpu_tile_size:int = 250, 
+    verbose = True,
   ):
 
-    self.fn_times_layers = fn_times_layers
-    self.time_order = time_order
-    self.max_n_layers_per_time = 0
-    self.out_dir = out_dir
-    self.root_dir_name = root_dir_name
     self.cpu_max_workers = cpu_max_workers
     self.time_win_size = time_win_size
-    self.spatial_win = spatial_win
     self.engine = engine
-    self.out_mantain_subdirs = out_mantain_subdirs
     self.gpu_tile_size = gpu_tile_size
+    self.yearly_temporal_resolution = yearly_temporal_resolution
+    
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
+    self._do_time_data()  
+  
+    if self.time_win_size > math.floor(self.n_years/2):
+      raise Exception(f'The time_win_size can not bigger than {math.floor(self.n_years/2)}')
 
+  def _do_time_data(self):
+    total_times = self.data.shape[2]
+
+    self.time_order = [ str(time) for time in range(0, self.yearly_temporal_resolution) ]
     self.time_data = {}
-    
-    self.verbose = verbose
-    
-  def read_layers(self):
-    for time in self.time_order:
-      self.time_data[time], _ = read_rasters(raster_files = self.fn_times_layers[time], verbose=self.verbose)
-      if self.verbose:
-        ttprint(f'{time} data shape: {self.time_data[time].shape}')
-      time_shape = self.time_data[time].shape
-      if time_shape[2] > self.max_n_layers_per_time:
-        self.max_n_layers_per_time = time_shape[2]
+    self.n_years = 0
 
-    if self.verbose:
-      ttprint('Reading process finished')
+    for time in self.time_order:
+      idx = list(range(int(time), total_times, self.yearly_temporal_resolution))
+      
+      if len(idx) > self.n_years:
+        self.n_years = len(idx)
+
+      self.time_data[time] = self.data[:,:,idx]
+      self._verbose(f"Data {self.time_data[time].shape} organized in time={time}")
 
   def _get_neib_times(self, time):
     
@@ -309,7 +341,7 @@ class TMWM():
     _, _, n_layers = self.time_data[time].shape
 
     end_msg = None
-    all_data = self.gapfilled_data.get(self.time_order, layer_pos)
+    all_data = self.tmwm_data.get(self.time_order, layer_pos)
     end_msg = self._fill_gaps(time, layer_pos, all_data, verbose_suffix='all seasons', gapflag_offset = n_layers*2)
     
     return end_msg
@@ -322,8 +354,8 @@ class TMWM():
 
     for before_times, after_times in self._get_neib_times(time):
 
-      before_data = self.gapfilled_data.get(before_times, layer_pos)
-      after_data = self.gapfilled_data.get(after_times, layer_pos)
+      before_data = self.tmwm_data.get(before_times, layer_pos)
+      after_data = self.tmwm_data.get(after_times, layer_pos)
 
       keys = list(set(before_data.keys()).intersection(after_data.keys()))
       keys.sort()
@@ -341,10 +373,10 @@ class TMWM():
     return end_msg
 
   def _fill_gaps_same_time(self, time, layer_pos):
-    newdata_dict = self.gapfilled_data.get(time, layer_pos)
+    newdata_dict = self.tmwm_data.get(time, layer_pos)
     return self._fill_gaps(time, layer_pos, newdata_dict, verbose_suffix='same season')
 
-  def fill_layer(self, time, layer_pos):
+  def fill_image(self, time, layer_pos):
     
     end_msg = self._fill_gaps_same_time(time, layer_pos)
     
@@ -356,53 +388,13 @@ class TMWM():
     
     return end_msg
   
-  def _write_data(self, time):
-    fn_base_img = self.fn_times_layers[time][0]
-    _, _, n_layers = self.time_data[time].shape
-
-    for t in range(0, n_layers):
-
-      src_fn = self.fn_times_layers[time][t]
-
-      if self.out_mantain_subdirs:
-        out_dir = os.path.join(self.out_dir, str(src_fn.parent).split(self.root_dir_name)[-1][1:])
-        out_fn_data = os.path.join(out_dir, ('%s.tif' % src_fn.stem))
-        out_fn_flag = os.path.join(out_dir, ('%s_flag.tif' % src_fn.stem))
-      else:
-        out_fn_data = os.path.join(self.out_dir, ('%s.tif' % src_fn.stem))
-        out_fn_flag = os.path.join(self.out_dir, ('%s_flag.tif' % src_fn.stem))
-
-      out_img_dir = os.path.dirname(out_fn_data)
-
-      if not os.path.isdir(out_img_dir):
-        try:
-          os.makedirs(out_img_dir)
-        except:
-          continue
-
-      write_new_raster(fn_base_img, out_fn_data, self.time_data[time][:,:,t:t+1], data_type='uint8')
-      write_new_raster(fn_base_img, out_fn_flag, self.time_data_gaps[time][:,:,t:t+1], data_type='uint8')
-    
-    return True
-    
-  def save_to_img(self):
-    if self.verbose:
-      ttprint(f'Saving the results')
-    
-    args = [ (time,) for time in self.time_order]
-    for end_msg in parallel.ThreadGeneratorLazy(self._write_data, iter(args), max_workers=len(self.time_order), chunk=len(self.time_order)):
-      end_msg = True
-
-    if self.verbose:
-      ttprint(f'Saving proces finished')
-
-  def run(self):
+  def _gapfill(self):
 
     self.time_data_gaps = {}
 
-    self.gapfilled_data = TMWMData(self.time_order, self.time_data, self.time_win_size, 
+    self.tmwm_data = TMWMData(self.time_order, self.time_data, self.time_win_size, 
       cpu_max_workers=self.cpu_max_workers, engine=self.engine, gpu_tile_size=self.gpu_tile_size)
-    self.gapfilled_data.run()
+    self.tmwm_data.run()
 
     layer_args = []
 
@@ -414,25 +406,34 @@ class TMWM():
       for layer_pos in range(0, n_layers):
         layer_args.append((time, layer_pos))
     
-    if self.verbose:
-      ttprint(f'Filling the gaps')
-    for end_msg in parallel.ThreadGeneratorLazy(self.fill_layer, iter(layer_args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
+    for end_msg in parallel.ThreadGeneratorLazy(self.fill_image, iter(layer_args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
       end_msg = True
 
-# Time First Space Later
-class TFSL(ImageGapfill):
+    gapfilled_data = []
+    gapfilled_data_flag = []
+    
+    for i in range(0, self.n_years):
+      for time in self.time_order:
+        
+        time_len = self.time_data[time].shape[2]
+        if (time_len <= self.n_years):
+          gapfilled_data.append(self.time_data[time][:,:,i])
 
+    gapfilled_data = np.stack(gapfilled_data, axis=2)
+
+    return gapfilled_data
+
+# Temporal Linear Interpolation
+class TLI(ImageGapfill):
+  
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None, 
-    verbose = True,
-    space_win_list = range(5, 20, 5)
+    verbose = True
   ):
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
 
-    self.space_win_list = space_win_list
-    super().__init__(fn_files, data, verbose)
-
-  def temporal_lm(self, data):
+  def _temporal_linear_inter(self, data):
    
     y = data.reshape(-1)
     y_nan = np.isnan(y)
@@ -455,65 +456,47 @@ class TFSL(ImageGapfill):
     else:
         return data
 
-  def n_gaps(self, data = None):
-    if data is None:
-      data = self.data
+  def _gapfill(self):
+    return parallel.apply_along_axis(self._temporal_linear_inter, 2, self.data)
 
-    return np.sum(np.isnan(data).astype('int'))
+# Spatial Moving Window Median
+class SMWM(ImageGapfill):
+
+  def __init__(self,
+    fn_files:List = None ,
+    data:np.array = None, 
+    verbose = True,
+    space_win_list = range(5, 20, 5)
+  ):
+
+    self.space_win_list = space_win_list
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
 
   def spatial_median(self, data, i=0, win_size=5):
-      return ndimage.median_filter(data.astype('float32'), size=win_size), i, win_size, 
+    return ndimage.median_filter(data.astype('float32'), size=win_size), i, win_size, 
 
-  def run_spatial_median(self, data):
+  def _gapfill(self):
       
-      max_workers = multiprocessing.cpu_count()
-      n_times = data.shape[2]
+    data = np.copy(self.data)
 
-      args = []
+    max_workers = multiprocessing.cpu_count()
+    n_times = data.shape[2]
 
-      for win_size in self.space_win_list:
-        for i in range(0, n_times):
-          if self.n_gaps(data[:,:,i]) > 0:
-            args.append((data[:,:,i], i, win_size))
+    args = []
 
-      result_set = {}
-      for band_data, i, win_size in parallel.ThreadGeneratorLazy(self.spatial_median, iter(args), max_workers=max_workers, chunk=max_workers*2):
-          result_set[f'{win_size}-{i}'] = band_data
-      
-      for win_size in self.space_win_list:
-        for i in range(0, n_times):
-            band_data_nan = np.isnan(data[:,:,i])
-            band_data_gapfilled = result_set[f'{win_size}-{i}']
-            data[:,:,i][band_data_nan] = band_data_gapfilled[band_data_nan]
-          
-      return data
-      
-  def calc_gaps_perc(self, gapfilled_data):
+    for win_size in self.space_win_list:
+      for i in range(0, n_times):
+        if self.n_gaps(data[:,:,i]) > 0:
+          args.append((data[:,:,i], i, win_size))
+
+    result_set = {}
+    for band_data, i, win_size in parallel.ThreadGeneratorLazy(self.spatial_median, iter(args), max_workers=max_workers, chunk=max_workers*2):
+        result_set[f'{win_size}-{i}'] = band_data
     
-    data_nan = np.isnan(self.data)
-    n_nan = np.sum(data_nan.astype('int'))
-    n_gapfilled = np.sum(data_nan[~np.isnan(gapfilled_data)].astype('int'))
-    
-    return n_gapfilled / n_nan
-
-  def run(self):
-      
-    self._verbose(f'There are {self.n_gaps()} gaps in {self.data.shape}')
-
-    start = time.time()
-    self._verbose(f'First, time...')
-    self.gapfilled_data = parallel.apply_along_axis(self.temporal_lm, 2, self.data)
-    
-    gaps_perc = self.calc_gaps_perc(self.gapfilled_data)
-    self._verbose(f'{gaps_perc*100:.2f}% of the gaps filled in {(time.time() - start):.2f} segs')
-    
-    if gaps_perc < 1:
-      self._verbose(f'Remaing gaps: {gaps_perc*100:.2f}% ')
-
-      self._verbose(f'...later, space.')
-      self.gapfilled_data = self.run_spatial_median(self.gapfilled_data)
-
-      gaps_perc = self.calc_gaps_perc(self.gapfilled_data)        
-      self._verbose(f'{gaps_perc*100:.2f}% of the gaps filled in {(time.time() - start):.2f} segs')
-    
-    return self.gapfilled_data
+    for win_size in self.space_win_list:
+      for i in range(0, n_times):
+          band_data_nan = np.isnan(data[:,:,i])
+          band_data_gapfilled = result_set[f'{win_size}-{i}']
+          data[:,:,i][band_data_nan] = band_data_gapfilled[band_data_nan]
+        
+    return data
