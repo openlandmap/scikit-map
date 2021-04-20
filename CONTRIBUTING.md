@@ -1,9 +1,12 @@
 # Contributing
 
 ## Design principles and intended scope
-<!-- needs to be discussed -->
 
-TBD
+The `eumap` software aims to provide:
+  1. ergonomically designed abstractions around [pan-european datasets](https://maps.opendatascience.eu) produced within the scope of the [GeoHarmonizer project](https://opendatascience.eu/geoharmonizer-project/) and beyond, to catalyze large-scale future research
+  2. a high-level, user-friendly and generalized utility package for geodata analytics, with functionality that is felt to be either entirely missing from the present ecosystem, or can be improved upon both in terms of ease of use and easy scalability to large datasets (e.g. performing machine learning tasks against terabyte-scale geodata)
+
+All contributions to this software should fall within the scope described above, unless discussed beforehand by the core development team.
 
 ## Issue reporting and suggestions
 
