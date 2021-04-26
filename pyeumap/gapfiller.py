@@ -14,6 +14,7 @@ from rasterio.windows import Window
 
 from . import parallel
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
 
 from typing import List, Dict, Union
 
@@ -76,7 +77,7 @@ class ImageGapfill(ABC):
     self._verbose(f'There are {self.n_gaps()} gaps in {self.data.shape}')
 
     start = time.time()
-    self.gapfilled_data = self._gapfill()
+    self.gapfilled_data, self.gapfilled_data_flag = self._gapfill()
     
     gaps_perc = self.perc_gaps(self.gapfilled_data)
     self._verbose(f'{gaps_perc*100:.2f}% of the gaps filled in {(time.time() - start):.2f} segs')
@@ -99,7 +100,12 @@ class ImageGapfill(ABC):
     if self.fn_files is None:
       raise Exception(f'To use save_rasters you should provide a fn_files list')
 
-    fn_base_img = self.fn_files[0]
+    base_img_i = 0
+    fn_base_img = self.fn_files[base_img_i]
+    while not fn_base_img.is_file():
+      base_img_i += 1
+      fn_base_img = self.fn_files[base_img_i]
+      
     n_files = len(self.fn_files)
     n_data = self.gapfilled_data.shape[2]
 
@@ -116,13 +122,18 @@ class ImageGapfill(ABC):
       if out_mantain_subdirs:
         cur_out_dir = out_dir.joinpath(str(src_fn.parent).split(root_dir_name)[-1][1:])
         fn_gapfilled_data = cur_out_dir.joinpath('%s.tif' % src_fn.stem)
+        fn_gapfilled_data_flag = cur_out_dir.joinpath('%s_flag.tif' % src_fn.stem)
       else:
         fn_gapfilled_data = out_dir.joinpath('%s.tif' % src_fn.stem)
+        fn_gapfilled_data_flag = out_dir.joinpath('%s_flag.tif' % src_fn.stem)
 
       fn_gapfilled_data.parent.mkdir(parents=True, exist_ok=True)
 
       write_new_raster(fn_base_img, fn_gapfilled_data, self.gapfilled_data[:,:,i], data_type = data_type)
+      write_new_raster(fn_base_img, fn_gapfilled_data_flag, self.gapfilled_data_flag[:,:,i], data_type = data_type)
+      
       fn_result.append(fn_gapfilled_data)
+      fn_result.append(fn_gapfilled_data_flag)
 
     self._verbose(f'Number of files saved in {out_dir}: {len(fn_result)}')
     return fn_result
@@ -418,10 +429,12 @@ class TMWM(ImageGapfill):
         time_len = self.time_data[time].shape[2]
         if (time_len <= self.n_years):
           gapfilled_data.append(self.time_data[time][:,:,i])
+          gapfilled_data_flag.append(self.time_data_gaps[time][:,:,i])
 
     gapfilled_data = np.stack(gapfilled_data, axis=2)
+    gapfilled_data_flag = np.stack(gapfilled_data_flag, axis=2)
 
-    return gapfilled_data
+    return gapfilled_data, gapfilled_data_flag
 
 # Temporal Linear Interpolation
 class TLI(ImageGapfill):
@@ -441,23 +454,27 @@ class TLI(ImageGapfill):
     y_valid = y[~y_nan]
     
     n_gaps = np.sum(y_nan.astype('int'))
+    data_flag = np.zeros(y.shape)
     
     if n_gaps > 0 and y_valid.shape[0] > 3:
 
         X = np.array(range(0, y_size))
-
+        
         model = LinearRegression()
         model.fit(X[~y_nan].reshape(-1, 1), y_valid)
         y_pred = model.predict(X.reshape(-1, 1))
+        rmse = mean_squared_error(y[~y_nan], y_pred[~y_nan], squared=False)
 
         y[y_nan] = y_pred[y_nan]
+        data_flag[y_nan] = rmse
 
-        return y.reshape(data.shape)
+        return np.stack([ y.reshape(data.shape), data_flag.reshape(data.shape) ], axis=1)
     else:
-        return data
+        return np.stack([ data, data_flag ], axis=1)
 
   def _gapfill(self):
-    return parallel.apply_along_axis(self._temporal_linear_inter, 2, self.data)
+    result = parallel.apply_along_axis(self._temporal_linear_inter, 2, self.data)
+    return (result[:,:,:,0], result[:,:,:,1])
 
 # Spatial Moving Window Median
 class SMWM(ImageGapfill):
@@ -466,7 +483,7 @@ class SMWM(ImageGapfill):
     fn_files:List = None ,
     data:np.array = None, 
     verbose = True,
-    space_win_list = range(5, 20, 5)
+    space_win_list = range(5, 21, 5)
   ):
 
     self.space_win_list = space_win_list
@@ -478,6 +495,7 @@ class SMWM(ImageGapfill):
   def _gapfill(self):
       
     data = np.copy(self.data)
+    data_flag = np.zeros(data.shape)
 
     max_workers = multiprocessing.cpu_count()
     n_times = data.shape[2]
@@ -495,8 +513,11 @@ class SMWM(ImageGapfill):
     
     for win_size in self.space_win_list:
       for i in range(0, n_times):
-          band_data_nan = np.isnan(data[:,:,i])
+        key = f'{win_size}-{i}'
+        if (key in result_set):
           band_data_gapfilled = result_set[f'{win_size}-{i}']
-          data[:,:,i][band_data_nan] = band_data_gapfilled[band_data_nan]
+          gapfill_mask = np.logical_and(~np.isnan(band_data_gapfilled), np.isnan(data[:,:,i]))
+          data[:,:,i][gapfill_mask] = band_data_gapfilled[gapfill_mask]
+          data_flag[:,:,i][gapfill_mask] = win_size
         
-    return data
+    return data, data_flag
