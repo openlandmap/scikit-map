@@ -58,15 +58,16 @@ DEFAULT = {
 #imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean')
 
 class PredictionStrategyType(Enum):
-    Lazy = 1
-    Eager = 2
+  Lazy = 1
+  Eager = 2
 
 class LandMapper():
 
   def __init__(self, 
                points:Union[DataFrame, Path], 
-               feat_col_prfxs:List[str], 
                target_col:str,
+               feat_col_prfxs:Union[List, None] = [],
+               feat_cols:Union[List, None] = [],
                weight_col:Union[str, None] = None, 
                nodata_imputer:Union[BaseEstimator, None] = None,
                estimator:Union[BaseEstimator, None] = DEFAULT['ESTIMATOR'],
@@ -89,7 +90,7 @@ class LandMapper():
     self.pts = self._pts(points)
     self.target_col = target_col
     
-    self.feature_cols = self._feature_cols(feat_col_prfxs)
+    self.feature_cols = self._feature_cols(feat_cols, feat_col_prfxs)
 
     self.nodata_imputer = nodata_imputer
     self.is_automl_estimator = (_automl_enabled and estimator is None)
@@ -135,10 +136,19 @@ class LandMapper():
     else:
       return points
 
-  def _feature_cols(self, feat_col_prfxs):
+  def _feature_cols(self, feat_cols, feat_col_prfxs):
     feature_cols = []
-    for feat_prfx in feat_col_prfxs:
-      feature_cols += list(self.pts.columns[self.pts.columns.str.startswith(feat_prfx)])
+    if len(feat_cols) > 0:
+      feature_cols = list(self.pts.columns[self.pts.columns.isin(feat_cols)])
+    elif len(feat_col_prfxs) > 0:
+      for feat_prfx in feat_col_prfxs:
+        feature_cols += list(self.pts.columns[self.pts.columns.str.startswith(feat_prfx)])
+    else:
+      raise Exception(f'You should provide at least one of these: feat_cols or feat_col_prfxs.')
+
+    if len(feature_cols) == 0:
+      raise Exception(f'None feature was found. Check the provided feat_cols or feat_col_prfxs.')
+
     return feature_cols
 
   def _get_column_if_exists(self, column_name, param_name):
@@ -380,17 +390,19 @@ class LandMapper():
   def _feature_idx(self, fn_layer):
     return self.feature_cols.index(fn_layer.stem)
 
-  def _reorder_layers(self, layernames, dict_layers_newnames, input_data):
+  def _reorder_layers(self, layernames, dict_layers_newnames, input_data, raster_files):
     
     sorted_input_data = []
+    sorted_raster_files = []
     for feature_col in self.feature_cols:
       try:
         idx = layernames.index(feature_col)
         sorted_input_data.append(input_data[:,:,idx])
+        sorted_raster_files.append(raster_files[idx])
       except:
         raise Exception(f"The feature {feature_col} was not provided")
     
-    return np.stack(sorted_input_data, axis=2)
+    return np.stack(sorted_input_data, axis=2), sorted_raster_files
 
   def _read_layers(self, dirs_layers:List = [], fn_layers:List = [], spatial_win = None, 
     allow_aditional_layers = False, inmem_calc_func = None, dict_layers_newnames={}):
@@ -408,8 +420,11 @@ class LandMapper():
       layername = raster_file.stem
       
       for newname in dict_layers_newnames.keys():
+        layername_aux = layername
         layername = re.sub(dict_layers_newnames[newname], newname, layername)
-      
+        if layername_aux != layername:
+          self._verbose(f'Renaming {layername_aux} to {layername}')
+        
       if not allow_aditional_layers and layername not in feature_cols_set:
         raise Exception(f"Layer {layername} does not exist as feature_cols.\nUse dict_layers_newnames param to match their names")
       
@@ -418,7 +433,7 @@ class LandMapper():
     if inmem_calc_func is not None:
       layernames, raster_data = inmem_calc_func(layernames, raster_data, spatial_win)
     
-    return self._reorder_layers(layernames, dict_layers_newnames, raster_data), raster_files
+    return self._reorder_layers(layernames, dict_layers_newnames, raster_data, raster_files)
 
   def _write_layer(self, fn_base_layer, fn_output, input_data_shape, output_data, 
     nan_mask, separate_probs = True, spatial_win = None, scale=1, 
@@ -604,12 +619,14 @@ class LandMapper():
   
   def predict(self, dirs_layers:List = [], fn_layers:List = [], fn_output:str = None, 
     spatial_win = None, data_type = 'float32', fill_nodata = False, separate_probs = True, 
-    hard_class = True, inmem_calc_func = None, dict_layers_newnames = {}):
+    hard_class = True, inmem_calc_func = None, dict_layers_newnames = {},
+    allow_aditional_layers=False,):
 
     n_jobs = 4
 
     input_data, fn_layers = self._read_layers(dirs_layers, fn_layers, spatial_win, \
-      inmem_calc_func=inmem_calc_func, dict_layers_newnames=dict_layers_newnames)
+      inmem_calc_func=inmem_calc_func, dict_layers_newnames=dict_layers_newnames,
+      allow_aditional_layers=allow_aditional_layers)
 
     x_size, y_size, n_features = input_data.shape
     
@@ -763,12 +780,13 @@ class EagerLoadPrediction(PredictionStrategy):
     
     dict_layers_newnames = {}
     if len(self.dict_layers_newnames_list) > 0:
-      self.dict_layers_newnames_list[i]
+      dict_layers_newnames = self.dict_layers_newnames_list[i]
     
     start = time.time()
     input_data, _ = self.landmapper._read_layers(fn_layers=fn_layers, 
       spatial_win=self.spatial_win, inmem_calc_func = self.inmem_calc_func, 
-      dict_layers_newnames = dict_layers_newnames)
+      dict_layers_newnames = dict_layers_newnames, 
+      allow_aditional_layers=self.allow_aditional_layers)
     
     self.landmapper._verbose(f'{i+1}) Reading time: {(time.time() - start):.2f} segs')
 
@@ -885,13 +903,14 @@ class LazyLoadPrediction(PredictionStrategy):
     
     dict_layers_newnames = {}
     if len(self.dict_layers_newnames_list) > 0:
-      self.dict_layers_newnames_list[i]
-    
+      dict_layers_newnames = self.dict_layers_newnames_list[i]
+
     start = time.time()
     input_data, _ = self.landmapper._read_layers(fn_layers=fn_layers, 
       spatial_win=self.spatial_win, inmem_calc_func = self.inmem_calc_func, 
-      dict_layers_newnames = dict_layers_newnames)
-    
+      dict_layers_newnames = dict_layers_newnames, 
+      allow_aditional_layers=self.allow_aditional_layers)
+
     self.landmapper._verbose(f'{i+1}) Reading time: {(time.time() - start):.2f} segs')
 
     input_data_key = str(uuid.uuid4())
@@ -955,8 +974,8 @@ class LazyLoadPrediction(PredictionStrategy):
         self.reading_pool.submit(self.reading_fn, (i))
       )
     
-    reading_results = [ future for future in as_completed(self.reading_futures) ]
-    processing_results = [ future for future in as_completed(self.processing_futures) ]
+    reading_results = [ future.result() for future in as_completed(self.reading_futures) ]
+    processing_results = [ future.result() for future in as_completed(self.processing_futures) ]
     output_fn_files = sum([ future.result() for future in as_completed(self.writing_futures) ], [])
 
     self.reading_pool.shutdown(wait=False)
