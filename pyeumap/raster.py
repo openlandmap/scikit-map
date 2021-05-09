@@ -11,7 +11,7 @@ def read_rasters(
 									raster_files:List = [], 
 									raster_ext = 'tif', 
 									spatial_win = None,
-									dtype = 'Float16', 
+									dtype = 'float16', 
 									n_jobs = 4, 
 									verbose = False,
 									try_without_window = False
