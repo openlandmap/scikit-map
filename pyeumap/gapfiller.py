@@ -27,16 +27,16 @@ import os
 from abc import ABC, abstractmethod
 import bottleneck as bc
 from .misc import ttprint
-from pyeumap.raster import read_rasters, write_new_raster
+from .raster import read_rasters, write_new_raster
 
 CPU_COUNT = multiprocessing.cpu_count()
 _OUT_DIR = os.path.join(os.getcwd(), 'gapfilled')
 
 class ImageGapfill(ABC):
-  
+
   def __init__(self,
     fn_files:List = None ,
-    data:np.array = None, 
+    data:np.array = None,
     verbose = True,
   ):
 
@@ -45,7 +45,7 @@ class ImageGapfill(ABC):
 
     n_jobs_read = CPU_COUNT
     if n_jobs_read > 10:
-      n_jobs_read = 10 
+      n_jobs_read = 10
 
     if data is None:
       self.fn_files = fn_files
@@ -66,11 +66,11 @@ class ImageGapfill(ABC):
     return np.sum(np.isnan(data).astype('int'))
 
   def perc_gaps(self, gapfilled_data):
-    
+
     data_nan = np.isnan(self.data)
     n_nan = np.sum(data_nan.astype('int'))
     n_gapfilled = np.sum(data_nan[~np.isnan(gapfilled_data)].astype('int'))
-    
+
     return n_gapfilled / n_nan
 
   def run(self):
@@ -78,7 +78,7 @@ class ImageGapfill(ABC):
 
     start = time.time()
     self.gapfilled_data, self.gapfilled_data_flag = self._gapfill()
-    
+
     gaps_perc = self.perc_gaps(self.gapfilled_data)
     self._verbose(f'{gaps_perc*100:.2f}% of the gaps filled in {(time.time() - start):.2f} segs')
 
@@ -91,9 +91,9 @@ class ImageGapfill(ABC):
   def _gapfill(self):
     pass
 
-  def save_rasters(self, out_dir, data_type = None, out_mantain_subdirs = True, 
+  def save_rasters(self, out_dir, data_type = None, out_mantain_subdirs = True,
     root_dir_name = DATA_ROOT_NAME, fn_files = None):
-    
+
     if fn_files is not None:
       self.fn_files = fn_files
 
@@ -105,7 +105,7 @@ class ImageGapfill(ABC):
     while not fn_base_img.is_file():
       base_img_i += 1
       fn_base_img = self.fn_files[base_img_i]
-      
+
     n_files = len(self.fn_files)
     n_data = self.gapfilled_data.shape[2]
 
@@ -131,7 +131,7 @@ class ImageGapfill(ABC):
 
       write_new_raster(fn_base_img, fn_gapfilled_data, self.gapfilled_data[:,:,i], data_type = data_type)
       write_new_raster(fn_base_img, fn_gapfilled_data_flag, self.gapfilled_data_flag[:,:,i], data_type = data_type)
-      
+
       fn_result.append(fn_gapfilled_data)
       fn_result.append(fn_gapfilled_data_flag)
 
@@ -140,12 +140,12 @@ class ImageGapfill(ABC):
 
 class TMWMData():
 
-  def __init__(self, time_order: List, time_data, time_win_size = 5, 
-    cpu_max_workers:int = multiprocessing.cpu_count(), 
+  def __init__(self, time_order: List, time_data, time_win_size = 5,
+    cpu_max_workers:int = multiprocessing.cpu_count(),
     engine='CPU',
     gpu_tile_size:int = 250):
 
-    self.time_win_size = time_win_size 
+    self.time_win_size = time_win_size
     self.time_order = time_order
     self.time_data = time_data
     self.cpu_max_workers = cpu_max_workers
@@ -186,7 +186,7 @@ class TMWMData():
 
     for x1 in chain(range(0, x_size, self.gpu_tile_size), [self.gpu_tile_size]):
       for y1 in chain(range(0, x_size, self.gpu_tile_size), [self.gpu_tile_size]):
-        
+
         gpu_data = {}
 
         x2 = ( (x_size-1) if (x1 + self.gpu_tile_size) >= x_size else (x1 + self.gpu_tile_size))
@@ -194,7 +194,7 @@ class TMWMData():
 
         for time in self.time_order:
           gpu_data[time] = cp.asarray(self.time_data[time][x1:x2,y1:y2,:])
-          
+
         for time, t1, t2 in iter(args):
           key = self._key_from_time(time, t1, t2)
           if key not in self.gapfilled_data:
@@ -213,7 +213,7 @@ class TMWMData():
     args = set()
 
     for time in self.time_order:
-      
+
       _, _, n_layers = self.time_data[time].shape
       self.available_windows[time] = []
 
@@ -234,11 +234,11 @@ class TMWMData():
     elif  self.engine == 'GPU':
       ttprint(f'Using GPU engine')
       self._gpu_processing(args)
-    
+
     ttprint(f'Possibilities calculated')
 
   def get(self, time, layer_pos):
-    
+
     time_list = (time if type(time) == list else [time])
     result = {}
 
@@ -251,7 +251,7 @@ class TMWMData():
       except:
         traceback.format_exc()
         continue
-    
+
     for win_size in list(result.keys()):
       result[win_size] = np.nanmean(np.stack(result[win_size], axis=2), axis=2)
 
@@ -262,12 +262,12 @@ class TMWM(ImageGapfill):
 
   def __init__(self,
     fn_files:List = None ,
-    data:np.array = None, 
+    data:np.array = None,
     yearly_temporal_resolution = None,
     time_win_size: int=8,
     cpu_max_workers:int = multiprocessing.cpu_count(),
     engine='CPU',
-    gpu_tile_size:int = 250, 
+    gpu_tile_size:int = 250,
     verbose = True,
   ):
 
@@ -276,10 +276,10 @@ class TMWM(ImageGapfill):
     self.engine = engine
     self.gpu_tile_size = gpu_tile_size
     self.yearly_temporal_resolution = yearly_temporal_resolution
-    
+
     super().__init__(fn_files=fn_files, data=data, verbose=verbose)
-    self._do_time_data()  
-  
+    self._do_time_data()
+
     if self.time_win_size > math.floor(self.n_years/2):
       raise Exception(f'The time_win_size can not bigger than {math.floor(self.n_years/2)}')
 
@@ -292,7 +292,7 @@ class TMWM(ImageGapfill):
 
     for time in self.time_order:
       idx = list(range(int(time), total_times, self.yearly_temporal_resolution))
-      
+
       if len(idx) > self.n_years:
         self.n_years = len(idx)
 
@@ -300,13 +300,13 @@ class TMWM(ImageGapfill):
       self._verbose(f"Data {self.time_data[time].shape} organized in time={time}")
 
   def _get_neib_times(self, time):
-    
+
     total_times = len(self.time_order)
     i = self.time_order.index(time)
 
     time_order_rev = self.time_order.copy()
     time_order_rev.reverse()
-    
+
     neib_times = []
 
     for j in range(1, math.ceil(total_times / 2) + 1):
@@ -324,20 +324,20 @@ class TMWM(ImageGapfill):
     return neib_times
 
   def _fill_gaps(self, time, layer_pos, newdata_dict, verbose_suffix='', gapflag_offset = 0):
-    
+
     end_msg = None
 
     for i in newdata_dict.keys():
 
       gaps_mask = np.isnan(self.time_data[time][:,:,layer_pos])
       newdata = newdata_dict[i][gaps_mask]
-      
+
       gaps_pct = np.count_nonzero(~np.isnan(newdata))
       newdata_pct = np.count_nonzero(gaps_mask.flatten())
 
       if newdata_pct != 0:
         gapfilled_pct =  gaps_pct / newdata_pct
-        
+
         self.time_data[time][:,:,layer_pos][gaps_mask] = newdata
         self.time_data_gaps[time][:,:,layer_pos][gaps_mask] = int(i) + gapflag_offset
 
@@ -354,7 +354,7 @@ class TMWM(ImageGapfill):
     end_msg = None
     all_data = self.tmwm_data.get(self.time_order, layer_pos)
     end_msg = self._fill_gaps(time, layer_pos, all_data, verbose_suffix='all seasons', gapflag_offset = n_layers*2)
-    
+
     return end_msg
 
   def _fill_gaps_neib_time(self, time, layer_pos):
@@ -388,44 +388,44 @@ class TMWM(ImageGapfill):
     return self._fill_gaps(time, layer_pos, newdata_dict, verbose_suffix='same season')
 
   def fill_image(self, time, layer_pos):
-    
+
     end_msg = self._fill_gaps_same_time(time, layer_pos)
-    
+
     if end_msg is None:
       end_msg = self._fill_gaps_neib_time(time, layer_pos)
 
     if end_msg is None:
       end_msg = self._fill_gaps_all_times(time, layer_pos)
-    
+
     return end_msg
-  
+
   def _gapfill(self):
 
     self.time_data_gaps = {}
 
-    self.tmwm_data = TMWMData(self.time_order, self.time_data, self.time_win_size, 
+    self.tmwm_data = TMWMData(self.time_order, self.time_data, self.time_win_size,
       cpu_max_workers=self.cpu_max_workers, engine=self.engine, gpu_tile_size=self.gpu_tile_size)
     self.tmwm_data.run()
 
     layer_args = []
 
     for time in self.time_order:
-      
+
       nrows, ncols, n_layers = self.time_data[time].shape
       self.time_data_gaps[time] = np.zeros((nrows, ncols, n_layers), dtype='int8')
 
       for layer_pos in range(0, n_layers):
         layer_args.append((time, layer_pos))
-    
+
     for end_msg in parallel.ThreadGeneratorLazy(self.fill_image, iter(layer_args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
       end_msg = True
 
     gapfilled_data = []
     gapfilled_data_flag = []
-    
+
     for i in range(0, self.n_years):
       for time in self.time_order:
-        
+
         time_len = self.time_data[time].shape[2]
         if (time_len <= self.n_years):
           gapfilled_data.append(self.time_data[time][:,:,i])
@@ -438,28 +438,28 @@ class TMWM(ImageGapfill):
 
 # Temporal Linear Interpolation
 class TLI(ImageGapfill):
-  
+
   def __init__(self,
     fn_files:List = None ,
-    data:np.array = None, 
+    data:np.array = None,
     verbose = True
   ):
     super().__init__(fn_files=fn_files, data=data, verbose=verbose)
 
   def _temporal_linear_inter(self, data):
-   
+
     y = data.reshape(-1)
     y_nan = np.isnan(y)
     y_size = data.shape[0]
     y_valid = y[~y_nan]
-    
+
     n_gaps = np.sum(y_nan.astype('int'))
     data_flag = np.zeros(y.shape)
-    
+
     if n_gaps > 0 and y_valid.shape[0] > 3:
 
         X = np.array(range(0, y_size))
-        
+
         model = LinearRegression()
         model.fit(X[~y_nan].reshape(-1, 1), y_valid)
         y_pred = model.predict(X.reshape(-1, 1))
@@ -481,7 +481,7 @@ class SMWM(ImageGapfill):
 
   def __init__(self,
     fn_files:List = None ,
-    data:np.array = None, 
+    data:np.array = None,
     verbose = True,
     space_win_list = range(5, 21, 5)
   ):
@@ -490,10 +490,10 @@ class SMWM(ImageGapfill):
     super().__init__(fn_files=fn_files, data=data, verbose=verbose)
 
   def spatial_median(self, data, i=0, win_size=5):
-    return ndimage.median_filter(data.astype('float32'), size=win_size), i, win_size, 
+    return ndimage.median_filter(data.astype('float32'), size=win_size), i, win_size,
 
   def _gapfill(self):
-      
+
     data = np.copy(self.data)
     data_flag = np.zeros(data.shape)
 
@@ -510,7 +510,7 @@ class SMWM(ImageGapfill):
     result_set = {}
     for band_data, i, win_size in parallel.ThreadGeneratorLazy(self.spatial_median, iter(args), max_workers=max_workers, chunk=max_workers*2):
         result_set[f'{win_size}-{i}'] = band_data
-    
+
     for win_size in self.space_win_list:
       for i in range(0, n_times):
         key = f'{win_size}-{i}'
@@ -519,5 +519,5 @@ class SMWM(ImageGapfill):
           gapfill_mask = np.logical_and(~np.isnan(band_data_gapfilled), np.isnan(data[:,:,i]))
           data[:,:,i][gapfill_mask] = band_data_gapfilled[gapfill_mask]
           data_flag[:,:,i][gapfill_mask] = win_size
-        
+
     return data, data_flag

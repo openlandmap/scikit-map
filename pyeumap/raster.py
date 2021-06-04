@@ -1,18 +1,18 @@
 import numpy as np
 
 from typing import List, Union
-from pyeumap.misc import ttprint, find_files
-from pyeumap import parallel
+from .misc import ttprint, find_files
+from . import parallel
 
 import rasterio
 
-def read_rasters(	
-									raster_dirs:List = [], 
-									raster_files:List = [], 
-									raster_ext = 'tif', 
+def read_rasters(
+									raster_dirs:List = [],
+									raster_files:List = [],
+									raster_ext = 'tif',
 									spatial_win = None,
-									dtype = 'float16', 
-									n_jobs = 4, 
+									dtype = 'float16',
+									n_jobs = 4,
 									verbose = False,
 									try_without_window = False
 								):
@@ -48,63 +48,63 @@ def read_rasters(
 		raster_file = raster_files[raster_pos]
 
 		if (isinstance(band_data, np.ndarray)):
-			
+
 			band_data = band_data.astype(dtype)
 			band_data[band_data == nodata] = np.nan
-			
+
 			#if (verbose and np.isnan(np.min(band_data))):
 			#	ttprint(f'Layer {raster_file} has NA values (nodata={nodata})')
-		
+
 		else:
 			raise Exception(f'The raster {raster_file} was not found.')
 		raster_data[raster_pos] = band_data
-	
+
 	raster_data = [raster_data[i] for i in range(0,len(raster_files))]
 	raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
 	return raster_data, raster_files
 
 def create_raster(
-										fn_base_raster, 
-										fn_raster, 
-										data, 
-										spatial_win = None, 
-										data_type = None, 
-										raster_format = 'GTiff', 
+										fn_base_raster,
+										fn_raster,
+										data,
+										spatial_win = None,
+										data_type = None,
+										raster_format = 'GTiff',
 										nodata = 0
 									):
-	
+
 	if len(data.shape) < 3:
 		data = np.stack([data], axis=2)
 
 	x_size, y_size, nbands = data.shape
-	
+
 	with rasterio.open(fn_base_raster, 'r') as base_raster:
 
 		if data_type is None:
 			data_type = base_raster.dtypes[0]
-					
+
 		transform = base_raster.transform
-		
+
 		if spatial_win is not None:
 			transform = rasterio.windows.transform(spatial_win, transform)
-			
-		return rasterio.open(fn_raster, 'w', 
-						driver=raster_format, 
-						width=x_size, 
-						height=y_size, 
+
+		return rasterio.open(fn_raster, 'w',
+						driver=raster_format,
+						width=x_size,
+						height=y_size,
 						count=nbands,
-						dtype=data_type, 
+						dtype=data_type,
 						crs=base_raster.crs,
 						compress='LZW',
 						transform=transform)
 
 def write_new_raster(
-											fn_base_raster, 
-											fn_new_raster, 
-											data, 
-											spatial_win = None, 
-											data_type = None, 
-											raster_format = 'GTiff', 
+											fn_base_raster,
+											fn_new_raster,
+											data,
+											spatial_win = None,
+											data_type = None,
+											raster_format = 'GTiff',
 											nodata = 0
 										):
 
