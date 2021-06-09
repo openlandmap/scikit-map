@@ -11,3 +11,4 @@ eumap_data
 gapfilled
 *.tif
 tmp*
+docs/pyeumap/_build/
