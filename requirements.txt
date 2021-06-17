@@ -114,7 +114,7 @@ pycairo==1.16.2
 pycparser==2.20
 pycrypto==2.6.1
 pycups==2.0.1
-pyeumap==0.1.0
+eumap==0.1.0
 Pygments==2.7.2
 PyGObject==3.38.0
 PyHamcrest==1.9.0

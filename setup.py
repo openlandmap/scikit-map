@@ -1,14 +1,14 @@
 import setuptools
-from pyeumap import __version__
+from eumap import __version__
 from pathlib import Path
 
 root_dir = Path(__file__).parent
 
-with open(root_dir.joinpath('pyeumap', 'README.md'), 'r') as fh:
+with open(root_dir.joinpath('eumap', 'README.md'), 'r') as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='pyeumap',
+    name='eumap',
     version=__version__,
     description='eumap Python package',
     long_description=long_description,
