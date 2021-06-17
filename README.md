@@ -10,9 +10,9 @@
 [Resources](demo/README.md) |
 [Release Notes](NEWS.md)
 
-eumap is a library to enable easier access to EU environmental maps and functions to produce and improve new value-added spatial layers.
-It implements efficient spatial and spatiotemporal overlay, High Performance Computing, extends the Ensemble Machine Learning algorithms developed within the [mlr3](https://mlr3.mlr-org.com/) and [scikit-learn](https://scikit-learn.org) framework.
-eumap builds upon various existing softare, especially on GDAL, R and Python packages for spatial analysis and Machine Learning libraries.
+Eumap is a library to enable easier access to several **spatial layers prepared for Continental Europe** (*Landsat and Sentinel mosaics, DTM and climate datasets, land cover, potential natural vegetation and environmental quality maps*), as well the classes and functions used to produce them. 
+
+It implements efficient **raster access** through [rasterio](https://rasterio.readthedocs.io), different **gapfiling**, approachs **spatial and spacetime overlay**, **training samples** preparation (LUCAS points), and **Ensemble Machine Learning** applied to spatial predictions (fully compatible with [scikit-learn](https://scikit-learn.org)).
 
 pyeumap Workflow 
 -------
