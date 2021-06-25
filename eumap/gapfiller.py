@@ -1,3 +1,6 @@
+'''
+Gapfilling approaches using temporal and spatial neighbor pixels
+'''
 from .misc import ttprint
 from .datasets import DATA_ROOT_NAME
 import multiprocessing

@@ -1,5 +1,5 @@
 '''
-Parallelization helpers
+Parallelization helpers based in thread and process pools
 '''
 
 def ThreadGeneratorLazy(worker, args, max_workers, chunk, fixed_args = ()):

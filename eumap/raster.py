@@ -1,3 +1,7 @@
+'''
+Functions to read/write raster data
+'''
+
 import numpy as np
 
 from typing import List, Union

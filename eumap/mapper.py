@@ -1,3 +1,6 @@
+'''
+Spatial prediction approaches based on machine learning (scikit-learn)
+'''
 from abc import ABC, abstractmethod
 
 from .misc import ttprint, find_files

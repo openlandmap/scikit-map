@@ -1,3 +1,6 @@
+'''
+Access to eumap demo datasets hosted in zenodo
+'''
 import requests
 import tarfile
 import tempfile

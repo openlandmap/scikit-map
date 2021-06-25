@@ -1,7 +1,3 @@
-##################
-API reference
-##################
-
 {{ fullname | escape | underline}}
 
 .. automodule:: {{ fullname }}

@@ -1,3 +1,7 @@
+'''
+Functions to plot raster data
+'''
+
 import matplotlib.pyplot as plt
 import skimage.exposure as exposure
 from matplotlib.colors import ListedColormap

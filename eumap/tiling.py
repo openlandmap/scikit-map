@@ -1,3 +1,7 @@
+'''
+Parallelization strategies to optimize raster processing
+'''
+
 import geopandas as gpd
 import multiprocessing
 from osgeo import osr

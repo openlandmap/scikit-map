@@ -1,8 +1,6 @@
 '''
-Script for overlaying points (sampling)
-Only first band from each file
+Point overlay considering multiple raster layers (space and spacetime)
 '''
-#%%
 from typing import List
 import rasterio
 import rasterio.windows
