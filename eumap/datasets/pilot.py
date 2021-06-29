@@ -13,6 +13,8 @@ from operator import add
 from typing import Union, List
 import shutil
 
+from .defaults import DATA_ROOT_NAME
+
 DATASETS = [
     '4582_spain_landcover_samples.gpkg',
     '4582_spain_rasters.tar.gz',
@@ -62,7 +64,6 @@ TILES = sorted(set(reduce(add, map(
     DATASETS
 ))))
 
-DATA_ROOT_NAME = 'eumap_data'
 _CHUNK_LENGTH = 2**13
 _DOWNLOAD_DIR = os.getcwd()
 _PROGRESS_INTERVAL = .2 # seconds
