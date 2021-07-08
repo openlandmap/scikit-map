@@ -114,7 +114,7 @@ class Catalogue:
         import pandas as pd
         from io import BytesIO
         from base64 import b64decode
-        from .fallbacks import CATALOGUE_CSV
+        from .fallback import CATALOGUE_CSV
 
         self.layers = pd.read_csv(
             BytesIO(b64decode(CATALOGUE_CSV)),
