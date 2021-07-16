@@ -16,7 +16,7 @@ class LucasRequest:
     st_aggregated = False
     group = None
 
-    gh_workspace = 'lucas_deploy'
+    gh_workspace = 'lucas'
     gh_typename = 'lucas_points'
     gh_typename_st = 'lucas_st_points'
 

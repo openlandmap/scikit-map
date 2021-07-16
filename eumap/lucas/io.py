@@ -23,7 +23,7 @@ class LucasIO:
     :param str version: WFS version to be used
     """
 
-    def __init__(self, url='http://geo102.fsv.cvut.cz:8080/geoserver/wfs',
+    def __init__(self, url='http://lincalc-02.fsv.cvut.cz:8080/geoserver/wfs',
                  version='1.1.0'):
         Logger.info(f"Using owslib version {owslib_version}")
         self._wfs_url = url
@@ -222,3 +222,14 @@ class LucasIO:
         :return bool: True for empty collection otherwise False
         """
         return self.num_of_features() < 1
+
+    # def get_images(self, point_id):
+    #     """Get images of point and its surrounding from ftp server
+    #     :param point_id:
+    #     :return images: dictionary of images
+    #     """
+    #     images = {}
+    #     url = f'https://gisco-services.ec.europa.eu/lucas/photos/2015/BE/{str(point_id)[0:3]}/{str(point_id)[3:6]}/{str(point_id)}'
+    #     for i in ("Point", "South", "North", "East", "West"):
+    #         images[i] = url+i[0:1]+".jpg"
+    #     return images
