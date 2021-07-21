@@ -10,6 +10,33 @@ from . import parallel
 
 import rasterio
 
+def save_rasters(
+										fn_base_raster,
+										fn_raster_list,
+										data,
+										spatial_win = None,
+										data_type = None,
+										raster_format = 'GTiff',
+										nodata = 0, 
+										n_jobs = 4,
+										verbose=True
+									):
+	
+	if len(data.shape) < 3:
+		data = np.stack([data], axis=2)
+	else:
+		n_files = data.shape[2]
+		if n_files != len(fn_raster_list):
+			raise Exception(f'The data dimension {data.shape} is incompatible with the fn_raster_list size {len(fn_raster_list)}.')
+
+	if verbose:
+		ttprint(f'Writing {len(fn_raster_list)} raster files using {n_jobs} workers')
+
+	args = [ (fn_base_raster, fn_raster_list[i], data[:,:,i], spatial_win, data_type, raster_format, nodata) for i in range(0,len(fn_raster_list)) ]
+
+	for fn_new_raster in parallel.ThreadGeneratorLazy(write_new_raster, iter(args), max_workers=n_jobs, chunk=n_jobs*2):
+		continue
+
 def read_rasters(
 									raster_dirs:List = [],
 									raster_files:List = [],

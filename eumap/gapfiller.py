@@ -14,6 +14,7 @@ import time
 from scipy import ndimage
 from pathlib import Path
 from rasterio.windows import Window
+from pyts.decomposition import SingularSpectrumAnalysis
 
 from . import parallel
 from sklearn.linear_model import LinearRegression
@@ -25,6 +26,7 @@ from itertools import chain
 import numpy as np
 from osgeo import gdal
 from osgeo import osr
+import cv2 as cv
 import os
 
 from abc import ABC, abstractmethod
@@ -36,16 +38,20 @@ CPU_COUNT = multiprocessing.cpu_count()
 _OUT_DIR = os.path.join(os.getcwd(), 'gapfilled')
 
 class ImageGapfill(ABC):
-  """ImageGapfill description
+  """
+  Abstract class responsable for read/save the raster files used/produced 
+  by all implemented gapfilling methods. 
     
-  :param fn_files: TODO
-  :param data: TODO
-  :param verbose: TODO
+  :param fn_files: Raster file paths to be read and gapfilled.
+  :param data: 3D array where the last dimension is the time.
+  :param verbose: Use ``True`` to print the progress of the gapfilled.
   """
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None,
-    verbose = True,
+    drop_outliers:bool = False,
+    th_outliers:bool = [2,98],
+    verbose:bool = True,
   ):
 
     if data is None and fn_files is None:
@@ -61,27 +67,28 @@ class ImageGapfill(ABC):
     else:
       self.data = data
 
+    self.drop_outliers = drop_outliers
+    self.th_outliers = th_outliers
+
     self.verbose = verbose
 
   def _verbose(self, *args, **kwargs):
     if self.verbose:
       ttprint(*args, **kwargs)
 
-  def n_gaps(self, data = None):
-    """n_gaps
-
-    :param data: TODO
-    """
+  def _n_gaps(self, data = None):
     if data is None:
       data = self.data
 
     return np.sum(np.isnan(data).astype('int'))
 
-  def perc_gaps(self, gapfilled_data):
-    """perc_gaps
+  def _remove_outliers(self, ts_data):
+    lower_pct, higher_pct = np.nanpercentile(ts_data, q = self.th_outliers)
+    outlier_mask = np.logical_or(ts_data <= lower_pct, ts_data >= higher_pct)
+    ts_data[outlier_mask] = np.nan
+    return ts_data
 
-    :param gapfilled_data: TODO
-    """
+  def _perc_gaps(self, gapfilled_data):
     data_nan = np.isnan(self.data)
     n_nan = np.sum(data_nan.astype('int'))
     n_gapfilled = np.sum(data_nan[~np.isnan(gapfilled_data)].astype('int'))
@@ -89,19 +96,25 @@ class ImageGapfill(ABC):
     return n_gapfilled / n_nan
 
   def run(self):
-    """run
+    """
+    Execute the gapfilling approach.
     
     """
-    self._verbose(f'There are {self.n_gaps()} gaps in {self.data.shape}')
+    self._verbose(f'There are {self._n_gaps()} gaps in {self.data.shape}')
 
     start = time.time()
+
+    if self.drop_outliers:
+      self._verbose(f'Removing temporal outliers considering {self.th_outliers} quantiles.')
+      self.data = parallel.apply_along_axis(self._remove_outliers, 2, self.data)
+
     self.gapfilled_data, self.gapfilled_data_flag = self._gapfill()
 
-    gaps_perc = self.perc_gaps(self.gapfilled_data)
+    gaps_perc = self._perc_gaps(self.gapfilled_data)
     self._verbose(f'{gaps_perc*100:.2f}% of the gaps filled in {(time.time() - start):.2f} segs')
 
     if gaps_perc < 1:
-      self._verbose(f'Remained gaps: {self.n_gaps(self.gapfilled_data)}')
+      self._verbose(f'Remained gaps: {self._n_gaps(self.gapfilled_data)}')
 
     return self.gapfilled_data
 
@@ -109,22 +122,33 @@ class ImageGapfill(ABC):
   def _gapfill(self):
     pass
 
-  def save_rasters(self, out_dir, data_type = None, out_mantain_subdirs = True,
-    root_dir_name = DATA_ROOT_NAME, fn_files = None):
-    """save_rasters
+  def save_rasters(self, 
+      out_dir, 
+      data_type:str = None, 
+      out_mantain_subdirs:bool = True,
+      root_dir_name:str = DATA_ROOT_NAME, 
+      fn_files:List = None, 
+      spatial_win:Window = None
+    ):
+    """
+    Save the result in raster files maintaining the same filenames
+    of the read rasters.
     
-    :param out_dir: TODO
-    :param data_type: TODO
-    :param out_mantain_subdirs: TODO
-    :param root_dir_name: TODO
-    :param fn_files: TODO
+    :param out_dir: Folder path to save the files.
+    :param data_type: Convert the rasters for the specified Numpy ``data_type`` before save.
+    :param out_mantain_subdirs: Keep the full folder hierarchy of the read raster in the ``out_dir``.
+    :param root_dir_name: Keep the relative folder hierarchy of the read raster in the ``out_dir`` 
+                          considering the ``root_dir_name``.
+    :param fn_files: Raster file paths to retreive the filenames. Use this parameter in
+                     situations where the ``data`` parameter is informed in the class constructor.
+    :param spatial_win: Save the files considering the specified spatial window.
     """
 
     if fn_files is not None:
       self.fn_files = fn_files
 
     if self.fn_files is None:
-      raise Exception(f'To use save_rasters you should provide a fn_files list')
+      raise Exception(f'To use save_rasters you should provide a fn_files list.')
 
     base_img_i = 0
     fn_base_img = self.fn_files[base_img_i]
@@ -155,8 +179,8 @@ class ImageGapfill(ABC):
 
       fn_gapfilled_data.parent.mkdir(parents=True, exist_ok=True)
 
-      write_new_raster(fn_base_img, fn_gapfilled_data, self.gapfilled_data[:,:,i], data_type = data_type)
-      write_new_raster(fn_base_img, fn_gapfilled_data_flag, self.gapfilled_data_flag[:,:,i], data_type = data_type)
+      write_new_raster(fn_base_img, fn_gapfilled_data, self.gapfilled_data[:,:,i], data_type = data_type, spatial_win = spatial_win)
+      write_new_raster(fn_base_img, fn_gapfilled_data_flag, self.gapfilled_data_flag[:,:,i], data_type = data_type, spatial_win = spatial_win)
 
       fn_result.append(fn_gapfilled_data)
       fn_result.append(fn_gapfilled_data_flag)
@@ -164,7 +188,7 @@ class ImageGapfill(ABC):
     self._verbose(f'Number of files saved in {out_dir}: {len(fn_result)}')
     return fn_result
 
-class TMWMData():
+class _TMWMData():
   def __init__(self, time_order: List, time_data, time_win_size = 5,
     cpu_max_workers:int = multiprocessing.cpu_count(),
     engine='CPU',
@@ -282,21 +306,40 @@ class TMWMData():
         continue
 
     for win_size in list(result.keys()):
-      result[win_size] = np.nanmean(np.stack(result[win_size], axis=2), axis=2)
+      result[win_size] = bc.nanmean(np.stack(result[win_size], axis=2), axis=2)
 
     return result
 
 class TMWM(ImageGapfill):
-  """Temporal Moving Window Median
-    
-  :param fn_files: TODO
-  :param data: TODO
-  :param yearly_temporal_resolution: TODO
-  :param time_win_size: TODO
-  :param cpu_max_workers: TODO
-  :param engine: TODO
-  :param gpu_tile_size: TODO
-  :param verbose: TODO
+  """
+  Temporal Moving Window Median able to gapfill the missing pixels using the temporal neighborhood
+  by a growing window to calculate several median possibilities. The approach prioritizes
+  values derived for **1–the same day/month/season**, **2–neighboring days/months/seasons**, 
+  **and 3–all the year**. 
+
+  For example, in the best case scenario a missing pixel on Jan-2005 is filled using a median
+  value derived from January of other years, and in the worst case scenario it uses a value derived
+  of all the months and available years. If a pixel remains with a missing value, it is because
+  there is **no valid data on the entire time series**.
+
+  :param fn_files: Raster file paths to be read and gapfilled.
+  :param data: 3D array where the last dimension is the time.
+  :param yearly_temporal_resolution: Season size of a year (For monthly time series it is equal ``12``).
+  :param time_win_size: Size of the temporal window used to calculate the median value possibilities.
+  :param cpu_max_workers: Number of CPU cores to be used in parallel.
+  :param engine: Execute in ``CPU`` [1] or ``GPU`` [2].
+  :param gpu_tile_size: Tile size used to split the processing in the GPU.
+  :param verbose: Use ``True`` to print the progress of the gapfilled.
+
+  >>> # For a 4-season time series
+  >>> tmwm = gapfiller.TMWM(fn_files=fn_rasters, yearly_temporal_resolution=4, time_win_size=4)
+  >>> data_tmwm = tmwm.run()
+  >>> fn_rasters_tmwm = tmwm.save_rasters('./gapfilled_tmwm')
+
+  [1] `Bootleneck nanmedian <https://kwgoodman.github.io/bottleneck-doc/reference.html#bottleneck.nanmedian>`_
+
+  [2] `CuPY nanmedian <https://docs.cupy.dev/en/stable/reference/generated/cupy.nanmedian.html>`_
+  
   """
 
   def __init__(self,
@@ -414,7 +457,7 @@ class TMWM(ImageGapfill):
         stacked = np.stack([before_data[i], after_data[i]], axis=2)
         valid_mean = np.any(np.isnan(stacked), axis=2)
         stacked[valid_mean] = np.nan
-        newdata_dict[i] = np.nanmean(stacked, axis=2)
+        newdata_dict[i] = bc.nanmean(stacked, axis=2)
 
       end_msg = self._fill_gaps(time, layer_pos, newdata_dict, verbose_suffix='neighborhood seasons', gapflag_offset = n_layers)
       if end_msg is not None:
@@ -426,7 +469,7 @@ class TMWM(ImageGapfill):
     newdata_dict = self.tmwm_data.get(time, layer_pos)
     return self._fill_gaps(time, layer_pos, newdata_dict, verbose_suffix='same season')
 
-  def fill_image(self, time, layer_pos):
+  def _fill_image(self, time, layer_pos):
 
     end_msg = self._fill_gaps_same_time(time, layer_pos)
 
@@ -442,7 +485,7 @@ class TMWM(ImageGapfill):
 
     self.time_data_gaps = {}
 
-    self.tmwm_data = TMWMData(self.time_order, self.time_data, self.time_win_size,
+    self.tmwm_data = _TMWMData(self.time_order, self.time_data, self.time_win_size,
       cpu_max_workers=self.cpu_max_workers, engine=self.engine, gpu_tile_size=self.gpu_tile_size)
     self.tmwm_data.run()
 
@@ -456,7 +499,7 @@ class TMWM(ImageGapfill):
       for layer_pos in range(0, n_layers):
         layer_args.append((time, layer_pos))
 
-    for end_msg in parallel.ThreadGeneratorLazy(self.fill_image, iter(layer_args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
+    for end_msg in parallel.ThreadGeneratorLazy(self._fill_image, iter(layer_args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
       end_msg = True
 
     gapfilled_data = []
@@ -476,11 +519,20 @@ class TMWM(ImageGapfill):
     return gapfilled_data, gapfilled_data_flag
 
 class TLI(ImageGapfill):
-  """Temporal Linear Interpolation
-    
-  :param fn_files: TODO
-  :param data: TODO
-  :param verbose: TODO
+  """
+  Temporal Linear Interpolation able to gapfill the missing pixels using a linear regression [1]
+  over the time using all valid pixels.
+
+  :param fn_files: Raster file paths to be read and gapfilled.
+  :param data: 3D array where the last dimension is the time.
+  :param verbose: Use ``True`` to print the progress of the gapfilled.
+
+  >>> tli = gapfiller.TLI(fn_files=fn_rasters)
+  >>> data_tli = tli.run()
+  >>> fn_rasters_tli = tli.save_rasters('./gapfilled_tli')
+
+  [1] `Scikit-learn linear regression <https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html>`_
+
   """
 
   def __init__(self,
@@ -520,13 +572,208 @@ class TLI(ImageGapfill):
     result = parallel.apply_along_axis(self._temporal_linear_inter, 2, self.data)
     return (result[:,:,:,0], result[:,:,:,1])
 
-class SMWM(ImageGapfill):
-  """Spatial Moving Window Median
+class SSA(ImageGapfill):
+  """Singular Spectral Analysis
     
   :param fn_files: TODO
   :param data: TODO
+  :param window_size: TODO
+  :param ngroups: TODO
+  :param reconstruct_ngroups: TODO
   :param verbose: TODO
-  :param space_win_list: TODO
+  """
+
+  def __init__(self,
+    fn_files:List = None ,
+    data:np.array = None,
+    window_size:int = 4,
+    ngroups:int = 4,
+    reconstruct_ngroups:int = 2,
+    season_size:int = 4,
+    verbose = True
+  ):
+    
+    self.window_size = window_size
+    self.ngroups = ngroups
+    self.season_size = season_size
+    self.reconstruct_ngroups = reconstruct_ngroups
+
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
+
+  def gapfill_ltm(self, ts_data, season_size=12, agg_year=5):
+    ts_size = ts_data.shape[1]
+    agg_size = (season_size * agg_year)
+    i_list = [ (i0, (ts_size if (i0 + agg_size) > ts_size else (i0 + agg_size))) for i0 in range(0,ts_size,agg_size) ]  
+    
+    arr_ltm = []
+    for i0, i1 in i_list:
+      ts_year = ts_data[0, i0:i1].reshape(-1, season_size)
+      
+      if self._perc_gaps(ts_year) == 1.0:
+        ts_ltm = np.empty((i1 - i0))
+        ts_ltm[:] = np.nan
+      else:
+        ts_ltm = bc.nanmean(ts_year, axis=0)
+        repetions = int((i1 - i0) / season_size)
+        ts_ltm = np.tile(ts_ltm, repetions)
+
+      arr_ltm.append(ts_ltm)
+    
+    ts_ltm = np.concatenate(arr_ltm).reshape(ts_data.shape)
+    
+    return ts_ltm
+
+  def _all_nan(self, data):
+    return np.all(np.isnan(data))
+
+  def _perc_gaps(self, data):
+    return np.sum(np.isnan(data).astype('int')) / data.flatten().shape[0]
+
+  def _ssa_reconstruction(self, data):
+
+    ts_data = data.reshape(1,-1).astype('Float32')
+    ts_flag = np.zeros(ts_data.shape)
+
+    if self._all_nan(ts_data):
+      return np.stack([ ts_data.reshape(data.shape),
+                ts_flag.reshape(data.shape) ], axis=1)
+
+    na_mask_initial = np.isnan(ts_data)
+
+    if self._all_nan(ts_data):
+      return np.stack([ ts_data.reshape(data.shape),
+                ts_flag.reshape(data.shape) ], axis=1)
+
+    ts_gapfilled = ts_data.copy()
+    na_mask_no_outiler = np.isnan(ts_gapfilled)
+    n_years = int(ts_gapfilled.shape[1] / self.season_size)
+
+    if self._perc_gaps(ts_gapfilled.flatten()) <= 0.80:
+      for year in range(5, n_years, 3):
+        ts_gapfilled_y = self.gapfill_ltm(ts_data, season_size=self.season_size, agg_year=year)    
+        gapfill_mask = np.logical_and(np.isnan(ts_gapfilled),~np.isnan(ts_gapfilled_y))
+        ts_gapfilled[gapfill_mask] = ts_gapfilled_y[gapfill_mask]
+        gapfill_mask = np.isnan(ts_gapfilled)
+    
+        if self._perc_gaps(ts_gapfilled) == 0:
+          break
+    
+    if self._perc_gaps(ts_gapfilled.flatten()) < 1.0:
+      gapfill_mask = np.isnan(ts_gapfilled)
+      ts_mean = bc.nanmean(ts_gapfilled)
+      ts_gapfilled[gapfill_mask] = ts_mean
+
+    ssa = SingularSpectrumAnalysis(window_size=self.window_size, groups=self.ngroups)
+    ts_components = ssa.fit_transform(ts_gapfilled)
+    ts_reconstructed = np.sum(ts_components[0:self.reconstruct_ngroups,:], axis=0)
+    ts_flag[na_mask_initial] = 2
+    ts_flag[~na_mask_no_outiler] = 1
+    
+    ssa = SingularSpectrumAnalysis(window_size=self.window_size, groups=self.ngroups)
+    ts_components = ssa.fit_transform(ts_gapfilled)
+    ts_reconstructed = np.sum(ts_components[0:self.reconstruct_ngroups,:], axis=0)
+    
+    return np.stack([ts_reconstructed.reshape(data.shape), ts_flag.reshape(data.shape)], axis=1)
+
+  def _gapfill(self):
+    result = parallel.apply_along_axis(self._ssa_reconstruction, 2, self.data)
+    return (result[:,:,:,0], result[:,:,:,1])
+
+class InPainting(ImageGapfill):
+  """
+  Approach that uses a inpating technique [1] to gapfill raster data
+  using the region neighborhood.
+   
+  :param fn_files: Raster file paths to be read and gapfilled.
+  :param data: 3D array where the last dimension is the time.
+  :param space_win: Radius of a circular neighborhood of each point inpainted that is considered by the algorithm.
+  :param data_mask: 2D array indicating a valid areas, equal 1, where in case of gaps should be filled.
+  :param mode:  Inpainting method that could be cv::INPAINT_NS or cv::INPAINT_TELEA [1]
+  :param verbose: Use ``True`` to print the progress of the gapfilled.
+  
+  >>> # Considerer land_mask as 2D numpy array where 1 indicates land
+  >>> inPainting = gapfiller.InPainting(fn_files=fn_rasters, space_win = 10, data_mask=land_mask)
+  >>> data_inp = inPainting.run()
+  >>> fn_rasters_inp = inPainting.save_rasters('./gapfilled_inp')
+
+  [1] `OpenCV Tutorial - Image Inpainting <https://docs.opencv.org/4.5.2/df/d3d/tutorial_py_inpainting.html>`_
+  
+  """
+
+  def __init__(self,
+    fn_files:List = None ,
+    data:np.array = None,
+    verbose:bool = True,
+    space_win:int = 10,
+    data_mask:np.array = None,
+    mode = cv.INPAINT_TELEA
+  ):
+
+    self.data_mask = data_mask
+    self.space_win = space_win
+    self.mode = mode
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
+
+  def _inpaint(self, data, i=0):
+
+    # necessary for a proper inpaint execution
+    data_copy = np.copy(data)
+    initial_value = np.nanmedian(data_copy)
+    na_data_mask = np.isnan(data_copy)
+    data_copy[na_data_mask] = initial_value
+    data_gapfilled = cv.inpaint(data_copy.astype('float32'), na_data_mask.astype('uint8'), self.space_win, self.mode)
+    
+    return (data_gapfilled, i)
+
+  def _gapfill(self):
+
+    data = np.copy(self.data)
+    data_flag = np.zeros(data.shape)
+
+    max_workers = multiprocessing.cpu_count()
+    n_times = data.shape[2]
+
+    args = []
+
+    for i in range(0, n_times):
+      if self._n_gaps(data[:,:,i]) > 0:
+        args.append((data[:,:,i], i))
+      
+    result_set = {}
+    for band_data, i in parallel.ThreadGeneratorLazy(self._inpaint, iter(args), max_workers=max_workers, chunk=max_workers*2):
+        result_set[f'{i}'] = band_data
+
+    for i in range(0, n_times):
+      key = f'{i}'
+      
+      if (key in result_set):
+        band_data_gapfilled = result_set[key]
+        
+        gapfill_mask = np.logical_and(~np.isnan(band_data_gapfilled), np.isnan(data[:,:,i]))
+        gapfill_mask = np.logical_and(gapfill_mask, (self.data_mask == 1))
+        
+        data[:,:,i][gapfill_mask] = band_data_gapfilled[gapfill_mask]
+        data_flag[:,:,i][gapfill_mask] = 1
+
+    return data, data_flag
+
+class SMWM(ImageGapfill):
+  """
+  Spatial Moving Window Median able to gapfill the missing pixels using the spatial neighborhood
+  by a growing window to calculate the median [1]. The smaller windows will be prioritized 
+  over larger ones.
+
+  :param fn_files: Raster file paths to be read and gapfilled.
+  :param data: 3D array where the last dimension is the time.
+  :param verbose: Use ``True`` to print the progress of the gapfilled.
+  :param space_win_list: Spatial window possibilities used by the median calculation.
+
+  >>> smwm = gapfiller.SMWM(fn_files=fn_rasters,  space_win_list = [5, 10, 50])
+  >>> data_smwm = smwm.run()
+  >>> fn_rasters_smwm = smwm.save_rasters('./gapfilled_smwm')
+
+  [1] `Scipy multidimensional median_filter <https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.median_filter.html>`_
+
   """
 
   def __init__(self,
@@ -539,7 +786,7 @@ class SMWM(ImageGapfill):
     self.space_win_list = space_win_list
     super().__init__(fn_files=fn_files, data=data, verbose=verbose)
 
-  def spatial_median(self, data, i=0, win_size=5):
+  def _spatial_median(self, data, i=0, win_size=5):
     return ndimage.median_filter(data.astype('float32'), size=win_size), i, win_size,
 
   def _gapfill(self):
@@ -554,11 +801,11 @@ class SMWM(ImageGapfill):
 
     for win_size in self.space_win_list:
       for i in range(0, n_times):
-        if self.n_gaps(data[:,:,i]) > 0:
+        if self._n_gaps(data[:,:,i]) > 0:
           args.append((data[:,:,i], i, win_size))
 
     result_set = {}
-    for band_data, i, win_size in parallel.ThreadGeneratorLazy(self.spatial_median, iter(args), max_workers=max_workers, chunk=max_workers*2):
+    for band_data, i, win_size in parallel.ThreadGeneratorLazy(self._spatial_median, iter(args), max_workers=max_workers, chunk=max_workers*2):
         result_set[f'{win_size}-{i}'] = band_data
 
     for win_size in self.space_win_list:
