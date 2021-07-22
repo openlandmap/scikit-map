@@ -137,10 +137,11 @@ def read_rasters(
                   dtype = 'float16',
                   n_jobs = 4,
                   verbose = False,
+                  data_mask = None,
                   try_without_window = False
                 ):
   if len(raster_dirs) == 0 and len(raster_files) == 0:
-    raise Exception('The raster_dirs and raster_files params can be empty at same time.')
+    raise Exception('The raster_dirs and raster_files params can not be empty at same time.')
 
   if len(raster_files) == 0:
     raster_files = find_files(raster_dirs, f'*.{raster_ext}')
@@ -162,6 +163,13 @@ def read_rasters(
           ttprint(f'ERROR: Failed to read {raster_file} window {spatial_win}.')
           band_data = np.empty((int(spatial_win.width), int(spatial_win.height)))
           band_data[:] = np.nan
+
+      if data_mask is not None:
+        if (data_mask.shape == band_data.shape):
+          band_data[data_mask] = np.nan
+        else:
+          ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
+
     return raster_pos, band_data, raster_ds.nodatavals[0]
 
   raster_data = {}
@@ -184,7 +192,6 @@ def read_rasters(
 
   raster_data = [raster_data[i] for i in range(0,len(raster_files))]
   raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
-  
   return raster_data, raster_files
 
 def create_raster(
