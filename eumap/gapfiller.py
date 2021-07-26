@@ -51,6 +51,8 @@ class ImageGapfill(ABC):
     data:np.array = None,
     drop_outliers:bool = False,
     th_outliers:bool = [2,98],
+    outlier_std_win:int = 2,
+    outlier_std_env:int = 1,
     verbose:bool = True,
   ):
 
@@ -68,7 +70,9 @@ class ImageGapfill(ABC):
       self.data = data
 
     self.drop_outliers = drop_outliers
-    self.th_outliers = th_outliers
+    #self.th_outliers = th_outliers
+    self.outlier_std_win = self.outlier_std_win
+    self.outlier_std_env = outlier_std_env
 
     self.verbose = verbose
 
@@ -82,11 +86,44 @@ class ImageGapfill(ABC):
 
     return np.sum(np.isnan(data).astype('int'))
 
-  def _remove_outliers(self, ts_data):
+  def _remove_outliers_perc(self, ts_data):
     lower_pct, higher_pct = np.nanpercentile(ts_data, q = self.th_outliers)
     outlier_mask = np.logical_or(ts_data <= lower_pct, ts_data >= higher_pct)
     ts_data[outlier_mask] = np.nan
     return ts_data
+
+  def _remove_outliers(self, ts_data):
+    
+    if np.sum(np.isnan(ts_data).astype('int')) != ts_data.shape[0]:
+      ts_data = ts_data.astype('float32')
+      ts_size = ts_data.shape[0]
+      
+      ts_win = self.outlier_std_win
+      env = self.outlier_std_env
+      
+      outliers = []
+
+      for i in range(0, ts_size):
+        i0 = 0 if (i - ts_win) < 0 else (i - ts_win)
+        i1 = ts_size if (i + ts_win) < ts_size else (i + ts_win)
+        
+        win_data = ts_data[i0:i1]
+
+        if (np.sum(np.isnan(win_data).astype('int')) >= 3):
+          med = bc.nanmedian(win_data)
+          std = bc.nanstd(win_data)
+
+          lower = (med - std * env)
+          upper = (med + std * env)
+
+          outliers.append(lower > ts_data[i] or upper < ts_data[i])
+        else:
+          outliers.append(False)
+
+      outliers = np.array(outliers)
+      ts_data[outliers] = np.nan
+
+    return ts_data.astype('float16')
 
   def _perc_gaps(self, gapfilled_data):
     data_nan = np.isnan(self.data)
@@ -105,7 +142,7 @@ class ImageGapfill(ABC):
     start = time.time()
 
     if self.drop_outliers:
-      self._verbose(f'Removing temporal outliers considering {self.th_outliers} quantiles.')
+      self._verbose(f'Removing temporal outliers using a moving std window ({self.outlier_std_win}) ')
       self.data = parallel.apply_along_axis(self._remove_outliers, 2, self.data)
 
     self.gapfilled_data, self.gapfilled_data_flag = self._gapfill()
@@ -218,10 +255,8 @@ class _TMWMData():
     return f'{time}_{t1}_{t2}'
 
   def _calc_nanmedian(self, time, t1, t2):
-    #return self._key_from_time(time, t1, t2), np.nanmedian(self.time_data[time][:,:,t1:t2], axis=2)
-    return self._key_from_time(time, t1, t2), bc.nanmedian(self.time_data[time][:,:,t1:t2], axis=2)
-    #med = nanPercentile(np.transpose(self.time_data[time][:,:,t1:t2], axes=[2, 0, 1]), [50])
-    #return self._key_from_time(time, t1, t2), med[0]
+    result = bc.nanmedian(self.time_data[time][:,:,t1:t2].astype('float32'), axis=2)
+    return self._key_from_time(time, t1, t2), result.astype('float16')
 
   def _cpu_processing(self, args):
     for key, data in parallel.ThreadGeneratorLazy(self._calc_nanmedian, iter(args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
@@ -298,7 +333,7 @@ class _TMWMData():
     for t in time_list:
       try:
         for win_size in (self.available_windows[t][layer_pos]):
-          result[win_size] = ( [] if t not in result else result[win_size])
+          result[win_size] = ( [] if win_size not in result else result[win_size])
           key = self._key_from_layer_pos(t, layer_pos, win_size)
           result[win_size].append(self.gapfilled_data[key])
       except:
@@ -306,7 +341,9 @@ class _TMWMData():
         continue
 
     for win_size in list(result.keys()):
-      result[win_size] = bc.nanmean(np.stack(result[win_size], axis=2), axis=2)
+      win_stacked = np.stack(result[win_size], axis=2).astype('float32')
+      result[win_size] = bc.nanmedian(win_stacked, axis=2).astype('float16')
+      del win_stacked
 
     return result
 
