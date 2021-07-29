@@ -21,7 +21,7 @@ def save_rasters(
                     spatial_win = None,
                     data_type = None,
                     raster_format = 'GTiff',
-                    nodata = 0, 
+                    nodata = None, 
                     n_jobs = 4,
                     verbose=False
                   ):
@@ -129,6 +129,7 @@ def read_rasters_remote(
   else:
     return raster_data, url_list
 
+    
 def read_rasters(
                   raster_dirs:List = [],
                   raster_files:List = [],
@@ -138,6 +139,7 @@ def read_rasters(
                   n_jobs = 4,
                   verbose = False,
                   data_mask = None,
+                  expected_img_size = None,
                   try_without_window = False
                 ):
   if len(raster_dirs) == 0 and len(raster_files) == 0:
@@ -151,40 +153,49 @@ def read_rasters(
 
   def _read_raster(raster_pos):
     raster_file = raster_files[raster_pos]
-    band_data = None
+    raster_ds, band_data = None, None
+    nodata = 0
 
-    with rasterio.open(raster_file) as raster_ds:
-      try:
-        band_data = raster_ds.read(1, window=spatial_win)
-        if band_data.size == 0 and try_without_window:
-          band_data = raster_ds.read(1)
-      except:
-        if spatial_win is not None:
-          ttprint(f'ERROR: Failed to read {raster_file} window {spatial_win}.')
-          band_data = np.empty((int(spatial_win.width), int(spatial_win.height)))
-          band_data[:] = np.nan
+    try:
+      raster_ds = rasterio.open(raster_file)
+      
+      band_data = raster_ds.read(1, window=spatial_win)
+      if band_data.size == 0 and try_without_window:
+        band_data = raster_ds.read(1)
 
-      if data_mask is not None:
-        if (data_mask.shape == band_data.shape):
-          band_data[data_mask] = np.nan
-        else:
-          ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
+      nodata = raster_ds.nodatavals[0]
+    except:
+      if spatial_win is not None:
+        ttprint(f'ERROR: Failed to read {raster_file} window {spatial_win}.')
+        band_data = np.empty((int(spatial_win.width), int(spatial_win.height)))
+        band_data[:] = np.nan
 
-    return raster_pos, band_data, raster_ds.nodatavals[0]
+      if expected_img_size is not None:
+        ttprint(f'Full nan image for {raster_file}')
+        band_data = np.empty(expected_img_size)
+        band_data[:] = np.nan
+
+    if data_mask is not None:
+      if (data_mask.shape == band_data.shape):
+        band_data[data_mask] = np.nan
+      else:
+        ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
+    
+    return raster_pos, band_data, nodata
 
   raster_data = {}
   args = [ (raster_pos,) for raster_pos in range(0,len(raster_files)) ]
 
-  for raster_pos, band_data, nodata in parallel.ThreadGeneratorLazy(_read_raster, iter(args), max_workers=n_jobs, chunk=n_jobs*2):
+  from joblib import Parallel, delayed
+
+  for raster_pos, band_data, nodata in Parallel(n_jobs=n_jobs)(delayed(_read_raster)(*arg) for arg in args):
+  #for raster_pos, band_data, nodata in parallel.ThreadGeneratorLazy(_read_raster, iter(args), max_workers=n_jobs, chunk=n_jobs*2):
     raster_file = raster_files[raster_pos]
 
     if (isinstance(band_data, np.ndarray)):
 
       band_data = band_data.astype(dtype)
       band_data[band_data == nodata] = np.nan
-
-      #if (verbose and np.isnan(np.min(band_data))):
-      # ttprint(f'Layer {raster_file} has NA values (nodata={nodata})')
 
     else:
       raise Exception(f'The raster {raster_file} was not found.')
@@ -195,13 +206,13 @@ def read_rasters(
   return raster_data, raster_files
 
 def create_raster(
-                    base_raster,
+                    fn_base_raster,
                     fn_raster,
                     data,
                     spatial_win = None,
                     data_type = None,
                     raster_format = 'GTiff',
-                    nodata = 0
+                    nodata = None
                   ):
 
   if len(data.shape) < 3:
@@ -209,31 +220,47 @@ def create_raster(
 
   x_size, y_size, nbands = data.shape
 
-  if not isinstance(base_raster, rasterio._base.DatasetBase):
-    base_raster = rasterio.open(base_raster, 'r')
+  with rasterio.open(fn_base_raster, 'r') as base_raster:
 
-  if data_type is None:
-    data_type = base_raster.dtypes[0]
+    if data_type is None:
+      data_type = base_raster.dtypes[0]
 
-  transform = base_raster.transform
+    if nodata is None:
+      nodata = base_raster.nodata
 
-  if spatial_win is not None:
-    transform = rasterio.windows.transform(spatial_win, transform)
+    transform = base_raster.transform
 
-  if not isinstance(fn_raster, Path):
-    fn_raster = Path(fn_raster)
+    if spatial_win is not None:
+      transform = rasterio.windows.transform(spatial_win, transform)
+    
+    return rasterio.open(fn_raster, 'w',
+            driver=raster_format,
+            height=x_size,
+            width=y_size,
+            count=nbands,
+            dtype=data_type,
+            crs=base_raster.crs,
+            compress='LZW',
+            transform=transform,
+            nodata=nodata)
+
+def _fit_in_dtype(data, dtype, nodata):
   
-  fn_raster.parent.mkdir(parents=True, exist_ok=True)
+  if dtype in ('uint8', 'uint8', 'int', 'int'):
+    data = np.rint(data)
 
-  return rasterio.open(fn_raster, 'w',
-          driver=raster_format,
-          width=x_size,
-          height=y_size,
-          count=nbands,
-          dtype=data_type,
-          crs=base_raster.crs,
-          compress='LZW',
-          transform=transform)
+    min_val = np.iinfo(dtype).min
+    max_val = np.iinfo(dtype).max
+    
+    data = np.where((data < min_val), min_val, data)
+    data = np.where((data > max_val), max_val, data)
+
+    if nodata == min_val:
+      data = np.where((data == nodata), (min_val + 1), data)
+    elif nodata == max_val:
+      data = np.where((data == nodata), (max_val - 1), data)
+
+  return data
 
 def write_new_raster(
                       fn_base_raster,
@@ -242,7 +269,8 @@ def write_new_raster(
                       spatial_win = None,
                       data_type = None,
                       raster_format = 'GTiff',
-                      nodata = 0
+                      nodata = None,
+                      fit_in_data_type = False
                     ):
 
   if len(data.shape) < 3:
@@ -250,7 +278,17 @@ def write_new_raster(
 
   _, _, nbands = data.shape
 
-  with create_raster(fn_base_raster, fn_new_raster, data, spatial_win, data_type, raster_format) as new_raster:
-    new_raster.nodata = nodata
+  with create_raster(fn_base_raster, fn_new_raster, data, spatial_win, data_type, raster_format, nodata) as new_raster:
+
     for band in range(0, nbands):
-      new_raster.write(data[:,:,band].astype(new_raster.dtypes[band]), indexes=(band+1))
+      
+      band_data = data[:,:,band]
+      band_dtype = new_raster.dtypes[band]
+      
+      if fit_in_data_type:
+        band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
+
+      band_data[np.isnan(band_data)] = new_raster.nodata
+      new_raster.write(band_data.astype(band_dtype), indexes=(band+1))
+
+  return fn_new_raster

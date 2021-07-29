@@ -2,13 +2,13 @@
 Parallelization helpers based in thread and process pools
 '''
 
-def ThreadGeneratorLazy(worker, args, max_workers, chunk, fixed_args = ()):
+def ThreadGeneratorLazy(worker, args, max_workers, chunk):
   import concurrent.futures
   from itertools import islice
 
   with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
     group = islice(args, chunk)
-    futures = {executor.submit(worker, *arg + fixed_args) for arg in group}
+    futures = {executor.submit(worker, *arg) for arg in group}
 
     while futures:
       done, futures = concurrent.futures.wait(
@@ -21,15 +21,15 @@ def ThreadGeneratorLazy(worker, args, max_workers, chunk, fixed_args = ()):
       group = islice(args, chunk)
 
       for arg in group:
-        futures.add(executor.submit(worker,*arg + fixed_args))
+        futures.add(executor.submit(worker,*arg))
 
-def ProcessGeneratorLazy(worker, args, max_workers, chunk, fixed_args = ()):
+def ProcessGeneratorLazy(worker, args, max_workers, chunk):
   import concurrent.futures
   from itertools import islice
 
   with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
     group = islice(args, chunk)
-    futures = {executor.submit(worker, *arg + fixed_args) for arg in group}
+    futures = {executor.submit(worker, *arg) for arg in group}
 
     while futures:
       done, futures = concurrent.futures.wait(
@@ -42,7 +42,7 @@ def ProcessGeneratorLazy(worker, args, max_workers, chunk, fixed_args = ()):
       group = islice(args, chunk)
 
       for arg in group:
-        futures.add(executor.submit(worker, *arg + fixed_args))
+        futures.add(executor.submit(worker, *arg))
 
 def unpacking_apply_along_axis(all_args):
   import numpy as np

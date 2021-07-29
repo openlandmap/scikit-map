@@ -23,10 +23,10 @@ from sklearn.metrics import mean_squared_error
 from typing import List, Dict, Union
 
 from itertools import chain
+import cv2 as cv
 import numpy as np
 from osgeo import gdal
 from osgeo import osr
-import cv2 as cv
 import os
 
 from abc import ABC, abstractmethod
@@ -36,6 +36,18 @@ from .raster import read_rasters, write_new_raster
 
 CPU_COUNT = multiprocessing.cpu_count()
 _OUT_DIR = os.path.join(os.getcwd(), 'gapfilled')
+
+def time_first_space_later(time_strategy, space_strategy, space_flag_val = 100):
+  time_gapfilled = time_strategy.run()
+  time_gapfilled_pct = time_strategy._perc_gaps(time_strategy.gapfilled_data)
+
+  if time_gapfilled_pct < 1.0:
+    space_strategy.run()
+    time_gapfilled.gapfilled_data_flag[space_strategy.gapfilled_data_flag == 1] = space_flag_val
+    space_strategy.gapfilled_data_flag = time_gapfilled.gapfilled_data_flag
+    return space_strategy
+  else:
+    return space_strategy
 
 class ImageGapfill(ABC):
   """
@@ -49,10 +61,10 @@ class ImageGapfill(ABC):
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None,
-    drop_outliers:bool = False,
-    th_outliers:bool = [2,98],
+    outlier_remover:str = None,
     outlier_std_win:int = 2,
     outlier_std_env:int = 1,
+    outlier_perc_th:list = [2,98],
     verbose:bool = True,
   ):
 
@@ -69,10 +81,16 @@ class ImageGapfill(ABC):
     else:
       self.data = data
 
-    self.drop_outliers = drop_outliers
-    #self.th_outliers = th_outliers
-    self.outlier_std_win = self.outlier_std_win
+    self.outlier_remover = outlier_remover
+    self.outlier_perc_th = outlier_perc_th
+    self.outlier_std_win = outlier_std_win
     self.outlier_std_env = outlier_std_env
+
+    self.outlier_fn = None
+    if self.outlier_remover == 'std':
+      self.outlier_fn = self._remove_outliers_std
+    elif self.outlier_remover == 'perc':
+      self.outlier_fn = self._remove_outliers_perc
 
     self.verbose = verbose
 
@@ -92,7 +110,7 @@ class ImageGapfill(ABC):
     ts_data[outlier_mask] = np.nan
     return ts_data
 
-  def _remove_outliers(self, ts_data):
+  def _remove_outliers_std(self, ts_data):
     
     if np.sum(np.isnan(ts_data).astype('int')) != ts_data.shape[0]:
       ts_data = ts_data.astype('float32')
@@ -141,9 +159,9 @@ class ImageGapfill(ABC):
 
     start = time.time()
 
-    if self.drop_outliers:
-      self._verbose(f'Removing temporal outliers using a moving std window ({self.outlier_std_win}) ')
-      self.data = parallel.apply_along_axis(self._remove_outliers, 2, self.data)
+    if self.outlier_fn:
+      self._verbose(f'Removing temporal outliers using {self.outlier_remover}')
+      self.data = parallel.apply_along_axis(self.outlier_fn, 2, self.data)
 
     self.gapfilled_data, self.gapfilled_data_flag = self._gapfill()
 
@@ -188,8 +206,8 @@ class ImageGapfill(ABC):
       raise Exception(f'To use save_rasters you should provide a fn_files list.')
 
     base_img_i = 0
-    fn_base_img = self.fn_files[base_img_i]
-    while not fn_base_img.is_file():
+    fn_base_img = None
+    while base_img_i is not self.fn_files and not self.fn_files[base_img_i].is_file():
       base_img_i += 1
       fn_base_img = self.fn_files[base_img_i]
 
@@ -255,7 +273,7 @@ class _TMWMData():
     return f'{time}_{t1}_{t2}'
 
   def _calc_nanmedian(self, time, t1, t2):
-    result = bc.nanmedian(self.time_data[time][:,:,t1:t2].astype('float32'), axis=2)
+    result = bc.nanmedian(self.time_data[time][:,:,t1:t2+1].astype('float32'), axis=2)
     return self._key_from_time(time, t1, t2), result.astype('float16')
 
   def _cpu_processing(self, args):
@@ -387,6 +405,10 @@ class TMWM(ImageGapfill):
     cpu_max_workers:int = multiprocessing.cpu_count(),
     engine='CPU',
     gpu_tile_size:int = 250,
+    outlier_remover:str = None,
+    outlier_std_win:int = 2,
+    outlier_std_env:int = 1,
+    outlier_perc_th:list = [2,98],
     verbose = True,
   ):
 
@@ -396,11 +418,14 @@ class TMWM(ImageGapfill):
     self.gpu_tile_size = gpu_tile_size
     self.yearly_temporal_resolution = yearly_temporal_resolution
 
-    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose,
+      outlier_remover=outlier_remover, outlier_std_win=outlier_std_win, outlier_std_env=outlier_std_env,
+      outlier_perc_th=outlier_perc_th)
+
     self._do_time_data()
 
     if self.time_win_size > math.floor(self.n_years/2):
-      raise Exception(f'The time_win_size can not bigger than {math.floor(self.n_years/2)}')
+      raise Exception(f'The time_win_size can not be bigger than {math.floor(self.n_years/2)}')  
 
   def _do_time_data(self):
     total_times = self.data.shape[2]
@@ -445,6 +470,8 @@ class TMWM(ImageGapfill):
   def _fill_gaps(self, time, layer_pos, newdata_dict, verbose_suffix='', gapflag_offset = 0):
 
     end_msg = None
+    keys = list(newdata_dict.keys())
+    keys.sort()
 
     for i in newdata_dict.keys():
 
@@ -453,10 +480,9 @@ class TMWM(ImageGapfill):
 
       gaps_pct = np.count_nonzero(~np.isnan(newdata))
       newdata_pct = np.count_nonzero(gaps_mask.flatten())
-
+      
       if newdata_pct != 0:
         gapfilled_pct =  gaps_pct / newdata_pct
-
         self.time_data[time][:,:,layer_pos][gaps_mask] = newdata
         self.time_data_gaps[time][:,:,layer_pos][gaps_mask] = int(i) + gapflag_offset
 
@@ -471,6 +497,7 @@ class TMWM(ImageGapfill):
     _, _, n_layers = self.time_data[time].shape
 
     end_msg = None
+    
     all_data = self.tmwm_data.get(self.time_order, layer_pos)
     end_msg = self._fill_gaps(time, layer_pos, all_data, verbose_suffix='all seasons', gapflag_offset = n_layers*2)
 
@@ -494,7 +521,7 @@ class TMWM(ImageGapfill):
         stacked = np.stack([before_data[i], after_data[i]], axis=2)
         valid_mean = np.any(np.isnan(stacked), axis=2)
         stacked[valid_mean] = np.nan
-        newdata_dict[i] = bc.nanmean(stacked, axis=2)
+        newdata_dict[i] = np.nanmean(stacked, axis=2)
 
       end_msg = self._fill_gaps(time, layer_pos, newdata_dict, verbose_suffix='neighborhood seasons', gapflag_offset = n_layers)
       if end_msg is not None:
@@ -506,7 +533,7 @@ class TMWM(ImageGapfill):
     newdata_dict = self.tmwm_data.get(time, layer_pos)
     return self._fill_gaps(time, layer_pos, newdata_dict, verbose_suffix='same season')
 
-  def _fill_image(self, time, layer_pos):
+  def fill_image(self, time, layer_pos):
 
     end_msg = self._fill_gaps_same_time(time, layer_pos)
 
@@ -515,7 +542,8 @@ class TMWM(ImageGapfill):
 
     if end_msg is None:
       end_msg = self._fill_gaps_all_times(time, layer_pos)
-
+    #end_msg = self._fill_gaps_all_times(time, layer_pos)
+    
     return end_msg
 
   def _gapfill(self):
@@ -536,7 +564,7 @@ class TMWM(ImageGapfill):
       for layer_pos in range(0, n_layers):
         layer_args.append((time, layer_pos))
 
-    for end_msg in parallel.ThreadGeneratorLazy(self._fill_image, iter(layer_args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
+    for end_msg in parallel.ThreadGeneratorLazy(self.fill_image, iter(layer_args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
       end_msg = True
 
     gapfilled_data = []
@@ -575,9 +603,16 @@ class TLI(ImageGapfill):
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None,
+    outlier_remover:str = None,
+    outlier_std_win:int = 2,
+    outlier_std_env:int = 1,
+    outlier_perc_th:list = [2,98],
     verbose = True
   ):
-    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose,
+      outlier_remover=outlier_remover, outlier_std_win=outlier_std_win, 
+      outlier_std_env=outlier_std_env, outlier_perc_th=outlier_perc_th)
+
 
   def _temporal_linear_inter(self, data):
 
@@ -627,6 +662,10 @@ class SSA(ImageGapfill):
     ngroups:int = 4,
     reconstruct_ngroups:int = 2,
     season_size:int = 4,
+    outlier_remover:str = None,
+    outlier_std_win:int = 2,
+    outlier_std_env:int = 1,
+    outlier_perc_th:list = [2,98],
     verbose = True
   ):
     
@@ -635,7 +674,9 @@ class SSA(ImageGapfill):
     self.season_size = season_size
     self.reconstruct_ngroups = reconstruct_ngroups
 
-    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose,
+      outlier_remover=outlier_remover, outlier_std_win=outlier_std_win, 
+      outlier_std_env=outlier_std_env, outlier_perc_th=outlier_perc_th)
 
   def gapfill_ltm(self, ts_data, season_size=12, agg_year=5):
     ts_size = ts_data.shape[1]
@@ -740,16 +781,23 @@ class InPainting(ImageGapfill):
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None,
-    verbose:bool = True,
-    space_win:int = 10,
-    data_mask:np.array = None,
-    mode = cv.INPAINT_TELEA
+    space_win = 10,
+    data_mask = None,
+    mode = cv.INPAINT_TELEA,
+    outlier_remover:str = None,
+    outlier_std_win:int = 2,
+    outlier_std_env:int = 1,
+    outlier_perc_th:list = [2,98],
+    verbose = True,
   ):
 
     self.data_mask = data_mask
     self.space_win = space_win
     self.mode = mode
-    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
+    
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose,
+      outlier_remover=outlier_remover, outlier_std_win=outlier_std_win, 
+      outlier_std_env=outlier_std_env, outlier_perc_th=outlier_perc_th)
 
   def _inpaint(self, data, i=0):
 
@@ -816,12 +864,19 @@ class SMWM(ImageGapfill):
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None,
+    space_win_list = range(5, 21, 5),
+    outlier_remover:str = None,
+    outlier_std_win:int = 2,
+    outlier_std_env:int = 1,
+    outlier_perc_th:list = [2,98],
     verbose = True,
-    space_win_list = range(5, 21, 5)
   ):
 
     self.space_win_list = space_win_list
-    super().__init__(fn_files=fn_files, data=data, verbose=verbose)
+    
+    super().__init__(fn_files=fn_files, data=data, verbose=verbose,
+      outlier_remover=outlier_remover, outlier_std_win=outlier_std_win, 
+      outlier_std_env=outlier_std_env, outlier_perc_th=outlier_perc_th)
 
   def _spatial_median(self, data, i=0, win_size=5):
     return ndimage.median_filter(data.astype('float32'), size=win_size), i, win_size,
