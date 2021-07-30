@@ -12,7 +12,26 @@ from .misc import ttprint, find_files
 from . import parallel
 
 from pathlib import Path
+from affine import Affine
 import rasterio
+
+def _fit_in_dtype(data, dtype, nodata):
+  
+  if dtype in ('uint8', 'uint8', 'int', 'int'):
+    data = np.rint(data)
+
+    min_val = np.iinfo(dtype).min
+    max_val = np.iinfo(dtype).max
+    
+    data = np.where((data < min_val), min_val, data)
+    data = np.where((data > max_val), max_val, data)
+
+    if nodata == min_val:
+      data = np.where((data == nodata), (min_val + 1), data)
+    elif nodata == max_val:
+      data = np.where((data == nodata), (max_val - 1), data)
+
+  return data
 
 def save_rasters(
                     fn_base_raster,
@@ -36,10 +55,87 @@ def save_rasters(
   if verbose:
     ttprint(f'Writing {len(fn_raster_list)} raster files using {n_jobs} workers')
 
-  args = [ (fn_base_raster, fn_raster_list[i], data[:,:,i], spatial_win, data_type, raster_format, nodata) for i in range(0,len(fn_raster_list)) ]
+  args = [ \
+    (fn_base_raster, fn_raster_list[i], data[:,:,i], spatial_win, data_type, raster_format, nodata) \
+    for i in range(0,len(fn_raster_list)) 
+  ]
 
-  for fn_new_raster in parallel.ThreadGeneratorLazy(write_new_raster, iter(args), max_workers=n_jobs, chunk=n_jobs*2):
+  result = []
+  for fn_new_raster in parallel.job(write_new_raster, args, n_jobs=n_jobs):
+    result.append(fn_new_raster)
     continue
+
+  return result
+
+def create_raster(
+                    fn_base_raster,
+                    fn_raster,
+                    data,
+                    spatial_win = None,
+                    data_type = None,
+                    raster_format = 'GTiff',
+                    nodata = None
+                  ):
+
+  if len(data.shape) < 3:
+    data = np.stack([data], axis=2)
+
+  x_size, y_size, nbands = data.shape
+
+  with rasterio.open(fn_base_raster, 'r') as base_raster:
+
+    if data_type is None:
+      data_type = base_raster.dtypes[0]
+
+    if nodata is None:
+      nodata = base_raster.nodata
+
+    transform = base_raster.transform
+
+    if spatial_win is not None:
+      transform = rasterio.windows.transform(spatial_win, transform)
+    
+    return rasterio.open(fn_raster, 'w',
+            driver=raster_format,
+            height=x_size,
+            width=y_size,
+            count=nbands,
+            dtype=data_type,
+            crs=base_raster.crs,
+            compress='LZW',
+            transform=transform,
+            nodata=nodata)
+
+def write_new_raster(
+                      fn_base_raster,
+                      fn_new_raster,
+                      data,
+                      spatial_win = None,
+                      data_type = None,
+                      raster_format = 'GTiff',
+                      nodata = None,
+                      fit_in_data_type = False
+                    ):
+
+  if len(data.shape) < 3:
+    data = np.stack([data], axis=2)
+
+  _, _, nbands = data.shape
+
+  with create_raster(fn_base_raster, fn_new_raster, data, spatial_win, data_type, raster_format, nodata) as new_raster:
+
+    for band in range(0, nbands):
+      
+      band_data = data[:,:,band]
+      band_dtype = new_raster.dtypes[band]
+      
+      if fit_in_data_type:
+        band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
+
+      band_data[np.isnan(band_data)] = new_raster.nodata
+      new_raster.write(band_data.astype(band_dtype), indexes=(band+1))
+
+  return fn_new_raster
 
 def read_rasters_remote(
                   url_list:List = [],
@@ -50,6 +146,7 @@ def read_rasters_remote(
                   n_jobs = 4,
                   verbose = False,
                   return_ds = False,
+                  driver = 'GTiff',
                   nodata = None
                 ):
   
@@ -83,7 +180,7 @@ def read_rasters_remote(
 
         ds_params = {
           'fp': ds.name,
-          'driver': 'GTiff',
+          'driver': driver,
           'width': x_size,
           'height': y_size,
           'count': nbands,
@@ -101,10 +198,7 @@ def read_rasters_remote(
   raster_data = {}
   raster_ds = {}
 
-  from joblib import Parallel, delayed
-  from affine import Affine
-
-  for url_pos, data, ds_params in Parallel(n_jobs=n_jobs)(delayed(_read_raster)(*arg) for arg in args):
+  for url_pos, data, ds_params in parallel.job(_read_raster, args, n_jobs=n_jobs):
     url = url_list[url_pos]
  
     raster_data[url_pos] = data
@@ -186,10 +280,7 @@ def read_rasters(
   raster_data = {}
   args = [ (raster_pos,) for raster_pos in range(0,len(raster_files)) ]
 
-  from joblib import Parallel, delayed
-
-  for raster_pos, band_data, nodata in Parallel(n_jobs=n_jobs)(delayed(_read_raster)(*arg) for arg in args):
-  #for raster_pos, band_data, nodata in parallel.ThreadGeneratorLazy(_read_raster, iter(args), max_workers=n_jobs, chunk=n_jobs*2):
+  for raster_pos, band_data, nodata in parallel.job(_read_raster, args, n_jobs=n_jobs):
     raster_file = raster_files[raster_pos]
 
     if (isinstance(band_data, np.ndarray)):
@@ -204,91 +295,3 @@ def read_rasters(
   raster_data = [raster_data[i] for i in range(0,len(raster_files))]
   raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
   return raster_data, raster_files
-
-def create_raster(
-                    fn_base_raster,
-                    fn_raster,
-                    data,
-                    spatial_win = None,
-                    data_type = None,
-                    raster_format = 'GTiff',
-                    nodata = None
-                  ):
-
-  if len(data.shape) < 3:
-    data = np.stack([data], axis=2)
-
-  x_size, y_size, nbands = data.shape
-
-  with rasterio.open(fn_base_raster, 'r') as base_raster:
-
-    if data_type is None:
-      data_type = base_raster.dtypes[0]
-
-    if nodata is None:
-      nodata = base_raster.nodata
-
-    transform = base_raster.transform
-
-    if spatial_win is not None:
-      transform = rasterio.windows.transform(spatial_win, transform)
-    
-    return rasterio.open(fn_raster, 'w',
-            driver=raster_format,
-            height=x_size,
-            width=y_size,
-            count=nbands,
-            dtype=data_type,
-            crs=base_raster.crs,
-            compress='LZW',
-            transform=transform,
-            nodata=nodata)
-
-def _fit_in_dtype(data, dtype, nodata):
-  
-  if dtype in ('uint8', 'uint8', 'int', 'int'):
-    data = np.rint(data)
-
-    min_val = np.iinfo(dtype).min
-    max_val = np.iinfo(dtype).max
-    
-    data = np.where((data < min_val), min_val, data)
-    data = np.where((data > max_val), max_val, data)
-
-    if nodata == min_val:
-      data = np.where((data == nodata), (min_val + 1), data)
-    elif nodata == max_val:
-      data = np.where((data == nodata), (max_val - 1), data)
-
-  return data
-
-def write_new_raster(
-                      fn_base_raster,
-                      fn_new_raster,
-                      data,
-                      spatial_win = None,
-                      data_type = None,
-                      raster_format = 'GTiff',
-                      nodata = None,
-                      fit_in_data_type = False
-                    ):
-
-  if len(data.shape) < 3:
-    data = np.stack([data], axis=2)
-
-  _, _, nbands = data.shape
-
-  with create_raster(fn_base_raster, fn_new_raster, data, spatial_win, data_type, raster_format, nodata) as new_raster:
-
-    for band in range(0, nbands):
-      
-      band_data = data[:,:,band]
-      band_dtype = new_raster.dtypes[band]
-      
-      if fit_in_data_type:
-        band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
-
-      band_data[np.isnan(band_data)] = new_raster.nodata
-      new_raster.write(band_data.astype(band_dtype), indexes=(band+1))
-
-  return fn_new_raster

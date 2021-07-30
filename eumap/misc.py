@@ -17,10 +17,13 @@ def _verbose(verbose, *args, **kwargs):
     if verbose:
       ttprint(*args, **kwargs)
 
-def find_files(dir_list, dir_pattern = '*.*'):
+def find_files(dir_list, pattern = '*.*'):
   files = []
 
-  glob_pattern = f'**/{dir_pattern}'
+  if not isinstance(dir_list, list):
+    dir_list = [dir_list]
+
+  glob_pattern = f'**/{pattern}'
 
   for _dir in dir_list:
     for file in list(Path(_dir).glob(glob_pattern)):
