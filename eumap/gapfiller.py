@@ -1,65 +1,70 @@
 '''
 Gapfilling approaches using temporal and spatial neighbor pixels
 '''
-from .misc import ttprint
-from .datasets import DATA_ROOT_NAME
 import multiprocessing
-import math
-from itertools import cycle, islice
-import math
 import traceback
-import rasterio
-import threading
+import warnings
 import time
-from scipy import ndimage
-from pathlib import Path
-from rasterio.windows import Window
-from pyts.decomposition import SingularSpectrumAnalysis
+import math
+import os
 
-from . import parallel
+from itertools import cycle, islice, chain
+from typing import List, Dict, Union
+from rasterio.windows import Window
+from abc import ABC, abstractmethod
+from pathlib import Path
+from enum import Enum
+
+from pyts.decomposition import SingularSpectrumAnalysis
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-
-from typing import List, Dict, Union
-
-from itertools import chain
+import bottleneck as bc
 import cv2 as cv
 import numpy as np
-from osgeo import gdal
-from osgeo import osr
-import os
-import warnings
 
-from abc import ABC, abstractmethod
-import bottleneck as bc
 from .misc import ttprint
+from .datasets import DATA_ROOT_NAME
+from . import parallel
 from .raster import read_rasters, save_rasters
 
-CPU_COUNT = multiprocessing.cpu_count()
-_OUT_DIR = os.path.join(os.getcwd(), 'gapfilled')
+class OutlierRemover(Enum):
+  """
+  Strategy to remove outliers considering the temporal domain.
+
+  """
+  Std = 1 #: Standard deviation moving window
+  Percentile = 2 #: Percentile calculation
 
 class ImageGapfill(ABC):
   """
-  Abstract class responsable for read/save the raster files used/produced 
+  Abstract class responsible for read/write the raster files used/produced 
   by all implemented gapfilling methods. 
     
-  :param fn_files: Raster file paths to be read and gapfilled.
+  :param fn_files: Raster file paths to be read and gapfilled. The filename alphabetic order 
+    is used to infer the temporal order for the read data. 
   :param data: 3D array where the last dimension is the time.
+  :param outlier_remover: Strategy to remove outliers.  
+  :param std_win: Temporal window size used to calculate a local median and std.
+  :param std_env: Number of std used to define a local envelope around the median. 
+    Values outside of this envelope are removed.
+  :param perc_env: A list containing the lower and upper percentiles used to defined a global 
+    envelope for the time series. Values outside of this envelope are removed.
+  :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
   """
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None,
-    outlier_remover:str = None,
-    outlier_std_win:int = 2,
-    outlier_std_env:int = 1,
-    outlier_perc_th:list = [2,98],
+    outlier_remover:OutlierRemover = None,
+    std_win:int = 3,
+    std_env:int = 2,
+    perc_env:list = [2,98],
     n_jobs_io = 4,
     verbose:bool = True,
   ):
 
     if data is None and fn_files is None:
-      raise Exception(f'You should provide at least one of these: data or fn_files')
+      raise ValueError(f'You should provide at least one of these: data or fn_files')
 
     self.n_jobs_io = n_jobs_io
 
@@ -70,14 +75,17 @@ class ImageGapfill(ABC):
       self.data = data
 
     self.outlier_remover = outlier_remover
-    self.outlier_perc_th = outlier_perc_th
-    self.outlier_std_win = outlier_std_win
-    self.outlier_std_env = outlier_std_env
+    self.perc_env = perc_env
+    self.std_win = std_win
+    self.std_env = std_env
+    
+    if self.std_win is not None and (self.std_win % 2) == 0:
+      raise ValueError(f'The std_win argument must be an odd number')
 
     self.outlier_fn = None
-    if self.outlier_remover == 'std':
+    if OutlierRemover.Std == outlier_remover:
       self.outlier_fn = self._remove_outliers_std
-    elif self.outlier_remover == 'perc':
+    elif OutlierRemover.Percentile == outlier_remover:
       self.outlier_fn = self._remove_outliers_perc
 
     self.verbose = verbose
@@ -93,9 +101,10 @@ class ImageGapfill(ABC):
     return np.sum(np.isnan(data).astype('int'))
 
   def _remove_outliers_perc(self, ts_data):
-    lower_pct, higher_pct = np.nanpercentile(ts_data, q = self.outlier_perc_th)
-    outlier_mask = np.logical_or(ts_data <= lower_pct, ts_data >= higher_pct)
-    ts_data[outlier_mask] = np.nan
+    ts_data = ts_data.copy()
+    lower_pct, higher_pct = np.nanpercentile(ts_data, q = self.perc_env)
+    valid_mask = np.logical_and(ts_data >= lower_pct, ts_data <= higher_pct)
+    ts_data[~valid_mask] = np.nan
     return ts_data
 
   def _remove_outliers_std(self, ts_data):
@@ -104,18 +113,19 @@ class ImageGapfill(ABC):
       ts_data = ts_data.astype('float32')
       ts_size = ts_data.shape[0]
       
-      ts_win = self.outlier_std_win
-      env = self.outlier_std_env
-      
+      ts_neib = int((self.std_win - 1) / 2)
+      env = self.std_env
+      min_len_std = 3
+
       outliers = []
 
       for i in range(0, ts_size):
-        i0 = 0 if (i - ts_win) < 0 else (i - ts_win)
-        i1 = ts_size if (i + ts_win) < ts_size else (i + ts_win)
+        i0 = 0 if (i - ts_neib) < 0 else (i - ts_neib)
+        i1 = ts_size if (i + ts_neib) < ts_size else (i + ts_neib)
         
         win_data = ts_data[i0:i1]
 
-        if (np.sum(np.isnan(win_data).astype('int')) >= 3):
+        if (np.sum(np.isnan(win_data).astype('int')) >= min_len_std):
           med = bc.nanmedian(win_data)
           std = bc.nanstd(win_data)
 
@@ -131,7 +141,7 @@ class ImageGapfill(ABC):
 
     return ts_data.astype('float16')
 
-  def _perc_gaps(self, gapfilled_data):
+  def _perc_gapfilled(self, gapfilled_data):
     data_nan = np.isnan(self.data)
     n_nan = np.sum(data_nan.astype('int'))
     n_gapfilled = np.sum(data_nan[~np.isnan(gapfilled_data)].astype('int'))
@@ -149,11 +159,19 @@ class ImageGapfill(ABC):
 
     if self.outlier_fn:
       self._verbose(f'Removing temporal outliers using {self.outlier_remover}')
-      self.data = parallel.apply_along_axis(self.outlier_fn, 2, self.data)
+      data_noout = parallel.apply_along_axis(self.outlier_fn, 2, self.data)
+
+      self.outlier_mask = np.logical_and(~np.isnan(self.data), np.isnan(data_noout))
+      n_outliers = np.sum(self.outlier_mask.astype('int'))
+      self._verbose(f'{n_outliers} outliers removed')
+
+      self.data = data_noout
+
+      self._verbose(f'There are {self._n_gaps()} gaps in {self.data.shape}')
 
     self.gapfilled_data, self.gapfilled_data_flag = self._gapfill()
 
-    gaps_perc = self._perc_gaps(self.gapfilled_data)
+    gaps_perc = self._perc_gapfilled(self.gapfilled_data)
     self._verbose(f'{gaps_perc*100:.2f}% of the gaps filled in {(time.time() - start):.2f} segs')
 
     if gaps_perc < 1:
@@ -180,13 +198,20 @@ class ImageGapfill(ABC):
     of the read rasters.
     
     :param out_dir: Folder path to save the files.
-    :param data_type: Convert the rasters for the specified Numpy ``data_type`` before save.
+    :param data_type: Convert the rasters for the specified Numpy ``data_type`` before save. This argument overwrite the values
+      retrieved of ``fn_files``
     :param out_mantain_subdirs: Keep the full folder hierarchy of the read raster in the ``out_dir``.
     :param root_dir_name: Keep the relative folder hierarchy of the read raster in the ``out_dir`` 
-                          considering the ``root_dir_name``.
-    :param fn_files: Raster file paths to retreive the filenames. Use this parameter in
-                     situations where the ``data`` parameter is informed in the class constructor.
-    :param spatial_win: Save the files considering the specified spatial window.
+      considering of the sub folders of ``root_dir_name``.
+    :param fn_files: Raster file paths to retrieve the filenames and folders. Use this parameter in
+      situations where the ``data`` parameter is informed in the class constructor. The pixel size,
+      crs, extent, image size and nodata for the gapfilled rasters are retrieved from the first valid 
+      raster of ``fn_files``
+    :param nodata: ``Nodata`` value used for the the gapfilled rasters. This argument overwrite the values
+      retrieved of ``fn_files``. This argument doesn't affect the flag rasters (gapfill summary), which have
+      ``nodata=0``.
+    :param spatial_win: Save the gapfilled rasters considering the specified spatial window.
+    :param save_flag: Save the flag rasters (gapfill summary).
     """
 
     if fn_files is not None:
@@ -242,10 +267,13 @@ class ImageGapfill(ABC):
     return result
 
 class _TMWMData():
-  def __init__(self, time_order: List, time_data, time_win_size = 5,
+  def __init__(self, 
+    time_order: List, 
+    time_data, time_win_size = 9,
     cpu_max_workers:int = multiprocessing.cpu_count(),
     engine='CPU',
-    gpu_tile_size:int = 250):
+    gpu_tile_size:int = 250
+  ):
 
     self.time_win_size = time_win_size
     self.time_order = time_order
@@ -256,10 +284,13 @@ class _TMWMData():
 
     self.gapfilled_data = {}
 
-  def _get_time_window(self, t, max_win_size, win_size):
+  def _get_time_window(self, t, n_layers, win_size):
+
+    neib_size = int((win_size - 1) / 2)
+
     return(
-      (t - win_size) if (t - win_size) > 0 else 0,
-      (t + win_size) if (t + win_size) < (max_win_size-1) else (max_win_size-1),
+      (t - neib_size) if (t - neib_size) > 0 else 0,
+      (t + neib_size) if (t + neib_size) < (n_layers-1) else (n_layers-1),
     )
 
   def _key_from_layer_pos(self, time, layer_pos, win_size):
@@ -366,7 +397,7 @@ class _TMWMData():
 class TMWM(ImageGapfill):
   """
   Temporal Moving Window Median able to gapfill the missing pixels using the temporal neighborhood
-  by a growing window to calculate several median possibilities. The approach prioritizes
+  by a moving window to calculate several median possibilities. The approach prioritizes
   values derived for **1–the same day/month/season**, **2–neighboring days/months/seasons**, 
   **and 3–all the year**. 
 
@@ -377,15 +408,22 @@ class TMWM(ImageGapfill):
 
   :param fn_files: Raster file paths to be read and gapfilled.
   :param data: 3D array where the last dimension is the time.
-  :param yearly_temporal_resolution: Season size of a year (For monthly time series it is equal ``12``).
+  :param season_size: Season size of a year (for monthly time series it is equal ``12``).
   :param time_win_size: Size of the temporal window used to calculate the median value possibilities.
   :param cpu_max_workers: Number of CPU cores to be used in parallel.
   :param engine: Execute in ``CPU`` [1] or ``GPU`` [2].
   :param gpu_tile_size: Tile size used to split the processing in the GPU.
+  :param outlier_remover: Strategy to remove outliers.  
+  :param std_win: Temporal window size used to calculate a local median and std.
+  :param std_env: Number of std used to define a local envelope around the median. 
+    Values outside of this envelope are removed.
+  :param perc_env: A list containing the lower and upper percentiles used to defined a global 
+    envelope for the time series. Values outside of this envelope are removed.
+  :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
   >>> # For a 4-season time series
-  >>> tmwm = gapfiller.TMWM(fn_files=fn_rasters, yearly_temporal_resolution=4, time_win_size=4)
+  >>> tmwm = gapfiller.TMWM(fn_files=fn_rasters, season_size=4, time_win_size=4)
   >>> data_tmwm = tmwm.run()
   >>> fn_rasters_tmwm = tmwm.save_rasters('./gapfilled_tmwm')
 
@@ -398,42 +436,42 @@ class TMWM(ImageGapfill):
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None,
-    yearly_temporal_resolution = None,
-    time_win_size: int=8,
+    season_size = None,
+    time_win_size: int=9,
     cpu_max_workers:int = multiprocessing.cpu_count(),
     engine='CPU',
     gpu_tile_size:int = 250,
-    outlier_remover:str = None,
-    outlier_std_win:int = 2,
-    outlier_std_env:int = 1,
-    outlier_perc_th:list = [2,98],
-    verbose = True,
+    outlier_remover:OutlierRemover = None,
+    std_win:int = 3,
+    std_env:int = 2,
+    perc_env:list = [2,98],
+    n_jobs_io = 4,
+    verbose = True
   ):
+    
+    super().__init__(fn_files=fn_files, data=data,
+      outlier_remover=outlier_remover, std_win=std_win, 
+      std_env=std_env, perc_env=perc_env, n_jobs_io=n_jobs_io,
+      verbose=verbose)
 
     self.cpu_max_workers = cpu_max_workers
     self.time_win_size = time_win_size
     self.engine = engine
     self.gpu_tile_size = gpu_tile_size
-    self.yearly_temporal_resolution = yearly_temporal_resolution
+    self.season_size = season_size
 
-    super().__init__(fn_files=fn_files, data=data, verbose=verbose,
-      outlier_remover=outlier_remover, outlier_std_win=outlier_std_win, outlier_std_env=outlier_std_env,
-      outlier_perc_th=outlier_perc_th)
-
-    self._do_time_data()
-
-    if self.time_win_size > math.floor(self.n_years/2):
-      raise Exception(f'The time_win_size can not be bigger than {math.floor(self.n_years/2)}')  
+    if (self.time_win_size % 2) == 0:
+      raise ValueError(f'The time_win_size argument must be an odd number')
 
   def _do_time_data(self):
     total_times = self.data.shape[2]
 
-    self.time_order = [ str(time) for time in range(0, self.yearly_temporal_resolution) ]
+    self.time_order = [ str(time) for time in range(0, self.season_size) ]
     self.time_data = {}
     self.n_years = 0
 
     for time in self.time_order:
-      idx = list(range(int(time), total_times, self.yearly_temporal_resolution))
+      idx = list(range(int(time), total_times, self.season_size))
 
       if len(idx) > self.n_years:
         self.n_years = len(idx)
@@ -533,22 +571,20 @@ class TMWM(ImageGapfill):
     return self._fill_gaps(time, layer_pos, newdata_dict, verbose_suffix='same season')
 
   def fill_image(self, time, layer_pos):
-
-    with warnings.catch_warnings():
-      warnings.filterwarnings('ignore', 'Mean of empty slice')
       
-      end_msg = self._fill_gaps_same_time(time, layer_pos)
+    end_msg = self._fill_gaps_same_time(time, layer_pos)
 
-      if end_msg is None:
-        end_msg = self._fill_gaps_neib_time(time, layer_pos)
+    if end_msg is None:
+      end_msg = self._fill_gaps_neib_time(time, layer_pos)
 
-      if end_msg is None:
-        end_msg = self._fill_gaps_all_times(time, layer_pos)
-    
+    if end_msg is None:
+      end_msg = self._fill_gaps_all_times(time, layer_pos)
+  
     return end_msg
 
   def _gapfill(self):
 
+    self._do_time_data()
     self.time_data_gaps = {}
 
     self.tmwm_data = _TMWMData(self.time_order, self.time_data, self.time_win_size,
@@ -565,8 +601,10 @@ class TMWM(ImageGapfill):
       for layer_pos in range(0, n_layers):
         layer_args.append((time, layer_pos))
 
-    for end_msg in parallel.ThreadGeneratorLazy(self.fill_image, iter(layer_args), max_workers=self.cpu_max_workers, chunk=self.cpu_max_workers):
-      end_msg = True
+    with warnings.catch_warnings():
+      warnings.filterwarnings('ignore', 'Mean of empty slice')
+      for end_msg in parallel.job(self.fill_image, iter(layer_args), n_jobs=self.cpu_max_workers, joblib_args={'require': 'sharedmem'}):
+        end_msg = True
 
     gapfilled_data = []
     gapfilled_data_flag = []
@@ -591,6 +629,13 @@ class TLI(ImageGapfill):
 
   :param fn_files: Raster file paths to be read and gapfilled.
   :param data: 3D array where the last dimension is the time.
+  :param outlier_remover: Strategy to remove outliers.  
+  :param std_win: Temporal window size used to calculate a local median and std.
+  :param std_env: Number of std used to define a local envelope around the median. 
+    Values outside of this envelope are removed.
+  :param perc_env: A list containing the lower and upper percentiles used to defined a global 
+    envelope for the time series. Values outside of this envelope are removed.
+  :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
   >>> tli = gapfiller.TLI(fn_files=fn_rasters)
@@ -604,16 +649,17 @@ class TLI(ImageGapfill):
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None,
-    outlier_remover:str = None,
-    outlier_std_win:int = 2,
-    outlier_std_env:int = 1,
-    outlier_perc_th:list = [2,98],
+    outlier_remover:OutlierRemover = None,
+    std_win:int = 3,
+    std_env:int = 2,
+    perc_env:list = [2,98],
+    n_jobs_io = 4,
     verbose = True
   ):
-    super().__init__(fn_files=fn_files, data=data, verbose=verbose,
-      outlier_remover=outlier_remover, outlier_std_win=outlier_std_win, 
-      outlier_std_env=outlier_std_env, outlier_perc_th=outlier_perc_th)
-
+    super().__init__(fn_files=fn_files, data=data,
+      outlier_remover=outlier_remover, std_win=std_win, 
+      std_env=std_env, perc_env=perc_env, n_jobs_io=n_jobs_io,
+      verbose=verbose)
 
   def _temporal_linear_inter(self, data):
 
@@ -646,38 +692,66 @@ class TLI(ImageGapfill):
     return (result[:,:,:,0], result[:,:,:,1])
 
 class SSA(ImageGapfill):
-  """Singular Spectral Analysis
+  """ 
+  Approach that uses a Singular Spectral Analysis (SSA [1]) to gapfill the missing 
+  values and smooth all the raster data. The missing values are first gapfilled using
+  a long-term median strategy derived over values from other days/months/seasons. Later
+  the SSA is uses to decompose each time series in multiple components (``ngroups``), 
+  considering only part of them to reconstruct the output time series 
+  (``reconstruct_ngroups``).  
     
-  :param fn_files: TODO
-  :param data: TODO
+  :param fn_files: Raster file paths to be read and gapfilled.
+  :param data: 3D array where the last dimension is the time.  
+  :param season_size: TODO
+  :param max_gap_pct: TODO
+  :param ltm_resolution: TODO
   :param window_size: TODO
   :param ngroups: TODO
   :param reconstruct_ngroups: TODO
-  :param verbose: TODO
+  :param outlier_remover: Strategy to remove outliers.  
+  :param std_win: Temporal window size used to calculate a local median and std.
+  :param std_env: Number of std used to define a local envelope around the median. 
+    Values outside of this envelope are removed.
+  :param perc_env: A list containing the lower and upper percentiles used to defined a global 
+    envelope for the time series. Values outside of this envelope are removed.
+  :param n_jobs_io: Number of parallel jobs to read/write raster files.
+  :param verbose: Use ``True`` to print the progress of the gapfilled.
+
+  >>> # For a 4-season time series
+  >>> tmwm = gapfiller.TMWM(fn_files=fn_rasters, season_size=4, time_win_size=4)
+  >>> data_tmwm = tmwm.run()
+  >>> fn_rasters_tmwm = tmwm.save_rasters('./gapfilled_tmwm')
+
+  [1] `Pyts SingularSpectrumAnalysis <https://pyts.readthedocs.io/en/stable/generated/pyts.decomposition.SingularSpectrumAnalysis.html>`_
   """
 
   def __init__(self,
     fn_files:List = None ,
     data:np.array = None,
+    season_size:int = 4,
+    max_gap_pct:int = 0.8,
+    ltm_resolution:int = 5,
     window_size:int = 4,
     ngroups:int = 4,
     reconstruct_ngroups:int = 2,
-    season_size:int = 4,
-    outlier_remover:str = None,
-    outlier_std_win:int = 2,
-    outlier_std_env:int = 1,
-    outlier_perc_th:list = [2,98],
+    outlier_remover:OutlierRemover = None,
+    std_win:int = 3,
+    std_env:int = 2,
+    perc_env:list = [2,98],
+    n_jobs_io = 4,
     verbose = True
   ):
-    
+    super().__init__(fn_files=fn_files, data=data,
+      outlier_remover=outlier_remover, std_win=std_win, 
+      std_env=std_env, perc_env=perc_env, n_jobs_io=n_jobs_io,
+      verbose=verbose)
+
+    self.season_size = season_size
+    self.max_gap_pct = max_gap_pct
+    self.ltm_resolution = ltm_resolution
     self.window_size = window_size
     self.ngroups = ngroups
-    self.season_size = season_size
     self.reconstruct_ngroups = reconstruct_ngroups
-
-    super().__init__(fn_files=fn_files, data=data, verbose=verbose,
-      outlier_remover=outlier_remover, outlier_std_win=outlier_std_win, 
-      outlier_std_env=outlier_std_env, outlier_perc_th=outlier_perc_th)
 
   def gapfill_ltm(self, ts_data, season_size=12, agg_year=5):
     ts_size = ts_data.shape[1]
@@ -719,16 +793,11 @@ class SSA(ImageGapfill):
 
     na_mask_initial = np.isnan(ts_data)
 
-    if self._all_nan(ts_data):
-      return np.stack([ ts_data.reshape(data.shape),
-                ts_flag.reshape(data.shape) ], axis=1)
-
     ts_gapfilled = ts_data.copy()
-    na_mask_no_outiler = np.isnan(ts_gapfilled)
     n_years = int(ts_gapfilled.shape[1] / self.season_size)
 
-    if self._perc_gaps(ts_gapfilled.flatten()) <= 0.80:
-      for year in range(5, n_years, 3):
+    if self._perc_gaps(ts_gapfilled.flatten()) <= self.max_gap_pct:
+      for year in range(self.ltm_resolution, n_years, self.ltm_resolution):
         ts_gapfilled_y = self.gapfill_ltm(ts_data, season_size=self.season_size, agg_year=year)    
         gapfill_mask = np.logical_and(np.isnan(ts_gapfilled),~np.isnan(ts_gapfilled_y))
         ts_gapfilled[gapfill_mask] = ts_gapfilled_y[gapfill_mask]
@@ -745,12 +814,7 @@ class SSA(ImageGapfill):
     ssa = SingularSpectrumAnalysis(window_size=self.window_size, groups=self.ngroups)
     ts_components = ssa.fit_transform(ts_gapfilled)
     ts_reconstructed = np.sum(ts_components[0:self.reconstruct_ngroups,:], axis=0)
-    ts_flag[na_mask_initial] = 2
-    ts_flag[~na_mask_no_outiler] = 1
-    
-    ssa = SingularSpectrumAnalysis(window_size=self.window_size, groups=self.ngroups)
-    ts_components = ssa.fit_transform(ts_gapfilled)
-    ts_reconstructed = np.sum(ts_components[0:self.reconstruct_ngroups,:], axis=0)
+    ts_flag[na_mask_initial] = 1
     
     return np.stack([ts_reconstructed.reshape(data.shape), ts_flag.reshape(data.shape)], axis=1)
 
@@ -761,13 +825,20 @@ class SSA(ImageGapfill):
 class InPainting(ImageGapfill):
   """
   Approach that uses a inpating technique [1] to gapfill raster data
-  using the region neighborhood.
+  using neighborhood values.
    
   :param fn_files: Raster file paths to be read and gapfilled.
   :param data: 3D array where the last dimension is the time.
   :param space_win: Radius of a circular neighborhood of each point inpainted that is considered by the algorithm.
   :param data_mask: 2D array indicating a valid areas, equal 1, where in case of gaps should be filled.
   :param mode:  Inpainting method that could be cv::INPAINT_NS or cv::INPAINT_TELEA [1]
+  :param outlier_remover: Strategy to remove outliers.  
+  :param std_win: Temporal window size used to calculate a local median and std.
+  :param std_env: Number of std used to define a local envelope around the median. 
+    Values outside of this envelope are removed.
+  :param perc_env: A list containing the lower and upper percentiles used to defined a global 
+    envelope for the time series. Values outside of this envelope are removed.
+  :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
   
   >>> # Considerer land_mask as 2D numpy array where 1 indicates land
@@ -785,20 +856,21 @@ class InPainting(ImageGapfill):
     space_win = 10,
     data_mask = None,
     mode = cv.INPAINT_TELEA,
-    outlier_remover:str = None,
-    outlier_std_win:int = 2,
-    outlier_std_env:int = 1,
-    outlier_perc_th:list = [2,98],
-    verbose = True,
+    outlier_remover:OutlierRemover = None,
+    std_win:int = 3,
+    std_env:int = 2,
+    perc_env:list = [2,98],
+    n_jobs_io = 4,
+    verbose = True
   ):
-
+    super().__init__(fn_files=fn_files, data=data,
+      outlier_remover=outlier_remover, std_win=std_win, 
+      std_env=std_env, perc_env=perc_env, n_jobs_io=n_jobs_io,
+      verbose=verbose)
+    
     self.data_mask = data_mask
     self.space_win = space_win
     self.mode = mode
-    
-    super().__init__(fn_files=fn_files, data=data, verbose=verbose,
-      outlier_remover=outlier_remover, outlier_std_win=outlier_std_win, 
-      outlier_std_env=outlier_std_env, outlier_perc_th=outlier_perc_th)
 
   def _inpaint(self, data, i=0):
 
@@ -847,12 +919,13 @@ class InPainting(ImageGapfill):
     return data, data_flag
 
 def time_first_space_later(
-    fn_files:List = None,
-    data:np.array = None,
-    time_strategy:ImageGapfill = TMWM, 
-    time_args:set = {},
-    space_strategy:ImageGapfill = InPainting, 
-    space_args:set = {}
+  fn_files:List = None,
+  data:np.array = None,
+  time_strategy:ImageGapfill = TMWM, 
+  time_args:set = {},
+  space_strategy:ImageGapfill = InPainting, 
+  space_args:set = {},
+  space_flag_val = 100
 ):
   
   time_args['fn_files'] = fn_files
@@ -860,7 +933,7 @@ def time_first_space_later(
 
   time = time_strategy(**time_args)
   time_gapfilled = time.run()
-  time_gapfilled_pct = time._perc_gaps(time.gapfilled_data)
+  time_gapfilled_pct = time._perc_gapfilled(time.gapfilled_data)
 
   if time_gapfilled_pct < 1.0:
     
@@ -869,7 +942,7 @@ def time_first_space_later(
     space.run()
     
     space_mask = (space.gapfilled_data_flag > 1)
-    time.gapfilled_data_flag[space_mask] = space.gapfilled_data_flag[space_mask]
+    time.gapfilled_data_flag[space_mask] = space_flag_val
     space.gapfilled_data_flag = time.gapfilled_data_flag
     
     return space

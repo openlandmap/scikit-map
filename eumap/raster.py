@@ -1,10 +1,11 @@
 '''
 Functions to read/write raster data
 '''
-
 import gdal
 import numpy as np
 import requests
+import tempfile
+import traceback
 from uuid import uuid4
 
 from typing import List, Union
@@ -41,6 +42,7 @@ def save_rasters(
                     data_type = None,
                     raster_format = 'GTiff',
                     nodata = None, 
+                    fit_in_data_type = False,
                     n_jobs = 4,
                     verbose=False
                   ):
@@ -56,7 +58,8 @@ def save_rasters(
     ttprint(f'Writing {len(fn_raster_list)} raster files using {n_jobs} workers')
 
   args = [ \
-    (fn_base_raster, fn_raster_list[i], data[:,:,i], spatial_win, data_type, raster_format, nodata) \
+    (fn_base_raster, fn_raster_list[i], data[:,:,i], spatial_win, data_type, 
+      raster_format, nodata, fit_in_data_type) \
     for i in range(0,len(fn_raster_list)) 
   ]
 
@@ -76,6 +79,8 @@ def create_raster(
                     raster_format = 'GTiff',
                     nodata = None
                   ):
+  
+  fn_raster.parent.mkdir(parents=True, exist_ok=True)
 
   if len(data.shape) < 3:
     data = np.stack([data], axis=2)
@@ -83,7 +88,6 @@ def create_raster(
   x_size, y_size, nbands = data.shape
 
   with rasterio.open(fn_base_raster, 'r') as base_raster:
-
     if data_type is None:
       data_type = base_raster.dtypes[0]
 
@@ -145,7 +149,7 @@ def read_rasters_remote(
                   password = None,
                   n_jobs = 4,
                   verbose = False,
-                  return_ds = False,
+                  return_base_raster = False,
                   driver = 'GTiff',
                   nodata = None
                 ):
@@ -161,65 +165,78 @@ def read_rasters_remote(
     try:
       data = requests.get(url, auth=(username, password), stream=True)
       
-      memmap_name = "/vsimem/"+uuid4().hex
-      gdal.FileFromMemBuffer(memmap_name, data.content)
-
-      with rasterio.open(memmap_name) as ds:
-        if bands is None:
-          bands = range(1, ds.count+1)
+      with rasterio.io.MemoryFile(data.content) as memfile:
         
-        if nodata is None:
-          nodata = ds.nodatavals[0]
-        
-        data = ds.read(bands)
-        if (isinstance(data, np.ndarray)):
-          data = data.astype(dtype)
-          data[data == nodata] = np.nan
+        if verbose:
+          ttprint(f'Reading {url} to {memfile.name}')
 
-        nbands, x_size, y_size = data.shape
+        with memfile.open() as ds:
+          if bands is None:
+            bands = range(1, ds.count+1)
+          
+          if nodata is None:
+            nodata = ds.nodatavals[0]
+          
+          data = ds.read(bands)
+          if (isinstance(data, np.ndarray)):
+            data = data.astype(dtype)
+            data[data == nodata] = np.nan
 
-        ds_params = {
-          'fp': ds.name,
-          'driver': driver,
-          'width': x_size,
-          'height': y_size,
-          'count': nbands,
-          'dtype': ds.dtypes[0],
-          'crs': ds.crs,
-          'transform': ds.transform
-        }
+          nbands, x_size, y_size = data.shape
+
+          ds_params = {
+            'driver': driver,
+            'width': x_size,
+            'height': y_size,
+            'count': nbands,
+            'dtype': ds.dtypes[0],
+            'crs': ds.crs,
+            'transform': ds.transform
+          }
 
     except:
+      ttprint(f'Invalid raster file {url}')
+      #traceback.print_exc()
       pass
 
     return url_pos, data, ds_params
 
   args = [ (url_list, url_pos, bands, username, password, dtype, nodata) for url_pos in range(0,len(url_list)) ]
+  
   raster_data = {}
-  raster_ds = {}
-
+  fn_base_raster = None
+    
   for url_pos, data, ds_params in parallel.job(_read_raster, args, n_jobs=n_jobs):
     url = url_list[url_pos]
- 
-    raster_data[url_pos] = data
+  
+    if data is not None:
+      raster_data[url_pos] = data
 
-    raster_ds[url_pos] = rasterio.open(ds_params['fp'], 'w',
-      driver = ds_params['driver'],
-      width = ds_params['width'],
-      height = ds_params['height'],
-      count = ds_params['count'],
-      crs = ds_params['crs'],
-      dtype = ds_params['dtype'],
-      transform = ds_params['transform']
-    )
+      if return_base_raster and fn_base_raster is None:
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as base_raster:
+          with rasterio.open(base_raster.name, 'w',
+            driver = ds_params['driver'],
+            width = ds_params['width'],
+            height = ds_params['height'],
+            count = ds_params['count'],
+            crs = ds_params['crs'],
+            dtype = ds_params['dtype'],
+            transform = ds_params['transform']
+          ) as ds:
+            fn_base_raster = ds.name
 
-  raster_ds = [raster_ds[i] for i in range(0,len(url_list))]
-  raster_data = [raster_data[i] for i in range(0,len(url_list))]
+  raster_data_arr = []
+  for i in range(0,len(url_list)):
+    if i in raster_data:
+      raster_data_arr.append(raster_data[i])
+  
+  raster_data = np.stack(raster_data_arr, axis=-1)
+  del raster_data_arr
 
-  raster_data = np.stack(raster_data, axis=-1)
-
-  if return_ds:
-    return raster_data, url_list, raster_ds
+  if return_base_raster:
+    if verbose:
+      ttprint(f'The base raster is {fn_base_raster}')
+    return raster_data, url_list, fn_base_raster
   else:
     return raster_data, url_list
 

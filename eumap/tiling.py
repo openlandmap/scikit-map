@@ -56,9 +56,7 @@ class TilingProcessing():
 		tile = self.tiles.iloc[idx]
 		left, bottom, right, top = tile.geometry.bounds
 
-		# Pay attetion here, because it can change the size of the tile
-		window = from_bounds(left, bottom, right, top, self.base_raster.transform) \
-							.round_lengths(op='floor', pixel_precision=self.pixel_precision)
+		window = from_bounds(left, bottom, right, top, self.base_raster.transform)
 
 		return func(idx, tile, window, *func_args)
 
@@ -72,9 +70,7 @@ class TilingProcessing():
 			tile = self.tiles.iloc[idx]
 			left, bottom, right, top = tile.geometry.bounds
 
-			# Pay attention here, because it can change the size of the tile
-			window = from_bounds(left, bottom, right, top, self.base_raster.transform) \
-								.round_lengths(op='floor', pixel_precision=self.pixel_precision)
+			window = from_bounds(left, bottom, right, top, self.base_raster.transform)
 
 			args.append((idx, tile, window, *func_args))
 		if progress_bar:
