@@ -422,7 +422,7 @@ class TMWM(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
-  >>> from eumap impor gapfiller
+  >>> from eumap import gapfiller
   >>> 
   >>> # For a 4-season time series
   >>> tmwm = gapfiller.TMWM(fn_files=fn_rasters, season_size=4, time_win_size=4)
@@ -641,7 +641,7 @@ class TLI(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
-  >>> from eumap impor gapfiller
+  >>> from eumap import gapfiller
   >>> 
   >>> tli = gapfiller.TLI(fn_files=fn_rasters)
   >>> data_tli = tli.run()
@@ -727,7 +727,7 @@ class SSA(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
-  >>> from eumap impor gapfiller
+  >>> from eumap import gapfiller
   >>> 
   >>> # For a 4-season time series
   >>> ssa = gapfiller.SSA(fn_files=fn_rasters, season_size=4)
@@ -854,7 +854,7 @@ class InPainting(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
   
-  >>> from eumap impor gapfiller
+  >>> from eumap import gapfiller
   >>> 
   >>> # Considerer land_mask as 2D numpy array where 1 indicates land
   >>> inPainting = gapfiller.InPainting(fn_files=fn_rasters, space_win = 10, data_mask=land_mask)
@@ -957,7 +957,7 @@ def time_first_space_later(
   :param space_flag_val: The flag value used to indicate which pixels were gapfilled
     by the spatial gapfilling strategy.
 
-  >>> from eumap impor gapfiller
+  >>> from eumap import gapfiller
   >>> 
   >>> # For a 4-season time series
   >>> tfsl = gapfiller.time_first_space_later(
