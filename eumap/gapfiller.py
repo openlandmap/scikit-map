@@ -37,8 +37,8 @@ class OutlierRemover(Enum):
 
 class ImageGapfill(ABC):
   """
-  Abstract class responsible for read/write the raster files used/produced 
-  by all implemented gapfilling methods. 
+  Abstract class responsible for read/write the raster files in
+  all implemented gapfilling methods. 
     
   :param fn_files: Raster file paths to be read and gapfilled. The filename alphabetic order 
     is used to infer the temporal order for the read data. 
@@ -422,9 +422,12 @@ class TMWM(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
+  >>> from eumap impor gapfiller
+  >>> 
   >>> # For a 4-season time series
   >>> tmwm = gapfiller.TMWM(fn_files=fn_rasters, season_size=4, time_win_size=4)
   >>> data_tmwm = tmwm.run()
+  >>> 
   >>> fn_rasters_tmwm = tmwm.save_rasters('./gapfilled_tmwm')
 
   [1] `Bootleneck nanmedian <https://kwgoodman.github.io/bottleneck-doc/reference.html#bottleneck.nanmedian>`_
@@ -638,8 +641,11 @@ class TLI(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
+  >>> from eumap impor gapfiller
+  >>> 
   >>> tli = gapfiller.TLI(fn_files=fn_rasters)
   >>> data_tli = tli.run()
+  >>> 
   >>> fn_rasters_tli = tli.save_rasters('./gapfilled_tli')
 
   [1] `Scikit-learn linear regression <https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html>`_
@@ -697,17 +703,21 @@ class SSA(ImageGapfill):
   values and smooth all the raster data. The missing values are first gapfilled using
   a long-term median strategy derived over values from other days/months/seasons. Later
   the SSA is uses to decompose each time series in multiple components (``ngroups``), 
-  considering only part of them to reconstruct the output time series 
+  considering only part of them to reconstruct the output time series.
   (``reconstruct_ngroups``).  
     
   :param fn_files: Raster file paths to be read and gapfilled.
   :param data: 3D array where the last dimension is the time.  
-  :param season_size: TODO
-  :param max_gap_pct: TODO
-  :param ltm_resolution: TODO
-  :param window_size: TODO
-  :param ngroups: TODO
-  :param reconstruct_ngroups: TODO
+  :param season_size: Season size of a year used to calculate 
+    the long-term median (for monthly time series it is equal ``12``).
+  :param max_gap_pct: Max percentage allowed to run the approach. For pixels
+    where this condition is satisfied the result is ``np.nan`` for all dates.
+  :param ltm_resolution: Number of years used to calculate the long-term median.
+  :param window_size: Size of the sliding window (i.e. the size of each word). 
+    If float, it represents the percentage of the size of each time series and must be between 0 and 1. 
+    The window size will be computed as ``max(2, ceil(window_size * n_timestamps))`` [1].
+  :param ngroups: Number of components used to decompose the time series [1].
+  :param reconstruct_ngroups: Number of components used to reconstruct the time series.
   :param outlier_remover: Strategy to remove outliers.  
   :param std_win: Temporal window size used to calculate a local median and std.
   :param std_env: Number of std used to define a local envelope around the median. 
@@ -717,10 +727,13 @@ class SSA(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
+  >>> from eumap impor gapfiller
+  >>> 
   >>> # For a 4-season time series
-  >>> tmwm = gapfiller.TMWM(fn_files=fn_rasters, season_size=4, time_win_size=4)
-  >>> data_tmwm = tmwm.run()
-  >>> fn_rasters_tmwm = tmwm.save_rasters('./gapfilled_tmwm')
+  >>> ssa = gapfiller.SSA(fn_files=fn_rasters, season_size=4)
+  >>> data_ssa = ssa.run()
+  >>> 
+  >>> fn_rasters_ssa = ssa.save_rasters('./gapfilled_ssa', data_type='uint8', save_flag=False)
 
   [1] `Pyts SingularSpectrumAnalysis <https://pyts.readthedocs.io/en/stable/generated/pyts.decomposition.SingularSpectrumAnalysis.html>`_
   """
@@ -841,9 +854,12 @@ class InPainting(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
   
+  >>> from eumap impor gapfiller
+  >>> 
   >>> # Considerer land_mask as 2D numpy array where 1 indicates land
   >>> inPainting = gapfiller.InPainting(fn_files=fn_rasters, space_win = 10, data_mask=land_mask)
   >>> data_inp = inPainting.run()
+  >>> 
   >>> fn_rasters_inp = inPainting.save_rasters('./gapfilled_inp')
 
   [1] `OpenCV Tutorial - Image Inpainting <https://docs.opencv.org/4.5.2/df/d3d/tutorial_py_inpainting.html>`_
@@ -927,7 +943,34 @@ def time_first_space_later(
   space_args:set = {},
   space_flag_val = 100
 ):
-  
+  """ 
+  Helper function to gapfill all the missing pixels using
+  first a temporal strategy (``TMWM``, ``TLI``, ``SSA``) and later
+  a spatial strategy (``InPainting``).
+    
+  :param fn_files: Raster file paths to be read and gapfilled.
+  :param data: 3D array where the last dimension is the time.  
+  :param time_strategy: One of the implemented temporal gapfilling approaches.
+  :param time_args: A ``set`` of parameters for the temporal gapfilling strategy
+  :param space_strategy: One of the implemented spatial gapfilling approaches.
+  :param space_args: A ``set`` of parameters for the spatial gapfilling strategy.
+  :param space_flag_val: The flag value used to indicate which pixels were gapfilled
+    by the spatial gapfilling strategy.
+
+  >>> from eumap impor gapfiller
+  >>> 
+  >>> # For a 4-season time series
+  >>> tfsl = gapfiller.time_first_space_later(
+  >>>  fn_files = fn_rasters,
+  >>>  time_strategy = gapfiller.TMWM,
+  >>>  time_args = { 'season_size': 4 },
+  >>>  space_strategy = gapfiller.InPainting,
+  >>>  space_args = { 'space_win': 10 }
+  >>> )
+  >>> 
+  >>> fn_rasters_tfsl  = tfsl.save_rasters('./gapfilled_tmwm_inpaint', data_type='uint8', fn_files=fn_rasters)
+
+  """
   time_args['fn_files'] = fn_files
   time_args['data'] = data
 
