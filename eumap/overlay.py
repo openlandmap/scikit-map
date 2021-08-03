@@ -23,12 +23,18 @@ warnings.filterwarnings('ignore')
 
 #%%
 
-class ParallelOverlay:
+class _ParallelOverlay:
 		# optimized for up to 200 points and about 50 layers
 		# sampling only first band in every layer
 		# assumption is that all layers have same blocks
 
-		def __init__(self, points_x: np.ndarray, points_y:np.ndarray, fn_layers:List[str], max_workers:int = multiprocessing.cpu_count(), verbose:bool = True):
+		def __init__(self, 
+			points_x: np.ndarray, 
+			points_y:np.ndarray, 
+			fn_layers:List[str], 
+			max_workers:int = multiprocessing.cpu_count(), 
+			verbose:bool = True
+		):
 				
 				self.error_val = -32768
 				self.points_x = points_x
@@ -226,9 +232,30 @@ class ParallelOverlay:
 
 				return self.result
 
-class SpaceOverlay(ParallelOverlay):
+class SpaceOverlay(_ParallelOverlay):
+		"""
+	  TODO
 
-		def __init__(self, points, fn_layers:str = None, dir_layers:List[str] = None, max_workers:int = multiprocessing.cpu_count(), regex_layers = '**/*.tif', verbose:bool = True):
+	  :param points: TODO
+	  :param fn_layers: TODO
+	  :param dir_layers: TODO
+	  :param max_workers: TODO
+	  :param regex_layers: TODO
+	  :param verbose: TODO
+
+	  >>> from eumap.overlay import SpaceOverlay
+	  >>> 
+
+	  """
+
+		def __init__(self, 
+			points, 
+			fn_layers:str = None, 
+			dir_layers:List[str] = None, 
+			max_workers:int = multiprocessing.cpu_count(), 
+			regex_layers = '**/*.tif', 
+			verbose:bool = True
+		):
 				
 				if fn_layers is None:
 					fn_layers = list(Path(dir_layers).glob(regex_layers))
@@ -253,40 +280,63 @@ class SpaceOverlay(ParallelOverlay):
 			return self.pts
 
 class SpaceTimeOverlay():
+		"""
+	  TODO
 
-		def __init__(self, points, col_date:str, fn_layers:str=None, dir_layers:str=None, time_regex:str=None, max_workers:int = multiprocessing.cpu_count(), verbose:bool = True):
+	  :param points: TODO
+	  :param col_date: TODO
+	  :param fn_layers: TODO
+	  :param dir_layers: TODO
+	  :param time_regex: TODO
+	  :param max_workers: TODO
+	  :param verbose: TODO
 
-				if not isinstance(points, gpd.GeoDataFrame):
-					points = gpd.read_file(points)
+	  >>> from eumap.overlay import SpaceOverlay
+	  >>> 
 
-				self.pts = points
-				self.col_date = col_date
-				self.overlay_objs = {}
-				self.verbose = verbose
+	  """
 
-				self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
-				self.uniq_years = self.pts[self.col_date].dt.year.unique()
+		def __init__(self, 
+			points, 
+			col_date:str, 
+			fn_layers:str=None, 
+			dir_layers:str=None, 
+			time_regex:str=None, 
+			max_workers:int = multiprocessing.cpu_count(), 
+			verbose:bool = True
+		):
 
-				for year in self.uniq_years:
-					year_points = self.pts[self.pts[self.col_date].dt.year == year]
+			if not isinstance(points, gpd.GeoDataFrame):
+				points = gpd.read_file(points)
+
+			self.pts = points
+			self.col_date = col_date
+			self.overlay_objs = {}
+			self.verbose = verbose
+
+			self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
+			self.uniq_years = self.pts[self.col_date].dt.year.unique()
+
+			for year in self.uniq_years:
+				year_points = self.pts[self.pts[self.col_date].dt.year == year]
+				
+				fn_layers_year = None
+				regex_layers = None
+				
+				if fn_layers is None:
+					regex_layers = time_regex.replace('{year}', str(int(year)))
+					if self.verbose:
+						ttprint(f'Overlay {len(year_points)} points from {year} in {len(list(Path(dir_layers).glob(regex_layers)))} raster layers')
+				else:
+					fn_layers_year = []
 					
-					fn_layers_year = None
-					regex_layers = None
-					
-					if fn_layers is None:
-						regex_layers = time_regex.replace('{year}', str(int(year)))
-						if self.verbose:
-							ttprint(f'Overlay {len(year_points)} points from {year} in {len(list(Path(dir_layers).glob(regex_layers)))} raster layers')
-					else:
-						fn_layers_year = []
-						
-						for fn_layer in fn_layers:
-							fn_layers_year.append(Path(fn_layer.replace('{year}', str(int(year)))))
+					for fn_layer in fn_layers:
+						fn_layers_year.append(Path(fn_layer.replace('{year}', str(int(year)))))
 
-						if self.verbose:
-							ttprint(f'Overlay {len(year_points)} points from {year} in {len(fn_layers_year)} raster layers')
-					
-					self.overlay_objs[year] = SpaceOverlay(points=year_points, fn_layers=fn_layers_year, dir_layers=dir_layers, regex_layers=regex_layers, max_workers=max_workers, verbose=verbose)
+					if self.verbose:
+						ttprint(f'Overlay {len(year_points)} points from {year} in {len(fn_layers_year)} raster layers')
+				
+				self.overlay_objs[year] = SpaceOverlay(points=year_points, fn_layers=fn_layers_year, dir_layers=dir_layers, regex_layers=regex_layers, max_workers=max_workers, verbose=verbose)
 
 
 		def run(self, dict_newnames={}):
