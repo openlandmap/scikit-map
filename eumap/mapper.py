@@ -61,6 +61,29 @@ DEFAULT = {
 
 #imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean')
 
+def build_ann(input_shape, output_shape, n_layers = 3, n_neurons = 32,
+              activation = 'relu', dropout_rate = 0.0, learning_rate = 0.0001,
+              output_activation = 'softmax', loss = 'categorical_crossentropy'):
+
+  from tensorflow.keras.layers import Dense, BatchNormalization, Dropout
+  from tensorflow.keras.models import Sequential
+  from tensorflow.keras.optimizers import Nadam
+
+  model = Sequential()
+  model.add(Dense(input_shape, activation=activation))
+
+  for i in range(0, n_layers):
+    model.add(Dense(n_neurons, activation=activation))
+    model.add(Dropout(dropout_rate))
+    model.add(BatchNormalization())
+
+  model.add(Dense(output_shape, activation=output_activation))
+  model.compile(loss=loss,
+      optimizer=Nadam(learning_rate=learning_rate),
+  )
+
+  return model
+
 class PredictionStrategyType(Enum):
   Lazy = 1
   Eager = 2

@@ -2,22 +2,46 @@
 Miscellaneous utils
 '''
 
+from typing import List, Dict, Union
+
 import rasterio
 import numpy as np
 from pathlib import Path
 
 def ttprint(*args, **kwargs):
+  """ 
+  A print function that displays the date and time.
+  
+  >>> from eumap.misc import ttprint
+  >>> ttprint('eumap rocks!')
+
+  """
   from datetime import datetime
   import sys
 
   print(f'[{datetime.now():%H:%M:%S}] ', end='')
   print(*args, **kwargs, flush=True)
 
-def _verbose(verbose, *args, **kwargs):
-    if verbose:
-      ttprint(*args, **kwargs)
 
-def find_files(dir_list, pattern = '*.*'):
+def find_files(
+  dir_list:List, 
+  pattern:str = '*.*'
+):
+  """ 
+  Recursively find files in multiple directories according to the
+  specified pattern. It's basically a wrapper for 
+  glob module [1]
+
+  :param dir_list: List with multiple directory paths.
+  :param pattern: Pattern to match with the desired files.
+
+  >>> from eumap.misc import find_files
+  >>> libs_so = find_files(['/lib', '/usr/lib64/'], f'*.so')
+  >>> print(f'{len(libs_so)} files found')
+
+  [1] `Python glob module <https://docs.python.org/3/library/glob.html>`_
+
+  """
   files = []
 
   if not isinstance(dir_list, list):
@@ -33,33 +57,33 @@ def find_files(dir_list, pattern = '*.*'):
 
   return files
 
-def build_ann(input_shape, output_shape, n_layers = 3, n_neurons = 32,
-              activation = 'relu', dropout_rate = 0.0, learning_rate = 0.0001,
-              output_activation = 'softmax', loss = 'categorical_crossentropy'):
+def nan_percentile(
+  arr:np.array, 
+  q:List = [25, 50, 75], 
+  keep_original_vals=False
+):
+  """ 
+  Optimized function to calculate percentiles ignoring ``np.nan`` 
+  in a 3D Numpy array [1].
 
-  from tensorflow.keras.layers import Dense, BatchNormalization, Dropout
-  from tensorflow.keras.models import Sequential
-  from tensorflow.keras.optimizers import Nadam
+  :param arr: 3D Numpy array where the first dimension is used to 
+    derive the percentiles.
+  :param q: Percentiles values between 0 and 100.
+  :param keep_original_vals: If ``True`` it does a copy of ``arr``
+    to preserve the structure and values.
 
-  model = Sequential()
-  model.add(Dense(input_shape, activation=activation))
+  >>> import numpy as np
+  >>> from eumap.misc import nan_percentile
+  >>> 
+  >>> data = np.random.rand(10, 10, 10)
+  >>> data[2:5,0:10,0] = np.nan
+  >>> data_perc = nan_percentile(data, q=[25, 50, 75])
+  >>> print(f'Shape: data={data.shape} data_perc={data_perc.shape}')
 
-  for i in range(0, n_layers):
-    model.add(Dense(n_neurons, activation=activation))
-    model.add(Dropout(dropout_rate))
-    model.add(BatchNormalization())
+  [1] `Kersten's blog <https://krstn.eu/np.nanpercentile()-there-has-to-be-a-faster-way>`_
 
-  model.add(Dense(output_shape, activation=output_activation))
-  model.compile(loss=loss,
-      optimizer=Nadam(learning_rate=learning_rate),
-  )
+  """
 
-  return model
-
-# See https://krstn.eu/np.nanpercentile()-there-has-to-be-a-faster-way
-# Thanks Kersten :)
-def nan_percentile(arr, q, keep_original_vals=False):
-  
   if keep_original_vals:
     arr = np.copy(arr)
 
