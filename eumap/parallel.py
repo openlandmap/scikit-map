@@ -5,13 +5,13 @@ CPU_COUNT = multiprocessing.cpu_count()
 '''
 Parallelization helpers based in thread and process pools
 '''
-def ThreadGeneratorLazy(worker, args, max_workers = CPU_COUNT, chunk = CPU_COUNT*2):
+def ThreadGeneratorLazy(worker, args, max_workers, chunk, fixed_args = ()):
   import concurrent.futures
   from itertools import islice
 
   with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
     group = islice(args, chunk)
-    futures = {executor.submit(worker, *arg) for arg in group}
+    futures = {executor.submit(worker, *arg + fixed_args) for arg in group}
 
     while futures:
       done, futures = concurrent.futures.wait(
@@ -24,15 +24,15 @@ def ThreadGeneratorLazy(worker, args, max_workers = CPU_COUNT, chunk = CPU_COUNT
       group = islice(args, chunk)
 
       for arg in group:
-        futures.add(executor.submit(worker,*arg))
+        futures.add(executor.submit(worker,*arg + fixed_args))
 
-def ProcessGeneratorLazy(worker, args, max_workers = CPU_COUNT, chunk = CPU_COUNT*2):
+def ProcessGeneratorLazy(worker, args, max_workers, chunk, fixed_args = ()):
   import concurrent.futures
   from itertools import islice
 
   with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
     group = islice(args, chunk)
-    futures = {executor.submit(worker, *arg) for arg in group}
+    futures = {executor.submit(worker, *arg + fixed_args) for arg in group}
 
     while futures:
       done, futures = concurrent.futures.wait(
@@ -45,7 +45,7 @@ def ProcessGeneratorLazy(worker, args, max_workers = CPU_COUNT, chunk = CPU_COUN
       group = islice(args, chunk)
 
       for arg in group:
-        futures.add(executor.submit(worker, *arg))
+        futures.add(executor.submit(worker, *arg + fixed_args))
 
 def job(worker, worker_args, n_jobs = -1, joblib_args = {}):
   from joblib import Parallel, delayed

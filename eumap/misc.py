@@ -51,7 +51,7 @@ def find_files(
 
   for _dir in dir_list:
     for file in list(Path(_dir).glob(glob_pattern)):
-      files.append(file)
+      files.append(Path(file))
 
   files = sorted(files)
 
