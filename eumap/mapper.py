@@ -32,9 +32,7 @@ import gc
 from concurrent.futures import as_completed, ThreadPoolExecutor
 
 import uuid
-from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
-from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.models import load_model
+
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV
@@ -370,6 +368,7 @@ class LandMapper():
       return {'sample_weight': self.samples_weight}
 
   def _is_keras_classifier(self, estimator):
+    from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
     return isinstance(estimator, Pipeline) and isinstance(estimator['estimator'], KerasClassifier)
 
   def _binarizer_target_if_needed(self, estimator):
@@ -721,6 +720,8 @@ class LandMapper():
     landmapper = joblib.load(fn_joblib)
     for estimator in landmapper.estimator_list:
       if landmapper._is_keras_classifier(estimator):
+        from tensorflow.keras.models import load_model
+        
         fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
         estimator['estimator'].model = load_model(fn_keras)
 

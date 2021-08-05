@@ -3,8 +3,10 @@ Parallelization helpers based in thread and process pools
 """
 import numpy
 import multiprocessing
-from typing import Callable, Iterator
+from typing import Callable, Iterator, List
 
+import warnings
+from pathlib import Path
 import geopandas as gpd
 import multiprocessing
 from osgeo import osr
@@ -17,11 +19,6 @@ from pqdm.threads import pqdm as tpqdm
 
 from .misc import ttprint
 from . import datasets
-
-EUMAP_TILING_SYSTEM_FN = 'eu_tilling system_30km.gpkg'
-"""
-Filename with the default tiling system for eumap
-"""
 
 CPU_COUNT = multiprocessing.cpu_count()
 """
@@ -145,7 +142,7 @@ def job(
   joblib_args:set = {}
 ):
   """ 
-  Execute a function in parallel using **Joblib**.
+  Execute a function in parallel using joblib [1].
 
   :param worker: Function to execute in parallel.
   :param worker_args: Argument iterator where each element is send
@@ -241,76 +238,180 @@ def apply_along_axis(
 
 
 class TilingProcessing():
+  """
+  Execute a processing function in parallel considering a tiling system 
+  and a base raster. It creates a rasterio ``window`` object for each tile 
+  according to the pixel size of the specified base.
 
-  def __init__(self, tiling_system_fn = None,
-         base_raster_fn = None,
-         pixel_precision = 6,
-         verbose:bool = True):
+  :param tiling_system_fn: Vector file path with the tiles to read.
+  :param base_raster_fn: Raster file path used the retrieve 
+    the ``affine transformation`` for ``windows``.
+  :param verbose: Use ``True`` to print informations about read tiles 
+    and the base raster.
 
-    if tiling_system_fn is None:
+  """
 
-      if verbose:
-        ttprint('Using default eumap tiling system')
+  def __init__(self, 
+    tiling_system_fn = 'http://s3.eu-central-1.wasabisys.com/eumap/tiling_system_30km.gpkg',
+    base_raster_fn = 'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_eumap_epsg3035_v1.0.tif',
+    verbose:bool = False
+  ):
 
-      tiling_system_fn = f'eumap_data/{EUMAP_TILING_SYSTEM_FN}'
-      if not os.path.isfile(tiling_system_fn):
-        datasets.get_data(EUMAP_TILING_SYSTEM_FN)
+    from pyproj import CRS
 
-    self.pixel_precision = pixel_precision
     self.tiles = gpd.read_file(tiling_system_fn)
     self.num_tiles = self.tiles.shape[0]
     self.base_raster = rasterio.open(base_raster_fn)
 
-    tiles_srs = osr.SpatialReference()
-    tiles_srs.ImportFromProj4(self.tiles.crs.to_proj4())
-    base_raster_srs = osr.SpatialReference()
-    base_raster_srs.ImportFromProj4(self.base_raster.crs.to_proj4())
+    tile_epsg = CRS(self.tiles.crs.to_wkt()).to_epsg() 
+    raster_epsg = CRS(self.base_raster.crs.to_wkt()).to_epsg()
 
-    if base_raster_srs.ImportFromProj4(self.base_raster.crs.to_proj4()) != tiles_srs.ImportFromProj4(self.tiles.crs.to_proj4()):
-      raise Exception('Different SpatialReference' +
-            f'\n tiling_system_fn ({tiles_srs.ExportToProj4()})'+
-            f'\n base_raster_fn ({base_raster_srs.ExportToProj4()})')
+    if tile_epsg != raster_epsg:
+      raise Exception(
+        'Different SpatialReference' +
+        f'\n tiling_system_fn:\n{self.tiles.crs.to_wkt()}'+
+        f'\n base_raster_fn:\n{self.base_raster.crs.to_wkt()}'
+      )
+    
     if verbose:
-      ttprint(f'{self.num_tiles} tiles available')
+      pixel_size = self.base_raster.transform[0]
+      ttprint(f'Pixel size equal {pixel_size} in {Path(base_raster_fn).name}')
+      ttprint(f'{self.num_tiles} tiles available in {Path(tiling_system_fn).name}')
+      ttprint(f'Using EPSG:{raster_epsg}')
 
-  def process_one(self, idx, func, func_args = ()):
-
+  def _tile_window(self, idx):
     tile = self.tiles.iloc[idx]
     left, bottom, right, top = tile.geometry.bounds
 
-    window = from_bounds(left, bottom, right, top, self.base_raster.transform)
+    return tile, from_bounds(left, bottom, right, top, self.base_raster.transform)
 
-    return func(idx, tile, window, *func_args)
+  def process_one(self, 
+    idx:int, 
+    func:Callable, 
+    *args:any
+  ):
+    """
+    Process a single tile using the specified function args.
 
-  def process_multiple(self, idx_list, func, func_args = (),
-    max_workers:int = multiprocessing.cpu_count(),
+    :param idx: The tile id to process. This idx is generated for all the tiles 
+      in a sequence starting from ``0``.
+    :param func: A function with at least the arguments ``idx, tile, window``.
+    :param args: Additional arguments to send to the function.
+
+    >>> from eumap.parallel import TilingProcessing
+    >>> from eumap.raster import read_rasters
+    >>> 
+    >>> def run(idx, tile, window, raster_files):
+    >>>     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
+    >>>     print(f'Tile {idx}: data read {data.shape}')
+    >>> 
+    >>> raster_files = [
+    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_eumap_epsg3035_v1.0.tif', # winter
+    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_eumap_epsg3035_v1.0.tif', # spring
+    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_eumap_epsg3035_v1.0.tif', # summer
+    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_eumap_epsg3035_v1.0.tif'  # fall
+    >>> ]
+    >>> 
+    >>> tiling= TilingProcessing(verbose=True)
+    >>> tiling.process_one(0, run, raster_files)
+
+    """
+    tile, window = self._tile_window(idx)
+    return func(idx, tile, window, *args)
+
+  def process_multiple(self, 
+    idx_list:List[int], 
+    func:Callable, 
+    *args:any,
+    max_workers:int = CPU_COUNT,
     use_threads:bool = True,
-    progress_bar:bool = True):
-    print(f"func_args: {func_args}")
-    args = []
+    progress_bar:bool = False
+  ):
+    """
+    Process in parallel a list of tile using the specified function args.
+
+    :param idx: The tile ids to process. This idx is generated for all the tiles 
+      in a sequence starting from ``0``.
+    :param func: A function with at least the arguments ``idx, tile, window``.
+    :param args: Additional arguments to send to the function.
+    :param max_workers: Number of CPU cores to use in the parallelization.
+      By default all cores are used.
+    :param use_threads: If ``True`` the parallel processing uses ``ThreadGeneratorLazy``,
+      otherwise it uses ProcessGeneratorLazy.
+    :param progress_bar: If ``True`` the parallel processing uses ``pqdm`` [1] presenting
+      a progress bar and ignoring the ``use_threads``.
+
+    >>> from eumap.parallel import TilingProcessing
+    >>> from eumap.raster import read_rasters
+    >>> 
+    >>> def run(idx, tile, window, raster_files):
+    >>>     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
+    >>>     print(f'Tile {idx}: data read {data.shape}')
+    >>> 
+    >>> raster_files = [
+    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_eumap_epsg3035_v1.0.tif', # winter
+    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_eumap_epsg3035_v1.0.tif', # spring
+    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_eumap_epsg3035_v1.0.tif', # summer
+    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_eumap_epsg3035_v1.0.tif'  # fall
+    >>> ]
+    >>> 
+    >>> tiling= TilingProcessing(verbose=True)
+    >>> idx_list = [0,10,100]
+    >>> result = tiling.process_multiple(idx_list, run, raster_files)
+    
+    [1] `Parallel TQDM <https://pqdm.readthedocs.io/en/latest/readme.html>`_
+    """
+
+    _args = []
+    
     for idx in idx_list:
-      tile = self.tiles.iloc[idx]
-      left, bottom, right, top = tile.geometry.bounds
-
-      window = from_bounds(left, bottom, right, top, self.base_raster.transform)
-
-      args.append((idx, tile, window, *func_args))
+      tile, window = self._tile_window(idx)
+      _args.append((idx, tile, window, *args))
+    
     if progress_bar:
       pqdm = (tpqdm if use_threads else ppqdm)
-      results = pqdm(args,func,n_jobs=max_workers,argument_type='args')
+      results = pqdm(iter(_args), func, n_jobs=max_workers, argument_type='args')
 
     else:
       WorkerPool = (ThreadGeneratorLazy if use_threads else ProcessGeneratorLazy)
 
       results = []
-      for r in WorkerPool(func, iter(args), max_workers=max_workers, chunk=max_workers*2):
+      for r in WorkerPool(func, iter(_args), max_workers=max_workers, chunk=max_workers*2):
         results.append(r)
 
     return results
 
-  def process_all(self, func, func_args = (),
-    max_workers:int = multiprocessing.cpu_count(),
-    use_threads:bool = True):
+  def process_all(self, 
+    func:Callable, 
+    *args:any,
+    max_workers:int = CPU_COUNT,
+    use_threads:bool = True,
+    progress_bar:bool = False
+  ):
+    """
+    Process in parallel all of tile using the specified function args.
+
+    :param func: A function with at least the arguments ``idx, tile, window``.
+    :param args: Additional arguments to send to the function.
+    :param max_workers: Number of CPU cores to use in the parallelization.
+      By default all cores are used.
+    :param use_threads: If ``True`` the parallel processing uses ``ThreadGeneratorLazy``,
+      otherwise it uses ProcessGeneratorLazy.
+    :param progress_bar: If ``True`` the parallel processing uses ``pqdm`` [1] presenting
+      a progress bar, ignoring the ``use_threads``.
+
+    >>> from eumap.parallel import TilingProcessing
+    >>> from eumap.raster import read_rasters
+    >>> 
+    >>> def run(idx, tile, window, msg):
+    >>>     print(f'Tile {idx} => {msg}')
+    >>> 
+    >>> tiling= TilingProcessing(verbose=True)
+    >>> msg = "Let's crunch some data."
+    >>> result = tiling.process_all(run)
+    
+    [1] `Parallel TQDM <https://pqdm.readthedocs.io/en/latest/readme.html>`_
+    """
 
     idx_list = range(0, self.num_tiles)
     return self.process_multiple(idx_list, func, func_args, max_workers, use_threads)
