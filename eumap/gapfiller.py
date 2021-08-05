@@ -185,7 +185,7 @@ class ImageGapfill(ABC):
 
   def save_rasters(self, 
       out_dir, 
-      data_type:str = None, 
+      dtype:str = None, 
       out_mantain_subdirs:bool = True,
       root_dir_name:str = DATA_ROOT_NAME, 
       fn_files:List = None, 
@@ -198,7 +198,7 @@ class ImageGapfill(ABC):
     of the read rasters.
     
     :param out_dir: Folder path to save the files.
-    :param data_type: Convert the rasters for the specified Numpy ``data_type`` before save. This argument overwrite the values
+    :param dtype: Convert the rasters for the specified Numpy ``dtype`` before save. This argument overwrite the values
       retrieved of ``fn_files``
     :param out_mantain_subdirs: Keep the full folder hierarchy of the read raster in the ``out_dir``.
     :param root_dir_name: Keep the relative folder hierarchy of the read raster in the ``out_dir`` 
@@ -256,11 +256,11 @@ class ImageGapfill(ABC):
       fn_flag_list.append(fn_flag)
 
     result = save_rasters(fn_base_img, fn_gapfilled_list, self.gapfilled_data, 
-      data_type = data_type, spatial_win = spatial_win, nodata=nodata)
+      dtype = dtype, spatial_win = spatial_win, nodata=nodata)
 
     if save_flag:
       flag_result = save_rasters(fn_base_img, fn_flag_list, self.gapfilled_data_flag, 
-      data_type = 'uint8', spatial_win = spatial_win, nodata=0, n_jobs=self.n_jobs_io)
+      dtype = 'uint8', spatial_win = spatial_win, nodata=0, n_jobs=self.n_jobs_io)
       result = result + flag_result
       
     self._verbose(f'Number of files saved in {out_dir}: {len(result)}')
@@ -733,7 +733,7 @@ class SSA(ImageGapfill):
   >>> ssa = gapfiller.SSA(fn_files=fn_rasters, season_size=4)
   >>> data_ssa = ssa.run()
   >>> 
-  >>> fn_rasters_ssa = ssa.save_rasters('./gapfilled_ssa', data_type='uint8', save_flag=False)
+  >>> fn_rasters_ssa = ssa.save_rasters('./gapfilled_ssa', dtype='uint8', save_flag=False)
 
   [1] `Pyts SingularSpectrumAnalysis <https://pyts.readthedocs.io/en/stable/generated/pyts.decomposition.SingularSpectrumAnalysis.html>`_
   """
@@ -968,7 +968,7 @@ def time_first_space_later(
   >>>  space_args = { 'space_win': 10 }
   >>> )
   >>> 
-  >>> fn_rasters_tfsl  = tfsl.save_rasters('./gapfilled_tmwm_inpaint', data_type='uint8', fn_files=fn_rasters)
+  >>> fn_rasters_tfsl  = tfsl.save_rasters('./gapfilled_tmwm_inpaint', dtype='uint8', fn_files=fn_rasters)
 
   """
   time_args['fn_files'] = fn_files

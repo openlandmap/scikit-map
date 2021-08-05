@@ -7,7 +7,7 @@ import gc
 import os
 
 from .. import parallel
-from ..raster import read_rasters_remote, save_rasters
+from ..raster import read_auth_rasters, save_rasters
 from ..misc import nan_percentile, ttprint
 
 class LandsatARD():
@@ -57,8 +57,11 @@ class LandsatARD():
       ttprint(*args, **kwargs)
 
   def read(self, tile, start, end, clear_sky = True, min_clear_sky = 0.2):
-    data, url_list, base_raster = read_rasters_remote(
-      url_list = self._glad_urls(tile, start, end),
+    
+    url_list = self._glad_urls(tile, start, end)
+
+    data, base_raster = read_auth_rasters(
+      raster_files = url_list,
       username = self.username,
       password = self.password,
       verbose = self.verbose,
@@ -140,7 +143,7 @@ class LandsatARD():
     data = np.concatenate(data, axis=2)
     
     output_files += save_rasters(fn_base_raster=base_raster, data=data, fn_raster_list=fn_raster_list, 
-      data_type=dtype, nodata=0, fit_in_data_type=True, n_jobs=self.parallel_download, verbose=self.verbose)
+      dtype=dtype, nodata=0, fit_in_dtype=True, n_jobs=self.parallel_download, verbose=self.verbose)
 
     return output_files
 
