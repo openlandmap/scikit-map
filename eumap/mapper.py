@@ -44,7 +44,6 @@ from sklearn import metrics
 from sklearn.model_selection import KFold,BaseCrossValidator
 from sklearn.model_selection import cross_val_predict
 
-from typing import List
 import rasterio
 import rasterio.windows
 from pathlib import Path
@@ -79,9 +78,35 @@ DEFAULT = {
 
 #imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean')
 
-def build_ann(input_shape, output_shape, n_layers = 3, n_neurons = 32,
-              activation = 'relu', dropout_rate = 0.0, learning_rate = 0.0001,
-              output_activation = 'softmax', loss = 'categorical_crossentropy'):
+def build_ann(
+  input_shape, 
+  output_shape, 
+  n_layers = 3, 
+  n_neurons = 32,
+  activation = 'relu', 
+  dropout_rate = 0.0, 
+  learning_rate = 0.0001,
+  output_activation = 'softmax', 
+  loss = 'categorical_crossentropy'
+):
+  """
+  TODO
+
+  :param input_shape: TODO
+  :param output_shape: TODO
+  :param n_layers: TODO
+  :param n_neurons: TODO
+  :param activation: TODO
+  :param dropout_rate: TODO
+  :param learning_rate: TODO
+  :param output_activation: TODO
+  :param loss: TODO
+
+  >>> TODO
+
+  :returns: TODO
+  :rtype: TODO
+  """
 
   from tensorflow.keras.layers import Dense, BatchNormalization, Dropout
   from tensorflow.keras.models import Sequential
@@ -108,28 +133,57 @@ class PredictionStrategyType(Enum):
 
 class LandMapper():
 
-  def __init__(self,
-               points:Union[DataFrame, Path],
-               target_col:str,
-               feat_col_prfxs:Union[List, None] = [],
-               feat_cols:Union[List, None] = [],
-               weight_col:Union[str, None] = None,
-               nodata_imputer:Union[BaseEstimator, None] = None,
-               estimator:Union[BaseEstimator, None] = DEFAULT['ESTIMATOR'],
-               estimator_list:Union[List[BaseEstimator], None] = None,
-               meta_estimator:BaseEstimator = DEFAULT['META_ESTIMATOR'],
-               hyperpar_selection:Union[BaseEstimator, None] = None,
-               hyperpar_selection_list:Union[BaseEstimator, None] = None,
-               hyperpar_selection_meta:Union[List[BaseEstimator], None] = None,
-               feature_selection:Union[BaseEstimator, None] = None,
-               feature_selections_list:Union[BaseEstimator, None] = None,
-               cv:BaseCrossValidator = DEFAULT['CV'],
-               cv_njobs:int = 1,
-               cv_group_col:str = None,
-               min_samples_per_class:float = 0.05,
-               pred_method:str = 'predict',
-               verbose:bool = True,
-               **autosklearn_kwargs):
+  """
+    TODO
+
+    :param points: TODO
+    :param target_col: TODO
+    :param feat_col_prfxs: TODO
+    :param feat_cols: TODO
+    :param weight_col: TODO
+    :param nodata_imputer: TODO
+    :param estimator: TODO
+    :param estimator_list: TODO
+    :param meta_estimator: TODO
+    :param hyperpar_selection: TODO
+    :param hyperpar_selection_list: TODO
+    :param hyperpar_selection_meta: TODO
+    :param feature_selection: TODO
+    :param feature_selections_list: TODO
+    :param cv: TODO
+    :param cv_njobs: TODO
+    :param cv_group_col: TODO
+    :param min_samples_per_class: TODO
+    :param pred_method: TODO
+    :param verbose:bool: TODO
+    :param **autosklearn_kwargs: TODO
+
+  """
+
+  def __init__(
+    self,
+    points:Union[DataFrame, Path],
+    target_col:str,
+    feat_col_prfxs:Union[List, None] = [],
+    feat_cols:Union[List, None] = [],
+    weight_col:Union[str, None] = None,
+    nodata_imputer:Union[BaseEstimator, None] = None,
+    estimator:Union[BaseEstimator, None] = DEFAULT['ESTIMATOR'],
+    estimator_list:Union[List[BaseEstimator], None] = None,
+    meta_estimator:BaseEstimator = DEFAULT['META_ESTIMATOR'],
+    hyperpar_selection:Union[BaseEstimator, None] = None,
+    hyperpar_selection_list:Union[BaseEstimator, None] = None,
+    hyperpar_selection_meta:Union[List[BaseEstimator], None] = None,
+    feature_selection:Union[BaseEstimator, None] = None,
+    feature_selections_list:Union[BaseEstimator, None] = None,
+    cv:BaseCrossValidator = DEFAULT['CV'],
+    cv_njobs:int = 1,
+    cv_group_col:str = None,
+    min_samples_per_class:float = 0.05,
+    pred_method:str = 'predict',
+    verbose:bool = True,
+    **autosklearn_kwargs
+  ):
 
     self.verbose = verbose
     self.pts = self._pts(points)
@@ -564,6 +618,9 @@ class LandMapper():
     return fn_out_files
 
   def train(self):
+    """
+    TODO
+    """
 
     # Hyperparameter optization for all estimators
     for hyperpar_selection, estimator in zip(self.hyperpar_selection_list, self.estimator_list):
@@ -654,7 +711,17 @@ class LandMapper():
 
       return meta_estimator_pred.astype('float32'), std_meta_features.astype('float32')
 
-  def predict_points(self, input_points):
+  def predict_points(self, 
+    input_points
+  ):
+    """
+    TODO
+
+    :param input_points: TODO
+
+    :returns: TODO
+    :rtype: TODO
+    """
 
     input_data = np.ascontiguousarray(input_points[self.feature_cols].to_numpy(), dtype=np.float32)
 
@@ -663,11 +730,38 @@ class LandMapper():
 
     return self._predict(input_data)
 
-  def predict(self, dirs_layers:List = [], fn_layers:List = [], fn_output:str = None,
-    spatial_win = None, dtype = 'float32', fill_nodata = False, separate_probs = True,
-    hard_class = True, inmem_calc_func = None, dict_layers_newnames = {},
-    allow_aditional_layers=False,):
+  def predict(self, 
+    dirs_layers:List = [], 
+    fn_layers:List = [], 
+    fn_output:str = None,
+    spatial_win = None, 
+    dtype = 'float32', 
+    fill_nodata = False, 
+    separate_probs = True,
+    hard_class = True, 
+    inmem_calc_func = None, 
+    dict_layers_newnames = {},
+    allow_aditional_layers=False
+  ):
 
+    """
+    TODO
+
+    :param dirs_layers: TODO
+    :param fn_layers: TODO
+    :param fn_output: TODO
+    :param spatial_win: TODO
+    :param dtype: TODO
+    :param fill_nodata: TODO
+    :param separate_probs: TODO
+    :param hard_class: TODO
+    :param inmem_calc_func: TODO
+    :param dict_layers_newnames: TODO
+    :param allow_aditional_layers: TODO
+
+    :returns: TODO
+    :rtype: TODO
+    """
     n_jobs = 4
 
     input_data, fn_layers = self._read_layers(dirs_layers, fn_layers, spatial_win, \
@@ -697,14 +791,43 @@ class LandMapper():
 
     return fn_out_files
 
-  def predict_multi(self, dirs_layers_list:List = [], fn_layers_list:List = [], fn_output_list:List = [], spatial_win = None,
-    dtype = 'float32', fill_nodata = False, separate_probs = True, hard_class = True,
-    inmem_calc_func = None, dict_layers_newnames_list:list = [], allow_aditional_layers=False,
-    prediction_strategy_type = PredictionStrategyType.Lazy):
+  def predict_multi(self, 
+    dirs_layers_list:List = [], 
+    fn_layers_list:List = [], 
+    fn_output_list:List = [], 
+    spatial_win = None,
+    dtype = 'float32', 
+    fill_nodata = False, 
+    separate_probs = True, 
+    hard_class = True,
+    inmem_calc_func = None, 
+    dict_layers_newnames_list:list = [], 
+    allow_aditional_layers=False,
+    prediction_strategy_type = PredictionStrategyType.Lazy
+  ):
+    """
+    TODO
 
-    PredictionStrategyClass = LazyLoadPrediction
+    :param dirs_layers_list: TODO
+    :param fn_layers_list: TODO
+    :param fn_output_list: TODO
+    :param spatial_win: TODO
+    :param dtype: TODO
+    :param fill_nodata: TODO
+    :param separate_probs: TODO
+    :param hard_class: TODO
+    :param inmem_calc_func: TODO
+    :param dict_layers_newnames_list: TODO
+    :param allow_aditional_layer: TODO
+    :param prediction_strategy_type: TODO
+
+    :returns: TODO
+    :rtype: TODO
+    """
+
+    PredictionStrategyClass = _LazyLoadPrediction
     if PredictionStrategyType.Eager == prediction_strategy_type:
-      PredictionStrategyClass = EagerLoadPrediction
+      PredictionStrategyClass = _EagerLoadPrediction
 
     prediction_strategy = PredictionStrategyClass(self, dirs_layers_list, fn_layers_list, fn_output_list,
         spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
@@ -713,7 +836,18 @@ class LandMapper():
     return prediction_strategy.run()
 
   @staticmethod
-  def load_instance(fn_joblib):
+  def load_instance(
+    fn_joblib
+  ):
+    """
+    TODO
+
+    :param fn_joblib: TODO
+
+    :returns: TODO
+    :rtype: TODO
+    """
+
     if not isinstance(fn_joblib, Path):
       fn_joblib = Path(fn_joblib)
 
@@ -727,7 +861,20 @@ class LandMapper():
 
     return landmapper
 
-  def save_instance(self, fn_joblib, no_train_data = False, compress='lz4'):
+  def save_instance(self, 
+    fn_joblib, 
+    no_train_data = False, 
+    compress='lz4'
+  ):
+    """
+    TODO
+
+    :param fn_joblib: TODO
+    :param no_train_data: TODO
+    :param compress: TODO
+
+    """
+
     if not isinstance(fn_joblib, Path):
       fn_joblib = Path(fn_joblib)
 
@@ -753,7 +900,7 @@ class LandMapper():
         fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
         estimator['estimator'].model = load_model(fn_keras)
 
-class PredictionStrategy(ABC):
+class _PredictionStrategy(ABC):
 
   def __init__(self,
                landmapper:LandMapper,
@@ -796,7 +943,7 @@ class PredictionStrategy(ABC):
   def run(self):
     pass
 
-class EagerLoadPrediction(PredictionStrategy):
+class _EagerLoadPrediction(_PredictionStrategy):
 
   def __init__(self,
                landmapper:LandMapper,
@@ -911,7 +1058,7 @@ class EagerLoadPrediction(PredictionStrategy):
 
     return output_fn_files
 
-class LazyLoadPrediction(PredictionStrategy):
+class _LazyLoadPrediction(_PredictionStrategy):
 
   def __init__(self,
                landmapper:LandMapper,
@@ -1033,7 +1180,6 @@ class LazyLoadPrediction(PredictionStrategy):
     output_fn_files.sort()
 
     return output_fn_files
-
 
 class _ParallelOverlay:
     # optimized for up to 200 points and about 50 layers
