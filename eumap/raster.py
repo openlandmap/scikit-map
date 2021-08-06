@@ -258,8 +258,8 @@ def read_auth_rasters(
   >>> 
   >>> # Do the registration here
   >>> # https://glad.umd.edu/ard/user-registration
-  >>> username = 'lealparente'
-  >>> password = '8IaXGlGEvvlFCA+a'
+  >>> username = '<YOUR_USERNAME>'
+  >>> password = '<YOUR_PASSWORD>'
   >>> raster_files = [
   >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/850.tif',
   >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/851.tif',

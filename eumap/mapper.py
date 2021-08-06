@@ -1,5 +1,5 @@
 '''
-Spatial prediction approaches based on machine learning (scikit-learn)
+Overlay and spatial prediction fully compatible with ``scikit-learn``.
 '''
 from abc import ABC, abstractmethod
 
@@ -83,29 +83,37 @@ def build_ann(
   output_shape, 
   n_layers = 3, 
   n_neurons = 32,
-  activation = 'relu', 
+  activation = 'relu',
   dropout_rate = 0.0, 
   learning_rate = 0.0001,
   output_activation = 'softmax', 
   loss = 'categorical_crossentropy'
 ):
   """
-  TODO
+  Helper function to create a pretty standard Artificial Neural
+  Network-ANN using ``tensorflow``. It's based in a ``Sequential``
+  model, which connects multiple hidden layers 
+  (``Dense=>Dropout=>BatchNormalization``) and uses a ``Nadam``
+  optimizer. Developed to be used together with ``KerasClassifier``.
 
-  :param input_shape: TODO
-  :param output_shape: TODO
-  :param n_layers: TODO
-  :param n_neurons: TODO
-  :param activation: TODO
-  :param dropout_rate: TODO
-  :param learning_rate: TODO
-  :param output_activation: TODO
-  :param loss: TODO
+  :param input_shape: The input data shape.
+  :param output_shape: The output data shape.
+  :param n_layers: Number of hidden layers.
+  :param n_neurons: Number of neurons for the hidden layers.
+  :param activation: Activation function for the input and hidden layers.
+  :param dropout_rate: Dropout rate for the ``BatchNormalization``.
+  :param learning_rate: Learning rate for the optimized.
+  :param output_activation: Activation function for the output layer.
+  :param loss: Loss function used for the Optimizer.
 
-  >>> TODO
+  >>> from eumap.mapper import build_ann
+  >>> from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
+  >>> 
+  >>> ann = KerasClassifier(build_ann, input_shape=(-1, 180), output_shape=33, 
+  >>>                       epochs=3, batch_size=64, shuffle=True, verbose=1)
 
-  :returns: TODO
-  :rtype: TODO
+  :returns: The ANN model 
+  :rtype: Sequential
   """
 
   from tensorflow.keras.layers import Dense, BatchNormalization, Dropout
@@ -128,13 +136,30 @@ def build_ann(
   return model
 
 class PredictionStrategyType(Enum):
-  Lazy = 1
-  Eager = 2
+  """
+  Strategy to read multiple raster files during the prediction
+
+  """
+  Lazy = 1 # Load one year while predict other.
+  Eager = 2 # First load all years, then predict all.
 
 class LandMapper():
 
   """
-    TODO
+    Spatial prediction implementation based in supervised machine
+    learning models and point samples.
+
+    It's fully compatible with ``scikit-learn`` supporting:
+    
+    1. Classification and regression,
+    2. Seamless training using point samples,
+    3. Data imputation,
+    4. Hyper-parameter optimization,
+    5. Feature selection,
+    6. Ensemble machine learning and prediction uncertainty,
+    7. AutoML through ``auto-sklearn``,
+    8. Accuracy assessment through cross-validation,
+    9. Seamless raster prediction (read and write).
 
     :param points: TODO
     :param target_col: TODO
@@ -157,6 +182,12 @@ class LandMapper():
     :param pred_method: TODO
     :param verbose:bool: TODO
     :param **autosklearn_kwargs: TODO
+    
+    For usage examples access the ``eumap`` tutorials [1,2].
+
+    [1] `Land Cover Mapping <../notebooks/03_landcover_mapping.html>`_
+
+    [2] `Land Cover Mapping (Advanced) <../notebooks/04_landcover_mapping_advanced.html>`_
 
   """
 
