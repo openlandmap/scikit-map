@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from .misc import ttprint, find_files
 from .raster import read_rasters, write_new_raster
 
-from typing import List, Union
+from typing import List, Union, Callable
 import joblib
 
 import multiprocessing
@@ -19,6 +19,7 @@ import math
 import rasterio
 import re
 import time
+from rasterio.windows import Window
 
 from enum import Enum
 from pathlib import Path
@@ -140,8 +141,8 @@ class PredictionStrategyType(Enum):
   Strategy to read multiple raster files during the prediction
 
   """
-  Lazy = 1 # Load one year while predict other.
-  Eager = 2 # First load all years, then predict all.
+  Lazy = 1 #: Load one year while predict other.
+  Eager = 2 #: First load all years, then predict all.
 
 class LandMapper():
 
@@ -149,45 +150,68 @@ class LandMapper():
     Spatial prediction implementation based in supervised machine
     learning models and point samples.
 
-    It's fully compatible with ``scikit-learn`` supporting:
+    It's fully compatible with ``scikit-learn`` [1] supporting:
     
-    1. Classification and regression,
+    1. Classification models,
     2. Seamless training using point samples,
     3. Data imputation,
     4. Hyper-parameter optimization,
     5. Feature selection,
-    6. Ensemble machine learning and prediction uncertainty,
-    7. AutoML through ``auto-sklearn``,
+    6. Ensemble machine learning (EML) and prediction uncertainty,
+    7. AutoML through ``auto-sklearn`` [2],
     8. Accuracy assessment through cross-validation,
     9. Seamless raster prediction (read and write).
 
-    :param points: TODO
-    :param target_col: TODO
-    :param feat_col_prfxs: TODO
-    :param feat_cols: TODO
-    :param weight_col: TODO
-    :param nodata_imputer: TODO
-    :param estimator: TODO
-    :param estimator_list: TODO
-    :param meta_estimator: TODO
-    :param hyperpar_selection: TODO
-    :param hyperpar_selection_list: TODO
-    :param hyperpar_selection_meta: TODO
-    :param feature_selection: TODO
-    :param feature_selections_list: TODO
-    :param cv: TODO
-    :param cv_njobs: TODO
-    :param cv_group_col: TODO
-    :param min_samples_per_class: TODO
-    :param pred_method: TODO
-    :param verbose:bool: TODO
-    :param **autosklearn_kwargs: TODO
+    :param points: Point samples used to train the ML model. It supports ``pandas.DataFrame`` and
+     a path for plain CSV ``(*.csv)`` or compressed csv file ``(*.gz)``, which are read 
+     through ``pandas.read_csv`` [3]. All the other extensions are read by ``geopandas`` as GIS vector files [4].
+    :param target_col: Column name used to retrieve the target values for the training.
+    :param feat_cols: List of column names used to retrieve the feature/covariates for the training.
+    :param feat_col_prfxs: List of column prefixes used to derive the ``feat_cols`` list, avoiding to provide 
+      dozens/hundreds of column names.
+    :param weight_col: Column name used to retrieve the ``sample_weight`` for the training.
+    :param nodata_imputer: Transformer used to input missing values filling all ``np.nan`` in the point
+      samples. All ``sklearn.impute`` classes are supported [1].
+    :param estimator: The ML model used by the class. The default model is a ``RandomForestClassifier``,
+      however all the ``sklearn`` model are supported [1]. For ``estimator=None`` it tries to use ``auto-sklearn``
+      to find the best model and hyper-parameters [2].
+    :param estimator_list: A list of models used by the EML implementation. The models output are used to 
+      feed the ``meta_estimator`` model and to derive the prediction uncertainty. This argument has
+      prevalence over ``estimator``.
+    :param meta_estimator: Model used to derive the prediction output in the EML implementation. The default model
+      here is a ``LogisticRegression``, however all the ``sklearn`` model are supported [1].
+    :param hyperpar_selection: Hyper-parameter optimizer used by ``estimator`` model. 
+    :param hyperpar_selection_list: A list of hyper-parameter optimizers used by ``estimator_list`` models, provided 
+      in the same order. This argument has prevalence over ``hyperpar_selection``.
+    :param hyperpar_selection_meta: Hyper-parameter optimizer used by ``meta_estimator`` model.
+    :param feature_selection: Feature selection algorithm used by ``estimator`` model.
+    :param feature_selections_list: A list of feature selection algorithm used by ``estimator_list`` models, provided 
+      in the same order. This argument has prevalence over ``feature_selection``.
+    :param cv: Cross validation strategy used by all models. The default strategy is a ``5-Fold cv``, 
+      however all the ``sklearn`` model are supported [1].
+    :param cv_njobs: Number of CPU cores to be used in parallel during the cross validation.
+    :param cv_group_col: Column name used to split the train/test set during the cross validation. Use this argument 
+      to perform a ``spatial CV`` by block/tiles.
+    :param min_samples_per_class: Minimum percentage of samples according to ``target_col`` to keep the class in the
+      training.
+    :param pred_method: Use ``predict_prob`` to predict probabilities and uncertainty, otherwise it predicts only 
+      the dominant class.
+    :param verbose:bool: Use ``True`` to print the progress of all steps.
+    :param \*\*autosklearn_kwargs: Named arguments supported by ``auto-sklearn`` [2].
     
-    For usage examples access the ``eumap`` tutorials [1,2].
+    For **usage examples** access the ``eumap`` tutorials [5,6].
+    
+    [1] `Sklearn API Reference <https://scikit-learn.org/stable/modules/classes.html>`_
 
-    [1] `Land Cover Mapping <../notebooks/03_landcover_mapping.html>`_
+    [2] `Auto-sklearn API <https://automl.github.io/auto-sklearn/master/api.html>`_
 
-    [2] `Land Cover Mapping (Advanced) <../notebooks/04_landcover_mapping_advanced.html>`_
+    [3] `Pandas read_csv function <https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html>`_
+
+    [4] `Geopandas read_file function <https://geopandas.org/docs/reference/api/geopandas.read_file.html>`_
+
+    [5] `Land Cover Mapping <../notebooks/03_landcover_mapping.html>`_
+
+    [6] `Land Cover Mapping (Advanced) <../notebooks/04_landcover_mapping_advanced.html>`_
 
   """
 
@@ -195,8 +219,8 @@ class LandMapper():
     self,
     points:Union[DataFrame, Path],
     target_col:str,
-    feat_col_prfxs:Union[List, None] = [],
     feat_cols:Union[List, None] = [],
+    feat_col_prfxs:Union[List, None] = [],
     weight_col:Union[str, None] = None,
     nodata_imputer:Union[BaseEstimator, None] = None,
     estimator:Union[BaseEstimator, None] = DEFAULT['ESTIMATOR'],
@@ -210,7 +234,7 @@ class LandMapper():
     cv:BaseCrossValidator = DEFAULT['CV'],
     cv_njobs:int = 1,
     cv_group_col:str = None,
-    min_samples_per_class:float = 0.05,
+    min_samples_per_class:float = 0,
     pred_method:str = 'predict',
     verbose:bool = True,
     **autosklearn_kwargs
@@ -256,9 +280,9 @@ class LandMapper():
     if isinstance(points, Path):
       suffix = points.suffix
       if suffix == '.csv':
-        return gpd.read_csv(points)
+        return pd.read_csv(points)
       elif suffix == '.gz':
-        return gpd.read_csv(points, compression='gzip')
+        return pd.read_csv(points, compression='gzip')
       else:
         return gpd.read_file(points)
     elif isinstance(points, DataFrame):
@@ -536,12 +560,12 @@ class LandMapper():
     return np.stack(sorted_input_data, axis=2), sorted_raster_files
 
   def _read_layers(self, dirs_layers:List = [], fn_layers:List = [], spatial_win = None,
-    allow_aditional_layers = False, inmem_calc_func = None, dict_layers_newnames={}):
-
-    n_jobs = 5
+    dtype = 'Float32', allow_additional_layers = False, inmem_calc_func = None, dict_layers_newnames={},
+    n_jobs_io = 5):
 
     raster_data, raster_files = read_rasters(raster_dirs=dirs_layers, raster_files=fn_layers, \
-                                      spatial_win=spatial_win, n_jobs=n_jobs, verbose=self.verbose)
+                                      spatial_win=spatial_win, dtype=dtype, n_jobs=n_jobs_io, \
+                                      verbose=self.verbose,)
 
     feature_cols_set = set(self.feature_cols)
     layernames = []
@@ -556,7 +580,7 @@ class LandMapper():
         if layername_aux != layername:
           self._verbose(f'Renaming {layername_aux} to {layername}')
 
-      if not allow_aditional_layers and layername not in feature_cols_set:
+      if not allow_additional_layers and layername not in feature_cols_set:
         raise Exception(f"Layer {layername} does not exist as feature_cols.\nUse dict_layers_newnames param to match their names")
 
       layernames.append(layername)
@@ -650,7 +674,7 @@ class LandMapper():
 
   def train(self):
     """
-    TODO
+    Train the ML/EML model according to the class arguments. 
     """
 
     # Hyperparameter optization for all estimators
@@ -743,15 +767,16 @@ class LandMapper():
       return meta_estimator_pred.astype('float32'), std_meta_features.astype('float32')
 
   def predict_points(self, 
-    input_points
+    input_points:DataFrame
   ):
     """
-    TODO
+    Predict point samples. It uses the ``feature_cols`` to retrieve the
+    input feature/covariates.
 
-    :param input_points: TODO
+    :param input_points: New set of point samples to be predicted. 
 
-    :returns: TODO
-    :rtype: TODO
+    :returns: The prediction result and the prediction uncertainty (only for EML) 
+    :rtype: Tuple[Numpy.array, Numpy.array]
     """
 
     input_data = np.ascontiguousarray(input_points[self.feature_cols].to_numpy(), dtype=np.float32)
@@ -765,39 +790,51 @@ class LandMapper():
     dirs_layers:List = [], 
     fn_layers:List = [], 
     fn_output:str = None,
-    spatial_win = None, 
+    spatial_win:Window = None, 
     dtype = 'float32', 
-    fill_nodata = False, 
-    separate_probs = True,
-    hard_class = True, 
-    inmem_calc_func = None, 
-    dict_layers_newnames = {},
-    allow_aditional_layers=False
+    fill_nodata:bool = False, 
+    separate_probs:bool = True,
+    hard_class:bool = True, 
+    inmem_calc_func:Callable = None, 
+    dict_layers_newnames:set = {},
+    allow_additional_layers:bool = False,
+    n_jobs_io:int = 4
   ):
 
     """
-    TODO
+    Predict raster data. It matches the raster filenames with the input feature/covariates 
+    used by training.
 
-    :param dirs_layers: TODO
-    :param fn_layers: TODO
-    :param fn_output: TODO
-    :param spatial_win: TODO
-    :param dtype: TODO
-    :param fill_nodata: TODO
-    :param separate_probs: TODO
-    :param hard_class: TODO
-    :param inmem_calc_func: TODO
-    :param dict_layers_newnames: TODO
-    :param allow_aditional_layers: TODO
+    :param dirs_layers: A list of folders where the raster files are located.
+    :param fn_layers: A list with the raster paths. Provide it and the ``dirs_layers`` is ignored. 
+    :param fn_output: File path where the prediction result is saved. For multiple outputs (probabilities, 
+      uncertainty) the same location is used, adding specific suffixes in the provided file path.
+    :param spatial_win: Read the data and predict according to the spatial window. By default is ``None``,
+      which means all the data is read and predict.
+    :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
+      converted to ``np.nan``.
+    :param fill_nodata: Use the ``nodata_imputer`` to fill all ``np.nan`` values. By default is ``False``
+      because for almost all the cases it's preferable use the ``eumap.gapfiller module`` to perform this task. 
+    :param separate_probs: Use ``True`` to save the predict probabilities in a separate raster, otherwise it's
+      write as multiple bands of a single raster file. For ``pred_method='predict'`` it's ignored. 
+    :param hard_class: When ``pred_method='predict_proba'`` use ``True`` to save the predict dominant 
+      class ``(*_hcl.tif)``, the probability ``(*_hcl_prob.tif)`` and uncertainty ``(*_hcl_uncertainty.tif)`` 
+      values of each dominant class.  
+    :param inmem_calc_func: Function to be executed before the prediction. Use it to derive covariates/features 
+      on-the-fly, calculating in memory, for example, a NDVI from the red and NIR bands.
+    :param dict_layers_newnames: A dictionary used to change the raster filenames on-the-fly. Use it to match
+      the column names for the point samples with different raster filenames.
+    :param allow_additional_layers: Use ``False`` to throw a ``Exception`` if a read raster is not present
+      in ``feature_cols``.
+    :param n_jobs_io: Number of parallel jobs to read the raster files.
 
-    :returns: TODO
-    :rtype: TODO
+    :returns: List with all the raster files produced as output.
+    :rtype: List[Path]
     """
-    n_jobs = 4
 
     input_data, fn_layers = self._read_layers(dirs_layers, fn_layers, spatial_win, \
-      inmem_calc_func=inmem_calc_func, dict_layers_newnames=dict_layers_newnames,
-      allow_aditional_layers=allow_aditional_layers)
+      dtype=dtype, inmem_calc_func=inmem_calc_func, dict_layers_newnames=dict_layers_newnames, \
+      allow_additional_layers=allow_additional_layers, n_jobs_io=n_jobs_io)
 
     x_size, y_size, n_features = input_data.shape
 
@@ -823,37 +860,50 @@ class LandMapper():
     return fn_out_files
 
   def predict_multi(self, 
-    dirs_layers_list:List = [], 
-    fn_layers_list:List = [], 
-    fn_output_list:List = [], 
-    spatial_win = None,
-    dtype = 'float32', 
-    fill_nodata = False, 
-    separate_probs = True, 
-    hard_class = True,
-    inmem_calc_func = None, 
-    dict_layers_newnames_list:list = [], 
-    allow_aditional_layers=False,
+    dirs_layers_list:List[List] = [], 
+    fn_layers_list:List[List] = [], 
+    fn_output_list:List[List] = [], 
+    spatial_win:Window = None,
+    dtype:str = 'float32', 
+    fill_nodata:bool = False, 
+    separate_probs:bool = True, 
+    hard_class:bool = True,
+    inmem_calc_func:Callable = None, 
+    dict_layers_newnames_list:List[set] = [], 
+    allow_additional_layers=False,
     prediction_strategy_type = PredictionStrategyType.Lazy
   ):
     """
-    TODO
+    Predict multiple raster data. It matches the raster filenames with the input feature/covariates 
+    used by training.
 
-    :param dirs_layers_list: TODO
-    :param fn_layers_list: TODO
-    :param fn_output_list: TODO
-    :param spatial_win: TODO
-    :param dtype: TODO
-    :param fill_nodata: TODO
-    :param separate_probs: TODO
-    :param hard_class: TODO
-    :param inmem_calc_func: TODO
-    :param dict_layers_newnames_list: TODO
-    :param allow_aditional_layer: TODO
-    :param prediction_strategy_type: TODO
+    :param dirs_layers_list: A list of list containing the folders where the raster files are located.
+    :param fn_layers_list: A list of list containing the raster paths. Provide it and the 
+      ``dirs_layers_list`` is ignored. 
+    :param fn_output_list: A list of file path where the prediction result is saved. For multiple outputs (probabilities, 
+      uncertainty) the same location is used, adding specific suffixes in the provided file path.
+    :param spatial_win: Read the data and predict according to the spatial window. By default is ``None``,
+      which means all the data is read and predict.
+    :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
+      converted to ``np.nan``.
+    :param fill_nodata: Use the ``nodata_imputer`` to fill all ``np.nan`` values. By default is ``False``
+      because for almost all the cases it's preferable use the ``eumap.gapfiller module`` to perform this task. 
+    :param separate_probs: Use ``True`` to save the predict probabilities in a separate raster, otherwise it's
+      write as multiple bands of a single raster file. For ``pred_method='predict'`` it's ignored. 
+    :param hard_class: When ``pred_method='predict_proba'`` use ``True`` to save the predict dominant 
+      class ``(*_hcl.tif)``, the probability ``(*_hcl_prob.tif)`` and uncertainty ``(*_hcl_uncertainty.tif)`` 
+      values of each dominant class.  
+    :param inmem_calc_func: Function to be executed before the prediction. Use it to derive covariates/features 
+      on-the-fly, calculating in memory, for example, a NDVI from the red and NIR bands.
+    :param dict_layers_newnames: A list of dictionaries used to change the raster filenames on-the-fly. Use it to match
+      the column names for the point samples with different raster filenames.
+    :param allow_additional_layers: Use ``False`` to throw a ``Exception`` if a read raster is not present
+      in ``feature_cols``.
+    :param prediction_strategy_type: Which strategy is used to predict the multiple raster data. By default is ``Lazỳ``, 
+      loading one year while predict the other.
 
-    :returns: TODO
-    :rtype: TODO
+    :returns: List with all the raster files produced as output.
+    :rtype: List[Path]
     """
 
     PredictionStrategyClass = _LazyLoadPrediction
@@ -862,7 +912,7 @@ class LandMapper():
 
     prediction_strategy = PredictionStrategyClass(self, dirs_layers_list, fn_layers_list, fn_output_list,
         spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
-        dict_layers_newnames_list, allow_aditional_layers)
+        dict_layers_newnames_list, allow_additional_layers)
 
     return prediction_strategy.run()
 
@@ -871,12 +921,12 @@ class LandMapper():
     fn_joblib
   ):
     """
-    TODO
+    Load a class instance from disk.
 
-    :param fn_joblib: TODO
+    :param fn_joblib: Location of the saved instance.
 
-    :returns: TODO
-    :rtype: TODO
+    :returns: Class instance
+    :rtype: LandMapper
     """
 
     if not isinstance(fn_joblib, Path):
@@ -893,16 +943,18 @@ class LandMapper():
     return landmapper
 
   def save_instance(self, 
-    fn_joblib, 
-    no_train_data = False, 
-    compress='lz4'
+    fn_joblib:Path, 
+    no_train_data:bool = False, 
+    compress:str = 'lz4'
   ):
     """
-    TODO
+    Persist the class instance in disk using ``joblib.dump``. Use it to perform prediction
+    over new raster/point data without retrain the models from scratch.
 
-    :param fn_joblib: TODO
-    :param no_train_data: TODO
-    :param compress: TODO
+    :param fn_joblib: Location of the output file.
+    :param no_train_data: Remove all the training data before persist it 
+      in disk.
+    :param compress: Enable compression.
 
     """
 
@@ -945,7 +997,7 @@ class _PredictionStrategy(ABC):
                hard_class = True,
                inmem_calc_func = None,
                dict_layers_newnames_list:list = [],
-               allow_aditional_layers=False):
+               allow_additional_layers=False):
 
     self.landmapper = landmapper
 
@@ -959,7 +1011,7 @@ class _PredictionStrategy(ABC):
     self.hard_class = hard_class
     self.inmem_calc_func = inmem_calc_func
     self.dict_layers_newnames_list = dict_layers_newnames_list
-    self.allow_aditional_layers = allow_aditional_layers
+    self.allow_additional_layers = allow_additional_layers
 
     super().__init__()
 
@@ -988,11 +1040,11 @@ class _EagerLoadPrediction(_PredictionStrategy):
                hard_class = True,
                inmem_calc_func = None,
                dict_layers_newnames_list:list = [],
-               allow_aditional_layers=False):
+               allow_additional_layers=False):
 
     super().__init__(landmapper, dirs_layers_list, fn_layers_list, fn_output_list,
       spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
-      dict_layers_newnames_list, allow_aditional_layers)
+      dict_layers_newnames_list, allow_additional_layers)
 
     self.reading_futures = []
     self.writing_futures = []
@@ -1012,7 +1064,7 @@ class _EagerLoadPrediction(_PredictionStrategy):
     input_data, _ = self.landmapper._read_layers(fn_layers=fn_layers,
       spatial_win=self.spatial_win, inmem_calc_func = self.inmem_calc_func,
       dict_layers_newnames = dict_layers_newnames,
-      allow_aditional_layers=self.allow_aditional_layers)
+      allow_additional_layers=self.allow_additional_layers)
 
     self.landmapper._verbose(f'{i+1}) Reading time: {(time.time() - start):.2f} segs')
 
@@ -1103,14 +1155,14 @@ class _LazyLoadPrediction(_PredictionStrategy):
                hard_class = True,
                inmem_calc_func = None,
                dict_layers_newnames_list:list = [],
-               allow_aditional_layers=False,
+               allow_additional_layers=False,
                reading_pool_size = 1,
                processing_pool_size = 1,
                writing_pool_size = 1):
 
     super().__init__(landmapper, dirs_layers_list, fn_layers_list, fn_output_list,
       spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
-      dict_layers_newnames_list, allow_aditional_layers)
+      dict_layers_newnames_list, allow_additional_layers)
 
     self.data_pool = {}
     self.result_pool = {}
@@ -1135,7 +1187,7 @@ class _LazyLoadPrediction(_PredictionStrategy):
     input_data, _ = self.landmapper._read_layers(fn_layers=fn_layers,
       spatial_win=self.spatial_win, inmem_calc_func = self.inmem_calc_func,
       dict_layers_newnames = dict_layers_newnames,
-      allow_aditional_layers=self.allow_aditional_layers)
+      allow_additional_layers=self.allow_additional_layers)
 
     self.landmapper._verbose(f'{i+1}) Reading time: {(time.time() - start):.2f} segs')
 
