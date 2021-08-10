@@ -1,3 +1,5 @@
+from typing import List, Union
+
 import requests
 import numpy as np
 import bottleneck as bc
@@ -10,8 +12,28 @@ from .. import parallel
 from ..raster import read_auth_rasters, save_rasters
 from ..misc import nan_percentile, ttprint
 
-class LandsatARD():
-  
+class GLADLandsat():
+  """
+    
+    Automation to download and process Landsat ARD images provided GLAD [1,2]. 
+
+    :param username: Username to access the files [3].
+    :param password: Password to access the files [3].
+    :param parallel_download: Number of files to download in parallel.
+    :param filter_additional_qa: Use ``True`` to remove pixels flagged as additional 
+      cloud (``11 to 17`` - table 3 in [2]).
+    :param verbose: Use ``True`` to print the progress of all steps.
+
+    References
+    ==========
+
+    [1] `User Manual - GLAD Landsat ARD <https://glad.geog.umd.edu/ard/user-manual>`_
+
+    [2] `Remote Sensing paper (Potapov, et al, 2020) <https://doi.org/10.3390/rs12030426>`_
+
+    [3] `User Registration - GLAD Landsat ARD <https://glad.geog.umd.edu/ard/user-registration>`_
+
+  """
   def __init__(self,
     username:str,
     password:str,
@@ -56,8 +78,57 @@ class LandsatARD():
     if self.verbose:
       ttprint(*args, **kwargs)
 
-  def read(self, tile, start, end, clear_sky = True, min_clear_sky = 0.2):
+  def read(self, 
+    tile:str, 
+    start:str, 
+    end:str, 
+    clear_sky:bool = True, 
+    min_clear_sky:float = 0.2
+  ):
+    """
     
+    Download and read multiple dates for a specific tile. The images are
+    read on-the-fly without save the download files in disk.
+
+    :param tile: GLAD tile id to be processed according to [1].
+    :param start: Start date format (``{YEAR}-{INTERVAL_ID}`` - ``2000-1``). 
+      The ``INTERVAL_ID`` ranges from 1 to 23 according to [2].
+    :param end: End date format (``{YEAR}-{INTERVAL_ID}`` - ``2000-1``).
+      The ``INTERVAL_ID`` ranges from 1 to 23 according to [2].
+    :param clear_sky: Use ``True`` to keep only the clear sky pixels, which are
+      ``1, 2, 5 and 6`` according to quality flag band (Table 3 in [3]). For
+      ``filter_additional_qa=False`` the pixels ``11 to 17`` are also considered
+      clear sky.
+    :param min_clear_sky: Minimum percentage of clear sky pixels in the tile to
+      keep a specific data, otherwise remove it from the result.
+
+    :returns: The read data, the accessed URLs and the Path for a empty base raster.
+    :rtype: Tuple[Numpy.array, List[str], Path]
+    
+    Examples
+    ========
+
+    >>> from eumap.datasets.eo import GLADLandsat
+    >>> 
+    >>> # Do the registration in
+    >>> # https://glad.umd.edu/ard/user-registration
+    >>> username = '<YOUR_USERNAME>'
+    >>> password = '<YOUR_PASSWORD>'
+    >>> glad_landsat = GLADLandsat(username, password, verbose=True)
+    >>> data, urls, base_raster = glad_landsat.read('092W_47N', '2020-6', '2020-10')
+    >>> print(f'Data shape: {data.shape}')
+
+    References
+    ==========
+
+    [1] `File glad_ard_tiles.shp (GLAD Landsat ARD Tools V1.1) <https://glad.geog.umd.edu/ard/software-download>`_
+    
+    [2] `File 16d_intervals.xlsx (GLAD Landsat ARD Tools V1.1) <https://glad.geog.umd.edu/ard/software-download>`_
+
+    [3] `Remote Sensing paper (Potapov, et al, 2020) <https://doi.org/10.3390/rs12030426>`_
+
+    """
+
     url_list = self._glad_urls(tile, start, end)
 
     data, base_raster = read_auth_rasters(
@@ -147,8 +218,67 @@ class LandsatARD():
 
     return output_files
 
-  def percentile_agg(self, tile, start, end, p, clear_sky = True, min_clear_sky = 0.2, 
-    n_jobs = 7, output_dir = None, unit8 = True):
+  def percentile_agg(self, 
+    tile:str, 
+    start:str, 
+    end:str, 
+    p:List, 
+    clear_sky:bool = True, 
+    min_clear_sky:bool = 0.2, 
+    n_jobs = 7, 
+    output_dir:Path = None, 
+    unit8:bool = True
+  ):
+    """
+    
+    Download, read and aggregate multiple dates in different percentiles.
+
+    :param tile: GLAD tile id to be processed according to [1].
+    :param start: Start date format (``{YEAR}-{INTERVAL_ID}`` - ``2000-1``). 
+      The ``INTERVAL_ID`` ranges from 1 to 23 according to [2].
+    :param end: End date format (``{YEAR}-{INTERVAL_ID}`` - ``2000-1``).
+      The ``INTERVAL_ID`` ranges from 1 to 23 according to [2].
+    :param p: A list with the percentiles values between 0 and 100.
+    :param clear_sky: Use ``True`` to keep only the clear sky pixels, which are
+      ``1, 2, 5 and 6`` according to quality flag band (Table 3 in [3]). For
+      ``filter_additional_qa=False`` the pixels ``11 to 17`` are also considered
+      clear sky.
+    :param min_clear_sky: Minimum percentage of clear sky pixels in the tile to
+      keep a specific data, otherwise remove it from the result.
+    :param n_jobs: Number of jobs to process the spectral bands in parallel. More
+      then ``7`` is meaningless and don't improve the performance.
+    :param output_dir: If provided save the result to this folder. By default is 
+      ``None`` and no files are saved to disk.
+    :param unit8: Use ``True`` to convert the read data to ``unit8``.
+
+    :returns: The read data, the Path for a empty base raster and the saved 
+      files (only if ``output_dir=True``).
+    :rtype: Tuple[Numpy.array, List[str], Path]
+
+    Examples
+    ========
+    
+    >>> from eumap.datasets.eo import GLADLandsat
+    >>> 
+    >>> # Do the registration here
+    >>> # https://glad.umd.edu/ard/user-registration
+    >>> username = '<YOUR_USERNAME>'
+    >>> password = '<YOUR_PASSWORD>'
+    >>> glad_landsat = GLADLandsat(username, password, verbose=True)
+    >>> data, base_raster, _ = glad_landsat.percentile_agg('092W_47N', '2020-6', '2020-10', 
+    >>>                         p=[25,50,75], output_dir='./glad_landsat_ard_percentiles')
+    >>> print(f'Shape of data: {data.shape}')
+
+    References
+    ==========
+    
+    [1] `File glad_ard_tiles.shp (GLAD Landsat ARD Tools V1.1) <https://glad.geog.umd.edu/ard/software-download>`_
+    
+    [2] `File 16d_intervals.xlsx (GLAD Landsat ARD Tools V1.1) <https://glad.geog.umd.edu/ard/software-download>`_
+
+    [3] `Remote Sensing paper (Potapov, et al, 2020) <https://doi.org/10.3390/rs12030426>`_
+
+    """
 
     def _run(band_data, p, i, max_val):
       if (i == 6):
