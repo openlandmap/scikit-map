@@ -45,6 +45,9 @@ def ThreadGeneratorLazy(
   :returns: A generator with the return of all workers
   :rtype: Generator
 
+  Examples
+  ========
+
   >>> from eumap.parallel import ThreadGeneratorLazy
   >>> 
   >>> def worker(i, msg):
@@ -56,6 +59,9 @@ def ThreadGeneratorLazy(
   >>> 
   >>> for result in ThreadGeneratorLazy(worker, args, fixed_args=fixed_args):
   >>>   print(result)
+
+  References
+  ==========
 
   [1] `Python ThreadPoolExecutor class <https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor>`_
 
@@ -100,6 +106,9 @@ def ProcessGeneratorLazy(
   :returns: A generator with the return of all workers
   :rtype: Generator
 
+  Examples
+  ========
+
   >>> from eumap.parallel import ProcessGeneratorLazy
   >>> 
   >>> def worker(i, msg):
@@ -111,6 +120,9 @@ def ProcessGeneratorLazy(
   >>> 
   >>> for result in ProcessGeneratorLazy(worker, args, fixed_args=fixed_args):
   >>>   print(result)
+
+  References
+  ==========
 
   [1] `Python ProcessPoolExecutor class <https://docs.python.org/3/library/concurrent.futures.html#processpoolexecutor>`_
 
@@ -153,6 +165,9 @@ def job(
   :returns: A generator with the return of all workers
   :rtype: Generator
 
+  Examples
+  ========
+
   >>> from eumap import parallel
   >>> 
   >>> def worker(i, msg):
@@ -164,6 +179,9 @@ def job(
   >>> 
   >>> for result in parallel.job(worker, args, n_jobs=-1, joblib_args={'backend': 'threading'}):
   >>>   print(result)
+
+  References
+  ==========
 
   [1] `joblib.Parallel class <https://joblib.readthedocs.io/en/latest/generated/joblib.Parallel.html#joblib.Parallel>`_
 
@@ -196,6 +214,9 @@ def apply_along_axis(
   :returns: The output array with one dimension less than the input array.
   :rtype: numpy.array
 
+  Examples
+  ========
+
   >>> from eumap import parallel
   >>> 
   >>> def fn(arr, const):
@@ -206,6 +227,9 @@ def apply_along_axis(
   >>> 
   >>> out = parallel.apply_along_axis(fn, 0, arr, const)
   >>> print(arr.shape, out.shape)
+
+  References
+  ==========
   
   [1] `Best answer from Eric O Lebigot <https://stackoverflow.com/a/45555516>`_
 
@@ -298,6 +322,9 @@ class TilingProcessing():
     :param func: A function with at least the arguments ``idx, tile, window``.
     :param args: Additional arguments to send to the function.
 
+    Examples
+    ========
+
     >>> from eumap.parallel import TilingProcessing
     >>> from eumap.raster import read_rasters
     >>> 
@@ -341,6 +368,9 @@ class TilingProcessing():
     :param progress_bar: If ``True`` the parallel processing uses ``pqdm`` [1] presenting
       a progress bar and ignoring the ``use_threads``.
 
+    Examples
+    ========
+
     >>> from eumap.parallel import TilingProcessing
     >>> from eumap.raster import read_rasters
     >>> 
@@ -359,7 +389,11 @@ class TilingProcessing():
     >>> idx_list = [0,10,100]
     >>> result = tiling.process_multiple(idx_list, run, raster_files)
     
+    References
+    ==========
+
     [1] `Parallel TQDM <https://pqdm.readthedocs.io/en/latest/readme.html>`_
+
     """
 
     _args = []
@@ -400,6 +434,9 @@ class TilingProcessing():
     :param progress_bar: If ``True`` the parallel processing uses ``pqdm`` [1] presenting
       a progress bar, ignoring the ``use_threads``.
 
+    Examples
+    ========
+
     >>> from eumap.parallel import TilingProcessing
     >>> from eumap.raster import read_rasters
     >>> 
@@ -409,6 +446,9 @@ class TilingProcessing():
     >>> tiling= TilingProcessing(verbose=True)
     >>> msg = "Let's crunch some data."
     >>> result = tiling.process_all(run)
+
+    References
+    ==========
     
     [1] `Parallel TQDM <https://pqdm.readthedocs.io/en/latest/readme.html>`_
     """

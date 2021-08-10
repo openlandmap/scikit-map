@@ -131,6 +131,9 @@ def read_rasters(
     containing the read paths.
   :rtype: Tuple[Numpy.array, List[Path]]
 
+  Examples
+  ========
+
   >>> import rasterio
   >>> from eumap.raster import read_rasters
   >>> 
@@ -149,6 +152,9 @@ def read_rasters(
   >>> 
   >>> data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
   >>> print(f'Data shape: {data.shape}')
+
+  References
+  ==========
 
   [1] `Float16 Precision <https://github.com/numpy/numpy/issues/8063>`_
 
@@ -254,9 +260,12 @@ def read_auth_rasters(
     will be a base raster path.
   :rtype: Numpy.array or Tuple[Numpy.array, Path]
 
+  Examples
+  ========
+
   >>> from eumap.raster import read_auth_rasters
   >>> 
-  >>> # Do the registration here
+  >>> # Do the registration in
   >>> # https://glad.umd.edu/ard/user-registration
   >>> username = '<YOUR_USERNAME>'
   >>> password = '<YOUR_PASSWORD>'
@@ -270,6 +279,9 @@ def read_auth_rasters(
   >>> data, base_raster = read_auth_rasters(raster_files, username, password, 
   >>>                         return_base_raster=True, verbose=True)
   >>> print(f'Data: shape={data.shape}, dtype={data.dtype} and base_raster={base_raster}')
+
+  References
+  ==========
 
   [1] `Float16 Precision <https://github.com/numpy/numpy/issues/8063>`_
   """
@@ -404,6 +416,9 @@ def save_rasters(
   :returns: A list containing the path for new rasters.
   :rtype: List[Path]
 
+  Examples
+  ========
+
   >>> import rasterio
   >>> from eumap.raster import read_rasters, save_rasters
   >>> 
@@ -494,6 +509,9 @@ def write_new_raster(
 
   :returns: The path of the new raster.
   :rtype: Path
+
+  Examples
+  ========
 
   >>> import rasterio
   >>> from eumap.raster import read_rasters, save_rasters

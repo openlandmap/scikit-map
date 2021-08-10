@@ -12,6 +12,9 @@ def ttprint(*args, **kwargs):
   """ 
   A print function that displays the date and time.
   
+  Examples
+  ========
+
   >>> from eumap.misc import ttprint
   >>> ttprint('eumap rocks!')
 
@@ -35,9 +38,15 @@ def find_files(
   :param dir_list: List with multiple directory paths.
   :param pattern: Pattern to match with the desired files.
 
+  Examples
+  ========
+
   >>> from eumap.misc import find_files
   >>> libs_so = find_files(['/lib', '/usr/lib64/'], f'*.so')
   >>> print(f'{len(libs_so)} files found')
+
+  References
+  ==========
 
   [1] `Python glob module <https://docs.python.org/3/library/glob.html>`_
 
@@ -72,6 +81,9 @@ def nan_percentile(
   :param keep_original_vals: If ``True`` it does a copy of ``arr``
     to preserve the structure and values.
 
+  Examples
+  ========
+
   >>> import numpy as np
   >>> from eumap.misc import nan_percentile
   >>> 
@@ -79,6 +91,9 @@ def nan_percentile(
   >>> data[2:5,0:10,0] = np.nan
   >>> data_perc = nan_percentile(data, q=[25, 50, 75])
   >>> print(f'Shape: data={data.shape} data_perc={data_perc.shape}')
+
+  References
+  ==========
 
   [1] `Kersten's blog <https://krstn.eu/np.nanpercentile()-there-has-to-be-a-faster-way>`_
 

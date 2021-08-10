@@ -421,6 +421,9 @@ class TMWM(ImageGapfill):
     envelope for the time series. Values outside of this envelope are removed.
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
+  
+  Examples
+  ========
 
   >>> from eumap import gapfiller
   >>> 
@@ -429,6 +432,9 @@ class TMWM(ImageGapfill):
   >>> data_tmwm = tmwm.run()
   >>> 
   >>> fn_rasters_tmwm = tmwm.save_rasters('./gapfilled_tmwm')
+
+  References
+  ==========
 
   [1] `Bootleneck nanmedian <https://kwgoodman.github.io/bottleneck-doc/reference.html#bottleneck.nanmedian>`_
 
@@ -641,12 +647,18 @@ class TLI(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
+  Examples
+  ========
+
   >>> from eumap import gapfiller
   >>> 
   >>> tli = gapfiller.TLI(fn_files=fn_rasters)
   >>> data_tli = tli.run()
   >>> 
   >>> fn_rasters_tli = tli.save_rasters('./gapfilled_tli')
+
+  References
+  ==========
 
   [1] `Scikit-learn linear regression <https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html>`_
 
@@ -727,6 +739,9 @@ class SSA(ImageGapfill):
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
 
+  Examples
+  ========
+
   >>> from eumap import gapfiller
   >>> 
   >>> # For a 4-season time series
@@ -734,6 +749,9 @@ class SSA(ImageGapfill):
   >>> data_ssa = ssa.run()
   >>> 
   >>> fn_rasters_ssa = ssa.save_rasters('./gapfilled_ssa', dtype='uint8', save_flag=False)
+
+  References
+  ==========
 
   [1] `Pyts SingularSpectrumAnalysis <https://pyts.readthedocs.io/en/stable/generated/pyts.decomposition.SingularSpectrumAnalysis.html>`_
   """
@@ -853,7 +871,10 @@ class InPainting(ImageGapfill):
     envelope for the time series. Values outside of this envelope are removed.
   :param n_jobs_io: Number of parallel jobs to read/write raster files.
   :param verbose: Use ``True`` to print the progress of the gapfilled.
-  
+
+  Examples
+  ========
+
   >>> from eumap import gapfiller
   >>> 
   >>> # Considerer land_mask as 2D numpy array where 1 indicates land
@@ -861,6 +882,9 @@ class InPainting(ImageGapfill):
   >>> data_inp = inPainting.run()
   >>> 
   >>> fn_rasters_inp = inPainting.save_rasters('./gapfilled_inp')
+
+  References
+  ==========
 
   [1] `OpenCV Tutorial - Image Inpainting <https://docs.opencv.org/4.5.2/df/d3d/tutorial_py_inpainting.html>`_
   
@@ -956,6 +980,9 @@ def time_first_space_later(
   :param space_args: A ``set`` of parameters for the spatial gapfilling strategy.
   :param space_flag_val: The flag value used to indicate which pixels were gapfilled
     by the spatial gapfilling strategy.
+
+  Examples
+  ========
 
   >>> from eumap import gapfiller
   >>> 

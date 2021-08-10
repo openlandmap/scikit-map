@@ -1,65 +1,41 @@
 '''
 Overlay and spatial prediction fully compatible with ``scikit-learn``.
 '''
-from abc import ABC, abstractmethod
-
-from .misc import ttprint, find_files
-from .raster import read_rasters, write_new_raster
-
 from typing import List, Union, Callable
-import joblib
-
-import multiprocessing
-import geopandas as gpd
-import numpy as np
-from osgeo import gdal
-from osgeo import osr
-import os
-import math
-import rasterio
-import re
-import time
-from rasterio.windows import Window
-
+from abc import ABC, abstractmethod
 from enum import Enum
-from pathlib import Path
 
-from geopandas import GeoDataFrame
-from pandas import DataFrame
-
-from . import parallel
-
-import gc
 from concurrent.futures import as_completed, ThreadPoolExecutor
-
+import concurrent.futures
+import traceback
+import joblib
+import math
+import time
 import uuid
+import gc
+import re
 
-from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import GridSearchCV
-from sklearn.base import BaseEstimator
+from sklearn.model_selection import cross_val_predict, GridSearchCV, KFold, BaseCrossValidator
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.impute import SimpleImputer
+from sklearn.base import BaseEstimator
+from sklearn.pipeline import Pipeline
 from sklearn import preprocessing
 from sklearn import metrics
-from sklearn.model_selection import KFold,BaseCrossValidator
-from sklearn.model_selection import cross_val_predict
 
-import rasterio
-import rasterio.windows
+from rasterio.windows import Window
+from pandas import DataFrame
 from pathlib import Path
-import numpy as np
-import os
-import pandas as pd
+
 import geopandas as gpd
-import concurrent.futures
-import multiprocessing
-import traceback
-import re
-import math
+import pandas as pd
+import numpy as np
+import rasterio
 
 from . import parallel
 from .misc import ttprint, find_files
+from .raster import read_rasters, write_new_raster
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -76,8 +52,6 @@ DEFAULT = {
   'ESTIMATOR': RandomForestClassifier(),
   'CV': KFold(5)
 }
-
-#imputer:BaseEstimator = SimpleImputer(missing_values=np.nan, strategy='mean')
 
 def build_ann(
   input_shape, 
@@ -107,14 +81,18 @@ def build_ann(
   :param output_activation: Activation function for the output layer.
   :param loss: Loss function used for the Optimizer.
 
+  :returns: The ANN model 
+  :rtype: Sequential
+
+  Examples
+  ========
+
   >>> from eumap.mapper import build_ann
   >>> from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
   >>> 
   >>> ann = KerasClassifier(build_ann, input_shape=(-1, 180), output_shape=33, 
   >>>                       epochs=3, batch_size=64, shuffle=True, verbose=1)
 
-  :returns: The ANN model 
-  :rtype: Sequential
   """
 
   from tensorflow.keras.layers import Dense, BatchNormalization, Dropout
@@ -200,7 +178,10 @@ class LandMapper():
     :param \*\*autosklearn_kwargs: Named arguments supported by ``auto-sklearn`` [2].
     
     For **usage examples** access the ``eumap`` tutorials [5,6].
-    
+ 
+    References
+    ==========
+
     [1] `Sklearn API Reference <https://scikit-learn.org/stable/modules/classes.html>`_
 
     [2] `Auto-sklearn API <https://automl.github.io/auto-sklearn/master/api.html>`_
@@ -1273,7 +1254,7 @@ class _ParallelOverlay:
       points_x: np.ndarray, 
       points_y:np.ndarray, 
       fn_layers:List[str], 
-      max_workers:int = multiprocessing.cpu_count(), 
+      max_workers:int = parallel.CPU_COUNT, 
       verbose:bool = True
     ):
         
@@ -1505,6 +1486,9 @@ class SpaceOverlay():
     are used.
   :param verbose: Use ``True`` to print the overlay progress.
 
+  Examples
+  ========
+
   >>> from eumap.mapper import SpaceOverlay
   >>> 
   >>> spc_overlay = SpaceOverlay('./my_points.gpkg', ['./raster_dir_1', './raster_dir_2'])
@@ -1574,6 +1558,9 @@ class SpaceTimeOverlay():
   :param max_workers: Number of CPU cores to be used in parallel. By default all cores
     are used.
   :param verbose: Use ``True`` to print the overlay progress.
+
+  Examples
+  ========
 
   >>> from eumap.mapper import SpaceTimeOverlay
   >>> 

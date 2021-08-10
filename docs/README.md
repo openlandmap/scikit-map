@@ -20,7 +20,7 @@ You can clone this repo and build and view the API and tutorial documentation lo
 
 2. Assuming a Python 3.x environment, install dependencies:
 
-   `pip install -r requirements.txt`
+   `pip --use-feature=2020-resolver install -r requirements.txt`
 
 3. Build the documentation:
 
