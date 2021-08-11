@@ -69,6 +69,27 @@ _DOWNLOAD_DIR = os.getcwd()
 _PROGRESS_INTERVAL = .2 # seconds
 
 def get_datasets(keywords: Union[str, List[str]]='') -> list:
+    """
+    Get dataset filenames by keyword(s).
+
+    :param keywords: One or more keywords to find datasets by. All recognized keywords are stored in ``eumap.datasets.pilot.KEYWORDS``
+
+    :returns: List of datasets
+    :rtype: List[str]
+
+    Examples
+    ========
+
+    >>> from eumap.datasets import pilot
+    >>>
+    >>> print('all datasets:\n', pilot.DATASETS)
+    >>> print('all keywords:\n', pilot.KEYWORDS)
+    >>>
+    >>> datasets = pilot.get_datasets('landcover')
+    >>> print('found datasets:\n', datasets)
+
+    """
+
     if isinstance(keywords, str):
         keywords = [keywords]
     return [*filter(
@@ -139,6 +160,23 @@ class _DownloadWorker:
         self.thread.start()
 
 def get_data(datasets: Union[str, list], download_dir: str=_DOWNLOAD_DIR):
+    """
+    Download dataset(s).
+
+    Files will be stored in an ``eumap_data`` subdirectory within the current working directory. Archives are automatically unpacked.
+
+    :param datasets: One or more datasets to download. If datasets is ``'all'``, all files will be downloaded.
+
+    Examples
+    ========
+
+    >>> from eumap.datasets import pilot
+    >>>
+    >>> datasets = pilot.get_datasets('landcover')
+    >>> pilot.get_data(datasets)
+
+    """
+
     if datasets == 'all':
         datasets = DATASETS
     if isinstance(datasets, str):
