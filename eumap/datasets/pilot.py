@@ -65,7 +65,6 @@ TILES = sorted(set(reduce(add, map(
 ))))
 
 _CHUNK_LENGTH = 2**13
-_DOWNLOAD_DIR = os.getcwd()
 _PROGRESS_INTERVAL = .2 # seconds
 
 def get_datasets(keywords: Union[str, List[str]]='') -> list:
@@ -106,14 +105,15 @@ def _make_download_request(dataset:str) -> requests.Response:
 
 class _DownloadWorker:
 
-    def __init__(self, dataset:str, download_dir: str=_DOWNLOAD_DIR):
+    def __init__(self, dataset:str, download_dir: str=''):
         self.done = False
         self.dataset = dataset
-        self.download_dir = download_dir
+        self.download_dir = download_dir or os.getcwd()
         self.progress = 0
         self.downloaded = 0
         self.size = None
         __, self.tmpfile = tempfile.mkstemp()
+        self.interrupt = False
 
     def _unpack(self):
         datapath = os.path.join(self.download_dir, DATA_ROOT_NAME)
@@ -143,23 +143,29 @@ class _DownloadWorker:
             )
 
     def _download(self):
-        with _make_download_request(self.dataset) as resp:
-            resp.raise_for_status()
-            self.size = int(resp.headers.get('content-length'))
-            with open(self.tmpfile, 'wb') as dst:
-                for chunk in resp.iter_content(_CHUNK_LENGTH):
-                    dst.write(chunk)
-                    dst.flush()
-                    self.downloaded += _CHUNK_LENGTH
-                    self.progress = (100 * self.downloaded) // self.size
-        self._unpack()
+        try:
+            with _make_download_request(self.dataset) as resp:
+                resp.raise_for_status()
+                self.size = int(resp.headers.get('content-length'))
+                with open(self.tmpfile, 'wb') as dst:
+                    for chunk in resp.iter_content(_CHUNK_LENGTH):
+                        if self.interrupt:
+                            raise Exception(f'{self.dataset} interrupted.')
+                        dst.write(chunk)
+                        dst.flush()
+                        self.downloaded += _CHUNK_LENGTH
+                        self.progress = (100 * self.downloaded) // self.size
+            self._unpack()
+        except Exception as e:
+            os.remove(self.tmpfile)
+            raise e
         self.done = True
 
     def start(self):
         self.thread = threading.Thread(target=self._download)
         self.thread.start()
 
-def get_data(datasets: Union[str, list], download_dir: str=_DOWNLOAD_DIR):
+def get_data(datasets: Union[str, list], download_dir: str=''):
     """
     Download dataset(s).
 
@@ -188,6 +194,7 @@ def get_data(datasets: Union[str, list], download_dir: str=_DOWNLOAD_DIR):
                 print('\t • '+ds_name)
             return
 
+    download_dir = download_dir or os.getcwd()
     workers = [
         _DownloadWorker(ds, download_dir)
         for ds in datasets
@@ -197,25 +204,30 @@ def get_data(datasets: Union[str, list], download_dir: str=_DOWNLOAD_DIR):
         w.start()
 
     while True:
-        time.sleep(_PROGRESS_INTERVAL)
-        done = sum((w.done for w in workers)) == n_workers
-        sizes = [w.size for w in workers]
-        if None in sizes:
-            print('Starting downloads...', end='\r')
-            continue
-        total_size = sum(sizes)
-        total_download = sum((w.downloaded for w in workers))
-        total_progress = (100 * total_download) // total_size
-        if total_progress < 100:
-            print(
-                f'{total_progress}% of {n_workers} downloads / ' \
-                f'{round(total_download/2**20, 2)} of {round(total_size/2**20, 2)} MB',
-                end='\r',
-            )
-        else:
-            print(f'{round(total_size/2**20, 2)} MB downloaded, unpacking...' + ' '*20, end='\r')
-        if done:
-            print('\nDownload complete.')
+        try:
+            time.sleep(_PROGRESS_INTERVAL)
+            done = sum((w.done for w in workers)) == n_workers
+            sizes = [w.size for w in workers]
+            if None in sizes:
+                print('Starting downloads...', end='\r')
+                continue
+            total_size = sum(sizes)
+            total_download = sum((w.downloaded for w in workers))
+            total_progress = (100 * total_download) // total_size
+            if total_progress < 100:
+                print(
+                    f'{total_progress}% of {n_workers} downloads / ' \
+                    f'{round(total_download/2**20, 2)} of {round(total_size/2**20, 2)} MB',
+                    end='\r',
+                )
+            else:
+                print(f'{round(total_size/2**20, 2)} MB downloaded, unpacking...' + ' '*20, end='\r')
+            if done:
+                print('\nDownload complete.')
+                break
+        except KeyboardInterrupt as e:
+            for w in workers:
+                w.interrupt = True
             break
 
 if __name__ == '__main__':
