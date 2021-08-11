@@ -81,11 +81,11 @@ def get_datasets(keywords: Union[str, List[str]]='') -> list:
 
     >>> from eumap.datasets import pilot
     >>>
-    >>> print('all datasets:\n', pilot.DATASETS)
-    >>> print('all keywords:\n', pilot.KEYWORDS)
+    >>> print('all datasets:\\n', pilot.DATASETS)
+    >>> print('all keywords:\\n', pilot.KEYWORDS)
     >>>
     >>> datasets = pilot.get_datasets('landcover')
-    >>> print('found datasets:\n', datasets)
+    >>> print('found datasets:\\n', datasets)
 
     """
 
