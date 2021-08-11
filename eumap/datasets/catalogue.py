@@ -105,6 +105,8 @@ class Catalogue:
         else:
             self._init_fallback()
 
+        self._themes = None
+
     def _init_csw(self):
         from owslib.csw import CatalogueServiceWeb
 
@@ -114,7 +116,7 @@ class Catalogue:
         import pandas as pd
         from io import BytesIO
         from base64 import b64decode
-        from .fallback import CATALOGUE_CSV
+        from ._fallback import CATALOGUE_CSV
 
         self.layers = pd.read_csv(
             BytesIO(b64decode(CATALOGUE_CSV)),
@@ -127,6 +129,7 @@ class Catalogue:
         years: Iterable[int]=[],
         exclude: Iterable[str]=[],
         split_keywords: bool=True,
+        key: str='title',
     ):
         _args = args
         if split_keywords:
@@ -142,13 +145,14 @@ class Catalogue:
 
         results = map(_DotDict, _search(
             *_args,
+            key=key,
         ))
 
         exclude = [*exclude]
         if len(exclude) > 0:
             results = [
                 res for res in results
-                if not _match(*exclude, strategy=any)(res.title)
+                if not _match(*exclude, strategy=any)(res[key])
             ]
 
         years = sorted(years)
@@ -173,6 +177,7 @@ class Catalogue:
 
     def _search_csw(self,
         *args: Iterable[str],
+        key: str='title',
         full: bool=True,
     ):
         from owslib.fes import PropertyIsEqualTo, And
@@ -189,7 +194,7 @@ class Catalogue:
 
         query = [PropertyIsEqualTo('csw:Subject', 'Geoharmonizer')]
         for arg in args:
-            query.append(PropertyIsEqualTo('csw:Title', arg))
+            query.append(PropertyIsEqualTo(f'csw:{key}', arg))
 
         step = 10
         start_pos = 1
@@ -231,10 +236,21 @@ class Catalogue:
 
         return layers
 
+    @property
+    def themes(self):
+        if self._themes is None:
+            results = self.search('')
+            self._themes = [*set((
+                m.theme
+                for m in results.meta
+            ))]
+        return self._themes
+
     def _search_fallback(self,
         *args: Iterable[str],
+        key: str='title',
     ):
-        matches = self.layers['title'].apply(_match(*args))
+        matches = self.layers[key].apply(_match(*args))
         results = self.layers[matches]
 
         return [res for __, res in results.iterrows()]
