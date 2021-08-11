@@ -13,7 +13,7 @@ from operator import add
 from typing import Union, List
 import shutil
 
-from .defaults import DATA_ROOT_NAME
+from ._defaults import DATA_ROOT_NAME
 
 DATASETS = [
     '4582_spain_landcover_samples.gpkg',
