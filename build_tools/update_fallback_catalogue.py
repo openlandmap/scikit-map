@@ -21,7 +21,7 @@ sys.path = [
 import pandas as pd
 from eumap.datasets import Catalogue
 
-FALLBACK_FILE = REPO_ROOT/'eumap/datasets/fallback.py'
+FALLBACK_FILE = REPO_ROOT/'eumap/datasets/_fallback.py'
 
 if __name__ == '__main__':
     cat = Catalogue(use_csw=True)
