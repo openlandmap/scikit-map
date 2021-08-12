@@ -1,3 +1,7 @@
+'''
+Access to the Geoharmonizer data product catalogue.
+'''
+
 import re
 from functools import reduce
 from operator import add
@@ -89,8 +93,58 @@ class _ResourceCollection(list):
             ])
 
 class Catalogue:
+    """
+    Quick access to all Geoharmonizer data products catalogued on the project's GeoNetwork server.
+
+    Provides resources with metadata either live from GeoNetwork [1, 2] (with included access to the raw OWSLib API [3] through ``Catalogue.csw``) or from a local copy of the record included in the package (which might not always be up to date).
+
+    :param use_csw: Indicates wheather to use live GeoNetwork access via CSW (the default) or to fall back to the local copy of the record (faster but might not be up to date).
+
+    For full usage examples please refer to the catalogue tutorial notebook [4].
+
+    Examples
+    ========
+
+    >>> from eumap.datasets import Catalogue
+    >>>
+    >>> cat = Catalogue()
+    >>> results = cat.search('land-cover')
+    >>> print(results)
+
+    References
+    ==========
+
+    [1] `Geoharmonizer GeoNetwork server <https://data.opendatascience.eu>`_
+
+    [2] `GeoNetwork <https://www.geonetwork-opensource.org/>`_
+
+    [3] `OWSLib CSW API <https://geopython.github.io/OWSLib/usage.html#csw>`_
+
+    [4] `Catalogue tutorial <../notebooks/07_catalogue.html>`_
+
+    """
+
     GEONETWORK_URL = 'https://data.opendatascience.eu/geonetwork/srv/eng/csw?service=csw&version=2.0.2'
+    """
+    Geoharmonizer GeoNetwork CSW API endpoint.
+
+    """
+
     KEYWORD_SEPARATORS = ' _-,;\t\n'
+    """
+    Default separators used to tokenize keywords.
+
+    The ``Catalogue.search`` method splits both e.g. ``'land-cover'`` and ``'land cover'`` into ``['land', 'cover']`` and maches the tokens individually (if ``split_keywords=True``).
+
+    """
+
+    csw = None
+    """
+    Access to the raw `OWSLib CSW API <https://geopython.github.io/OWSLib/usage.html#csw>`_.
+
+    If ``Catalogue`` is initialized with ``use_csw=True`` (the default) this becomes an ``owslib.csw.CatalogueServiceWeb`` instance, and is otherwise ``None``.
+
+    """
 
     def __init__(self,
         use_csw: bool=True,
@@ -131,6 +185,24 @@ class Catalogue:
         split_keywords: bool=True,
         key: str='title',
     ):
+        """
+        Search the catalogue for resources by matching metadata with keywords.
+
+        Returns a list of resources with ``key`` matching ``*args``, from ``years``, and excluding those matchin keywords in ``exclude``.
+
+        For full usage examples please refer to the `catalogue tutorial notebook <../notebooks/07_catalogue.html>`_.
+
+        :param *args: Keywords to match.
+        :param years: Years to match.
+        :param exclude: Keywords to match for exclusion of resources.
+        :param split_keywords: Wheather or not to split keywords by ``Catalogue.KEYWORD_SEPARATORS`` and match tokens individually.
+        :param key: Which metadata field to match with ``*args``. Can be ``'title'``, ``'theme'``, ``'abstract'``, ``'url'`` (case insensitive).
+
+        :returns: List of resources (URL strings) with attached metadata (see `tutorial <../notebooks/07_catalogue.html>`_)
+        :rtype: _ResourceCollection
+
+        """
+
         _args = args
         if split_keywords:
             _args = reduce(add, [
@@ -238,6 +310,13 @@ class Catalogue:
 
     @property
     def themes(self):
+        """
+        Provides a list of all themes in the catalogue.
+
+        Accessing for the first time might take up to several seconds if ``use_csw=True``.
+
+        """
+
         if self._themes is None:
             results = self.search('')
             self._themes = [*set((

@@ -1,5 +1,5 @@
 '''
-Access to eumap demo datasets hosted in zenodo
+Access to eumap demo datasets hosted in Zenodo.
 '''
 import requests
 import tarfile
@@ -169,9 +169,11 @@ def get_data(datasets: Union[str, list], download_dir: str=''):
     """
     Download dataset(s).
 
-    Files will be stored in an ``eumap_data`` subdirectory within the current working directory. Archives are automatically unpacked.
+    Files will be stored in an ``eumap_data`` subdirectory under the destination download directory. Archives are automatically unpacked.
+    While the files are ultimately stored in the specified directory, the downloader uses the OS default temporary file path for partial downloads before copying (and unpacking if applicable) the complete downloads to the destination. Thus it is required to have sufficient free storage on both the destination drive and the default temporary file drive.
 
     :param datasets: One or more datasets to download. If datasets is ``'all'``, all files will be downloaded.
+    :param download_dir: Destination path for downloads. If defined as ``''`` (the default) files will be stored in the current working directory.
 
     Examples
     ========
