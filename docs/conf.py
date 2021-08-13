@@ -14,6 +14,8 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('../'))  # Source code dir relative to this file
 
+import eumap
+
 # -- Project information -----------------------------------------------------
 
 project = 'Eumap library'
@@ -21,9 +23,9 @@ copyright = '2019-2021, Geo-harmonizer project team'
 author = 'Geo-harmonizer project team'
 
 # The short X.Y version
-version = '0.1'
+version = '.'.join(eumap.__version__.split('.')[:-1])
 # The full version, including alpha/beta/rc tags
-release = '0.1'
+release = eumap.__version__
 
 # -- General configuration ---------------------------------------------------
 
