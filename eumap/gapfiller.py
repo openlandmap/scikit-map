@@ -112,6 +112,8 @@ class ImageGapfill(ABC):
     if np.sum(np.isnan(ts_data).astype('int')) != ts_data.shape[0]:
       ts_data = ts_data.astype('float32')
       ts_size = ts_data.shape[0]
+
+      glob_med = bc.nanmedian(ts_data)
       
       ts_neib = int((self.std_win - 1) / 2)
       env = self.std_env
@@ -121,20 +123,25 @@ class ImageGapfill(ABC):
 
       for i in range(0, ts_size):
         i0 = 0 if (i - ts_neib) < 0 else (i - ts_neib)
-        i1 = ts_size if (i + ts_neib) < ts_size else (i + ts_neib)
+        i1 = ts_size if (i + ts_neib) + 1 > ts_size else (i + ts_neib) + 1
         
-        win_data = ts_data[i0:i1]
+        # Expand the window in the boundaries years
+        if i1 == ts_size:
+          i0 -= self.std_win - (i1 - i0)
 
-        if (np.sum(np.isnan(win_data).astype('int')) >= min_len_std):
-          med = bc.nanmedian(win_data)
-          std = bc.nanstd(win_data)
+        if i0 == 0:
+          i1 += self.std_win - (i1 - i0)
 
-          lower = (med - std * env)
-          upper = (med + std * env)
+        win_data = ts_data[i0:i1].copy()
+        win_data[np.isnan(win_data)] = glob_med
 
-          outliers.append(lower > ts_data[i] or upper < ts_data[i])
-        else:
-          outliers.append(False)
+        med = bc.nanmedian(win_data)
+        std = bc.nanstd(win_data)
+
+        lower = (med - std * env)
+        upper = (med + std * env)
+
+        outliers.append(lower > ts_data[i] or upper < ts_data[i])
 
       outliers = np.array(outliers)
       ts_data[outliers] = np.nan

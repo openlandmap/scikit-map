@@ -180,6 +180,7 @@ def read_rasters(
       if band_data.size == 0 and try_without_window:
         band_data = raster_ds.read(1)
 
+      band_data = band_data.astype(dtype)
       nodata = raster_ds.nodatavals[0]
     except:
       if spatial_win is not None:
@@ -194,7 +195,7 @@ def read_rasters(
 
     if data_mask is not None:
       if (data_mask.shape == band_data.shape):
-        band_data[data_mask] = np.nan
+        band_data[~data_mask] = np.nan
       else:
         ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
     
@@ -208,7 +209,6 @@ def read_rasters(
 
     if (isinstance(band_data, np.ndarray)):
 
-      band_data = band_data.astype(dtype)
       if nodata is not None:
         band_data[band_data == nodata] = _nodata_replacement(dtype)
 
