@@ -278,7 +278,8 @@ class TilingProcessing():
   def __init__(self, 
     tiling_system_fn = 'http://s3.eu-central-1.wasabisys.com/eumap/tiling_system_30km.gpkg',
     base_raster_fn = 'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_eumap_epsg3035_v1.0.tif',
-    verbose:bool = False
+    verbose:bool = False,
+    epsg_checking:bool = True
   ):
 
     from pyproj import CRS
@@ -290,7 +291,7 @@ class TilingProcessing():
     tile_epsg = CRS(self.tiles.crs.to_wkt()).to_epsg() 
     raster_epsg = CRS(self.base_raster.crs.to_wkt()).to_epsg()
 
-    if tile_epsg != raster_epsg:
+    if epsg_checking and tile_epsg != raster_epsg:
       raise Exception(
         'Different SpatialReference' +
         f'\n tiling_system_fn:\n{self.tiles.crs.to_wkt()}'+

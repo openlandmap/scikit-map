@@ -528,18 +528,15 @@ class TMWM(ImageGapfill):
     for i in newdata_dict.keys():
 
       gaps_mask = np.isnan(self.time_data[time][:,:,layer_pos])
-      newdata = newdata_dict[i][gaps_mask]
-
-      gaps_pct = np.count_nonzero(~np.isnan(newdata))
-      newdata_pct = np.count_nonzero(gaps_mask.flatten())
+      n_gaps = np.sum(gaps_mask.astype('int'))
       
-      if newdata_pct != 0:
-        gapfilled_pct =  gaps_pct / newdata_pct
-        self.time_data[time][:,:,layer_pos][gaps_mask] = newdata
-        self.time_data_gaps[time][:,:,layer_pos][gaps_mask] = int(i) + gapflag_offset
-
-        if gapfilled_pct == 1:
-          end_msg = f'Layer {layer_pos}: reached {100*gapfilled_pct:.2f}% with {i}-year window from {verbose_suffix})'
+      if n_gaps > 0:
+        newdata = newdata_dict[i]
+        gapfill_mask = np.logical_and(~np.isnan(newdata),gaps_mask)
+        self.time_data[time][:,:,layer_pos][gapfill_mask] = newdata[gapfill_mask]
+        self.time_data_gaps[time][:,:,layer_pos][gapfill_mask] = int(i) + gapflag_offset
+      else:
+          end_msg = f'Layer {layer_pos}: gapfilled all with {i}-year window from {verbose_suffix})'
           break
 
     return end_msg
