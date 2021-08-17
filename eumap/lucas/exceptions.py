@@ -1,3 +1,7 @@
+'''
+LUCAS-related exceptions.
+'''
+
 class LucasRequestError(Exception):
     """Building request failed"""
     pass

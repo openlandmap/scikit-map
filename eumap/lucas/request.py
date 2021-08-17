@@ -1,3 +1,7 @@
+'''
+Build request for quering LUCAS dataset.
+'''
+
 from owslib.etree import etree
 from owslib.fes import Or, And, PropertyIsEqualTo, BBox, PropertyIsNull, Not
 

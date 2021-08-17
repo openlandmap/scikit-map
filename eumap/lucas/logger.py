@@ -1,3 +1,7 @@
+'''
+LUCAS-related logging.
+'''
+
 import os
 import logging
 import logging.config
