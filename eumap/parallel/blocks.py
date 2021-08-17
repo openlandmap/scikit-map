@@ -67,7 +67,7 @@ class RasterBlockFunction:
             return result
         return result, mask, window
 
-class RasterReader:
+class RasterBlockReader:
 
     def __init__(self,
         reference_file: str=None,
@@ -179,7 +179,7 @@ class RasterReader:
 class RasterAggregator:
 
     def __init__(self,
-        reader: RasterReader=None,
+        reader: RasterBlockReader=None,
     ):
         self.reader = reader
 
@@ -191,7 +191,7 @@ class RasterAggregator:
         **kwargs,
     ):
         if self.reader is None:
-            self.reader = RasterReader(src_path)
+            self.reader = RasterBlockReader(src_path)
 
         (*block_results,) = map(
             RasterBlockFunction(
@@ -209,10 +209,10 @@ class RasterAggregator:
         result = agg_func(block_results)
         return result
 
-class RasterWriter:
+class RasterBlockWriter:
 
     def __init__(self,
-        reader: RasterReader=None,
+        reader: RasterBlockReader=None,
     ):
         self.reader = reader
 
@@ -226,7 +226,7 @@ class RasterWriter:
         **kwargs,
     ):
         if self.reader is None:
-            self.reader = RasterReader(src_path)
+            self.reader = RasterBlockReader(src_path)
 
         profile = self.reader.reference.profile
 

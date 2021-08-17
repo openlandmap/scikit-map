@@ -10,7 +10,7 @@ import rasterio as rio
 import numpy as np
 from pathlib import Path
 
-def percent_clip(data, perc_min, perc_max):
+def _percent_clip(data, perc_min, perc_max):
 	return (data - np.percentile(data, perc_min))/(np.percentile(data, perc_max) - np.percentile(data, perc_min))
 
 def plot_rgb(raster, perc_min=2, perc_max=98):
@@ -18,7 +18,7 @@ def plot_rgb(raster, perc_min=2, perc_max=98):
 	bands = range(0, raster.shape[2])
 	data_equalized = []
 	for band in bands:
-		data_equalized.append(percent_clip(raster[:, :, band], perc_min, perc_max))
+		data_equalized.append(_percent_clip(raster[:, :, band], perc_min, perc_max))
 
 	data_equalized = np.stack(data_equalized, axis=2)
 	plt.imshow(data_equalized)
