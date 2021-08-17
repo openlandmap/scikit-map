@@ -54,20 +54,20 @@ DEFAULT = {
 }
 
 def build_ann(
-  input_shape, 
-  output_shape, 
-  n_layers = 3, 
+  input_shape,
+  output_shape,
+  n_layers = 3,
   n_neurons = 32,
   activation = 'relu',
-  dropout_rate = 0.0, 
+  dropout_rate = 0.0,
   learning_rate = 0.0001,
-  output_activation = 'softmax', 
+  output_activation = 'softmax',
   loss = 'categorical_crossentropy'
 ):
   """
   Helper function to create a pretty standard Artificial Neural
   Network-ANN using ``tensorflow``. It's based in a ``Sequential``
-  model, which connects multiple hidden layers 
+  model, which connects multiple hidden layers
   (``Dense=>Dropout=>BatchNormalization``) and uses a ``Nadam``
   optimizer. Developed to be used together with ``KerasClassifier``.
 
@@ -81,7 +81,7 @@ def build_ann(
   :param output_activation: Activation function for the output layer.
   :param loss: Loss function used for the Optimizer.
 
-  :returns: The ANN model 
+  :returns: The ANN model
   :rtype: Sequential
 
   Examples
@@ -89,15 +89,18 @@ def build_ann(
 
   >>> from eumap.mapper import build_ann
   >>> from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
-  >>> 
-  >>> ann = KerasClassifier(build_ann, input_shape=(-1, 180), output_shape=33, 
+  >>>
+  >>> ann = KerasClassifier(build_ann, input_shape=(-1, 180), output_shape=33,
   >>>                       epochs=3, batch_size=64, shuffle=True, verbose=1)
 
   """
 
-  from tensorflow.keras.layers import Dense, BatchNormalization, Dropout
-  from tensorflow.keras.models import Sequential
-  from tensorflow.keras.optimizers import Nadam
+  try:
+    from tensorflow.keras.layers import Dense, BatchNormalization, Dropout
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.optimizers import Nadam
+  except ImportError as e:
+    warnings.warn('build_ann requires tensorflow>=2.5.0')
 
   model = Sequential()
   model.add(Dense(input_shape, activation=activation))
@@ -129,7 +132,7 @@ class LandMapper():
     learning models and point samples.
 
     It's fully compatible with ``scikit-learn`` [1] supporting:
-    
+
     1. Classification models,
     2. Seamless training using point samples,
     3. Data imputation,
@@ -141,11 +144,11 @@ class LandMapper():
     9. Seamless raster prediction (read and write).
 
     :param points: Point samples used to train the ML model. It supports ``pandas.DataFrame`` and
-     a path for plain CSV ``(*.csv)`` or compressed csv file ``(*.gz)``, which are read 
+     a path for plain CSV ``(*.csv)`` or compressed csv file ``(*.gz)``, which are read
      through ``pandas.read_csv`` [3]. All the other extensions are read by ``geopandas`` as GIS vector files [4].
     :param target_col: Column name used to retrieve the target values for the training.
     :param feat_cols: List of column names used to retrieve the feature/covariates for the training.
-    :param feat_col_prfxs: List of column prefixes used to derive the ``feat_cols`` list, avoiding to provide 
+    :param feat_col_prfxs: List of column prefixes used to derive the ``feat_cols`` list, avoiding to provide
       dozens/hundreds of column names.
     :param weight_col: Column name used to retrieve the ``sample_weight`` for the training.
     :param nodata_imputer: Transformer used to input missing values filling all ``np.nan`` in the point
@@ -153,32 +156,32 @@ class LandMapper():
     :param estimator: The ML model used by the class. The default model is a ``RandomForestClassifier``,
       however all the ``sklearn`` model are supported [1]. For ``estimator=None`` it tries to use ``auto-sklearn``
       to find the best model and hyper-parameters [2].
-    :param estimator_list: A list of models used by the EML implementation. The models output are used to 
+    :param estimator_list: A list of models used by the EML implementation. The models output are used to
       feed the ``meta_estimator`` model and to derive the prediction uncertainty. This argument has
       prevalence over ``estimator``.
     :param meta_estimator: Model used to derive the prediction output in the EML implementation. The default model
       here is a ``LogisticRegression``, however all the ``sklearn`` model are supported [1].
-    :param hyperpar_selection: Hyper-parameter optimizer used by ``estimator`` model. 
-    :param hyperpar_selection_list: A list of hyper-parameter optimizers used by ``estimator_list`` models, provided 
+    :param hyperpar_selection: Hyper-parameter optimizer used by ``estimator`` model.
+    :param hyperpar_selection_list: A list of hyper-parameter optimizers used by ``estimator_list`` models, provided
       in the same order. This argument has prevalence over ``hyperpar_selection``.
     :param hyperpar_selection_meta: Hyper-parameter optimizer used by ``meta_estimator`` model.
     :param feature_selection: Feature selection algorithm used by ``estimator`` model.
-    :param feature_selections_list: A list of feature selection algorithm used by ``estimator_list`` models, provided 
+    :param feature_selections_list: A list of feature selection algorithm used by ``estimator_list`` models, provided
       in the same order. This argument has prevalence over ``feature_selection``.
-    :param cv: Cross validation strategy used by all models. The default strategy is a ``5-Fold cv``, 
+    :param cv: Cross validation strategy used by all models. The default strategy is a ``5-Fold cv``,
       however all the ``sklearn`` model are supported [1].
     :param cv_njobs: Number of CPU cores to be used in parallel during the cross validation.
-    :param cv_group_col: Column name used to split the train/test set during the cross validation. Use this argument 
+    :param cv_group_col: Column name used to split the train/test set during the cross validation. Use this argument
       to perform a ``spatial CV`` by block/tiles.
     :param min_samples_per_class: Minimum percentage of samples according to ``target_col`` to keep the class in the
       training.
-    :param pred_method: Use ``predict_prob`` to predict probabilities and uncertainty, otherwise it predicts only 
+    :param pred_method: Use ``predict_prob`` to predict probabilities and uncertainty, otherwise it predicts only
       the dominant class.
     :param verbose:bool: Use ``True`` to print the progress of all steps.
     :param \*\*autosklearn_kwargs: Named arguments supported by ``auto-sklearn`` [2].
-    
+
     For **usage examples** access the ``eumap`` tutorials [5,6].
- 
+
     References
     ==========
 
@@ -655,7 +658,7 @@ class LandMapper():
 
   def train(self):
     """
-    Train the ML/EML model according to the class arguments. 
+    Train the ML/EML model according to the class arguments.
     """
 
     # Hyperparameter optization for all estimators
@@ -747,16 +750,16 @@ class LandMapper():
 
       return meta_estimator_pred.astype('float32'), std_meta_features.astype('float32')
 
-  def predict_points(self, 
+  def predict_points(self,
     input_points:DataFrame
   ):
     """
     Predict point samples. It uses the ``feature_cols`` to retrieve the
     input feature/covariates.
 
-    :param input_points: New set of point samples to be predicted. 
+    :param input_points: New set of point samples to be predicted.
 
-    :returns: The prediction result and the prediction uncertainty (only for EML) 
+    :returns: The prediction result and the prediction uncertainty (only for EML)
     :rtype: Tuple[Numpy.array, Numpy.array]
     """
 
@@ -767,41 +770,41 @@ class LandMapper():
 
     return self._predict(input_data)
 
-  def predict(self, 
-    dirs_layers:List = [], 
-    fn_layers:List = [], 
+  def predict(self,
+    dirs_layers:List = [],
+    fn_layers:List = [],
     fn_output:str = None,
-    spatial_win:Window = None, 
-    dtype = 'float32', 
-    fill_nodata:bool = False, 
+    spatial_win:Window = None,
+    dtype = 'float32',
+    fill_nodata:bool = False,
     separate_probs:bool = True,
-    hard_class:bool = True, 
-    inmem_calc_func:Callable = None, 
+    hard_class:bool = True,
+    inmem_calc_func:Callable = None,
     dict_layers_newnames:set = {},
     allow_additional_layers:bool = False,
     n_jobs_io:int = 4
   ):
 
     """
-    Predict raster data. It matches the raster filenames with the input feature/covariates 
+    Predict raster data. It matches the raster filenames with the input feature/covariates
     used by training.
 
     :param dirs_layers: A list of folders where the raster files are located.
-    :param fn_layers: A list with the raster paths. Provide it and the ``dirs_layers`` is ignored. 
-    :param fn_output: File path where the prediction result is saved. For multiple outputs (probabilities, 
+    :param fn_layers: A list with the raster paths. Provide it and the ``dirs_layers`` is ignored.
+    :param fn_output: File path where the prediction result is saved. For multiple outputs (probabilities,
       uncertainty) the same location is used, adding specific suffixes in the provided file path.
     :param spatial_win: Read the data and predict according to the spatial window. By default is ``None``,
       which means all the data is read and predict.
     :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
       converted to ``np.nan``.
     :param fill_nodata: Use the ``nodata_imputer`` to fill all ``np.nan`` values. By default is ``False``
-      because for almost all the cases it's preferable use the ``eumap.gapfiller module`` to perform this task. 
+      because for almost all the cases it's preferable use the ``eumap.gapfiller module`` to perform this task.
     :param separate_probs: Use ``True`` to save the predict probabilities in a separate raster, otherwise it's
-      write as multiple bands of a single raster file. For ``pred_method='predict'`` it's ignored. 
-    :param hard_class: When ``pred_method='predict_proba'`` use ``True`` to save the predict dominant 
-      class ``(*_hcl.tif)``, the probability ``(*_hcl_prob.tif)`` and uncertainty ``(*_hcl_uncertainty.tif)`` 
-      values of each dominant class.  
-    :param inmem_calc_func: Function to be executed before the prediction. Use it to derive covariates/features 
+      write as multiple bands of a single raster file. For ``pred_method='predict'`` it's ignored.
+    :param hard_class: When ``pred_method='predict_proba'`` use ``True`` to save the predict dominant
+      class ``(*_hcl.tif)``, the probability ``(*_hcl_prob.tif)`` and uncertainty ``(*_hcl_uncertainty.tif)``
+      values of each dominant class.
+    :param inmem_calc_func: Function to be executed before the prediction. Use it to derive covariates/features
       on-the-fly, calculating in memory, for example, a NDVI from the red and NIR bands.
     :param dict_layers_newnames: A dictionary used to change the raster filenames on-the-fly. Use it to match
       the column names for the point samples with different raster filenames.
@@ -840,47 +843,47 @@ class LandMapper():
 
     return fn_out_files
 
-  def predict_multi(self, 
-    dirs_layers_list:List[List] = [], 
-    fn_layers_list:List[List] = [], 
-    fn_output_list:List[List] = [], 
+  def predict_multi(self,
+    dirs_layers_list:List[List] = [],
+    fn_layers_list:List[List] = [],
+    fn_output_list:List[List] = [],
     spatial_win:Window = None,
-    dtype:str = 'float32', 
-    fill_nodata:bool = False, 
-    separate_probs:bool = True, 
+    dtype:str = 'float32',
+    fill_nodata:bool = False,
+    separate_probs:bool = True,
     hard_class:bool = True,
-    inmem_calc_func:Callable = None, 
-    dict_layers_newnames_list:List[set] = [], 
+    inmem_calc_func:Callable = None,
+    dict_layers_newnames_list:List[set] = [],
     allow_additional_layers=False,
     prediction_strategy_type = PredictionStrategyType.Lazy
   ):
     """
-    Predict multiple raster data. It matches the raster filenames with the input feature/covariates 
+    Predict multiple raster data. It matches the raster filenames with the input feature/covariates
     used by training.
 
     :param dirs_layers_list: A list of list containing the folders where the raster files are located.
-    :param fn_layers_list: A list of list containing the raster paths. Provide it and the 
-      ``dirs_layers_list`` is ignored. 
-    :param fn_output_list: A list of file path where the prediction result is saved. For multiple outputs (probabilities, 
+    :param fn_layers_list: A list of list containing the raster paths. Provide it and the
+      ``dirs_layers_list`` is ignored.
+    :param fn_output_list: A list of file path where the prediction result is saved. For multiple outputs (probabilities,
       uncertainty) the same location is used, adding specific suffixes in the provided file path.
     :param spatial_win: Read the data and predict according to the spatial window. By default is ``None``,
       which means all the data is read and predict.
     :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
       converted to ``np.nan``.
     :param fill_nodata: Use the ``nodata_imputer`` to fill all ``np.nan`` values. By default is ``False``
-      because for almost all the cases it's preferable use the ``eumap.gapfiller module`` to perform this task. 
+      because for almost all the cases it's preferable use the ``eumap.gapfiller module`` to perform this task.
     :param separate_probs: Use ``True`` to save the predict probabilities in a separate raster, otherwise it's
-      write as multiple bands of a single raster file. For ``pred_method='predict'`` it's ignored. 
-    :param hard_class: When ``pred_method='predict_proba'`` use ``True`` to save the predict dominant 
-      class ``(*_hcl.tif)``, the probability ``(*_hcl_prob.tif)`` and uncertainty ``(*_hcl_uncertainty.tif)`` 
-      values of each dominant class.  
-    :param inmem_calc_func: Function to be executed before the prediction. Use it to derive covariates/features 
+      write as multiple bands of a single raster file. For ``pred_method='predict'`` it's ignored.
+    :param hard_class: When ``pred_method='predict_proba'`` use ``True`` to save the predict dominant
+      class ``(*_hcl.tif)``, the probability ``(*_hcl_prob.tif)`` and uncertainty ``(*_hcl_uncertainty.tif)``
+      values of each dominant class.
+    :param inmem_calc_func: Function to be executed before the prediction. Use it to derive covariates/features
       on-the-fly, calculating in memory, for example, a NDVI from the red and NIR bands.
     :param dict_layers_newnames: A list of dictionaries used to change the raster filenames on-the-fly. Use it to match
       the column names for the point samples with different raster filenames.
     :param allow_additional_layers: Use ``False`` to throw a ``Exception`` if a read raster is not present
       in ``feature_cols``.
-    :param prediction_strategy_type: Which strategy is used to predict the multiple raster data. By default is ``Lazỳ``, 
+    :param prediction_strategy_type: Which strategy is used to predict the multiple raster data. By default is ``Lazỳ``,
       loading one year while predict the other.
 
     :returns: List with all the raster files produced as output.
@@ -917,15 +920,15 @@ class LandMapper():
     for estimator in landmapper.estimator_list:
       if landmapper._is_keras_classifier(estimator):
         from tensorflow.keras.models import load_model
-        
+
         fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
         estimator['estimator'].model = load_model(fn_keras)
 
     return landmapper
 
-  def save_instance(self, 
-    fn_joblib:Path, 
-    no_train_data:bool = False, 
+  def save_instance(self,
+    fn_joblib:Path,
+    no_train_data:bool = False,
     compress:str = 'lz4'
   ):
     """
@@ -933,7 +936,7 @@ class LandMapper():
     over new raster/point data without retrain the models from scratch.
 
     :param fn_joblib: Location of the output file.
-    :param no_train_data: Remove all the training data before persist it 
+    :param no_train_data: Remove all the training data before persist it
       in disk.
     :param compress: Enable compression.
 
@@ -1250,14 +1253,14 @@ class _ParallelOverlay:
     # sampling only first band in every layer
     # assumption is that all layers have same blocks
 
-    def __init__(self, 
-      points_x: np.ndarray, 
-      points_y:np.ndarray, 
-      fn_layers:List[str], 
-      max_workers:int = parallel.CPU_COUNT, 
+    def __init__(self,
+      points_x: np.ndarray,
+      points_y:np.ndarray,
+      fn_layers:List[str],
+      max_workers:int = parallel.CPU_COUNT,
       verbose:bool = True
     ):
-        
+
       self.error_val = -32768
       self.points_x = points_x
       self.points_y = points_y
@@ -1339,20 +1342,20 @@ class _ParallelOverlay:
             sample = self.error_val
 
           out_sample[ind] = sample
-    
+
       return out_sample, fn_layer
 
     def _sample_one_block(self, args):
       out_sample, fn_layer, window, ind, col, row = args
       with rasterio.open(fn_layer) as src:
-        
+
         try:
           data = src.read(1, window=window)
           sample = data[row,col]
         except Exception as exception:
           traceback.print_exc()
           sample = self.error_val
-            
+
         out_sample[ind] = sample
           #return sample, ind
 
@@ -1363,11 +1366,11 @@ class _ParallelOverlay:
 
       blocks = self.points_blocks[dim]
       args = ((out_sample, fn_layer, *blocks[ij]) for ij in blocks)
-      
+
       with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
         for _ in executor.map(self._sample_one_block, args, chunksize=1000):
           pass #out_sample[ind] = sample
-      
+
       return out_sample
 
     def _sample_one_layer_mp(self, fn_layer):
@@ -1377,7 +1380,7 @@ class _ParallelOverlay:
 
       blocks = self.points_blocks[dim]
       args = ((out_sample, fn_layer, *blocks[ij]) for ij in blocks)
-      
+
       with concurrent.futures.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
         for _ in executor.map(self._sample_one_block, args, chunksize=1000):
             pass #out_sample[ind] = sample
@@ -1390,7 +1393,7 @@ class _ParallelOverlay:
       '''
       res={}
       n_layers = len(self.fn_layers)
-      
+
       for i_layer, fn_layer in enumerate(self.fn_layers):
         if self.verbose:
           ttprint(f'{i_layer}/{n_layers} {Path(fn_layer).name}')
@@ -1405,10 +1408,10 @@ class _ParallelOverlay:
       '''
       Serial layers, parallel blocks in layer
       '''
-      
+
       res={}
       n_layers = len(self.fn_layers)
-      
+
       for i_layer, fn_layer in enumerate(self.fn_layers):
         if self.verbose:
           ttprint(f'{i_layer}/{n_layers} {Path(fn_layer).name}')
@@ -1427,7 +1430,7 @@ class _ParallelOverlay:
       i_layer=1
       n_layers=len(self.fn_layers)
       args = ((fn_layer.as_posix(),) for fn_layer in self.fn_layers)
-      
+
       for sample, fn_layer in parallel.ThreadGeneratorLazy(self._sample_one_layer_sp, args,
                           self.max_workers, self.max_workers*2):
         col = Path(fn_layer).with_suffix('').name
@@ -1448,7 +1451,7 @@ class _ParallelOverlay:
       args = ((fn_layer.as_posix(),) for fn_layer in self.fn_layers)
       #with concurrent.futures.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
           #for sample, fn_layer in executor.map(self._sample_one_layer_sp, args, chunksize=n_layers//self.max_workers):
-      
+
       for sample, fn_layer in parallel.ProcessGeneratorLazy(self._sample_one_layer_sp, args, self.max_workers, 1):
         col = Path(fn_layer).with_suffix('').name
         if self.verbose:
@@ -1471,14 +1474,14 @@ class _ParallelOverlay:
 class SpaceOverlay():
   """
   Overlay a set of points over multiple raster files.
-  The retrieved pixel values are organized in columns 
+  The retrieved pixel values are organized in columns
   according to the filenames.
 
   :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
     the points.
-  :param fn_layers: A list with the raster file paths. If it's not provided 
+  :param fn_layers: A list with the raster file paths. If it's not provided
     the ``dir_layers`` and ``regex_layers`` are used to retrieve the raster files.
-  :param dir_layers: A list of folders where the raster files are located. The raster 
+  :param dir_layers: A list of folders where the raster files are located. The raster
     are selected according to the pattern specified in ``regex_layers``.
   :param regex_layers: Pattern to select the raster files in ``dir_layers``.
     By default all GeoTIFF files are selected.
@@ -1490,47 +1493,47 @@ class SpaceOverlay():
   ========
 
   >>> from eumap.mapper import SpaceOverlay
-  >>> 
+  >>>
   >>> spc_overlay = SpaceOverlay('./my_points.gpkg', ['./raster_dir_1', './raster_dir_2'])
   >>> result = spc_overlay.run()
-  >>> 
+  >>>
   >>> print(result.shape)
 
   """
 
-  def __init__(self, 
-    points, 
-    fn_layers:List[str] = [], 
-    dir_layers:List[str] = [], 
-    regex_layers = '*.tif', 
+  def __init__(self,
+    points,
+    fn_layers:List[str] = [],
+    dir_layers:List[str] = [],
+    regex_layers = '*.tif',
     max_workers:int = parallel.CPU_COUNT,
     verbose:bool = True
   ):
-      
+
     if len(fn_layers) == 0:
       fn_layers = find_files(dir_layers, regex_layers)
 
     self.fn_layers = [ Path(l) for l in fn_layers ]
-    
+
     if not isinstance(points, gpd.GeoDataFrame):
       points = gpd.read_file(points)
 
     self.pts = points
     self.pts['overlay_id'] = range(1,len(self.pts)+1)
 
-    self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values, 
+    self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
       fn_layers, max_workers, verbose)
 
-  def run(self, 
+  def run(self,
     dict_newnames:set = {}
   ):
     """
     Execute the space overlay.
 
-    :param dict_newnames: A dictionary used to update the column names after the overlay. 
+    :param dict_newnames: A dictionary used to update the column names after the overlay.
       The ``key`` is the new name and the ``value`` is the raster file name (without extension).
 
-    :returns: Data frame with the original columns plus the overlay result (one new 
+    :returns: Data frame with the original columns plus the overlay result (one new
       column per raster).
     :rtype: geopandas.GeoDataFrame
     """
@@ -1552,8 +1555,8 @@ class SpaceTimeOverlay():
   :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
     the points.
   :param col_date: Date column to retrieve the year information.
-  :param fn_layers: A list with the raster file paths. The file path placeholders 
-    ``{year}``, ``{year_minus_1}``, ``{year_plus_1}`` are replaced considering the 
+  :param fn_layers: A list with the raster file paths. The file path placeholders
+    ``{year}``, ``{year_minus_1}``, ``{year_plus_1}`` are replaced considering the
     year information of each point.
   :param max_workers: Number of CPU cores to be used in parallel. By default all cores
     are used.
@@ -1563,19 +1566,19 @@ class SpaceTimeOverlay():
   ========
 
   >>> from eumap.mapper import SpaceTimeOverlay
-  >>> 
+  >>>
   >>> fn_layers = [ 'raster_{year_minus_1}1202..{year}0320.tif' ] # raster_20101202..20110320.tif, ...
   >>> spt_overlay = SpaceTimeOverlay('./my_points.gpkg', 'survey_date' fn_layers)
   >>> result = spt_overlay.run()
-  >>> 
-  >>> print(result.shape) 
+  >>>
+  >>> print(result.shape)
 
   """
 
-  def __init__(self, 
-    points, 
-    col_date:str, 
-    fn_layers:List[str] = [], 
+  def __init__(self,
+    points,
+    col_date:str,
+    fn_layers:List[str] = [],
     max_workers:int = parallel.CPU_COUNT,
     verbose:bool = True
   ):
@@ -1591,22 +1594,22 @@ class SpaceTimeOverlay():
 
     self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
     self.uniq_years = self.pts[self.col_date].dt.year.unique()
-    
+
     self.fn_layers = [ Path(l) for l in fn_layers ]
 
     for year in self.uniq_years:
-      
+
       year = int(year)
       year_points = self.pts[self.pts[self.col_date].dt.year == year]
-      
+
       fn_layers_year = []
       for fn_layer in self.fn_layers:
         fn_layers_year.append(Path(self._replace_year(fn_layer, year)))
 
       if self.verbose:
         ttprint(f'Overlay {len(year_points)} points from {year} in {len(fn_layers_year)} raster layers')
-      
-      self.overlay_objs[year] = SpaceOverlay(points=year_points, fn_layers=fn_layers_year, 
+
+      self.overlay_objs[year] = SpaceOverlay(points=year_points, fn_layers=fn_layers_year,
         max_workers=max_workers, verbose=verbose)
 
   def _replace_year(self, fn_layer, year = None):
@@ -1623,25 +1626,25 @@ class SpaceTimeOverlay():
 
   def run(self):
     """
-    Execute the spacetime overlay. It removes the year part from the column names. 
+    Execute the spacetime overlay. It removes the year part from the column names.
     For example, the raster ``raster_20101202..20110320.tif`` results in the column
     name ``raster_1202..0320``.
 
-    :returns: Data frame with the original columns plus the overlay result (one new 
+    :returns: Data frame with the original columns plus the overlay result (one new
       column per raster).
     :rtype: geopandas.GeoDataFrame
     """
     self.result = None
 
     for year in self.uniq_years:
-      
-      year_newnames = {}      
+
+      year_newnames = {}
       for fn_layer in self.fn_layers:
-        
+
         name = str(fn_layer.stem)
         curname = self._replace_year(name, year)
         newname = self._replace_year(name)
-        
+
         year_newnames[newname] = curname
 
       if self.verbose:

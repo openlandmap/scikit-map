@@ -2,13 +2,17 @@
 Functions to plot raster data
 '''
 
-import matplotlib.pyplot as plt
-import skimage.exposure as exposure
-from matplotlib.colors import ListedColormap
-from typing import Union, List, Tuple
-import rasterio as rio
-import numpy as np
-from pathlib import Path
+try:
+	import matplotlib.pyplot as plt
+	import skimage.exposure as exposure
+	from matplotlib.colors import ListedColormap
+	from typing import Union, List, Tuple
+	import rasterio as rio
+	import numpy as np
+	from pathlib import Path
+except ImportError as e:
+    from .misc import _warn_deps
+    _warn_deps(e, 'plotter')
 
 def _percent_clip(data, perc_min, perc_max):
 	return (data - np.percentile(data, perc_min))/(np.percentile(data, perc_max) - np.percentile(data, perc_min))

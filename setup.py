@@ -23,4 +23,24 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     python_requires='>=3.7',
+    install_requires=[
+        'geopandas==0.8',
+        'joblib==0.17',
+        'pyproj==3.1',
+        'OWSLib==0.24',
+        'requests==2.24',
+        'scikit_learn==0.24',
+        'rasterio==1.1',
+    ],
+    extras_require=[
+        'full': [
+            'Bottleneck==1.3',
+            'matplotlib==3.3',
+            'opencv_python==4.5',
+            'pqdm==0.1',
+            'pyts==0.11',
+            'Shapely==1.7',
+            'scikit_image==0.17',
+        ],
+    ]
 )

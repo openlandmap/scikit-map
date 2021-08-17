@@ -1,16 +1,20 @@
-import pygeos as pg
-import rasterio as rio
-import rasterio.features as rfeatures
-import numpy as np
-import sys
-from shapely import speedups
-if speedups.available:
-    speedups.enable()
-import shapely.geometry as g
-from multiprocessing.pool import ThreadPool
-import multiprocessing as mp
-import threading
-from datetime import datetime
+try:
+    import pygeos as pg
+    import rasterio as rio
+    import rasterio.features as rfeatures
+    import numpy as np
+    import sys
+    from shapely import speedups
+    if speedups.available:
+        speedups.enable()
+    import shapely.geometry as g
+    from multiprocessing.pool import ThreadPool
+    import multiprocessing as mp
+    import threading
+    from datetime import datetime
+except ImportError as e:
+    from ..misc import _warn_deps
+    _warn_deps(e, 'blocks')
 
 from typing import Union, Tuple, Iterable, Callable
 

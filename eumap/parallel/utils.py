@@ -14,8 +14,6 @@ import math
 import rasterio
 from rasterio.windows import Window, from_bounds
 import os.path
-from pqdm.processes import pqdm as ppqdm
-from pqdm.threads import pqdm as tpqdm
 
 from ..misc import ttprint
 from .. import datasets
@@ -404,10 +402,17 @@ class TilingProcessing():
       _args.append((idx, tile, window, *args))
 
     if progress_bar:
-      pqdm = (tpqdm if use_threads else ppqdm)
-      results = pqdm(iter(_args), func, n_jobs=max_workers, argument_type='args')
+      try:
+        from pqdm.processes import pqdm as ppqdm
+        from pqdm.threads import pqdm as tpqdm
+        pqdm = (tpqdm if use_threads else ppqdm)
+        results = pqdm(iter(_args), func, n_jobs=max_workers, argument_type='args')
+      except ImportError as e:
+        from ..misc import _warn_deps
+        _warn_deps(e, 'progress bar')
+        progress_bar = False
 
-    else:
+    if not progress_bar:
       WorkerPool = (ThreadGeneratorLazy if use_threads else ProcessGeneratorLazy)
 
       results = []
