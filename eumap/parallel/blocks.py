@@ -52,7 +52,7 @@ def _read_block(
 def _id(x):
     return x
 
-class RasterBlockFunction:
+class _RasterBlockFunction:
 
     def __init__(self,
         func: Callable,
@@ -83,17 +83,17 @@ class RasterBlockReader:
                 tup[1]
                 for tup in self.reference.block_windows()
             ])
-            boxes = self.blocks2boxes(self.block_windows)
+            boxes = self._blocks2boxes(self.block_windows)
             self.rtree = pg.strtree.STRtree(boxes)
             __ = self.rtree.query(boxes[0])
 
-    def get_block_indices(self,
+    def _get_block_indices(self,
         geometry: dict,
     ):
         _geom = pg.from_shapely(g.shape(geometry))
         return self.rtree.query(_geom)
 
-    def blocks2boxes(self, block_windows):
+    def _blocks2boxes(self, block_windows):
         coords = np.array([
             self.reference.window_bounds(bw)
             for bw in block_windows
@@ -108,7 +108,7 @@ class RasterBlockReader:
         max_workers: int=mp.cpu_count(),
         optimize_threadcount: bool=True,
     ):
-        block_idx = self.get_block_indices(geometry)
+        block_idx = self._get_block_indices(geometry)
 
         if isinstance(src_path, str):
             src_path = [src_path]
@@ -180,7 +180,7 @@ class RasterBlockReader:
             )
             sources = {}
 
-class RasterAggregator:
+class RasterBlockAggregator:
 
     def __init__(self,
         reader: RasterBlockReader=None,
@@ -198,7 +198,7 @@ class RasterAggregator:
             self.reader = RasterBlockReader(src_path)
 
         (*block_results,) = map(
-            RasterBlockFunction(
+            _RasterBlockFunction(
                 block_func,
                 return_data_only=True,
                 agg_func=agg_func,
@@ -234,8 +234,8 @@ class RasterBlockWriter:
 
         profile = self.reader.reference.profile
 
-        block_indices = self.reader.get_block_indices(geometry)
-        out_window_geometry = self.reader.blocks2boxes(self.reader.block_windows[block_indices])
+        block_indices = self.reader._get_block_indices(geometry)
+        out_window_geometry = self.reader._blocks2boxes(self.reader.block_windows[block_indices])
         out_window_geometry = pg.set_operations.coverage_union_all(out_window_geometry)
         out_bounds = pg.measurement.bounds(out_window_geometry)
 
@@ -256,7 +256,7 @@ class RasterBlockWriter:
             **profile,
         ) as dst:
             for data, mask, window in map(
-                RasterBlockFunction(block_func, return_data_only=False),
+                _RasterBlockFunction(block_func, return_data_only=False),
                 self.reader.read_overlay(
                     src_path,
                     geometry,
