@@ -32,7 +32,7 @@ setuptools.setup(
         'scikit_learn==0.24',
         'rasterio==1.1',
     ],
-    extras_require=[
+    extras_require={
         'full': [
             'Bottleneck==1.3',
             'matplotlib==3.3',
@@ -42,5 +42,5 @@ setuptools.setup(
             'Shapely==1.7',
             'scikit_image==0.17',
         ],
-    ]
+    },
 )
