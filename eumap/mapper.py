@@ -38,7 +38,7 @@ from .misc import ttprint, find_files
 from .raster import read_rasters, write_new_raster
 
 import warnings
-warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore') # should not ignore all warnings
 
 _automl_enabled = False
 try:
