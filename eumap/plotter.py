@@ -6,7 +6,7 @@ try:
 	import matplotlib.pyplot as plt
 	import skimage.exposure as exposure
 	from matplotlib.colors import ListedColormap
-	from typing import Union, List, Tuple
+	from typing import Union, List, Iterable
 	import rasterio as rio
 	import numpy as np
 	from pathlib import Path
@@ -14,7 +14,7 @@ try:
 	def _percent_clip(data, perc_min, perc_max):
 		return (data - np.percentile(data, perc_min))/(np.percentile(data, perc_max) - np.percentile(data, perc_min))
 
-	def plot_rgb(raster, perc_min=2, perc_max=98):
+	def _plot_rgb(raster, perc_min=2, perc_max=98):
 
 		bands = range(0, raster.shape[2])
 		data_equalized = []
@@ -25,7 +25,7 @@ try:
 		plt.imshow(data_equalized)
 
 	def plot_rasters(
-		*rasters: Union[Tuple[str], Tuple[np.ndarray], Tuple[Path]],
+		*rasters: Union[Iterable[str], Iterable[np.ndarray], Iterable[Path]],
 		out_file: Union[str, Path]=None,
 		vertical_layout: bool=False,
 		figsize: float=10,
@@ -36,7 +36,58 @@ try:
 		nodata: List[Union[int, float]]=None,
 		vmin: List[Union[int, float]]=None,
 		vmax: List[Union[int, float]]=None,
+		perc_clip: bool=False,
+		perc_min: List[Union[int, float]]=2,
+		perc_max: List[Union[int, float]]=98,
 	):
+		"""
+        Plots data from one or more rasters.
+
+		Preserves pixel aspect ratio, removes axes and ensures transparency on nodata.
+
+		Uses ``matplotlib.pyplot.imshow`` [1].
+
+        :param *rasters:        List of rasters, passed as either data or file paths. If 3D (multiband) data is passed (as ``numpy`` array(s)), the first axis of the array must correspond to the band index.
+		:param out_file:        Path to save figure if not ``None``.
+		:param vertical_layout: Produces a vertical array of plots if ``True``, horizontal if ``False`` (default).
+		:param figsize:         Print size of the horizontal axis of the plot (passed to ``matplotlib``). The vertical size is calculated automatically.
+		:param spacing:         Spacing between raster plots.
+		:param cmaps:           Colormap to use for singleband plots, or list of colormaps (applied respectively). Must contain valid ``matplotlib`` colormaps [2]. For rasters with multiple (3 or more) bands, this argument is ignored and RGB plots are produced.
+		:param titles:          Titles to produce for each plot.
+		:param dpi:             DPI of the figure.
+		:param nodata:          Nodata value or list of values respective to each raster. If ``None`` and ``*rasters`` contains file paths, ``nodata`` will be inferred from raster source.
+		:param vmin:            Minimum value to clip data.
+		:param vmax:            Maximum value to clip data.
+		:param perc_clip:       Clips rasters with percentiles if ``True``.
+		:param perc_min:        Minimum percentile to clip with if ``perc_clip=True``.
+		:param perc_max:        Maximum percentile to clip with if ``perc_clip=True``.
+
+        Examples
+        ========
+
+        >>> from eumap import plotter
+		>>> import numpy as np
+		>>>
+		>>> singleband = np.random.randint(0, 255, [5, 5])
+		>>> multiband = np.random.randint(0, 255, [3, 5, 5])
+		>>>
+		>>> plotter.plot_rasters(
+		>>>     singleband,
+		>>>     multiband,
+		>>>     titles=['single band', 'RGB'],
+		>>>     figsize=4,
+		>>>     cmaps='Greens',
+		>>> )
+
+        References
+        ==========
+
+        [1] `Matplotlib imshow <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.imshow.html>`_
+
+        [2] `Matplotlib colormaps <https://matplotlib.org/stable/tutorials/colors/colormaps.html>`_
+
+        """
+
 		if isinstance(rasters, (str, Path, np.ndarray)):
 			rasters = [rasters]
 		else:
@@ -57,9 +108,22 @@ try:
 		for i, r in enumerate(rasters):
 			if isinstance(r, (str, Path)):
 				with rio.open(r) as src:
-					rasters[i] = src.read(1)
+					rasters[i] = src.read()
 					if nodata[i] is None:
 						nodata[i] = src.nodata
+			if len(rasters[i].shape) < 3:
+				rasters[i] = rasters[i].reshape(1, *rasters[i].shape)
+			rasters[i] = np.stack(rasters[i], axis=-1)[:, :, :4]
+			if perc_clip:
+				try:
+					bands = range(0, raster[i].shape[2])
+					data_equalized = []
+					for band in bands:
+						data_equalized.append(_percent_clip(rasters[i][:, :, band], perc_min, perc_max))
+					data_equalized = np.stack(data_equalized, axis=-1)
+					rasters[i] = data_equalized
+				except IndexError:
+					pass
 
 		if titles and isinstance(titles, str):
 			titles = [titles]
