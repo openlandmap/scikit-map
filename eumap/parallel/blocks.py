@@ -1,3 +1,7 @@
+'''
+Parallel block-wise processing and result aggregation for large raster datasets
+'''
+
 try:
     import pygeos as pg
     import rasterio as rio
@@ -13,7 +17,7 @@ try:
     import threading
     from datetime import datetime
 
-    from typing import Union, Tuple, Iterable, Callable
+    from typing import Union, Tuple, Iterable, Callable, Iterator
 
     def _read_block(
         src: Union[rio.DatasetReader, Iterable[rio.DatasetReader]],
@@ -69,20 +73,52 @@ try:
             return result, mask, window
 
     class RasterBlockReader:
+        """
+        Thread-parallel reader for large rasters.
+
+        If ``reference_file`` is not ``None``, builds an R-tree index [1] of the block geometries read from the ``reference_file`` on initialization. All rasters read with the initialized reader are assumed to have identical geotransforms and block structures to the reference.
+
+        :param reference_file: Path (URL) of the reference raster.
+
+        For full usage examples please refer to the block processing tutorial notebook [2].
+
+        Examples
+        ========
+
+        >>> from eumap.parallel.blocks import RasterBlockReader
+        >>> from eumap.misc import ttprint
+        >>>
+        >>> fp = 'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_eumap_epsg3035_v0.1.tif'
+        >>>
+        >>> ttprint('initializing reader')
+        >>> reader = RasterBlockReader(fp)
+        >>> ttprint('reader initialized')
+
+        References
+        ==========
+
+        [1] `pygeos STRTree <https://pygeos.readthedocs.io/en/latest/strtree.html>`_
+
+        [2] `Raster block processing tutorial <../notebooks/06_raster_block_processing.html>`_
+
+        """
 
         def __init__(self,
             reference_file: str=None,
         ):
             self.reference = None
             if reference_file is not None:
-                self.reference = rio.open(reference_file)
-                self.block_windows = np.array([
-                    tup[1]
-                    for tup in self.reference.block_windows()
-                ])
-                boxes = self._blocks2boxes(self.block_windows)
-                self.rtree = pg.strtree.STRtree(boxes)
-                __ = self.rtree.query(boxes[0])
+                self._build_rtree(reference_file)
+
+        def _build_rtree(self, reference_file):
+            self.reference = rio.open(reference_file)
+            self.block_windows = np.array([
+                tup[1]
+                for tup in self.reference.block_windows()
+            ])
+            boxes = self._blocks2boxes(self.block_windows)
+            self.rtree = pg.strtree.STRtree(boxes)
+            __ = self.rtree.query(boxes[0])
 
         def _get_block_indices(self,
             geometry: dict,
@@ -104,14 +140,59 @@ try:
             geometry_mask: bool=True,
             max_workers: int=mp.cpu_count(),
             optimize_threadcount: bool=True,
-        ):
-            block_idx = self._get_block_indices(geometry)
+        ) -> Iterator[Tuple[np.ndarray, np.ndarray, rio.windows.Window]]:
+            """
+            Thread-parallel reading of large rasters within a bounding geometry.
+
+            Only blocks that intersect with ``geometry`` are read. Returns a generator yielding ``(data, mask, window)`` tuples for each block, where ``data`` are the stacked pixel values of all rasters at ``mask==True``,
+            ``mask`` is the reduced (via bitwise ``and``) block data mask for all rasters, and ``window`` is the ``rasterio.windows.Window`` [1] for the block within the transform of the ``reference_file``.
+            All rasters read with the initialized reader are assumed to have identical geotransforms and block structures to the ``reference_file`` used for initialization.
+            If the reader was initialized with ``reference_file==None``, the first file in ``src_path`` is used as the reference and the block R-tree is built before yielding data from the first block.
+
+            :param src_path:             Path(s) (or URLs) of the raster file(s) to read.
+            :param geometry:             The bounding geometry within which to read raster blocks, given as a dictionary (with the GeoJSON geometry schema).
+            :param band:                 Index of band to read from all rasters.
+            :param geometry_mask:        Indicates wheather or not to use the geometry as a data mask. If ``False``, the block data will be returned in its entirety, regardless if some of it falls outside of the ``geometry``.
+            :param max_workers:          Maximum number of worker threads to use, defaults to ``multiprocessing.cpu_count()``.
+            :param optimize_threadcount: Wheather or not to optimize number of workers. If ``True``, the number of worker threads will be iteratively increased until the average read time per block stops decreasing or ``max_workers`` is reached. If ``False``, ``max_workers`` will be used as the number of threads.
+
+            :returns: Generator yielding ``(data, mask, window)`` tuples for each block.
+            :rtype: Iterator[Tuple(np.ndarray, np.ndarray, rasterio.windows.Window)]
+
+            For full usage examples please refer to the block processing tutorial notebook [2].
+
+            Examples
+            ========
+
+            >>> geom = {
+            >>>     'type': 'Polygon',
+            >>>     'coordinates': [[
+            >>>         [4765389, 2441103],
+            >>>         [4764441, 2439352],
+            >>>         [4767369, 2438696],
+            >>>         [4761659, 2441949],
+            >>>         [4765389, 2441103],
+            >>>     ]],
+            >>> }
+            >>> block_data_gen = reader.read_overlay(fp)
+            >>> data, mask, window = next(block_data_gen)
+
+            References
+            ==========
+
+            [1] `Rasterio Window <https://rasterio.readthedocs.io/en/latest/api/rasterio.windows.html>`_
+
+            [2] `Raster block processing tutorial <../notebooks/06_raster_block_processing.html>`_
+
+            """
 
             if isinstance(src_path, str):
                 src_path = [src_path]
 
             if self.reference is None:
-                self.reference = rio.open(reference_file)
+                self._build_rtree(src_path[0])
+
+            block_idx = self._get_block_indices(geometry)
 
             sources = {}
 
@@ -178,6 +259,29 @@ try:
                 sources = {}
 
     class RasterBlockAggregator:
+        """
+        Class for aggregating results of block wise raster processing into a single result.
+
+        :param reader: RasterBlockReader instance to use for reading rasters.
+
+        For full usage examples please refer to the block processing tutorial notebook [1].
+
+        Examples
+        ========
+
+        >>> from eumap.parallel.blocks import RasterBlockReader, RasterBlockAggregator
+        >>>
+        >>> fp = 'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_eumap_epsg3035_v0.1.tif'
+        >>>
+        >>> reader = RasterBlockReader(fp)
+        >>> aggregator = RasterBlockAggregator(reader)
+
+        References
+        ==========
+
+        [1] `Raster block processing tutorial <../notebooks/06_raster_block_processing.html>`_
+
+        """
 
         def __init__(self,
             reader: RasterBlockReader=None,
@@ -191,8 +295,54 @@ try:
             agg_func: Callable=np.mean,
             **kwargs,
         ):
+            """
+            Aggregates results of block wise raster processing into a single result.
+
+            :param src_path:             Path(s) (or URLs) of the raster file(s) to read. If aggregator is initialized with ``reader=None``, the first file in ``src_path`` will be used to initialize a new reader.
+            :param geometry:             The bounding geometry within which to read raster blocks, given as a dictionary (with the GeoJSON geometry schema).
+            :param block_func:           Callable to perform on the data for each block.
+            :param agg_func:             Callable to produce an aggregation of block-wise results.
+            :param **kwargs:             Additional keyword arguments passed to ``RasterBlockReader.read_overlay()``.
+
+            :returns: The result of ``agg_func`` called with block-wise ``block_func`` results as the argument.
+
+            For full usage examples please refer to the block processing tutorial notebook [1].
+
+            Examples
+            ========
+
+            >>> geom = {
+            >>>     'type': 'Polygon',
+            >>>     'coordinates': [[
+            >>>         [4765389, 2441103],
+            >>>         [4764441, 2439352],
+            >>>         [4767369, 2438696],
+            >>>         [4761659, 2441949],
+            >>>         [4765389, 2441103],
+            >>>     ]],
+            >>> }
+            >>>
+            >>> def urban_fabric_area(lc):
+            >>>     return (lc==1) * 9e-4 # spatial resolution is 30x30 m
+            >>>
+            >>> result = agg.aggregate(
+            >>>     fp, geom,
+            >>>     block_func=urban_fabric_area,
+            >>>     agg_func=np.sum,
+            >>> )
+
+            References
+            ==========
+
+            [1] `Raster block processing tutorial <../notebooks/06_raster_block_processing.html>`_
+
+            """
+
+            if isinstance(src_path, str):
+                src_path = [src_path]
+
             if self.reader is None:
-                self.reader = RasterBlockReader(src_path)
+                self.reader = RasterBlockReader(src_path[0])
 
             (*block_results,) = map(
                 _RasterBlockFunction(
@@ -211,6 +361,29 @@ try:
             return result
 
     class RasterBlockWriter:
+        """
+        Class for writing results of block wise raster processing results into a new raster file.
+
+        :param reader: RasterBlockReader instance to use for reading rasters.
+
+        For full usage examples please refer to the block processing tutorial notebook [1].
+
+        Examples
+        ========
+
+        >>> from eumap.parallel.blocks import RasterBlockReader, RasterBlockWriter
+        >>>
+        >>> fp = 'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_eumap_epsg3035_v0.1.tif'
+        >>>
+        >>> reader = RasterBlockReader(fp)
+        >>> writer = RasterBlockWriter(reader)
+
+        References
+        ==========
+
+        [1] `Raster block processing tutorial <../notebooks/06_raster_block_processing.html>`_
+
+        """
 
         def __init__(self,
             reader: RasterBlockReader=None,
@@ -226,8 +399,54 @@ try:
             reader_kwargs: dict={},
             **kwargs,
         ):
+            """
+            Writes block wise calculation results to new raster file.
+
+            Performs ``block_func`` on all blocks of file(s) listed in ``src_path`` that intersect with ``geometry`` and writes the results to a new raster.
+
+            :param src_path:             Path(s) (or URLs) of the raster file(s) to read. If aggregator is initialized with ``reader=None``, the first file in ``src_path`` will be used to initialize a new reader.
+            :param dst_path:             Path to write the result raster to.
+            :param geometry:             The bounding geometry within which to read raster blocks, given as a dictionary (with the GeoJSON geometry schema).
+            :param block_func:           Callable to perform on the data for each block. Result must retain the shape of input data. Defaults to the identity function.
+            :param geometry_mask:        Indicates wheather or not to use the geometry as a data mask. If ``False``, calculation will be performed on all of the block data, regardless if some of it falls outside of the ``geometry``.
+            :param reader_kwargs:        Additional keyword arguments passed to ``RasterBlockReader.read_overlay()``.
+            :param **kwargs:             Additional raster profile keyword arguments passed to the ``rasterio`` dataset writer [1].
+
+            For full usage examples please refer to the block processing tutorial notebook [2].
+
+            Examples
+            ========
+
+            >>> geom = {
+            >>>     'type': 'Polygon',
+            >>>     'coordinates': [[
+            >>>         [4765389, 2441103],
+            >>>         [4764441, 2439352],
+            >>>         [4767369, 2438696],
+            >>>         [4761659, 2441949],
+            >>>         [4765389, 2441103],
+            >>>     ]],
+            >>> }
+            >>>
+            >>> def is_urban_fabric(lc):
+            >>>     return lc == 1
+            >>>
+            >>> writer.write(fp, 'urban_fabric.tif', geom, is_urban_fabric, dtype='uint8', nodata=0)
+
+            References
+            ==========
+
+            [1] `Writing datasets with Rasterio <https://rasterio.readthedocs.io/en/latest/quickstart.html#saving-raster-data>`_
+            
+            [2] `Raster block processing tutorial <../notebooks/06_raster_block_processing.html>`_
+
+            """
+
+            if isinstance(src_path, str):
+                src_path = [src_path]
+
             if self.reader is None:
-                self.reader = RasterBlockReader(src_path)
+                self.reader = RasterBlockReader(src_path[0])
 
             profile = self.reader.reference.profile
 
