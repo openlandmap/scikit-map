@@ -1577,7 +1577,7 @@ class SpaceTimeOverlay():
     col_date:str, 
     fn_layers:List[str] = [], 
     max_workers:int = parallel.CPU_COUNT,
-    verbose:bool = True
+    verbose:bool = False
   ):
 
     if not isinstance(points, gpd.GeoDataFrame):
