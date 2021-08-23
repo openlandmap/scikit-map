@@ -1,3 +1,7 @@
+'''
+Analyze downloaded LUCAS samples.
+'''
+
 import json
 import sqlite3
 from osgeo import ogr

@@ -8,10 +8,18 @@ import rasterio
 import numpy as np
 from pathlib import Path
 
+def _warn_deps(e, module_name):
+    import warnings
+    warnings.warn(
+        f'ERROR: {e}\n\n' \
+        f'Encountered because {module_name} has additional dependencies, please try:\n\n' \
+        '\tpip install eumap[full]\n'
+    )
+
 def ttprint(*args, **kwargs):
-  """ 
+  """
   A print function that displays the date and time.
-  
+
   Examples
   ========
 
@@ -27,12 +35,12 @@ def ttprint(*args, **kwargs):
 
 
 def find_files(
-  dir_list:List, 
+  dir_list:List,
   pattern:str = '*.*'
 ):
-  """ 
+  """
   Recursively find files in multiple directories according to the
-  specified pattern. It's basically a wrapper for 
+  specified pattern. It's basically a wrapper for
   glob module [1]
 
   :param dir_list: List with multiple directory paths.
@@ -67,15 +75,15 @@ def find_files(
   return files
 
 def nan_percentile(
-  arr:np.array, 
-  q:List = [25, 50, 75], 
+  arr:np.array,
+  q:List = [25, 50, 75],
   keep_original_vals=False
 ):
-  """ 
-  Optimized function to calculate percentiles ignoring ``np.nan`` 
+  """
+  Optimized function to calculate percentiles ignoring ``np.nan``
   in a 3D Numpy array [1].
 
-  :param arr: 3D Numpy array where the first dimension is used to 
+  :param arr: 3D Numpy array where the first dimension is used to
     derive the percentiles.
   :param q: Percentiles values between 0 and 100.
   :param keep_original_vals: If ``True`` it does a copy of ``arr``
@@ -86,7 +94,7 @@ def nan_percentile(
 
   >>> import numpy as np
   >>> from eumap.misc import nan_percentile
-  >>> 
+  >>>
   >>> data = np.random.rand(10, 10, 10)
   >>> data[2:5,0:10,0] = np.nan
   >>> data_perc = nan_percentile(data, q=[25, 50, 75])
@@ -108,11 +116,11 @@ def nan_percentile(
 
   # valid (non NaN) observations along the first axis
   valid_obs = np.sum(np.isfinite(arr), axis=0)
-  
+
   # replace NaN with maximum
   max_val = np.nanmax(arr)
   arr[np.isnan(arr)] = max_val
-  
+
   # sort - former NaNs will move to the end
   arr = np.sort(arr, axis=0)
 

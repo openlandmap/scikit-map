@@ -1,3 +1,7 @@
+'''
+Download LUCAS samples based on built request.
+'''
+
 import os
 import logging
 import tempfile
