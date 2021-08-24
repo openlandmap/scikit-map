@@ -1,3 +1,6 @@
+"""
+Earth observation data acess
+"""
 from typing import List, Union
 
 import requests

@@ -1,5 +1,5 @@
 """
-Parallelization helpers based in thread and process pools
+Parallelization helpers based in thread/process pools and joblib
 """
 import numpy
 import multiprocessing

@@ -114,7 +114,9 @@ try:
           ts_data = ts_data.astype('float32')
           ts_size = ts_data.shape[0]
 
-          glob_med = bc.nanmedian(ts_data)
+          with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+            glob_med = bc.nanmedian(ts_data)
 
           ts_neib = int((self.std_win - 1) / 2)
           env = self.std_env
@@ -135,9 +137,11 @@ try:
 
             win_data = ts_data[i0:i1].copy()
             win_data[np.isnan(win_data)] = glob_med
-
-            med = bc.nanmedian(win_data)
-            std = bc.nanstd(win_data)
+            
+            with warnings.catch_warnings():
+              warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+              med = bc.nanmedian(win_data)
+              std = bc.nanstd(win_data)
 
             lower = (med - std * env)
             upper = (med + std * env)
@@ -310,7 +314,10 @@ try:
         return f'{time}_{t1}_{t2}'
 
       def _calc_nanmedian(self, time, t1, t2):
-        result = bc.nanmedian(self.time_data[time][:,:,t1:t2+1].astype('float32'), axis=2)
+        with warnings.catch_warnings():
+          warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+          result = bc.nanmedian(self.time_data[time][:,:,t1:t2+1].astype('float32'), axis=2)
+        
         return self._key_from_time(time, t1, t2), result.astype('float16')
 
       def _cpu_processing(self, args):
@@ -400,7 +407,11 @@ try:
 
         for win_size in list(result.keys()):
           win_stacked = np.stack(result[win_size], axis=2).astype('float32')
-          result[win_size] = bc.nanmedian(win_stacked, axis=2).astype('float16')
+          
+          with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+            result[win_size] = bc.nanmedian(win_stacked, axis=2).astype('float16')
+
           del win_stacked
 
         return result
@@ -924,7 +935,11 @@ try:
 
         # necessary for a proper inpaint execution
         data_copy = np.copy(data)
-        initial_value = np.nanmedian(data_copy)
+        
+        with warnings.catch_warnings():
+          warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+          initial_value = np.nanmedian(data_copy)
+
         na_data_mask = np.isnan(data_copy)
         data_copy[na_data_mask] = initial_value
         data_gapfilled = cv.inpaint(data_copy.astype('float32'), na_data_mask.astype('uint8'), self.space_win, self.mode)

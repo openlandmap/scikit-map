@@ -40,6 +40,7 @@ extensions = [
     'sphinx_autodoc_typehints', # Automatically document param types (less noise in class signature)
     'nbsphinx',  # Integrate Jupyter Notebooks and Sphinx
     'numpydoc',
+    'sphinx_copybutton',
     'IPython.sphinxext.ipython_console_highlighting'
 ]
 
@@ -99,18 +100,36 @@ templates_path = ['_templates']
 
 # Readthedocs theme
 # on_rtd is whether on readthedocs.org, this line of code grabbed from docs.readthedocs.org...
-on_rtd = os.environ.get("READTHEDOCS", None) == "True"
-if not on_rtd:  # only import and set the theme if we're building docs locally
-    import sphinx_rtd_theme
-    html_theme = "sphinx_rtd_theme"
-    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
-html_css_files = ["readthedocs-custom.css"] # Override some CSS settings
+#on_rtd = os.environ.get("READTHEDOCS", None) == "True"
+#if not on_rtd:  # only import and set the theme if we're building docs locally
+#    import sphinx_rtd_theme
+#    html_theme = "sphinx_rtd_theme"
+#    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+#html_css_files = ["readthedocs-custom.css"] # Override some CSS settings
+
+#import sphinx_pdj_theme
+#html_theme = 'sphinx_pdj_theme'
+#html_theme_path = [sphinx_pdj_theme.get_html_theme_path()]
 
 # Pydata theme
-#html_theme = "pydata_sphinx_theme"
-#html_logo = "_static/logo-company.png"
+html_theme = "pydata_sphinx_theme"
+html_logo = "_static/logo.png"
 #html_theme_options = { "show_prev_next": False}
 #html_css_files = ['pydata-custom.css']
+html_theme_options = {
+    "collapse_navigation" : False,
+    "icon_links": [
+        {
+            "name": "GitLab",
+            "url": "https://gitlab.com/geoharmonizer_inea/eumap",
+            "icon": "fab fa-gitlab",
+        }
+    ],
+    "external_links": [
+      {"name": "Open Data Science Europe", "url": "http://opendatascience.eu"},
+    ],
+    "show_prev_next": False
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

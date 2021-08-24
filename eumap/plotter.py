@@ -160,8 +160,10 @@ try:
 			if nd is None:
 				alpha = None
 			else:
-				alpha = np.full_like(arr, 1, dtype=type(nd))
+				alpha = np.full_like(arr, 1, dtype='uint8')
 				alpha[arr==nd] = 0
+				if len(alpha.shape) == 3:
+					alpha = alpha[:,:,0]
 			ax.imshow(arr, alpha=alpha, cmap=cmap, vmin=_vmin, vmax=_vmax)
 			ax.axis('off')
 			if titles:
@@ -171,7 +173,7 @@ try:
 					ax.set_title(titles[i])
 		if out_file is not None:
 			plt.savefig(out_file, bbox_inches='tight')
-
+			
 except ImportError as e:
     from .misc import _warn_deps
     _warn_deps(e, 'plotter')

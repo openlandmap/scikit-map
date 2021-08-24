@@ -461,8 +461,11 @@ class LandMapper():
       return {'sample_weight': self.samples_weight}
 
   def _is_keras_classifier(self, estimator):
-    from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
-    return isinstance(estimator, Pipeline) and isinstance(estimator['estimator'], KerasClassifier)
+    try:
+      from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
+      return isinstance(estimator, Pipeline) and isinstance(estimator['estimator'], KerasClassifier)
+    except ImportError as e:
+      return False
 
   def _binarizer_target_if_needed(self, estimator):
     if  self.pred_method == 'predict_proba' and self._is_keras_classifier(estimator):
@@ -964,6 +967,8 @@ class LandMapper():
 
     for estimator in self.estimator_list:
       if self._is_keras_classifier(estimator):
+        from tensorflow.keras.models import load_model
+        
         fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
         estimator['estimator'].model = load_model(fn_keras)
 
