@@ -24,7 +24,7 @@ setuptools.setup(
     ],
     python_requires='>=3.7',
     install_requires=[
-        'GDAL>=3.1',
+        'GDAL',
         'affine>=2.3',
         'geopandas>=0.8',
         'joblib>=0.17',
