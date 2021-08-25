@@ -20,3 +20,13 @@ dependencies:
   - scikit-image>=0.17
   - scikit-learn>=0.24
   - shapely>=1.7
+  - sphinx
+  - sphinx-rtd-theme
+  - pydata-sphinx-theme
+  - sphinx-autodoc-typehints
+  - sphinx-copybutton
+  - nbsphinx
+  - jupytext
+  - jupyter
+  - matplotlib
+  - numpydoc
