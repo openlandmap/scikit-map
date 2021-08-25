@@ -4,6 +4,10 @@ version: 2
 
 conda:
   environment: docs/environment.yml
+  apt_packages:
+  - libclang
+  - cmake
+  - pandoc
 
 build:
   image: latest
