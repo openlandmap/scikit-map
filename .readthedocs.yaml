@@ -11,6 +11,7 @@ build:
     - gdal-bin
     - libgdal-dev
     - build-essential
+    - python-gdal
 
 python:
   version: 3.7
