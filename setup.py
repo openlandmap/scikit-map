@@ -24,10 +24,11 @@ setuptools.setup(
     ],
     python_requires='>=3.7',
     install_requires=[
+        'GDAL>=3.1',
         'affine>=2.3',
         'geopandas>=0.8',
         'joblib>=0.17',
-        'numpy>=1.19',
+        'numpy>=1.19<1.21',
         'pyproj>=3.1',
         'OWSLib>=0.24',
         'pandas>=1.1',

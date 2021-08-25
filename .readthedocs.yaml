@@ -5,19 +5,13 @@ version: 2
 sphinx:
   configuration: docs/conf.py
 
+conda:
+  environment: environment.yml
+
 build:
   image: latest
-  apt_packages:
-    - gdal-bin
-    - libgdal-dev
-    - build-essential
-    - python-gdal
 
 python:
   version: 3.7
   install:
   - requirements: docs/requirements.txt
-  - method: pip
-    path: .
-    extra_requirements:
-      - full
