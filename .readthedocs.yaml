@@ -10,6 +10,7 @@ build:
   apt_packages:
     - gdal-bin
     - libgdal-dev
+    - build-essential
 
 python:
   version: 3.7
