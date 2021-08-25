@@ -8,10 +8,6 @@
    Tutorials <tutorials>
    API Reference <_autosummary/eumap>
 
-##################
-EUMAP LIBRARY
-##################
-
 Eumap is a library to enable easier access to several **spatial layers prepared for Continental Europe** (*Landsat and Sentinel mosaics, DTM and climate datasets, land cover and vegetation maps*), as well the processing classes and functions used to produce them.
 
 It implements efficient **raster access** through `rasterio <https://rasterio.readthedocs.io>`_, multiple **gapfiling** approaches, **spatial and spacetime overlay**, **training samples** preparation (LUCAS points), and **Ensemble Machine Learning** applied to spatial predictions (fully compatible with `scikit-learn <https://scikit-learn.org>`_).

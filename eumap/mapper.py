@@ -14,6 +14,7 @@ import time
 import uuid
 import gc
 import re
+import os
 
 from sklearn.model_selection import cross_val_predict, GridSearchCV, KFold, BaseCrossValidator
 from sklearn.ensemble import RandomForestClassifier
@@ -39,6 +40,9 @@ from .raster import read_rasters, write_new_raster
 
 import warnings
 # warnings.filterwarnings('ignore') # should not ignore all warnings
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['AUTOGRAPH_VERBOSITY'] = '0'
 
 _automl_enabled = False
 try:
@@ -96,9 +100,16 @@ def build_ann(
   """
 
   try:
+    import tensorflow as tf
+    tf.autograph.set_verbosity(0)
+
+    import logging
+    logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
     from tensorflow.keras.layers import Dense, BatchNormalization, Dropout
     from tensorflow.keras.models import Sequential
     from tensorflow.keras.optimizers import Nadam
+
   except ImportError as e:
     warnings.warn('build_ann requires tensorflow>=2.5.0')
 
@@ -325,11 +336,13 @@ class LandMapper():
 
   def _min_samples_restriction(self, min_samples_per_class):
     classes_pct = (self.pts[self.target_col].value_counts() / self.pts[self.target_col].count())
-    rows_to_remove = self.pts[self.target_col].isin(classes_pct[classes_pct >= min_samples_per_class].axes[0])
-    nrows, _ = self.pts[~rows_to_remove].shape
+    rows_to_keep = self.pts[self.target_col].isin(classes_pct[classes_pct >= min_samples_per_class].axes[0])
+    nrows, _ = self.pts[~rows_to_keep].shape
     if nrows > 0:
-      self.pts = self.pts[rows_to_remove]
-      self._verbose(f'Removing {nrows} samples due min_samples_per_class condition (< {min_samples_per_class})')
+      removed_cls = self.pts[~rows_to_keep][self.target_col].unique()
+      self.pts = self.pts[rows_to_keep]
+      self._verbose(f'Removing {nrows} samples ({self.target_col} in {removed_cls}) '+
+        f'due min_samples_per_class condition (< {min_samples_per_class})')
 
   def _target_transformation(self):
 
