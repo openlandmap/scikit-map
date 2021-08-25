@@ -8,8 +8,6 @@ conda:
 build:
   image: latest
   apt_packages:
-    - libclang
-    - cmake
     - pandoc
 
 # This part is necessary otherwise the project is not built
