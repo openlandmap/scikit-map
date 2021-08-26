@@ -106,6 +106,7 @@ RUN apt-get update -y \
         python3-ply \
         python3-setuptools \
         python3-venv \
+        python3-wxgtk4.0 \
         software-properties-common \
         sqlite3 \
         subversion \
@@ -193,7 +194,9 @@ ENV GRASS_PYTHON=/usr/bin/python3
 # copy grass gis source
 WORKDIR /src
 RUN mkdir grass \
-    && wget -q https://github.com/OSGeo/grass/archive/refs/tags/${GRASS_VERSION}.tar.gz \
+# TODO: to be change when 8.0.0 will be released
+##    && wget -q https://github.com/OSGeo/grass/archive/refs/tags/${GRASS_VERSION}.tar.gz \
+    && wget -q https://github.com/OSGeo/grass/archive/refs/heads/main.tar.gz \
     -O - | tar xz -C grass --strip-components=1 \
     && cd grass \
     && rm -f dist.*/demolocation/.grassrc7? \
@@ -222,7 +225,8 @@ RUN mkdir grass \
     && make "-j$(nproc)" \
     && make install \
     && ldconfig \
-    && ln -s /usr/bin/grass78 /usr/bin/grass \
+#    && ln -sf /usr/bin/grass80 /usr/bin/grass \
+    && mv /usr/grass80 /usr/grass \
     && cd .. \
     && rm -rf grass
 
@@ -278,9 +282,6 @@ RUN wget https://www.uoguelph.ca/~hydrogeo/WhiteboxTools/WhiteboxTools_linux_amd
       && tar -xf WhiteboxTools_linux_amd64.tar.xz \
       && ln -s /opt/WBT/whitebox_tools /usr/bin/whitebox_tools \
       && rm WhiteboxTools_linux_amd64.tar.xz
-
-WORKDIR /
-RUN ln -s /usr/grass78 /usr/grass
 
 # Remove the dev deps
 RUN DEBIAN_FRONTEND=noninteractive apt-get remove -y \
