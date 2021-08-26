@@ -262,22 +262,32 @@ class Catalogue:
                 startposition=start_pos
             )
 
+        def key2csw(key):
+            return key if key == 'title' else 'AnyText'
+            # TODO: add support for more keys
+            # elif key == 'theme':
+            #     return 'gmd:MD_Keywords'
+
         layers = []
+        results = []
+
+        if key not in ('title', 'theme', 'abstract'):
+            warnings.warn(f'Key {key} is not supported by CSW implementation')
+            return results
 
         query = [PropertyIsEqualTo('csw:Subject', 'Geoharmonizer')]
         for arg in args:
-            query.append(PropertyIsEqualTo(f'csw:{key}', arg))
+            query.append(PropertyIsEqualTo(f'csw:{key2csw(key)}', arg))
 
         step = 10
         start_pos = 1
         getrecords(query, start_pos)
-        while start_pos < self.csw.results['matches']:
+        while start_pos <= self.csw.results['matches']:
             getrecords(query, start_pos)
             start_pos += step
 
-            self._records(layers)
+            self._records(layers, limit=(key, args))
 
-        results = []
         for layer in layers:
             for url in layer['urls']:
                 results.append({
@@ -287,7 +297,7 @@ class Catalogue:
 
         return results
 
-    def _records(self, layers):
+    def _records(self, layers, limit):
         for rec in self.csw.records:
             items = {
                 "title": self.csw.records[rec].identificationinfo[0].title,
@@ -303,6 +313,10 @@ class Catalogue:
             for ci in self.csw.records[rec].distribution.online:
                 if ci.protocol == "WWW:DOWNLOAD-1.0-http--download":
                     items['urls'].append(ci.url)
+
+            if (limit[0] == 'theme' and items['theme'] not in limit[1]) or \
+               (limit[0] == 'abstract' and limit[1][0].lower() not in items['abstract'].lower()):
+                continue
 
             layers.append(items)
 
