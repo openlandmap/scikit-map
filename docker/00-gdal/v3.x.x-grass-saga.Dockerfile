@@ -226,7 +226,6 @@ RUN mkdir grass \
     && make install \
     && ldconfig \
 #    && ln -sf /usr/bin/grass80 /usr/bin/grass \
-    && mv /usr/grass80 /usr/grass \
     && cd .. \
     && rm -rf grass
 
@@ -282,6 +281,9 @@ RUN wget https://www.uoguelph.ca/~hydrogeo/WhiteboxTools/WhiteboxTools_linux_amd
       && tar -xf WhiteboxTools_linux_amd64.tar.xz \
       && ln -s /opt/WBT/whitebox_tools /usr/bin/whitebox_tools \
       && rm WhiteboxTools_linux_amd64.tar.xz
+
+WORKDIR /
+RUN ln -s /usr/grass80 /usr/grass
 
 # Remove the dev deps
 RUN DEBIAN_FRONTEND=noninteractive apt-get remove -y \
