@@ -34,9 +34,9 @@ echo docker build \
 	--build-arg BASE_IMAGE=opengeohub/gdal:v3.1.4 \
 	--build-arg PDAL_VERSION=2.2.0 \
 	--build-arg LAZ_PERF_VERSION=1.5.0 \
-	--build-arg GRASS_VERSION=7.8.5 \
+	--build-arg GRASS_VERSION=8.0.dev \
 	--build-arg SAGA_VERSION=7.9.0 \
-	--tag opengeohub/gdal:v3.1.4-grass785-saga790 	\
+	--tag opengeohub/gdal:v3.1.4-grass80dev-saga790 	\
 	-f 00-gdal/v3.x.x-grass-saga.Dockerfile \
 	00-gdal
 
@@ -44,8 +44,8 @@ echo docker build \
 	--build-arg BASE_IMAGE=opengeohub/gdal:v3.2.2 \
 	--build-arg PDAL_VERSION=2.2.0 \
 	--build-arg LAZ_PERF_VERSION=1.5.0 \
-	--build-arg GRASS_VERSION=7.8.5 \
+	--build-arg GRASS_VERSION=8.0.dev \
 	--build-arg SAGA_VERSION=7.9.0 \
-	--tag opengeohub/gdal:v3.2.2-grass785-saga790 	\
+	--tag opengeohub/gdal:v3.2.2-grass80dev-saga790 	\
 	-f 00-gdal/v3.x.x-grass-saga.Dockerfile \
 	00-gdal
