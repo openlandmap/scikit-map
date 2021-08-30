@@ -13,3 +13,4 @@ gapfilled
 tmp*
 docs/_build/
 docs/_autosummary/
+docs/notebooks/*.gpkg
