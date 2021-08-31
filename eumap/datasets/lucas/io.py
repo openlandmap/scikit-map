@@ -27,7 +27,8 @@ class LucasIO:
     :param str version: WFS version to be used
     """
 
-    def __init__(self, url='http://lincalc-02.fsv.cvut.cz:8080/geoserver/wfs',
+    def __init__(self,
+                 url='http://lincalc-02.fsv.cvut.cz/geoserver/wfs',
                  version='1.1.0'):
         Logger.info(f"Using owslib version {owslib_version}")
         self._wfs_url = url
