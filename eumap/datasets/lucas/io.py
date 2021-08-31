@@ -126,8 +126,12 @@ class LucasIO:
                 layer_definition = layer1.GetLayerDefn()
                 for i in range(layer_definition.GetFieldCount()):
                     attr = layer_definition.GetFieldDefn(i).GetName()
-                    if attr not in ['point_id', 'nuts0', 'geom'] and int(attr[-4:]) not in self._years:
-                        layer.DeleteField(defn.GetFieldIndex(attr))
+                    try:
+                        if int(attr[-4:]) not in self._years:
+                            layer.DeleteField(defn.GetFieldIndex(attr))
+                    except ValueError:
+                        # some attributes are timeless (eg. point_id, ..., count_survey)
+                        pass
             del ds
         except RuntimeError as e:
             raise LucasDataError(f"Postprocessing failed: {e}")
