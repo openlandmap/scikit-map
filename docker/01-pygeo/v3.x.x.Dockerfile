@@ -81,7 +81,7 @@ RUN conda install --quiet --yes \
     "numexpr=2.7.*" \
     "numpy=1.21.*" \
     "opencv=4.5.*" \
-    "owslib=0.24.*" \
+    "owslib=0.22.*" \
     "pandas=1.3.*" \
     "patsy=0.5.*" \
     "proj=7.1.*" \

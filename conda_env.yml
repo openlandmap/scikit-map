@@ -11,7 +11,7 @@ dependencies:
   - numpy>=1.19
   - numba>=0.53
   - opencv>=4.5
-  - owslib>=0.24
+  - owslib>=0.22
   - pandas>=1.1
   - pygeos>=0.10
   - pyproj>=3.1

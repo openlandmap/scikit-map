@@ -30,7 +30,7 @@ setuptools.setup(
         'joblib>=0.17',
         'numpy>=1.19<1.21',
         'pyproj>=3.1',
-        'OWSLib>=0.24',
+        'OWSLib>=0.22',
         'pandas>=1.1',
         'requests>=2.24',
         'scikit_learn>=0.24',
@@ -45,7 +45,7 @@ setuptools.setup(
             'pyts>=0.11',
             'Shapely>=1.7',
             'scikit_image>=0.17',
-            'pygeos>=0.10',
+            'pygeos>=0.8',
         ],
     },
 )
