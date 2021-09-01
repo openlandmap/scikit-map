@@ -105,7 +105,7 @@ class LucasRequest:
             filter_xml = etree.tostring(filter_.toXML()).decode("utf-8")
             filter_xml = filter_xml.replace('ows:BoundingBox', 'geom')
             filter_xml = filter_xml.replace(
-                '<gml311:Envelope xmlns:gml311="http://www.opengis.net/gml">', '<gml311:Envelope xmlns:gml311="http://www.opengis.net/gml" srsName="http://www.opengis.net/gml/srs/epsg.xml#3035">'
+                '<gml311:Envelope', '<gml311:Envelope srsName="http://www.opengis.net/gml/srs/epsg.xml#3035"'
             )
             req.update({'filter': filter_xml})
 
