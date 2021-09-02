@@ -30,7 +30,7 @@ setuptools.setup(
         'joblib>=0.17',
         'numpy>=1.19<1.21',
         'pyproj>=3.1',
-        'OWSLib>=0.22',
+        'OWSLib==0.22',
         'pandas>=1.1',
         'requests>=2.24',
         'scikit_learn>=0.24',
