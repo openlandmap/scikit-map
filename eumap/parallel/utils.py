@@ -460,4 +460,5 @@ class TilingProcessing():
     """
 
     idx_list = range(0, self.num_tiles)
-    return self.process_multiple(idx_list, func, func_args, max_workers, use_threads)
+    return self.process_multiple(idx_list, func, *args, max_workers=max_workers, \
+      use_threads=use_threads, progress_bar=progress_bar)

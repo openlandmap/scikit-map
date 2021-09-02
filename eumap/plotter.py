@@ -116,7 +116,7 @@ try:
 			rasters[i] = np.stack(rasters[i], axis=-1)[:, :, :4]
 			if perc_clip:
 				try:
-					bands = range(0, raster[i].shape[2])
+					bands = range(0, rasters[i].shape[2])
 					data_equalized = []
 					for band in bands:
 						data_equalized.append(_percent_clip(rasters[i][:, :, band], perc_min, perc_max))
