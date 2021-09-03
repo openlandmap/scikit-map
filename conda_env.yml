@@ -7,7 +7,6 @@ dependencies:
   - gdal=3.1
   - geopandas=0.8
   - joblib=0.17
-  - matplotlib=3.3
   - numpy=1.19
   - numba=0.53
   - opencv=4.5

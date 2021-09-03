@@ -636,7 +636,7 @@ class LandMapper():
       separate_probs = False
 
     fn_pred_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_result, nan_mask,
-      separate_probs = separate_probs, spatial_win = spatial_win, scale=100)
+      separate_probs = separate_probs, spatial_win = spatial_win)
     fn_out_files += fn_pred_files
 
     if self.pred_method == 'predict_proba':
