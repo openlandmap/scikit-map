@@ -239,6 +239,7 @@ class LandMapper():
     self.pts = self._pts(points)
     self.target_col = target_col
 
+    self.feat_col_prfxs = feat_col_prfxs
     self.feature_cols = self._feature_cols(feat_cols, feat_col_prfxs)
 
     self.nodata_imputer = nodata_imputer
@@ -349,6 +350,7 @@ class LandMapper():
     self._verbose(f"Transforming {self.target_col}:")
 
     self.target_le = preprocessing.LabelEncoder()
+    # Change to starting from 1
     self.target = self.target_le.fit_transform(self.target)
 
     self.target_classes = {
@@ -561,7 +563,7 @@ class LandMapper():
 
   def _read_layers(self, dirs_layers:List = [], fn_layers:List = [], spatial_win = None,
     dtype = 'Float32', allow_additional_layers = False, inmem_calc_func = None, dict_layers_newnames={},
-    n_jobs_io = 5):
+    n_jobs_io = 5, verbose_renaming=True):
 
     raster_data, raster_files = read_rasters(raster_dirs=dirs_layers, raster_files=fn_layers, \
                                       spatial_win=spatial_win, dtype=dtype, n_jobs=n_jobs_io, \
@@ -577,7 +579,7 @@ class LandMapper():
       for newname in dict_layers_newnames.keys():
         layername_aux = layername
         layername = re.sub(dict_layers_newnames[newname], newname, layername)
-        if layername_aux != layername:
+        if layername_aux != layername and verbose_renaming:
           self._verbose(f'Renaming {layername_aux} to {layername}')
 
       if not allow_additional_layers and layername not in feature_cols_set:
@@ -608,7 +610,7 @@ class LandMapper():
 
     if new_suffix is not None:
       out_ext = Path(fn_output).suffix
-      fn_output = fn_output.replace(out_ext, new_suffix + out_ext)
+      fn_output = Path(str(fn_output).replace(out_ext, new_suffix + out_ext))
 
     fn_output_list = []
 
@@ -616,13 +618,15 @@ class LandMapper():
 
       for i in range(0,n_classes):
         out_ext = Path(fn_output).suffix
-        fn_output_c = fn_output.replace(out_ext, f'_b{i+1}' + out_ext)
+        fn_output_c = Path(str(fn_output).replace(out_ext, f'_b{i+1}' + out_ext))
 
-        write_new_raster(fn_base_layer, fn_output_c, output_data[:,:,i:i+1], spatial_win = spatial_win)
+        write_new_raster(fn_base_layer, fn_output_c, output_data[:,:,i:i+1], 
+          spatial_win = spatial_win, nodata=255)
         fn_output_list += [ fn_output_c ]
 
     else:
-      write_new_raster(fn_base_layer, fn_output, output_data, spatial_win = spatial_win)
+      write_new_raster(fn_base_layer, fn_output, output_data, 
+        spatial_win = spatial_win, nodata=255)
       fn_output_list += [ fn_output ]
 
     return fn_output_list
@@ -634,9 +638,12 @@ class LandMapper():
 
     if self.pred_method != 'predict_proba':
       separate_probs = False
+      scale = 1
+    else:
+      scale = 100
 
     fn_pred_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_result, nan_mask,
-      separate_probs = separate_probs, spatial_win = spatial_win)
+      separate_probs = separate_probs, spatial_win = spatial_win, scale = scale)
     fn_out_files += fn_pred_files
 
     if self.pred_method == 'predict_proba':
@@ -798,7 +805,8 @@ class LandMapper():
     inmem_calc_func:Callable = None,
     dict_layers_newnames:set = {},
     allow_additional_layers:bool = False,
-    n_jobs_io:int = 4
+    n_jobs_io:int = 4,
+    verbose_renaming:bool = True,
   ):
 
     """
@@ -827,6 +835,7 @@ class LandMapper():
     :param allow_additional_layers: Use ``False`` to throw a ``Exception`` if a read raster is not present
       in ``feature_cols``.
     :param n_jobs_io: Number of parallel jobs to read the raster files.
+    :param verbose_renaming: show which raster layers are renamed
 
     :returns: List with all the raster files produced as output.
     :rtype: List[Path]
@@ -834,7 +843,8 @@ class LandMapper():
 
     input_data, fn_layers = self._read_layers(dirs_layers, fn_layers, spatial_win, \
       dtype=dtype, inmem_calc_func=inmem_calc_func, dict_layers_newnames=dict_layers_newnames, \
-      allow_additional_layers=allow_additional_layers, n_jobs_io=n_jobs_io)
+      allow_additional_layers=allow_additional_layers, n_jobs_io=n_jobs_io, \
+      verbose_renaming=verbose_renaming)
 
     x_size, y_size, n_features = input_data.shape
 
