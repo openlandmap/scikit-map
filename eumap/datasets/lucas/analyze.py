@@ -77,8 +77,8 @@ class LucasClassAggregate:
         """
         try:
             with open(self.mappings_file) as json_file:
-                json_data = json.load(json_file)
-                self.apply(json_data)
+                self.mappings = json.load(json_file)
+                self._apply_from_data()
         except FileNotFoundError as e:
             raise LucasLoadError(f"Invalid json file path: {e}")
 
