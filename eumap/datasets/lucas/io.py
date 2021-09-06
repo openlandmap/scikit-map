@@ -36,7 +36,11 @@ class LucasIO:
         self._years = None
         self._st_aggregated = None
 
-        self._gml = None
+        self._path = None
+
+    @property
+    def data(self):
+        return self._path
 
     @staticmethod
     def __get_tempfile_name(extension):

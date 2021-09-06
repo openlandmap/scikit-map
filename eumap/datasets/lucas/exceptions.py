@@ -17,3 +17,7 @@ class LucasDataError(Exception):
 class LucasLoadError(Exception):
     """File open failed"""
     pass
+
+class LucasConfigError(Exception):
+    """File open failed"""
+    pass
