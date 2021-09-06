@@ -1,0 +1,1400 @@
+LC1,LU1,CLC3,Representativeness,Note
+A11,U111,111,1,
+A11,U113,111,0,U113 Kitchen garden
+A11,U120,121,0,U120 Forestry
+A11,U130,121,1,
+A11,U140,121,1,
+A11,U150,121,0,U150 Hunting
+A11,U210,121,1,
+A11,U221,121,1,
+A11,U222,121,1,
+A11,U223,121,1,
+A11,U224,121,1,
+A11,U225,121,1,
+A11,U226,121,1,
+A11,U227,121,1,
+A11,U228,121,1,
+A11,U311,111,1,U311 Railway transport
+A11,U312,111,1,U312 Road transport
+A11,U313,111,1,"U313 Water transport, 123 port areas?"
+A11,U314,111,1,124 Airports?
+A11,U316,121,1,
+A11,U317,121,1,
+A11,U318,121,1,U318 Protection infrastructure
+A11,U319,121,1,
+A11,U321,121,1,
+A11,U322,121,1,
+A11,U330,133,1,U330 Construction
+A11,U340,121,1,
+A11,U341,121,1,
+A11,U342,121,1,
+A11,U350,121,1,
+A11,U361,142,1,
+A11,U362,142,1,
+A11,U363,142,1,U362 Holiday camps (suppressed)
+A11,U364,111,0,U364 Nature reserve (suppressed)
+A11,U370,111,1,
+A11,U400,990,0,U400 Unused and abandoned areas
+A11,U410,990,0,U410 Abandoned areas
+A11,U411,121,0,U411 Abandoned industrial areas
+A11,U412,121,0,U412 Abandoned commercial areas
+A11,U413,111,0,U413 Abandoned transport areas
+A11,U414,111,0,U414 Abandoned residential areas
+A11,U415,990,0,U415 Other abandoned areas
+A12,U111,111,1,
+A12,U140,121,1,
+A12,U150,121,1,U150 Hunting
+A12,U210,121,1,
+A12,U221,121,1,
+A12,U222,121,1,
+A12,U223,121,1,
+A12,U224,121,1,
+A12,U225,121,1,
+A12,U226,121,1,
+A12,U227,121,1,
+A12,U228,121,1,
+A12,U311,111,1,U311 Railway transport
+A12,U312,111,1,U312 Road transport
+A12,U314,111,1,124 Airports?
+A12,U316,121,1,
+A12,U317,121,1,
+A12,U318,121,1,U318 Protection infrastructure
+A12,U319,121,1,
+A12,U321,121,1,
+A12,U322,121,1,
+A12,U330,133,1,U330 Construction
+A12,U340,121,1,
+A12,U341,121,1,
+A12,U342,121,1,
+A12,U350,121,1,
+A12,U361,142,1,
+A12,U362,142,1,
+A12,U370,111,1,
+A12,U400,990,0,U400 Unused and abandoned areas
+A12,U410,990,0,U410 Abandoned areas
+A12,U411,121,0,U411 Abandoned industrial areas
+A12,U412,121,0,U412 Abandoned commercial areas
+A12,U415,990,0,U415 Other abandoned areas
+A13,0,990,0,
+A13,U111,211,1,
+A13,U112,990,0,U112 Fallow land
+A13,U113,211,0,Patchy
+A13,U330,990,0,
+A13,U340,990,0,
+A13,U341,990,0,
+A13,U350,990,0,
+A13,U362,990,0,
+A13,U370,990,0,
+A13,U400,990,0,
+A13,U410,990,0,
+A13,U415,990,0,
+A21,U111,111,1,
+A21,U120,121,1,
+A21,U130,121,1,
+A21,U140,121,1,
+A21,U150,121,1,
+A21,U210,121,1,
+A21,U221,121,1,
+A21,U222,121,1,
+A21,U223,121,1,
+A21,U224,121,1,
+A21,U225,121,1,
+A21,U226,121,1,
+A21,U227,121,1,
+A21,U228,121,1,
+A21,U311,111,1,
+A21,U312,111,1,
+A21,U313,111,1,
+A21,U314,111,1,124 Airports?
+A21,U315,111,1,U315 Transport via pipelines
+A21,U316,121,1,
+A21,U317,121,1,
+A21,U318,121,1,U318 Protection infrastructures
+A21,U319,121,1,
+A21,U321,121,1,
+A21,U322,121,1,
+A21,U330,111,1,
+A21,U340,121,1,
+A21,U341,121,1,
+A21,U342,121,1,
+A21,U350,121,1,
+A21,U361,142,1,
+A21,U362,142,1,
+A21,U363,142,1,
+A21,U364,111,0,
+A21,U370,111,1,
+A21,U400,990,0,
+A21,U410,990,0,
+A21,U411,121,0,
+A21,U412,121,0,
+A21,U413,111,0,
+A21,U414,111,0,
+A21,U415,990,0,
+A22,U111,122,1,
+A22,U120,122,1,
+A22,U130,122,1,
+A22,U140,122,1,
+A22,U150,122,1,
+A22,U210,122,1,
+A22,U221,122,1,
+A22,U222,122,1,
+A22,U223,122,1,
+A22,U224,122,1,
+A22,U225,122,1,
+A22,U226,122,1,
+A22,U227,122,1,
+A22,U311,122,1,
+A22,U312,122,1,
+A22,U313,122,1,
+A22,U314,124,1,
+A22,U315,122,1,
+A22,U317,122,1,
+A22,U318,122,1,
+A22,U319,122,1,
+A22,U321,122,1,
+A22,U322,122,1,
+A22,U330,122,1,
+A22,U340,122,1,
+A22,U341,122,1,
+A22,U342,122,1,
+A22,U350,122,1,
+A22,U361,122,1,
+A22,U362,122,1,
+A22,U363,122,1,
+A22,U364,122,1,
+A22,U370,122,1,
+A22,U400,122,1,
+A22,U410,122,1,
+A22,U411,122,1,
+A22,U412,122,1,
+A22,U413,122,1,
+A22,U415,122,1,
+A30,U111,990,0,
+A30,U120,990,0,
+A30,U140,990,0,
+A30,U210,121,1,
+A30,U221,990,0,
+A30,U223,990,0,
+A30,U225,990,0,
+A30,U226,990,0,
+A30,U227,990,0,
+A30,U311,122,1,
+A30,U312,122,1,
+A30,U313,990,0,
+A30,U315,990,0,
+A30,U316,990,0,
+A30,U317,990,0,
+A30,U318,990,0,
+A30,U319,990,0,
+A30,U321,990,0,
+A30,U322,132,1,
+A30,U330,990,0,
+A30,U341,990,0,
+A30,U350,990,0,
+A30,U361,990,0,
+A30,U362,990,0,
+A30,U370,111,1,Residential
+A30,U410,132,1,
+A30,U411,990,0,
+A30,U413,990,0,
+A30,U415,990,0,
+A30,U420,990,0,
+B11,U111,211,1,-
+B11,U112,990,0,U112 Fallow and abandoned land
+B11,U113,211,0,Patchy
+B11,U150,990,0,U150 Hunting
+B11,U210,211,1,U210 Energy production
+B11,U350,990,0,U350 Community services
+B11,U410,990,0,U410 Abandoned areas
+B12,U111,211,1,-
+B12,U112,990,0,U112 Fallow and abandoned land
+B12,U113,211,0,Patchy
+B12,U364,990,0,U364 Nature reserves
+B13,U111,211,1,-
+B13,U112,990,0,U112 Fallow and abandoned land
+B13,U113,211,0,Patchy
+B13,U150,990,0,U150 Hunting
+B13,U350,990,0,U350 Community services
+B13,U361,990,0,U361 Leisure (allotments)
+B13,U364,990,0,U364 Nature reserves
+B14,U111,211,1,-
+B14,U112,990,0,U112 Fallow and abandoned land
+B15,U111,211,1,-
+B15,U112,990,0,U112 Fallow and abandoned land
+B15,U113,211,0,Patchy
+B15,U350,990,0,U350 Community services
+B15,U364,990,0,U364 Nature reserves
+B15,U410,990,0,U410 Abandoned areas
+B16,U111,211,1,-
+B16,U112,990,0,U112 Fallow and abandoned land
+B16,U113,211,0,Patchy
+B16,U150,990,0,U150 Hunting
+B16,U410,990,0,U410 Abandoned areas
+B17,U111,211,1,-
+B17,U112,990,0,U112 Fallow and abandoned land
+B18,U111,211,1,-
+B18,U112,990,0,U112 Fallow and abandoned land
+B18,U113,211,0,Patchy
+B19,U111,211,1,-
+B19,U112,990,0,U112 Fallow and abandoned land
+B19,U210,211,1,U210 Energy production
+B21,U111,211,1,-
+B21,U112,990,0,U112 Fallow and abandoned land
+B21,U113,211,0,Patchy
+B21,U120,990,0,U120 Forestry (wood production)
+B21,U312,990,0,U312 Roads
+B21,U361,990,0,U361 Leisure (allotments)
+B22,U111,211,1,-
+B22,U112,990,0,U112 Fallow and abandoned land
+B22,U113,211,0,Patchy
+B23,U111,211,1,-
+B23,U112,990,0,U112 Fallow and abandoned land
+B23,U113,211,0,Patchy
+B31,U111,211,1,-
+B31,U112,990,0,U112 Fallow and abandoned land
+B31,U113,211,0,Patchy
+B32,U111,211,1,-
+B32,U112,990,0,U112 Fallow and abandoned land
+B32,U113,211,0,Patchy
+B32,U150,990,0,U150 Hunting
+B32,U361,990,0,U361 Leisure (allotments)
+B33,U111,211,1,-
+B33,U112,990,0,U112 Fallow and abandoned land
+B33,U113,211,0,Patchy
+B34,U111,211,1,-
+B34,U113,990,0,U112 Fallow and abandoned land
+B35,U111,211,1,-
+B35,U112,990,0,U112 Fallow and abandoned land
+B35,U113,211,0,Patchy
+B36,U111,211,1,-
+B37,U111,211,1,-
+B37,U112,990,0,U112 Fallow and abandoned land
+B37,U113,211,0,Patchy
+B37,U210,211,1,U210 Energy production
+B37,U361,990,0,U361 Leisure (allotments)
+B41,U111,211,1,-
+B41,U112,990,0,U112 Fallow and abandoned land
+B41,U113,211,0,Patchy
+B42,U111,211,1,-
+B42,U112,990,0,U112 Fallow and abandoned land
+B42,U113,211,0,Patchy
+B42,U361,990,0,U361 Leisure (allotments)
+B43,U111,211,1,-
+B43,U112,990,0,U112 Fallow and abandoned land
+B43,U113,211,0,Patchy
+B43,U361,990,0,U361 Leisure (allotments)
+B44,U111,211,1,-
+B44,U113,211,0,Patchy
+B44,U312,990,0,U312 Roads
+B44,U340,990,0,"U340 Commerce, Finance, Business"
+B44,U341,990,0,U341 Wooded areas connected to commercial areas
+B44,U342,990,0,"U342 Financial, professional and information services"
+B44,U350,990,0,U350 Community services
+B44,U361,990,0,U361 Leisure (allotments)
+B44,U363,990,0,U363 Holiday camps
+B44,U370,990,0,U370 Ornamental plants in gardens of residential areas
+B44,U410,990,0,U410 Abandoned areas
+B45,U111,211,1,-
+B45,U112,990,0,U112 Fallow and abandoned land
+B45,U113,211,0,Patchy
+B51,U111,211,1,agricultural rotation
+B51,U112,990,0,agricultural rotation
+B51,U113,211,0,agricultural rotation
+B51,U361,990,0,U361 Leisure (allotments)
+B52,U111,211,1,agricultural rotation
+B52,U112,990,0,agricultural rotation
+B52,U113,211,0,agricultural rotation
+B52,U364,211,0,U364 Nature Reserve
+B52,U410,990,0,U410 Abandoned areas
+B53,U111,211,1,agricultural rotation
+B53,U112,990,0,agricultural rotation
+B53,U113,211,0,agricultural rotation
+B54,U111,211,1,agricultural rotation
+B54,U112,990,0,agricultural rotation
+B54,U113,211,0,agricultural rotation
+B54,U150,990,0,U150 Hunting
+B54,U415,990,0,U415 Other abandoned areas
+B55,U111,211,1,Temporary grasslands
+B55,U112,990,0,Temporary grasslands
+B55,U113,211,0,Temporary grasslands
+B55,U150,990,0,U150 Hunting
+B55,U350,990,0,U350 Community services
+B55,U361,990,0,U361 Leisure (allotments)
+B55,U415,990,0,U415 Other abandoned areas
+B71,U111,222,1,Permanent
+B71,U112,990,0,U112 Fallow and abandoned land
+B71,U113,222,0,Patchy
+B71,U120,990,0,U120 Forestry (wood production)
+B71,U350,990,0,U350 Community services
+B71,U361,990,0,U361 Leisure (allotments)
+B71,U363,990,0,U363 Holiday camps
+B71,U364,990,0,U364 Nature reserves
+B71,U370,990,0,U370 Ornamental plants in gardens of residential areas
+B71,U400,990,0,U400 Unused and abandoned areas
+B71,U410,990,0,U410 Abandoned areas
+B71,U415,990,0,U415 Other abandoned areas
+B72,U111,222,1,Permanent
+B72,U112,990,0,U112 Fallow and abandoned land
+B72,U113,222,0,Patchy
+B72,U410,990,0,U410 Abandoned areas
+B72,U415,990,0,U415 Other abandoned areas
+B73,U111,222,1,Permanent
+B73,U112,990,0,U112 Fallow and abandoned land
+B73,U113,222,0,Patchy
+B73,U120,990,0,U120 Forestry (wood production)
+B73,U350,990,0,U350 Community services
+B73,U361,990,0,U361 Leisure (allotments)
+B73,U363,990,0,U363 Holiday camps
+B73,U400,990,0,U400 Unused and abandoned areas
+B73,U410,990,0,U410 Abandoned areas
+B73,U414,990,0,U414 Abandoned residential areas
+B73,U415,990,0,U415 Other abandoned areas
+B74,U111,222,1,Permanent
+B74,U112,990,0,U112 Fallow and abandoned land
+B74,U113,222,0,Patchy
+B74,U120,990,0,U120 Forestry (wood production)
+B74,U150,990,0,U150 Hunting
+B74,U350,990,0,U350 Community services
+B74,U361,990,0,U361 Leisure (allotments)
+B74,U400,990,0,U400 Unused and abandoned areas
+B74,U410,990,0,U410 Abandoned areas
+B74,U415,990,0,U415 Other abandoned areas
+B75,U111,222,1,Permanent
+B75,U112,990,0,U112 Fallow and abandoned land
+B75,U113,222,0,Patchy
+B75,U350,990,0,U350 Community services
+B75,U361,990,0,U361 Leisure (allotments)
+B75,U370,990,0,U370 Ornamental plants in gardens of residential areas
+B75,U400,990,0,U400 Unused and abandoned areas
+B75,U410,990,0,U410 Abandoned areas
+B75,U415,990,0,U415 Other abandoned areas
+B76,U111,222,1,Permanent
+B76,U112,990,0,U112 Fallow and abandoned land
+B76,U113,222,0,Patchy
+B76,U400,990,0,U400 Unused and abandoned areas
+B76,U410,990,0,U410 Abandoned areas
+B76,U415,990,0,U415 Other abandoned areas
+B77,U111,222,1,Permanent
+B77,U112,990,0,U112 Fallow and abandoned land
+B77,U113,222,0,Patchy
+B77,U350,990,0,U350 Community services
+B77,U400,990,0,U400 Unused and abandoned areas
+B77,U410,990,0,U410 Abandoned areas
+B77,U415,990,0,U415 Other abandoned areas
+B81,U111,223,1,-
+B81,U112,990,0,U112 Fallow and abandoned land
+B81,U113,223,0,Patchy
+B81,U150,990,0,U150 Hunting
+B81,U350,990,0,U350 Community services
+B81,U361,990,0,U361 Leisure (allotments)
+B81,U400,990,0,U400 Unused and abandoned areas
+B81,U410,990,0,U410 Abandoned areas
+B81,U415,990,0,U415 Other abandoned areas
+B81,U420,990,0,U420 Semi-natural and natural areas not in use
+B82,U111,221,1,-
+B82,U112,990,0,U112 Fallow and abandoned land
+B82,U113,221,0,Patchy
+B82,U120,990,0,U120 Forestry (wood production)
+B82,U150,990,0,U150 Hunting
+B82,U312,990,0,U312 Roads
+B82,U361,990,0,U361 Leisure (allotments)
+B82,U400,990,0,U400 Unused and abandoned areas
+B82,U410,990,0,U410 Abandoned areas
+B82,U415,990,0,U415 Other abandoned areas
+B82,U420,990,0,U420 Semi-natural and natural areas not in use
+B83,U111,222,1,-
+B83,U113,222,0,Patchy
+B83,U120,990,0,U120 Forestry (wood production)
+B83,U150,990,0,U150 Hunting
+B83,U350,990,0,U350 Community services
+B83,U361,990,0,U361 Leisure (allotments)
+B83,U415,990,0,U415 Other abandoned areas
+B84,U111,222,0,Heterogeneous
+B84,U112,222,0,Patchy
+B84,U210,222,0,U210 Energy production
+B84,U361,990,0,U361 Leisure (allotments)
+B84,U400,990,0,U400 Unused and abandoned areas
+B84,U410,990,0,U410 Abandoned areas
+B84,U415,990,0,U415 Other abandoned areas
+BX1,8,990,0,
+BX1,U111,990,0,
+BX1,U112,990,0,
+BX1,U113,990,0,
+BX1,U120,990,0,U120 Forestry (wood production)
+BX1,U350,990,0,U350 Community services
+BX1,U410,990,0,U410 Abandoned areas
+BX1,U415,990,0,U415 Other abandoned areas
+BX2,U111,990,0,
+BX2,U112,990,0,
+BX2,U113,990,0,
+BX2,U350,990,0,U350 Community services
+BX2,U410,990,0,U410 Abandoned areas
+BX2,U415,990,0,U415 Other abandoned areas
+C10,U111,311,0,U111 Grazing
+C10,U112,311,0,U112 Shrub areas in fallow land
+C10,U120,311,1,U120 Areas used for forestry purpose
+C10,U130,311,0,U130 Fishing or collecting of water organisms
+C10,U140,311,0,U140 Salt extraction
+C10,U150,311,0,U150 wild growing non-wood forest products
+C10,U210,311,0,U210 Energy production
+C10,U221,311,1,U221L - Manufacture of food products
+C10,U223,311,0,"U223 Coal, oil and metal processing"
+C10,U224,311,0,U224 Production of non-metal mineral goods
+C10,U225,311,0,U225 Chemical and allied industries and manufacturing
+C10,U226,311,0,U226 Machinery and equipment
+C10,U227,311,1,U227 Wood based products
+C10,U311,311,0,U311 Railway transport
+C10,U312,311,0,U312 Road transport
+C10,U313,311,0,U313 Water transport
+C10,U314,311,0,U314 Air transport
+C10,U316,311,0,U316 Telecommunication
+C10,U317,311,0,U317 Logistics and storage
+C10,U318,311,0,U318 Protection infrastructures
+C10,U319,311,0,U319 Protection infrastructures
+C10,U321,311,0,U321 Water supply and treatment
+C10,U322,311,0,U322 Waste treatment
+C10,U330,311,0,U330 Construction
+C10,U340,311,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C10,U341,311,0,U341 Commerce
+C10,U342,311,0,"U342 Financial, professional and information services"
+C10,U350,311,0,U350 Wooded areas connected to community services
+C10,U361,311,0,"U361 Amenities, museums, leisure"
+C10,U362,311,0,U362 Sport
+C10,U363,311,0,U363 Holiday camps
+C10,U364,311,1,U364 Nature Reserve
+C10,U370,311,0,U370 Wooded areas in residential areas (urban parks)
+C10,U400,311,0,U400 Unused and abandoned areas
+C10,U410,311,0,U410 Abandoned areas
+C10,U411,311,0,U411 Abandoned industrial areas
+C10,U412,311,0,U350 Wooded areas connected to community services
+C10,U413,311,0,U411 Abandoned transport areas
+C10,U414,311,0,U414 Abandoned residential areas
+C10,U415,311,0,U415 Other abandoned areas
+C10,U420,311,0,U420 Semi-natural and natural areas not in use
+C11,U111,311,0,U111 Agricultural use: grazing
+C11,U113,311,0,U113 Kitchen garden
+C11,U120,311,0,U120 Areas used for forestry purpose
+C11,U130,311,0,U130 Fishing or collecting of water organisms
+C11,U140,311,0,U140 Salt extraction
+C11,U210,311,0,U210 Energy production
+C11,U226,311,0,U226 Machinery and equipment
+C11,U227,311,1,U227 Wood based products
+C11,U311,311,0,U311 Railway transport
+C11,U312,311,0,U312 Road transport
+C11,U318,311,0,U318 Protection infrastructures
+C11,U321,311,0,U321 Water supply and treatment
+C11,U340,311,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C11,U350,311,0,U350 Wooded areas connected to community services
+C11,U361,311,0,"U361 Amenities, museums, leisure"
+C11,U362,311,0,U362 Sport
+C11,U363,311,0,U363 Holiday camps
+C11,U370,311,0,U370 Wooded areas in residential areas (urban parks)
+C11,U400,311,0,U400 Unused and abandoned areas
+C11,U500,311,0,U50 Wetlands
+C12,U111,312,0,U111 Grazing
+C12,U113,312,0,U313 Water transport
+C12,U120,312,1,U120 Areas used for forestry purpose
+C12,U210,312,0,U210 Energy production
+C12,U225,312,0,U225 Chemical and allied industries and manufacturing
+C12,U227,312,1,U227 Wood based products
+C12,U312,312,0,U312 Road transport
+C12,U314,312,0,U314 Air transport
+C12,U322,312,0,U322 Waste treatment
+C12,U340,312,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C12,U350,312,0,U350 Wooded areas connected to community services
+C12,U361,312,0,"U361 Amenities, museums, leisure"
+C12,U362,312,0,U362 Sport
+C12,U363,312,0,U363 Holiday camps
+C12,U370,312,0,U370 Wooded areas in residential areas (urban parks)
+C12,U400,312,0,U400 Unused and abandoned areas
+C12,U500,312,0,U50 Wetlands
+C13,U111,313,0,U111 Grazing
+C13,U113,313,0,U313 Water transport
+C13,U120,313,1,U120 Areas used for forestry purpose
+C13,U130,313,0,U130 Fishing or collecting of water organisms
+C13,U140,313,0,U140 Salt extraction
+C13,U225,313,0,U225 Chemical and allied industries and manufacturing
+C13,U312,313,0,U312 Road transport
+C13,U316,313,0,U316 Telecommunication
+C13,U322,313,0,U322 Waste treatment
+C13,U340,313,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C13,U350,313,0,U350 Wooded areas connected to community services
+C13,U361,313,0,"U361 Amenities, museums, leisure"
+C13,U362,313,0,U362 Sport
+C13,U363,313,0,U363 Holiday camps
+C13,U370,313,0,U370 Wooded areas in residential areas (urban parks)
+C13,U400,313,0,U400 Unused and abandoned areas
+C13,U500,313,0,U50 Wetlands
+C20,U111,312,0,U111 Grazing
+C20,U120,312,1,U120 Areas used for forestry purpose
+C20,U130,312,0,U130 Fishing or collecting of water organisms
+C20,U140,312,0,U140 Salt extraction
+C20,U150,312,0,U150 wild growing non-wood forest products
+C20,U210,312,0,U210 Energy production
+C20,U226,312,0,U226 Machinery and equipment
+C20,U227,312,1,U227 Wood based products
+C20,U312,312,0,U312 Road transport
+C20,U314,312,0,U314 Air transport
+C20,U317,312,0,U317 Logistics and storage
+C20,U318,312,0,U318 Protection infrastructures
+C20,U321,312,0,U321 Water supply and treatment
+C20,U322,312,0,U322 Waste treatment
+C20,U340,312,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C20,U350,312,0,U350 Wooded areas connected to community services
+C20,U361,312,0,"U361 Amenities, museums, leisure"
+C20,U362,312,0,U362 Sport
+C20,U363,312,0,U363 Holiday camps
+C20,U364,312,1,U364 Nature Reserve
+C20,U370,312,0,U370 Wooded areas in residential areas (urban parks)
+C20,U400,312,0,U400 Unused and abandoned areas
+C21,U111,312,0,U111 Grazing
+C21,U112,312,0,U112 Shrub areas in fallow land
+C21,U113,312,0,U113 Kitchen garden
+C21,U120,312,1,U120 Areas used for forestry purpose
+C21,U130,312,0,U130 Fishing or collecting of water organisms
+C21,U140,312,0,U140 Salt extraction
+C21,U150,312,0,U150 wild growing non-wood forest products
+C21,U210,312,0,U210 Energy production
+C21,U224,312,0,U224 Production of non-metal mineral goods
+C21,U226,312,0,U226 Machinery and equipment
+C21,U311,312,0,U311 Railway transport
+C21,U312,312,0,U312 Road transport
+C21,U313,312,0,U313 Water transport
+C21,U316,312,0,U316 Telecommunication
+C21,U317,312,0,U317 Logistics and storage
+C21,U318,312,0,U318 Protection infrastructures
+C21,U319,312,0,U319 Protection infrastructures
+C21,U321,312,0,U321 Water supply and treatment
+C21,U322,312,0,U322 Waste treatment
+C21,U340,312,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C21,U341,312,0,U341 Wooded areas connected to commercial areas
+C21,U350,312,0,U350 Wooded areas connected to community services
+C21,U361,312,0,"U361 Amenities, museums, leisure"
+C21,U362,312,0,U362 Sport
+C21,U363,312,0,U363 Holiday camps
+C21,U370,312,0,U370 Wooded areas in residential areas (urban parks)
+C21,U400,312,0,U400 Unused and abandoned areas
+C21,U410,312,0,U410 Abandoned areas
+C21,U414,312,0,U414 Abandoned residential areas
+C21,U415,312,0,U415 Other abandoned areas
+C21,U420,312,0,U420 Semi-natural and natural areas not in use
+C21,U500,312,0,U50 Wetlands
+C22,U111,312,0,U111 Grazing
+C22,U120,312,1,U120 Areas used for forestry purpose
+C22,U130,312,0,U130 Fishing or collecting of water organisms
+C22,U140,312,0,U140 Salt extraction
+C22,U150,312,0,U150 wild growing non-wood forest products
+C22,U210,312,0,U210 Energy production
+C22,U221,312,1,U221L - Manufacture of food products
+C22,U224,312,0,U224 Production of non-metal mineral goods
+C22,U225,312,0,U225 Chemical and allied industries and manufacturing
+C22,U311,312,0,U311 Railway transport
+C22,U312,312,0,U312 Road transport
+C22,U314,312,0,U314 Air transport
+C22,U317,312,0,U317 Logistics and storage
+C22,U318,312,0,U318 Protection infrastructures
+C22,U319,312,0,U319 Protection infrastructures
+C22,U321,312,0,U321 Water supply and treatment
+C22,U322,312,0,U322 Waste treatment
+C22,U340,312,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C22,U341,312,0,U341 Wooded areas connected to commercial areas
+C22,U342,312,0,"U342 Financial, professional and information services"
+C22,U350,312,0,U350 Wooded areas connected to community services
+C22,U361,312,0,"U361 Amenities, museums, leisure"
+C22,U362,312,0,U362 Sport
+C22,U363,312,0,U363 Holiday camps
+C22,U370,312,0,U370 Wooded areas in residential areas (urban parks)
+C22,U400,312,0,U400 Unused and abandoned areas
+C22,U410,312,0,U410 Abandoned areas
+C22,U411,312,0,U411 Abandoned transport areas
+C22,U412,312,0,U350 Wooded areas connected to community services
+C22,U413,312,0,U411 Abandoned transport areas
+C22,U414,312,0,U414 Abandoned residential areas
+C22,U415,312,0,U415 Other abandoned areas
+C22,U420,312,0,U420 Semi-natural and natural areas not in use
+C22,U500,312,0,U50 Wetlands
+C23,U111,312,0,U111 Grazing
+C23,U112,312,0,U112 Shrub areas in fallow land
+C23,U120,312,1,U120 Areas used for forestry purpose
+C23,U130,312,0,U130 Fishing or collecting of water organisms
+C23,U140,312,0,U140 Salt extraction
+C23,U210,312,0,U210 Energy production
+C23,U312,312,0,U312 Road transport
+C23,U316,312,0,U316 Telecommunication
+C23,U318,312,0,U318 Protection infrastructures
+C23,U350,312,0,U350 Wooded areas connected to community services
+C23,U361,312,0,"U361 Amenities, museums, leisure"
+C23,U362,312,0,U362 Sport
+C23,U363,312,0,U363 Holiday camps
+C23,U370,312,0,U370 Wooded areas in residential areas (urban parks)
+C23,U400,312,0,U400 Unused and abandoned areas
+C23,U410,312,0,U410 Abandoned areas
+C23,U414,312,0,U414 Abandoned residential areas
+C23,U415,312,0,U415 Other abandoned areas
+C23,U420,312,0,U420 Semi-natural and natural areas not in use
+C23,U500,312,0,U50 Wetlands
+C30,U111,313,0,U111 Grazing
+C30,U120,313,1,U120 Areas used for forestry purpose
+C30,U130,313,0,U130 Fishing or collecting of water organisms
+C30,U140,313,0,U140 Salt extraction
+C30,U150,313,0,U150 wild growing non-wood forest products
+C30,U210,313,0,U210 Energy production
+C30,U221,313,1,U221L - Manufacture of food products
+C30,U223,313,0,"U223 Coal, oil and metal processing"
+C30,U311,313,0,U311 Railway transport
+C30,U312,313,0,U312 Road transport
+C30,U313,313,0,U313 Water transport
+C30,U318,313,0,U318 Protection infrastructures
+C30,U321,313,0,U321 Water supply and treatment
+C30,U322,313,0,U322 Waste treatment
+C30,U340,313,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C30,U350,313,0,U350 Wooded areas connected to community services
+C30,U361,313,0,"U361 Amenities, museums, leisure"
+C30,U362,313,0,U362 Sport
+C30,U363,313,0,U363 Holiday camps
+C30,U364,313,1,U364 Nature Reserve
+C30,U370,313,0,U370 Wooded areas in residential areas (urban parks)
+C30,U400,313,0,U400 Unused and abandoned areas
+C31,U111,313,0,U111 Grazing
+C31,U120,313,1,U120 Areas used for forestry purpose
+C31,U130,313,0,U130 Fishing or collecting of water organisms
+C31,U140,313,0,U140 Salt extraction
+C31,U150,313,0,U150 wild growing non-wood forest products
+C31,U210,313,0,U210 Energy production
+C31,U227,313,1,U227 Wood based products
+C31,U311,313,0,U311 Railway transport
+C31,U312,313,0,U312 Road transport
+C31,U316,313,0,U316 Telecommunication
+C31,U318,313,0,U318 Protection infrastructures
+C31,U319,313,0,U319 Protection infrastructures
+C31,U321,313,0,U321 Water supply and treatment
+C31,U341,313,0,U341 Wooded areas connected to commercial areas
+C31,U350,313,0,U350 Wooded areas connected to community services
+C31,U361,313,0,"U361 Amenities, museums, leisure"
+C31,U362,313,0,U362 Sport
+C31,U363,313,0,U363 Holiday camps
+C31,U370,313,0,U370 Wooded areas in residential areas (urban parks)
+C31,U410,313,0,U410 Abandoned areas
+C31,U411,313,0,U411 Abandoned transport areas
+C31,U420,313,0,U420 Semi-natural and natural areas not in use
+C32,U111,313,0,U111 Grazing
+C32,U120,313,1,U120 Areas used for forestry purpose
+C32,U130,313,0,U130 Fishing or collecting of water organisms
+C32,U140,313,0,U140 Salt extraction
+C32,U150,313,0,U150 wild growing non-wood forest products
+C32,U210,313,0,U210 Energy production
+C32,U223,313,0,"U223 Coal, oil and metal processing"
+C32,U224,313,0,U224 Production of non-metal mineral goods
+C32,U311,313,0,U311 Railway transport
+C32,U312,313,0,U312 Road transport
+C32,U314,313,0,U314 Air transport
+C32,U317,313,0,U317 Logistics and storage
+C32,U318,313,0,U318 Protection infrastructures
+C32,U319,313,0,U319 Protection infrastructures
+C32,U321,313,0,U321 Water supply and treatment
+C32,U322,313,0,U322 Waste treatment
+C32,U340,313,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C32,U341,313,0,U341 Wooded areas connected to commercial areas
+C32,U342,313,0,"U342 Financial, professional and information services"
+C32,U350,313,0,U350 Wooded areas connected to community services
+C32,U361,313,0,"U361 Amenities, museums, leisure"
+C32,U362,313,0,U362 Sport
+C32,U363,313,0,U363 Holiday camps
+C32,U370,313,0,U370 Wooded areas in residential areas (urban parks)
+C32,U410,313,0,U410 Abandoned areas
+C32,U411,313,0,U411 Abandoned transport areas
+C32,U414,313,0,U414 Abandoned residential areas
+C32,U415,313,0,U415 Other abandoned areas
+C32,U420,313,0,U420 Semi-natural and natural areas not in use
+C33,U111,313,0,U111 Grazing
+C33,U120,313,1,U120 Areas used for forestry purpose
+C33,U130,313,0,U130 Fishing or collecting of water organisms
+C33,U140,313,0,U140 Salt extraction
+C33,U210,313,0,U210 Energy production
+C33,U225,313,0,U225 Chemical and allied industries and manufacturing
+C33,U311,313,0,U311 Railway transport
+C33,U312,313,0,U312 Road transport
+C33,U313,313,0,U313 Water transport
+C33,U314,313,0,U314 Air transport
+C33,U317,313,0,U317 Logistics and storage
+C33,U318,313,0,U318 Protection infrastructures
+C33,U321,313,0,U321 Water supply and treatment
+C33,U340,313,0,"U340 COMMERCE, FINANCIAL, PROFESSIONAL AND INFORMATION SERVICE"
+C33,U341,313,0,U341 Wooded areas connected to commercial areas
+C33,U350,313,0,U350 Wooded areas connected to community services
+C33,U361,313,0,"U361 Amenities, museums, leisure"
+C33,U362,313,0,U362 Sport
+C33,U363,313,0,U363 Holiday camps
+C33,U370,313,0,U370 Wooded areas in residential areas (urban parks)
+C33,U410,313,0,U410 Abandoned areas
+C33,U411,313,0,U411 Abandoned transport areas
+C33,U413,313,0,U411 Abandoned transport areas
+C33,U414,313,0,U414 Abandoned residential areas
+C33,U415,313,0,U415 Other abandoned areas
+C33,U420,313,0,U420 Semi-natural and natural areas not in use
+D01,U111,322,1,U111 Agricultural use: grazing -> Pastures?
+D01,U112,322,1,
+D01,U120,322,1,
+D01,U140,322,1,
+D01,U210,322,1,
+D01,U224,322,1,
+D01,U225,322,1,
+D01,U311,322,1,
+D01,U312,322,1,
+D01,U317,322,1,
+D01,U318,322,1,
+D01,U321,322,1,
+D01,U340,322,1,
+D01,U350,322,1,
+D01,U361,322,1,
+D01,U362,322,1,
+D01,U363,322,1,
+D01,U370,141,1,
+D01,U400,322,1,
+D01,U500,990,0,U500 Wetland
+D02,U111,322,1,U111 Agricultural use: grazing -> Pastures?
+D02,U112,322,1,
+D02,U120,322,1,
+D02,U140,322,1,
+D02,U210,322,1,
+D02,U311,322,1,
+D02,U312,322,1,
+D02,U313,322,1,
+D02,U314,322,1,
+D02,U317,322,1,
+D02,U318,322,1,
+D02,U322,322,1,
+D02,U340,322,1,
+D02,U350,322,1,
+D02,U361,322,1,
+D02,U362,322,1,
+D02,U370,141,1,
+D02,U400,322,1,
+D02,U500,990,0,U500 Wetland
+D10,U111,322,1,U111 Agricultural use: grazing -> Pastures?
+D10,U112,322,1,
+D10,U120,322,1,
+D10,U130,322,1,
+D10,U140,322,1,
+D10,U150,322,1,
+D10,U210,322,1,
+D10,U223,322,1,
+D10,U224,322,1,
+D10,U225,322,1,
+D10,U226,322,1,
+D10,U227,322,1,
+D10,U311,322,1,
+D10,U312,322,1,
+D10,U313,322,1,
+D10,U314,322,1,
+D10,U315,322,1,
+D10,U316,322,1,
+D10,U317,322,1,
+D10,U318,322,1,
+D10,U319,322,1,
+D10,U321,322,1,
+D10,U322,322,1,
+D10,U330,322,1,
+D10,U340,322,1,
+D10,U341,322,1,
+D10,U342,322,1,
+D10,U350,322,1,
+D10,U361,322,1,
+D10,U362,322,1,
+D10,U363,322,1,
+D10,U364,322,1,
+D10,U370,141,1,
+D10,U400,322,1,
+D10,U410,322,1,
+D10,U411,322,1,
+D10,U412,322,1,
+D10,U413,322,1,
+D10,U414,141,0,U414 Abandoned residential areas
+D10,U415,322,1,
+D10,U420,322,1,
+D20,U111,322,1,U111 Agricultural use: grazing -> Pastures?
+D20,U112,322,1,
+D20,U120,322,1,
+D20,U130,322,1,
+D20,U140,322,1,
+D20,U150,322,1,
+D20,U210,322,1,
+D20,U221,322,1,
+D20,U224,322,1,
+D20,U225,322,1,
+D20,U226,322,1,
+D20,U227,322,1,
+D20,U311,322,1,
+D20,U312,322,1,
+D20,U313,322,1,
+D20,U314,322,1,
+D20,U315,322,1,
+D20,U316,322,1,
+D20,U317,322,1,
+D20,U318,322,1,
+D20,U319,322,1,
+D20,U321,322,1,
+D20,U322,322,1,
+D20,U330,322,1,
+D20,U340,322,1,
+D20,U341,322,1,
+D20,U350,322,1,
+D20,U361,322,1,
+D20,U362,322,1,
+D20,U363,322,1,
+D20,U364,322,1,
+D20,U370,141,1,
+D20,U400,322,1,
+D20,U410,322,1,
+D20,U411,322,1,
+D20,U412,322,1,
+D20,U413,322,1,
+D20,U414,141,0,U414 Abandoned residential areas
+D20,U415,322,1,
+D20,U420,322,1,
+E01,0,990,0,
+E01,U111,231,0,"U111 Agriculture: Permanent pastures, rough grazings, alpages"
+E01,U112,990,0,U112 Fallow land
+E01,U113,141,0,U113 Kitchen garden
+E01,U120,324,1,U120 Clear cuts within previously existing forests
+E01,U130,321,0,Possibly 141 Green urban areas?
+E01,U140,321,0,
+E01,U210,321,0,Possibly 141 Green urban areas?
+E01,U221,321,0,Possibly 141 Green urban areas?
+E01,U223,321,0,Possibly 141 Green urban areas?
+E01,U224,321,0,Possibly 141 Green urban areas?
+E01,U225,321,0,Possibly 141 Green urban areas?
+E01,U311,321,0,
+E01,U312,321,0,
+E01,U313,321,0,
+E01,U314,321,0,
+E01,U316,321,0,
+E01,U317,321,0,
+E01,U318,321,0,
+E01,U321,321,0,Possibly 141 Green urban areas?
+E01,U322,321,0,Possibly 141 Green urban areas?
+E01,U330,321,0,Possibly 141 Green urban areas?
+E01,U340,141,1,
+E01,U350,141,1,
+E01,U361,142,1,
+E01,U362,142,1,
+E01,U363,142,1,
+E01,U370,141,1,
+E01,U400,321,0,
+E01,U500,990,0,Wetlands (4)
+E02,U111,231,1,
+E02,U112,990,0,U112 Fallow land
+E02,U113,141,0,U113 Kitchen garden
+E02,U120,324,1,U120 Clear cuts within previously existing forests
+E02,U130,321,1,Possibly 141 Green urban areas?
+E02,U140,321,1,
+E02,U210,321,1,Possibly 141 Green urban areas?
+E02,U221,321,1,Possibly 141 Green urban areas?
+E02,U222,321,1,Possibly 141 Green urban areas?
+E02,U223,321,1,Possibly 141 Green urban areas?
+E02,U224,321,1,Possibly 141 Green urban areas?
+E02,U225,321,1,Possibly 141 Green urban areas?
+E02,U226,321,1,Possibly 141 Green urban areas?
+E02,U227,321,1,Possibly 141 Green urban areas?
+E02,U311,321,1,
+E02,U312,321,1,
+E02,U313,321,1,
+E02,U314,321,1,
+E02,U315,321,1,
+E02,U316,321,1,
+E02,U317,321,1,
+E02,U318,321,1,
+E02,U321,321,1,Possibly 141 Green urban areas?
+E02,U322,321,1,Possibly 141 Green urban areas?
+E02,U330,321,1,Possibly 141 Green urban areas?
+E02,U340,141,1,
+E02,U350,141,1,
+E02,U361,142,1,
+E02,U362,142,1,
+E02,U363,142,1,
+E02,U370,141,1,
+E02,U400,321,1,U400 UNUSED
+E02,U500,990,0,U500 Wetland
+E10,U111,231,0,"Agriculture: permanent pastures, rough grazing, alpages, meadows"
+E10,U112,990,0,U112 Fallow land
+E10,U113,141,0,U113 Kitchen garden
+E10,U120,324,1,U120 Clear cuts within previously existing forests
+E10,U130,321,0,Possibly 141 Green urban areas?
+E10,U140,321,0,
+E10,U150,321,0,
+E10,U210,321,0,Possibly 141 Green urban areas?
+E10,U221,321,0,Possibly 141 Green urban areas?
+E10,U222,321,0,Possibly 141 Green urban areas?
+E10,U223,321,0,Possibly 141 Green urban areas?
+E10,U224,321,0,Possibly 141 Green urban areas?
+E10,U225,321,0,Possibly 141 Green urban areas?
+E10,U226,321,0,Possibly 141 Green urban areas?
+E10,U227,321,0,Possibly 141 Green urban areas?
+E10,U228,321,0,Possibly 141 Green urban areas?
+E10,U311,321,0,
+E10,U312,321,0,
+E10,U313,321,0,
+E10,U314,321,0,
+E10,U315,321,0,
+E10,U316,321,0,
+E10,U317,321,0,
+E10,U318,321,0,
+E10,U319,321,0,
+E10,U321,321,0,Possibly 141 Green urban areas?
+E10,U322,321,0,Possibly 141 Green urban areas?
+E10,U330,321,0,Possibly 141 Green urban areas?
+E10,U340,141,1,
+E10,U341,141,1,
+E10,U342,141,1,
+E10,U350,141,1,
+E10,U361,142,1,
+E10,U362,142,1,
+E10,U363,142,1,
+E10,U364,321,0,
+E10,U370,141,1,
+E10,U400,321,0,
+E10,U410,321,0,
+E10,U411,321,0,Possibly 141 Green urban areas?
+E10,U412,321,0,Possibly 141 Green urban areas?
+E10,U413,321,0,
+E10,U414,321,0,Possibly 141 Green urban areas?
+E10,U415,321,0,
+E10,U420,321,0,
+E20,U111,231,1,Agriculture: Permanent pastures…
+E20,U112,990,0,U112 Fallow land
+E20,U113,141,0,U113 Kitchen garden
+E20,U120,324,1,U120 Clear cuts within previously existing forests
+E20,U130,321,1,Possibly 141 Green urban areas?
+E20,U140,321,1,
+E20,U150,321,1,
+E20,U210,321,1,Possibly 141 Green urban areas?
+E20,U221,321,1,Possibly 141 Green urban areas?
+E20,U222,321,1,Possibly 141 Green urban areas?
+E20,U223,321,1,Possibly 141 Green urban areas?
+E20,U224,321,1,Possibly 141 Green urban areas?
+E20,U225,321,1,Possibly 141 Green urban areas?
+E20,U226,321,1,Possibly 141 Green urban areas?
+E20,U227,321,1,Possibly 141 Green urban areas?
+E20,U311,321,1,
+E20,U312,321,1,
+E20,U313,321,1,
+E20,U314,321,1,
+E20,U315,321,1,
+E20,U316,321,1,
+E20,U317,321,1,
+E20,U318,321,1,
+E20,U319,321,1,
+E20,U321,321,1,Possibly 141 Green urban areas?
+E20,U322,321,1,Possibly 141 Green urban areas?
+E20,U330,321,1,Possibly 141 Green urban areas?
+E20,U340,141,1,
+E20,U341,141,1,
+E20,U342,141,1,
+E20,U350,141,1,
+E20,U361,142,1,
+E20,U362,142,1,
+E20,U363,142,1,
+E20,U364,321,1,
+E20,U370,141,1,
+E20,U400,321,1,
+E20,U410,321,1,
+E20,U411,321,1,Possibly 141 Green urban areas?
+E20,U412,321,1,Possibly 141 Green urban areas?
+E20,U413,321,1,
+E20,U414,321,1,Possibly 141 Green urban areas?
+E20,U415,321,1,
+E20,U420,321,1,
+E20 ,U400,321,1,
+E30,U111,990,0,
+E30,U112,990,0,
+E30,U113,990,0,
+E30,U120,324,1,
+E30,U130,990,0,
+E30,U140,990,0,
+E30,U150,990,0,
+E30,U210,990,0,
+E30,U221,990,0,
+E30,U223,990,0,
+E30,U224,990,0,
+E30,U225,990,0,
+E30,U226,990,0,
+E30,U227,990,0,
+E30,U311,990,0,
+E30,U312,990,0,
+E30,U313,990,0,
+E30,U314,990,0,
+E30,U315,990,0,
+E30,U316,990,0,
+E30,U317,990,0,
+E30,U318,990,0,
+E30,U319,990,0,
+E30,U321,990,0,
+E30,U322,990,0,
+E30,U330,990,0,
+E30,U340,990,0,Possibly 141 Green urban areas?
+E30,U341,990,0,Possibly 141 Green urban areas?
+E30,U342,990,0,Possibly 141 Green urban areas?
+E30,U350,990,0,Possibly 141 Green urban areas?
+E30,U361,142,1,
+E30,U362,142,1,
+E30,U363,142,1,
+E30,U364,990,0,
+E30,U370,990,0,Possibly 141 Green urban areas?
+E30,U400,990,0,
+E30,U410,990,0,
+E30,U411,990,0,
+E30,U412,990,0,
+E30,U413,990,0,
+E30,U414,990,0,
+E30,U415,990,0,
+E30,U420,990,0,
+F00,U111,990,0,Not specified
+F00,U112,990,0,U112 Fallow land
+F00,U113,990,0,Not specified
+F00,U120,324,1,U120 Forestry (clear cuts within forests)
+F00,U130,990,0,Not specified
+F00,U140,131,1,"U140 Scrapped or excavated areas for quarrying, mining purposes"
+F00,U150,990,0,Not specified
+F00,U210,990,0,Not specified
+F00,U221,990,0,Not specified
+F00,U222,990,0,Not specified
+F00,U223,990,0,Not specified
+F00,U224,990,0,Not specified
+F00,U225,990,0,Not specified
+F00,U226,990,0,Not specified
+F00,U227,990,0,Not specified
+F00,U311,990,0,Not specified
+F00,U312,990,0,Not specified
+F00,U313,990,0,Not specified
+F00,U314,990,0,Not specified
+F00,U316,990,0,Not specified
+F00,U317,990,0,Not specified
+F00,U318,990,0,Not specified
+F00,U321,990,0,Not specified
+F00,U322,990,0,Not specified
+F00,U330,133,1,U330 Construction sites
+F00,U340,990,0,Not specified
+F00,U350,990,0,Not specified
+F00,U361,990,0,Not specified
+F00,U362,990,0,Not specified
+F00,U363,990,0,Not specified
+F00,U364,990,0,Not specified
+F00,U370,990,0,Not specified
+F00,U400,332,1,"U400 Bare areas not utilised (inland rocks, top mountains)"
+F00,U500,990,0,U500 Wetland
+F10,U111,332,1,
+F10,U112,332,1,
+F10,U120,332,1,
+F10,U130,332,1,
+F10,U140,131,1,"40 Scrapped or excavated areas for quarrying, mining purposes"
+F10,U150,332,1,
+F10,U210,332,1,
+F10,U223,332,1,
+F10,U224,332,1,
+F10,U311,332,1,
+F10,U312,332,1,
+F10,U313,332,1,
+F10,U316,332,1,
+F10,U317,332,1,
+F10,U318,332,1,
+F10,U319,332,1,
+F10,U321,332,1,
+F10,U322,332,1,
+F10,U330,133,1,U330 Construction sites
+F10,U341,332,0,U34x Rocky areas attached to commercial services
+F10,U350,332,0,U350 Rocky areas attached to community services
+F10,U361,332,1,
+F10,U362,332,1,
+F10,U363,332,1,
+F10,U370,332,0,U370 Rocky areas attached to residential areas
+F10,U410,332,1,
+F10,U415,332,1,
+F10,U420,321,1,
+F20,U111,331,1,
+F20,U112,331,1,
+F20,U120,324,1,U120 Clear cuts within previously existing forests
+F20,U130,331,1,
+F20,U140,131,1,"U140 Scrapped or excavated areas for quarrying, mining purposes"
+F20,U150,331,1,
+F20,U210,331,1,
+F20,U221,331,1,
+F20,U223,331,1,
+F20,U224,331,1,
+F20,U226,331,1,
+F20,U227,331,1,
+F20,U312,331,1,
+F20,U313,331,1,
+F20,U314,331,1,
+F20,U317,331,1,
+F20,U318,331,1,
+F20,U319,331,1,
+F20,U321,331,1,
+F20,U322,331,1,
+F20,U330,133,1,U330 Construction sites
+F20,U341,331,0,Sandy areas attached to commercial services
+F20,U350,331,0,Sandy areas attached to community services
+F20,U361,331,1,
+F20,U362,331,1,
+F20,U363,331,1,
+F20,U370,331,0,Sandy areas attached to residential areas
+F20,U410,331,1,
+F20,U413,331,1,
+F20,U415,331,1,
+F20,U420,331,1,
+F30,U111,333,1,
+F30,U112,333,1,
+F30,U120,324,1,U120 Clear cuts within previously existing forests
+F30,U140,131,1,"U140 Scrapped or excavated areas for quarrying, mining purposes"
+F30,U319,333,1,
+F30,U350,133,1,U330 Construction sites
+F30,U361,333,1,
+F30,U370,333,0,U370 Areas attached to residential areas
+F30,U410,333,1,
+F30,U411,333,1,
+F30,U420,333,1,
+F40,U111,990,0,Not specified
+F40,U112,990,0,Not specified
+F40,U113,990,0,Not specified
+F40,U120,324,1,U120 Clear cuts within previously existing forests
+F40,U140,131,1,"U140 Scrapped or excavated areas for quarrying, mining purposes"
+F40,U210,990,0,Not specified
+F40,U221,990,0,Not specified
+F40,U223,990,0,Not specified
+F40,U224,990,0,Not specified
+F40,U225,990,0,Not specified
+F40,U226,990,0,Not specified
+F40,U227,990,0,Not specified
+F40,U311,990,0,Not specified
+F40,U312,990,0,Not specified
+F40,U313,990,0,Not specified
+F40,U314,990,0,Not specified
+F40,U315,990,0,Not specified
+F40,U316,990,0,Not specified
+F40,U317,990,0,Not specified
+F40,U318,990,0,Not specified
+F40,U319,990,0,Not specified
+F40,U321,990,0,Not specified
+F40,U322,990,0,Not specified
+F40,U330,133,1,U330 Construction sites
+F40,U340,990,0,Not specified
+F40,U341,990,0,Not specified
+F40,U350,990,0,Not specified
+F40,U361,990,0,Not specified
+F40,U362,990,0,Not specified
+F40,U370,990,0,Not specified
+F40,U410,990,0,Not specified
+F40,U411,990,0,Not specified
+F40,U412,990,0,Not specified
+F40,U413,990,0,Not specified
+F40,U414,990,0,Not specified
+F40,U415,990,0,Not specified
+F40,U420,990,0,Not specified
+G01,U111,512,1,
+G01,U120,512,1,
+G01,U130,512,1,
+G01,U140,512,1,
+G01,U210,512,1,
+G01,U221,512,1,
+G01,U224,512,1,
+G01,U226,512,1,
+G01,U312,512,1,
+G01,U313,512,1,
+G01,U317,512,1,
+G01,U321,512,1,U321 Water supply and treatment
+G01,U322,512,1,U322 Waste treatment
+G01,U330,512,1,
+G01,U340,512,1,
+G01,U350,512,1,
+G01,U361,512,0,Swimming pools
+G01,U362,512,0,Swimming pools
+G01,U363,512,0,Swimming pools
+G01,U370,512,0,Swimming pools
+G01,U400,512,1,
+G01,U500,990,0,U500 Wetlands
+G02,U111,511,1,
+G02,U120,511,1,
+G02,U130,511,1,
+G02,U210,511,1,
+G02,U312,511,1,
+G02,U313,511,1,
+G02,U314,511,1,
+G02,U318,511,1,
+G02,U321,511,1,U321 Water supply and treatment
+G02,U361,511,1,
+G02,U362,511,1,
+G02,U400,511,1,
+G02,U500,990,0,U500 Wetlands
+G03,U130,990,0,521 Coastal lagoons or 522 Estuaries
+G03,U140,422,1,U140 Salt extraction
+G03,U313,990,0,521 Coastal lagoons?
+G03,U321,990,0,U321 Water supply and treatment
+G03,U350,990,0,
+G03,U361,990,0,521 Coastal lagoons?
+G03,U400,990,0,
+G05,U350,335,1,
+G10,U111,512,1,
+G10,U130,512,1,
+G10,U140,512,1,
+G10,U150,512,1,
+G10,U210,512,1,
+G10,U221,512,1,
+G10,U224,512,1,
+G10,U313,512,1,
+G10,U314,512,1,
+G10,U317,512,1,
+G10,U318,512,1,
+G10,U321,512,1,
+G10,U322,512,1,
+G10,U340,512,1,
+G10,U350,512,1,
+G10,U361,512,0,Swimming pools
+G10,U362,512,0,Swimming pools
+G10,U363,512,0,Swimming pools
+G10,U364,512,1,
+G10,U370,512,0,Swimming pools
+G10,U400,512,1,
+G10,U410,512,1,
+G10,U420,512,1,
+G11,U111,512,1,
+G11,U130,512,1,
+G11,U140,512,1,
+G11,U210,512,1,
+G11,U313,512,1,
+G11,U321,512,1,
+G11,U322,512,1,
+G11,U330,512,1,
+G11,U341,512,1,
+G11,U342,512,1,
+G11,U350,512,1,
+G11,U361,512,0,Swimming pools
+G11,U362,512,0,Swimming pools
+G11,U370,512,0,Swimming pools
+G11,U410,512,1,
+G11,U411,512,1,
+G11,U413,512,1,
+G11,U415,512,1,
+G11,U420,512,1,
+G12,U111,512,1,
+G12,U130,512,1,
+G12,U140,512,1,
+G12,U313,512,1,
+G12,U321,512,1,
+G12,U361,512,0,Swimming pools
+G12,U362,512,0,Swimming pools
+G12,U370,512,0,Swimming pools
+G12,U410,512,1,
+G12,U420,512,1,
+G20,U111,511,1,
+G20,U130,511,1,
+G20,U140,511,1,
+G20,U150,511,1,
+G20,U210,511,1,
+G20,U224,511,1,
+G20,U313,511,1,
+G20,U318,511,1,
+G20,U321,511,1,
+G20,U322,511,1,
+G20,U350,511,1,
+G20,U361,511,1,
+G20,U362,511,1,
+G20,U364,511,1,
+G20,U370,511,1,
+G20,U400,511,1,
+G20,U410,511,1,
+G20,U420,511,1,
+G21,U111,511,1,
+G21,U130,511,1,
+G21,U140,511,1,
+G21,U210,511,1,
+G21,U313,511,1,
+G21,U321,511,1,
+G21,U322,511,1,
+G21,U341,511,1,
+G21,U350,511,1,
+G21,U361,511,1,
+G21,U362,511,1,
+G21,U370,511,1,
+G21,U410,511,1,
+G21,U415,511,1,
+G21,U420,511,1,
+G22,U130,511,1,
+G22,U140,511,1,
+G22,U313,511,1,
+G22,U420,511,1,
+G30,U130,990,0,521 Coastal lagoons or 522 Estuaries
+G30,U140,422,1,U140 Salt extraction
+G30,U313,990,0,521 Coastal lagoons or 522 Estuaries
+G30,U321,990,0,521 Coastal lagoons or 522 Estuaries
+G30,U350,990,0,521 Coastal lagoons or 522 Estuaries
+G30,U361,990,0,521 Coastal lagoons or 522 Estuaries
+G30,U362,990,0,521 Coastal lagoons or 522 Estuaries
+G30,U363,990,0,521 Coastal lagoons or 522 Estuaries
+G30,U364,990,0,521 Coastal lagoons or 522 Estuaries
+G30,U400,990,0,521 Coastal lagoons or 522 Estuaries
+G30,U420,990,0,521 Coastal lagoons or 522 Estuaries
+G50,U350,335,1,
+G50,U361,335,1,
+G50,U362,335,1,
+G50,U364,335,1,
+G50,U400,335,1,
+G50,U420,335,1,
+H11,U111,411,1,
+H11,U130,411,1,
+H11,U140,411,1,
+H11,U150,411,1,
+H11,U210,411,1,
+H11,U322,411,1,
+H11,U330,411,1,
+H11,U341,411,0,U341 Commerce
+H11,U350,411,0,U350 Community services
+H11,U361,411,0,"U361 Amenities, museums, leisure"
+H11,U362,411,0,U362 Sport
+H11,U364,411,1,
+H11,U370,411,0,U370 Residential
+H11,U400,411,1,
+H11,U410,411,0,
+H11,U411,411,0,U411 Abandoned industrial areas
+H11,U415,411,1,
+H11,U420,411,1,
+H12,U130,412,1,
+H12,U140,412,1,
+H12,U150,412,1,
+H12,U210,412,1,
+H12,U330,412,1,
+H12,U350,412,0,U350 Community services
+H12,U361,412,0,"U361 Amenities, museums, leisure"
+H12,U362,412,0,U362 Sport
+H12,U364,412,1,
+H12,U400,412,1,
+H12,U410,412,1,
+H12,U411,412,0,U411 Abandoned industrial areas
+H12,U415,412,1,
+H12,U420,412,1,
+H21,U111,421,1,
+H21,U130,421,1,
+H21,U150,421,1,
+H21,U210,421,1,
+H21,U350,421,0,U350 Community services
+H21,U361,421,0,"U361 Amenities, museums, leisure"
+H21,U364,421,1,
+H21,U370,421,0,U370 Residential
+H21,U400,421,0,
+H21,U410,421,0,
+H21,U415,421,0,
+H21,U420,421,1,
+H22,U130,422,1,
+H22,U140,422,1,
+H22,U150,422,1,
+H22,U322,422,1,
+H22,U364,422,1,
+H22,U400,422,0,
+H22,U410,422,0,
+H22,U411,422,0,
+H22,U415,422,0,
+H22,U420,422,1,
+H23,U130,423,1,
+H23,U313,423,1,
+H23,U361,423,1,
+H23,U364,423,1,
+H23,U400,423,1,
+H23,U420,423,1,
