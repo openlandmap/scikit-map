@@ -2,9 +2,12 @@
 Miscellaneous utils
 '''
 
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Iterable
+from datetime import datetime, timedelta
+from functools import reduce
 
 import rasterio
+import geopandas as gp
 import numpy as np
 from pathlib import Path
 
@@ -171,3 +174,125 @@ def _zvalueFromIndex(arr, ind):
   # get linear indices and extract elements with np.take()
   idx = nC*nR*ind + nR*np.arange(nR)[:,None] + np.arange(nC)
   return np.take(arr, idx)
+
+def _stringify(arr):
+    if isinstance(arr, np.ndarray):
+        try:
+            arr = arr.astype(int)
+        except ValueError:
+            pass
+        arr = arr.astype(str)
+    return arr
+
+def _add_group_elements(a1, a2):
+    return np.core.defchararray.add(a1, _stringify(a2))
+
+def sample_groups(
+    points: gp.GeoDataFrame,
+    *group_element_columns: Iterable[str],
+    spatial_resolution: Union[int, float]=None,
+    temporal_resolution: timedelta=None,
+    date_column: str='date',
+) -> np.ndarray:
+    """
+    Construct group IDs for spatial and temporal cross-validation.
+
+    Groups point samples into tiles of `spatial_resolution` width and height
+    and/or intervals of `temporal_resolution` size.
+    `group_element_columns` are also concatenated into the final group ID of each sample.
+
+    :param points: GeoDataFrame containing point samples.
+    :param *group_element_columns: Names of additional columns to be concatenated into the final group IDs.
+    :param spatial_resolution: Tile size (both x and y) for grouping, in sample CRS units.
+    :param temporal_resolution: Interval size for grouping.
+    :param date_column: Name of the column containing sample timestamps (as datetime objects).
+
+    :returns: 1D string array containing the group id of each sample.
+
+    Examples
+    ========
+
+    >>> import geopandas as gp
+    >>> import pygeos as pg
+    >>> import numpy as np
+    >>> from datetime import datetime, timedelta
+    >>> from sklearn.linear_model import LogisticRegression
+    >>> from sklearn.model_selection import cross_val_score, GroupKFold
+    >>>
+    >>> from eumap.misc import sample_groups
+    >>>
+    >>> # construct some synthetic point data
+    >>> coords = np.random.random((1000, 2)) * 4000
+    >>> dates = datetime.now() + np.array([*map(
+    >>>     timedelta,
+    >>>     range(1000),
+    >>> )])
+    >>>
+    >>> points = gp.GeoDataFrame({
+    >>>     'geometry': pg.points(coords),
+    >>>     'date': dates,
+    >>>     'group': np.random.choice(['a', 'b'], size=1000),
+    >>>     'predictor': np.random.random(1000),
+    >>>     'target': np.random.randint(2, size=1000),
+    >>> })
+    >>>
+    >>> # get the point groups
+    >>> groups = sample_groups(
+    >>>     points,
+    >>>     'group',
+    >>>     spatial_resolution=1000,
+    >>>     temporal_resolution=timedelta(days=365),
+    >>> )
+    >>>
+    >>> print(np.unique(groups))
+    >>>
+    >>> kfold = GroupKFold(n_splits=5)
+    >>>
+    >>> # cross validate a classifier
+    >>> print(cross_val_score(
+    >>>     estimator=LogisticRegression(),
+    >>>     X=points.predictor.values.reshape(-1, 1),
+    >>>     y=points.target,
+    >>>     scoring='f1',
+    >>>     groups=groups, # our groups go here
+    >>> ))
+    """
+
+    group_elements = [
+        points[col].values.astype(str)
+        for col in group_element_columns
+    ]
+
+    if all((
+        not group_elements,
+        spatial_resolution is None,
+        temporal_resolution is None,
+    )):
+        raise ValueError(
+            'no group elemements, specify one or more of the following:\n' \
+            '\tgroup_element_columns\n' \
+            '\tspatial_resolution\n' \
+            '\ttemporal_resolution\n' \
+        )
+
+    if spatial_resolution is not None:
+
+        x_el = points.geometry.x.values // spatial_resolution
+        x_el -= x_el.min()
+        group_elements += ['x', x_el]
+
+        y_el = points.geometry.y.values // spatial_resolution
+        y_el -= y_el.min()
+        group_elements += ['y', y_el]
+
+    if temporal_resolution is not None:
+
+        _tres = np.timedelta64(temporal_resolution)
+        times = points[date_column].values
+        t_el = (times - times.min()) // _tres
+        group_elements += ['t', t_el]
+
+    return reduce(
+        _add_group_elements,
+        group_elements,
+    )
