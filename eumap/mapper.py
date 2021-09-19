@@ -555,7 +555,8 @@ class LandMapper():
       try:
         idx = layernames.index(feature_col)
         sorted_input_data.append(input_data[:,:,idx])
-        sorted_raster_files.append(raster_files[idx])
+        if idx < len(raster_files):
+          sorted_raster_files.append(raster_files[idx])
       except:
         raise Exception(f"The feature {feature_col} was not provided")
 
