@@ -101,12 +101,17 @@ class LucasRequest:
             else:
                 filter_ = bbox_query
 
-            # TBD: workaround for owslib bug
-            filter_xml = etree.tostring(filter_.toXML()).decode("utf-8")
+            # TODO: workaround for owslib bug
+            tree = filter_.toXML()
+            namespaces = {'gml311': 'http://www.opengis.net/gml'}
+            envelopes = tree.findall('gml311:Envelope', namespaces)
+            for envelope in envelopes:
+                envelope.set('srsName', 'http://www.opengis.net/gml/srs/epsg.xml#3035')
+
+            filter_xml = etree.tostring(tree).decode("utf-8")
+            # TODO maybe change this in XML way as well
             filter_xml = filter_xml.replace('ows:BoundingBox', 'geom')
-            filter_xml = filter_xml.replace(
-                '<gml311:Envelope', '<gml311:Envelope srsName="http://www.opengis.net/gml/srs/epsg.xml#3035"'
-            )
+
             req.update({'filter': filter_xml})
 
         #
