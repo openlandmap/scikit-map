@@ -3,7 +3,8 @@ Parallelization helpers based in thread/process pools and joblib
 """
 import numpy
 import multiprocessing
-from typing import Callable, Iterator, List
+from typing import Callable, Iterator, List,  Union
+from concurrent.futures import as_completed, wait, FIRST_COMPLETED, ProcessPoolExecutor
 
 import warnings
 from pathlib import Path
@@ -17,6 +18,9 @@ from rasterio.mask import mask
 from shapely.geometry import Polygon
 from rasterio.windows import Window, from_bounds
 import os.path
+import psutil
+import time
+import gc
 
 from ..misc import ttprint
 from .. import datasets
@@ -25,6 +29,19 @@ CPU_COUNT = multiprocessing.cpu_count()
 """
 Number of CPU cores available.
 """
+
+def _mem_usage():
+  mem = psutil.virtual_memory()
+  return (mem.used / mem.total)
+
+def _run_task(i, task, mem_usage_limit, mem_check_interval, mem_check, verbose, *args):
+  while (_mem_usage() > mem_usage_limit and mem_check):
+    if verbose:
+      ttprint(f'Memory usage in {_mem_usage():.2f}%, stopping workers for {task.__name__}')
+    time.sleep(mem_check_interval)
+    gc.collect()
+  
+  return task(*args)
 
 def ThreadGeneratorLazy(
   worker:Callable,
@@ -271,7 +288,7 @@ class TilingProcessing():
   :param tiling_system_fn: Vector file path with the tiles to read.
   :param base_raster_fn: Raster file path used the retrieve
     the ``affine transformation`` for ``windows``.
-  :param verbose: Use ``True`` to print informations about read tiles
+  :param verbose: Use ``True`` to print information about read tiles
     and the base raster.
 
   """
@@ -477,18 +494,18 @@ class TilingProcessing():
     Generate a custom tiling system based on a regular grid.
 
     :param tile_size: Single value used to define the width and height of a
-      individual tile. It assumes the same unit of ``crs`` (degree for Geographic Coordinate
-      Systems and meter for Projected Coordinate Systems).
+      individual tile. It assumes the same unit of ``crs`` (degree for geographic coordinate
+      systems and meter for projected coordinate systems).
     :param extent: Extent definition considering ``minx, miny, maxx, maxy`` according 
       to the ``crs`` argument.
-    :param crs: Coordinate Reference System for the tile geometries. 
+    :param crs: Coordinate reference system for the tile geometries.
       Can be anything accepted by pyproj.CRS.from_user_input(), 
-      such as an authority string (eg “EPSG:4326”) or a WKT/PROJ string.
+      such as an authority string (EPSG:4326) or a WKT/proj4 string.
     :param raster_layer_fn: If provided, for each tile the ``min``, ``max`` and ``mode`` 
       values are calculated considering the raster pixels inside the tile. It assumes the
       same ``crs`` for the raster layer and tiles.
 
-    :returns: Tiling system where each tile have the follow columns:
+    :returns: Tiling system with follow columns:
       ``tile_id``, ``minx``, ``miny``, ``maxx``, ``maxy`` and ``geometry``. The additional 
       columns ``raster_min``, ``raster_mode_value``, ``raster_mode_count`` and ``raster_max``
       are returned when a raster layer is provided.
@@ -557,3 +574,167 @@ class TilingProcessing():
       tiles = gpd.GeoDataFrame(result, crs=crs)
 
     return tiles
+
+class TaskSequencer():
+  """
+  Execute a pipeline of sequential tasks, in a way that the output of 
+  one task is used as input for the next task. For each task,
+  a pool of workers is created, allowing the execution of all the 
+  available workers in parallel, for different portions of the input data
+
+  :param tasks: Task definition list, where each element can be: (1) a ``Callable`` function;
+    (2) a tuple containing a ``Callable`` function and the number of workers for the task; or
+    (3) a tuple containing a ``Callable`` function, the number of workers and an ``bool``
+    indication if the task would respect the ``mem_usage_limit``. The default number of 
+    workers is ``1``.
+  :param mem_usage_limit: Percentage of memory usage that when reached triggers a momentarily stop 
+    of execution for specific tasks. For example, if the ``task_1`` is responsible for reading
+    the data and ``task_2`` for processing it, the ``task_1`` definition can receive an 
+    ``bool`` indication to respect the ``mem_usage_limit``, allowing the ``task_2`` to process
+    the data that has already been read and releasing memory for the next ``task_1`` reads.
+  :param wait_timeout: Timeout argument used by ``concurrent.futures.wait``.
+  :param verbose: Use ``True`` to print the communication and status of the tasks
+  
+  Examples
+  ========
+  
+  >>> from eumap.parallel import TaskSequencer
+  >>> 
+  >>> output = TaskSequencer(
+  >>> tasks=[ 
+  >>>   task_1, 
+  >>>   (task_2, 2)
+  >>> ]
+  
+  Pipeline produced by this example code:
+
+  >>>                ----------      ----------
+  >>> input_data ->  | task_1 |  ->  | task_2 |  ->  output_data
+  >>>                 ----------      ----------
+  >>>                 |              |
+  >>>                 |-worker_1     |-worker_1
+  >>>                                |-worker_2
+
+  """
+
+  def __init__(self, 
+    tasks:Union[List[Callable], List[tuple]],
+    mem_usage_limit:float = 0.75,
+    wait_timeout:int = 5,
+    verbose:bool = False
+  ):
+  
+    self.wait_timeout = wait_timeout
+    self.mem_usage_limit = mem_usage_limit
+    self.verbose = verbose
+    self.mem_check_interval = 10
+
+    self.tasks = []
+    self.pipeline = []
+    self.mem_checks = []
+
+    for task in tasks:
+
+      pool_size = 1
+      mem_check = False
+
+      if type(task) is tuple:
+        if len(task) == 2:
+          task, pool_size = task
+        else:
+          task, pool_size, mem_check = task
+
+      self._verbose(f'Starting {pool_size} worker(s) for {task.__name__} (mem_check={mem_check})')
+
+      self.tasks.append(task)
+      self.pipeline.append(ProcessPoolExecutor(max_workers = pool_size))
+      self.mem_checks.append(mem_check)
+        
+    self.n_tasks = len(self.tasks)
+    self.pipeline_futures = [ set() for i in range(0, self.n_tasks) ]
+
+  def _verbose(self, *args, **kwargs):
+    if self.verbose:
+      ttprint(*args, **kwargs)
+
+  def run(self, input_data:List[tuple]):
+    """
+    Run the task pipeline considering the ``input_data`` argument.
+
+    :param input_data: Input data used to feed the first task.
+
+    :returns: List of returned values produced by the last task and 
+      with the same size of the ``input_data`` argument.
+    :rtype: List
+
+    Examples
+    ========
+
+    >>> from eumap.misc import ttprint
+    >>> from eumap.parallel import TaskSequencer
+    >>> import time
+    >>> 
+    >>> def rnd_data(const, size):
+    >>>     data = np.random.rand(size, size, size)
+    >>>     time.sleep(2)
+    >>>     return (const, data)
+    >>> 
+    >>> def max_value(const, data):
+    >>>     ttprint(f'Calculating the max value over {data.shape}')
+    >>>     time.sleep(8)
+    >>>     result = np.max(data + const)
+    >>>     return result
+    >>> 
+    >>> taskSeq = TaskSequencer(
+    >>> tasks=[ 
+    >>>      rnd_data, 
+    >>>      (max_value, 2)
+    >>>  ],
+    >>>  verbose=True
+    >>> )
+    >>> 
+    >>> taskSeq.run(input_data=[ (const, 10) for const in range(0,3) ])
+    >>> taskSeq.run(input_data=[ (const, 20) for const in range(3,6) ])
+
+    """
+
+    for i_dta in input_data:
+      self._verbose(f'Submission to {self.tasks[0].__name__}')
+    
+      self.pipeline_futures[0].add(
+        self.pipeline[0].submit(_run_task, *(
+            (0, self.tasks[0], self.mem_usage_limit, 
+             self.mem_check_interval, self.mem_checks[0], self.verbose,
+             *i_dta))
+        )
+      )
+    
+    keep_going = True
+    
+    while keep_going:
+      keep_going_aux = []
+      for i in range(0, self.n_tasks - 1):
+        
+        done, self.pipeline_futures[i] = wait(self.pipeline_futures[i], return_when=FIRST_COMPLETED, timeout=self.wait_timeout)
+        
+        if len(done) > 0:
+          self._verbose(f'{self.tasks[i].__name__} state: done={len(done)} waiting={len(self.pipeline_futures[i])}')
+
+        for f in done:
+          nex_i = i+1
+          self._verbose(f'Submission to {self.tasks[nex_i].__name__}')
+          self.pipeline_futures[nex_i].add(
+            self.pipeline[nex_i].submit( _run_task, *(
+                 nex_i, self.tasks[nex_i], self.mem_usage_limit, 
+                 self.mem_check_interval, self.mem_checks[nex_i], self.verbose,
+                 *f.result()))
+          )
+
+        keep_going_aux.append(len(self.pipeline_futures[i]) > 0) 
+      
+      keep_going = any(keep_going_aux)
+
+    self._verbose(f'Waiting {self.tasks[-1].__name__}')
+    result = [ future.result() for future in as_completed(self.pipeline_futures[-1]) ]
+    
+    return result

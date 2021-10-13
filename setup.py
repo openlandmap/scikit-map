@@ -35,6 +35,7 @@ setuptools.setup(
         'requests>=2.24',
         'scikit_learn>=0.24',
         'rasterio>=1.1',
+        'psutil>=5.8'
     ],
     extras_require={
         'full': [
