@@ -56,7 +56,6 @@ class GLADLandsat():
     self.bqa_idx = 7
 
     self.max_spectral_val = 40000
-    self.max_thermal_val = 100
 
     super().__init__()
 
@@ -199,8 +198,6 @@ class GLADLandsat():
 
       if unit8:
         scale, conv = self.max_spectral_val, 255
-        if (i == 6):
-          scale, conv = self.max_thermal_val, 1
         
         valid_mask = ~np.isnan(band_data)
         band_data[valid_mask] = ((band_data[valid_mask] / scale) * conv)
