@@ -8,10 +8,13 @@ from typing import Callable, Iterator, List
 import warnings
 from pathlib import Path
 import geopandas as gpd
+import numpy as np
 import multiprocessing
 from osgeo import osr
 import math
 import rasterio
+from rasterio.mask import mask
+from shapely.geometry import Polygon
 from rasterio.windows import Window, from_bounds
 import os.path
 
@@ -462,3 +465,95 @@ class TilingProcessing():
     idx_list = range(0, self.num_tiles)
     return self.process_multiple(idx_list, func, *args, max_workers=max_workers, \
       use_threads=use_threads, progress_bar=progress_bar)
+
+  @staticmethod
+  def generate_tiles(
+    tile_size:int, 
+    extent:tuple, 
+    crs:str,
+    raster_layer_fn:str = None,
+  ):
+    """
+    Generate a custom tiling system based on a regular grid.
+
+    :param tile_size: Single value used to define the width and height of a
+      individual tile. It assumes the same unit of ``crs`` (degree for Geographic Coordinate
+      Systems and meter for Projected Coordinate Systems).
+    :param extent: Extent definition considering ``minx, miny, maxx, maxy`` according 
+      to the ``crs`` argument.
+    :param crs: Coordinate Reference System for the tile geometries. 
+      Can be anything accepted by pyproj.CRS.from_user_input(), 
+      such as an authority string (eg “EPSG:4326”) or a WKT/PROJ string.
+    :param raster_layer_fn: If provided, for each tile the ``min``, ``max`` and ``mode`` 
+      values are calculated considering the raster pixels inside the tile. It assumes the
+      same ``crs`` for the raster layer and tiles.
+
+    :returns: Tiling system where each tile have the follow columns:
+      ``tile_id``, ``minx``, ``miny``, ``maxx``, ``maxy`` and ``geometry``. The additional 
+      columns ``raster_min``, ``raster_mode_value``, ``raster_mode_count`` and ``raster_max``
+      are returned when a raster layer is provided.
+    :rtype: geopandas.GeoDataFrame
+
+    Examples
+    ========
+
+    >>> eumap_extent = (900000, 930010, 6540000, 5460010)
+    >>> tiling_system = TilingProcessing.generate_tiles(30000, eumap_extent, 'epsg:3035')
+    >>> tiling_system.to_file(tiling_system_fn,  driver="GPKG")
+
+    """
+    
+    minx, miny, maxx, maxy = extent
+    
+    data = {'tile_id': [], 'minx':[], 'miny':[], 'maxx':[], 'maxy':[], 'geometry':[]}
+    tile_id = 0
+    
+    for x in np.arange(minx, maxx, tile_size):
+      for y in np.arange(miny, maxy, tile_size):
+        data['tile_id'].append(tile_id)
+        data['minx'].append(x)
+        data['miny'].append(y)
+        data['maxx'].append(x+tile_size)
+        data['maxy'].append(y+tile_size)
+        data['geometry'].append(Polygon([
+            (x,y), (x+tile_size,y), 
+            (x+tile_size,y+tile_size), (x,y+tile_size)
+        ]))
+        
+        tile_id += 1
+
+    tiles = gpd.GeoDataFrame(data, crs=crs)
+
+    if raster_layer_fn is not None:
+
+      def _raster_values(tile, raster_layer_fn):
+        shapes = [ tile['geometry'] ]
+        
+        try:
+          with rasterio.open(raster_layer_fn) as src:
+            out_image, out_transform = mask(src, shapes, crop=True)
+
+            values, counts = np.unique(out_image, return_counts=True)
+            m = counts.argmax()
+
+            tile['raster_min'] = np.min(values)
+            tile['raster_mode_value'] = values[m]
+            tile['raster_mode_count'] = counts[m]
+            tile['raster_max'] = np.max(values)
+        except:
+          tile['raster_min'] = None
+          tile['raster_mode_value'] = None
+          tile['raster_mode_count'] = None
+          tile['raster_max'] = None
+          
+        return tile
+
+      args = [ (tiles.loc[i,:], raster_layer_fn) for i in range(0, len(tiles)) ]
+      
+      result = []
+      for t in job(_raster_values, args):
+        result.append(t)
+
+      tiles = gpd.GeoDataFrame(result, crs=crs)
+
+    return tiles
