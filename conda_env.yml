@@ -14,15 +14,15 @@ dependencies:
   - pygeos=0.10
   - pyproj=3.1
   - rasterio=1.1
+  - pandas=1.1
+  - geopandas=0.8
   - shapely=1.7
   - pip>=20.1  # pip is needed as dependency
   - pip:
-    - geopandas==0.8
     - joblib==0.17
     - matplotlib==3.4.3
     - nbsphinx==0.8.7
     - numpydoc==1.1.0
-    - pandas==1.1
     - psutil==5.8.0
     - pydata-sphinx-theme==0.6.3
     - pyts==0.11
