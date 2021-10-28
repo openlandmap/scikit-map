@@ -184,18 +184,20 @@ def read_rasters(
       nodata = raster_ds.nodatavals[0]
     except:
       if spatial_win is not None:
-        ttprint(f'ERROR: Failed to read {raster_file} window {spatial_win}.')
+        if verbose:
+          ttprint(f'ERROR: Failed to read {raster_file} window {spatial_win}.')
         band_data = np.empty((int(spatial_win.width), int(spatial_win.height)))
         band_data[:] = _nodata_replacement(dtype)
 
       if expected_img_size is not None:
-        ttprint(f'Full nan image for {raster_file}')
+        if verbose:
+          ttprint(f'Full nan image for {raster_file}')
         band_data = np.empty(expected_img_size)
         band_data[:] = _nodata_replacement(dtype)
 
     if data_mask is not None:
       if (data_mask.shape == band_data.shape):
-        band_data[~data_mask] = np.nan
+        band_data[np.logical_not(data_mask)] = np.nan
       else:
         ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
 
