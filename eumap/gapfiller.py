@@ -1034,7 +1034,7 @@ try:
         space = space_strategy(**space_args)
         space.run()
 
-        space_mask = (space.gapfilled_data_flag > 1)
+        space_mask = (space.gapfilled_data_flag == 1)
         time.gapfilled_data_flag[space_mask] = space_flag_val
         space.gapfilled_data_flag = time.gapfilled_data_flag
 
