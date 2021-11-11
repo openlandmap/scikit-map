@@ -172,7 +172,7 @@ def _zvalueFromIndex(arr, ind):
   _,nC,nR = arr.shape
 
   # get linear indices and extract elements with np.take()
-  idx = nC*nR*ind + nR*np.arange(nR)[:,None] + np.arange(nC)
+  idx = nC*nR*ind + np.arange(nC*nR).reshape((nC,nR))
   return np.take(arr, idx)
 
 def _stringify(arr):
