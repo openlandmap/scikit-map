@@ -495,7 +495,8 @@ class TilingProcessing():
 
     :param tile_size: Single value used to define the width and height of a
       individual tile. It assumes the same unit of ``crs`` (degree for geographic coordinate
-      systems and meter for projected coordinate systems).
+      systems and meter for projected coordinate systems). Tiles outside of the image
+      are clipped to fit in the informed extent.
     :param extent: Extent definition considering ``minx, miny, maxx, maxy`` according 
       to the ``crs`` argument.
     :param crs: Coordinate reference system for the tile geometries.
@@ -525,21 +526,31 @@ class TilingProcessing():
     data = {'tile_id': [], 'minx':[], 'miny':[], 'maxx':[], 'maxy':[], 'geometry':[]}
     tile_id = 0
     
-    for x in np.arange(minx, maxx, tile_size):
-      for y in np.arange(miny, maxy, tile_size):
+    for x1 in np.arange(minx, maxx, tile_size):
+      for y1 in np.arange(miny, maxy, tile_size):
+        
+        x2 = x1+tile_size
+        if x2 > maxx:
+          x2 = maxx
+
+        y2 = y1+tile_size
+        if y2 > maxy:
+          y2 = maxy
+
         data['tile_id'].append(tile_id)
-        data['minx'].append(x)
-        data['miny'].append(y)
-        data['maxx'].append(x+tile_size)
-        data['maxy'].append(y+tile_size)
+        data['minx'].append(x1)
+        data['miny'].append(y1)
+        data['maxx'].append(x2)
+        data['maxy'].append(y2)
         data['geometry'].append(Polygon([
-            (x,y), (x+tile_size,y), 
-            (x+tile_size,y+tile_size), (x,y+tile_size)
+            (x1,y1), (x2,y1), 
+            (x2,y2), (x1,y2)
         ]))
         
         tile_id += 1
 
-    tiles = gpd.GeoDataFrame(data, crs=crs)
+    tiles = gpd.GeoDataFrame(data).set_crs(crs, inplace=True)
+
 
     if raster_layer_fn is not None:
 
@@ -571,7 +582,7 @@ class TilingProcessing():
       for t in job(_raster_values, args):
         result.append(t)
 
-      tiles = gpd.GeoDataFrame(result, crs=crs)
+      tiles = gpd.GeoDataFrame(result).set_crs(crs, inplace=True)
 
     return tiles
 
