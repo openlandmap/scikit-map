@@ -188,6 +188,7 @@ class LandMapper():
       training.
     :param pred_method: Use ``predict_prob`` to predict probabilities and uncertainty, otherwise it predicts only
       the dominant class.
+    :param apply_corr_factor: Apply a correction factor (``rmse / averaged_sd``) in the prediction uncertainty output.
     :param verbose:bool: Use ``True`` to print the progress of all steps.
     :param \*\*autosklearn_kwargs: Named arguments supported by ``auto-sklearn`` [2].
 
@@ -232,6 +233,7 @@ class LandMapper():
     min_samples_per_class:float = 0,
     pred_method:str = 'predict',
     verbose:bool = True,
+    apply_corr_factor:bool = False,
     **autosklearn_kwargs
   ):
 
@@ -268,6 +270,9 @@ class LandMapper():
 
     self.samples_weight = self._get_column_if_exists(weight_col, 'weight_col')
     self.cv_groups = self._get_column_if_exists(cv_group_col, 'cv_group_col')
+
+    self.corr_factor = 1
+    self.apply_corr_factor = apply_corr_factor
 
     if self.nodata_imputer is not None:
       self.features = self._impute_nodata(self.features, fit_and_tranform = True)
@@ -530,6 +535,9 @@ class LandMapper():
 
     if self.meta_estimator is not None:
       self.eval_pred = self._do_cv_prediction(self.meta_estimator, self.meta_features)
+      if self.apply_corr_factor:
+        self.corr_factor = self._correction_factor()
+        self._verbose(f'Correction factor equal to {self.corr_factor:.6f}')
     else:
       self.eval_pred = self._do_cv_prediction(self.estimator_list[0], self.features)
 
@@ -543,6 +551,26 @@ class LandMapper():
 
     self.meta_features = np.concatenate(self.meta_features, axis=1)
     self._verbose(f' Meta-features shape: {self.meta_features.shape}')
+
+  def _correction_factor(self, per_class = False):
+    
+    n_estimators = len(self.estimator_list)
+    n_meta_features = self.meta_features.shape[1]
+    n_classes = int(n_meta_features / n_estimators)
+    meta_features = self.meta_features.reshape(-1, n_classes, n_estimators)
+    
+    avg_std_axis, multioutput = None, 'uniform_average' 
+    if per_class:
+        avg_std_axis, multioutput = (0, 'raw_values')
+    
+    prep = preprocessing.LabelBinarizer()
+    target_bin = prep.fit_transform(self.target)
+    
+    avg_std = np.mean(np.std(meta_features, axis=-1), axis=avg_std_axis)
+    rmse = metrics.mean_squared_error(target_bin, self.eval_pred, multioutput=multioutput, squared=False)
+    
+    # See https://stats.stackexchange.com/questions/242787/how-to-interpret-root-mean-squared-error-rmse-vs-standard-deviation/375674
+    return (rmse / avg_std)
 
   def _feature_idx(self, fn_layer):
     return self.feature_cols.index(fn_layer.stem)
@@ -772,7 +800,7 @@ class LandMapper():
       meta_estimator_pred = meta_estimator_pred_method(input_meta_features)
       self._verbose(f'{meta_estimator_name} prediction time: {(time.time() - start):.2f} segs')
 
-      return meta_estimator_pred.astype('float32'), std_meta_features.astype('float32')
+      return meta_estimator_pred.astype('float32'), self.corr_factor * std_meta_features.astype('float32')
 
   def predict_points(self,
     input_points:DataFrame
