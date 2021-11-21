@@ -24,7 +24,8 @@ class LucasRequest:
     gh_typename = 'lucas_points'
     gh_typename_st = 'lucas_st_points'
 
-    def __typename(self):
+    @property
+    def typename(self):
         typename = self.gh_typename_st if self.st_aggregated else self.gh_typename
         if self.group is not None:
             typename += f'_{self.group}'
@@ -66,7 +67,7 @@ class LucasRequest:
         self._check_args()
 
         req = {
-            'typename': self.__typename()
+            'typename': self.typename
         }
 
         # filter by years

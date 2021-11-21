@@ -5,6 +5,8 @@ Download LUCAS samples based on built request.
 import os
 import logging
 import tempfile
+import json
+import requests
 from pathlib import Path
 from shutil import copy
 from requests.exceptions import HTTPError, ConnectionError, InvalidSchema, InvalidURL, MissingSchema
@@ -16,6 +18,7 @@ from owslib.wfs import WebFeatureService
 from owslib.util import ServiceException
 from owslib import __version__ as owslib_version
 
+from eumap import __version__
 from .logger import Logger
 from .exceptions import LucasDownloadError, LucasDataError
 
@@ -28,13 +31,14 @@ class LucasIO:
     """
 
     def __init__(self,
-                 url='http://lincalc-02.fsv.cvut.cz/geoserver/wfs',
+                 url='http://lincalc-02.fsv.cvut.cz',
                  version='1.1.0'):
         Logger.info(f"Using owslib version {owslib_version}")
-        self._wfs_url = url
+        self._wfs_url = url + "/geoserver/wfs"
         self._wfs_version = version
-        self._years = None
-        self._st_aggregated = None
+
+        self._mtd_url = url + "/geoserver/www/metadata_lucas.json"
+        self._request = None
 
         self._path = None
 
@@ -84,8 +88,7 @@ class LucasIO:
                 int(len(gml) / 1000)
             ))
 
-        self._years = request.years
-        self._st_aggregated = request.st_aggregated
+        self._request = request
 
         self._path = self._load(gml)
         self._postprocessing(self._path)
@@ -117,14 +120,21 @@ class LucasIO:
 
         :param str path: path to GPKG file
         """
+        def _group(name):
+            return {
+                "LC_LU": "LAND COVER,LAND USE",
+                "LC_LU_SO": "LAND COVER,LAND USE,SOIL",
+                "FO": "FORESTRY",
+                "CO": "COPERNICUS",
+                "IN": "INSPIRE"
+            }[name]
 
         try:
             ds = gdal.OpenEx(path, gdal.OF_VECTOR | gdal.OF_UPDATE)
             layer = ds.GetLayer()
             defn = layer.GetLayerDefn()
             layer.DeleteField(defn.GetFieldIndex('gml_id'))
-            if self._st_aggregated and self._years is not None:
-                # TBD: to be reviewed
+            if self._request.st_aggregated and self._request.years is not None:
                 driver = ogr.GetDriverByName("GPKG")
                 gpkg = driver.Open(path)
                 layer1 = gpkg.GetLayer()
@@ -132,11 +142,31 @@ class LucasIO:
                 for i in range(layer_definition.GetFieldCount()):
                     attr = layer_definition.GetFieldDefn(i).GetName()
                     try:
-                        if int(attr[-4:]) not in self._years:
+                        if int(attr[-4:]) not in self._request.years:
                             layer.DeleteField(defn.GetFieldIndex(attr))
                     except ValueError:
                         # some attributes are timeless (eg. point_id, ..., count_survey)
                         pass
+
+            # read LUCAS JSON metadata from server
+            try:
+                r = requests.get(self._mtd_url)
+                lucas_metadata = json.loads(r.content)
+            except (HTTPError, json.decoder.JSONDecodeError) as e:
+                raise LucasDataError(f"Postprocessing failed: {e}")
+
+            # write metadata into GPKG
+            metadata = ({
+                "EUMAP_VERSION": __version__,
+                "LUCAS_TABLE": self._request.typename.split(":")[1],
+                "LUCAS_ST": int(self._request.st_aggregated),
+                "LUCAS_VERSION": lucas_metadata["version"],
+                "LUCAS_MAX_FEATURES": lucas_metadata["max_features"],
+            })
+            if self._request.group is not None:
+                metadata["LUCAS_GROUP"] = _group(self._request.group.upper())
+            ds.SetMetadata(metadata)
+
             del ds
         except RuntimeError as e:
             raise LucasDataError(f"Postprocessing failed: {e}")
