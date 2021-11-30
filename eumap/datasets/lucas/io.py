@@ -156,12 +156,15 @@ class LucasIO:
                 raise LucasDataError(f"Postprocessing failed: {e}")
 
             # write metadata into GPKG
+            # note:
+            #  values are provided as strings due to GDAL < 3.3 limitation
+            #  -> Dictionary must contain tuples of strings
             metadata = ({
-                "EUMAP_VERSION": __version__,
+                "EUMAP_VERSION": str(__version__),
                 "LUCAS_TABLE": self._request.typename.split(":")[1],
-                "LUCAS_ST": int(self._request.st_aggregated),
-                "LUCAS_VERSION": lucas_metadata["version"],
-                "LUCAS_MAX_FEATURES": lucas_metadata["max_features"],
+                "LUCAS_ST": str(int(self._request.st_aggregated)),
+                "LUCAS_VERSION": str(lucas_metadata["version"]),
+                "LUCAS_MAX_FEATURES": str(lucas_metadata["max_features"]),
             })
             if self._request.group is not None:
                 metadata["LUCAS_GROUP"] = _group(self._request.group.upper())
