@@ -40,11 +40,28 @@ class LucasIO:
         self._mtd_url = url + "/geoserver/www/metadata_lucas.json"
         self._request = None
 
-        self._path = None
+        self._path = None # path to GPKG file
 
     @property
     def data(self):
         return self._path
+
+    @data.setter
+    def data(self, path):
+        """Set data property from existing GPKG file.
+
+        @param str path: path to existing GPKG file
+        """
+        try:
+            ds = gdal.OpenEx(path, gdal.OF_VECTOR | gdal.OF_READONLY)
+            driver = ds.GetDriver().ShortName
+            if driver != "GPKG":
+                raise LucasDataError(f"Unexpected input file: {driver}")
+            del ds
+        except RuntimeError as e:
+            raise LucasDataError(f"Unable to open input file: {e}")
+
+        self._path = path
 
     @staticmethod
     def __get_tempfile_name(extension):
@@ -269,13 +286,31 @@ class LucasIO:
         """
         return self.num_of_features() < 1
 
-    # def get_images(self, point_id):
-    #     """Get images of point and its surrounding from ftp server
-    #     :param point_id:
-    #     :return images: dictionary of images
-    #     """
-    #     images = {}
-    #     url = f'https://gisco-services.ec.europa.eu/lucas/photos/2015/BE/{str(point_id)[0:3]}/{str(point_id)[3:6]}/{str(point_id)}'
-    #     for i in ("Point", "South", "North", "East", "West"):
-    #         images[i] = url+i[0:1]+".jpg"
-    #     return images
+    def get_images(self, year, point_id):
+        """Get images of selected point and its surroundings from Eurostat FTP server.
+
+        :param int year: year of the measurement
+        :param int point_id: id of the LUCAS point
+
+        :return images: dictionary of images (URL)
+        """
+        try:
+            ds = gdal.OpenEx(self._path, gdal.OF_VECTOR | gdal.OF_READONLY)
+            layer = ds.GetLayer(0).GetName()
+            point_layer = ds.ExecuteSQL(
+                f"SELECT * FROM {layer} WHERE point_id={point_id} AND survey_year={year}"
+            )
+            num_points = point_layer.GetFeatureCount()
+            if num_points != 1:
+                raise LucasDataError(f"Unexpected number of selected points: {num_points}")
+            nuts0 = point_layer.GetNextFeature().GetFieldAsString("nuts0")
+            del ds
+        except RuntimeError as e:
+            raise LucasDataError(f"Unable to get images: {e}")
+
+        images = {}
+        url = f'https://gisco-services.ec.europa.eu/lucas/photos/{str(year)}/{nuts0}/{str(point_id)[0:3]}/{str(point_id)[3:6]}/{str(point_id)}'
+        for i in ("P", "S", "N", "E", "W"):
+            images[i] = f"{url}{i}.jpg"
+
+        return images
