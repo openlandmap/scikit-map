@@ -62,6 +62,7 @@ class _Resource(str):
                 'abstract',
                 'theme',
                 'year',
+                'layer',
             )
         })
         return self
@@ -160,6 +161,7 @@ class Catalogue:
             self._init_fallback()
 
         self._themes = None
+        self._ci_protocol = []
 
     def _init_csw(self):
         from owslib.csw import CatalogueServiceWeb
@@ -182,6 +184,7 @@ class Catalogue:
         *args: Iterable[str],
         years: Iterable[int]=[],
         exclude: Iterable[str]=[],
+        frmt: Iterable[str]=[],
         split_keywords: bool=True,
         key: str='title',
     ):
@@ -195,6 +198,7 @@ class Catalogue:
         :param *args: Keywords to match.
         :param years: Years to match.
         :param exclude: Keywords to match for exclusion of resources.
+        :param frmt: Formats to match (default: ["GeoTIFF"]). Supported formats: "GeoTIFF", "OGC WMS", "OGC WFS". Only supported by CSW implementation.
         :param split_keywords: Wheather or not to split keywords by ``Catalogue.KEYWORD_SEPARATORS`` and match tokens individually.
         :param key: Which metadata field to match with ``*args``. Can be ``'title'``, ``'theme'``, ``'abstract'``, ``'url'`` (case insensitive).
 
@@ -212,8 +216,22 @@ class Catalogue:
 
         if self.use_csw:
             _search = self._search_csw
+            if len(frmt) < 1:
+                frmt = ["GeoTIFF"]
+            self._ci_protocol = []
+            for f in [*frmt]:
+                if f == "GeoTIFF":
+                    self._ci_protocol.append("WWW:DOWNLOAD-1.0-http--download")
+                elif f == "OGC WMS":
+                    self._ci_protocol.append("OGC:WMS")
+                elif f == "OGC WFS":
+                    self._ci_protocol.append("OGC:WFS")
+                else:
+                    warnings.warn(f'Format {f} is not supported by CSW implementation')
         else:
             _search = self._search_fallback
+            if len(frmt) > 0:
+                warnings.warn(f'Filtering by the format is only supported by CSW implementation')
 
         results = map(_DotDict, _search(
             *_args,
@@ -311,7 +329,9 @@ class Catalogue:
                     break
             # get urls
             for ci in self.csw.records[rec].distribution.online:
-                if ci.protocol == "WWW:DOWNLOAD-1.0-http--download":
+                if ci.protocol in self._ci_protocol:
+                    if ci.protocol in ("OGC:WMS", "OGC:WFS"):
+                        items['layer'] = ci.name
                     items['urls'].append(ci.url)
 
             if (limit[0] == 'theme' and items['theme'] not in limit[1]) or \

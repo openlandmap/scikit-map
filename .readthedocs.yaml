@@ -9,9 +9,10 @@ conda:
   environment: conda_env.yml
 
 build:
-  image: latest
+  os: "ubuntu-20.04"
+  tools:
+    python: "mambaforge-4.10"
 
 python:
-  version: 3.7
   install:
   - requirements: docs/requirements.txt

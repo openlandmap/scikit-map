@@ -2,6 +2,7 @@ name: eumap
 channels:
   - conda-forge
 dependencies:
+  - python=3.7
   - affine=2.3
   - bottleneck=1.3
   - gdal=3.1
