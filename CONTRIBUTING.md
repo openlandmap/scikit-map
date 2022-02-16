@@ -27,8 +27,17 @@ All changes to code and documentation should be made in a separate branch, creat
 ```
 git checkout master
 git pull
-git branch issue_9
-git checkout issue_9
+git checkout -b issue_23
+
+git add [CHANGED FILES]
+git commit -m "closes #23; [GENERAL COMMENT]"
+
+git checkout master
+git pull
+git merge issue_23
+git push
+
+git branch -d issue_23
 ```
 
 When the changes are complete a merge request may be submitted from the development branch (if you have submitted a merge request with incomplete changes, please indicate that the branch is not to be merged yet in the title of the request).
