@@ -650,12 +650,12 @@ class LandMapper():
         fn_output_c = Path(str(fn_output).replace(out_ext, f'_b{i+1}' + out_ext))
 
         write_new_raster(fn_base_layer, fn_output_c, output_data[:,:,i:i+1], 
-          spatial_win = spatial_win, nodata=255)
+          spatial_win = spatial_win, dtype=dtype, nodata=255)
         fn_output_list += [ fn_output_c ]
 
     else:
       write_new_raster(fn_base_layer, fn_output, output_data, 
-        spatial_win = spatial_win, nodata=255)
+        spatial_win = spatial_win, dtype=dtype, nodata=255)
       fn_output_list += [ fn_output ]
 
     return fn_output_list
