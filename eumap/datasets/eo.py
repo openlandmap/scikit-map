@@ -162,10 +162,8 @@ class GLADLandsat():
 
     qa_data = data[self.bqa_idx,:,:,:]
 
-    self._verbose(np.nanmax(qa_data))
     if(np.nanmax(qa_data) > 255):
       qa_data /= 100
-    self._verbose(np.nanmax(qa_data))
 
     clear_sky1 = np.logical_and(qa_data >= 1, qa_data <= 2)
     clear_sky2 = np.logical_and(qa_data >= 5, qa_data <= 6)
