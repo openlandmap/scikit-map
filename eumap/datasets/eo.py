@@ -2,6 +2,7 @@
 Earth observation data acess
 """
 from typing import List, Union
+from dateutil.relativedelta import relativedelta
 
 import requests
 import numpy as np
@@ -11,9 +12,18 @@ from pathlib import Path
 import gc
 import os
 
+import pandas as pd
+
+import rasterio
+import warnings
+import re
+import mimetypes
+from datetime import datetime
+import matplotlib.pyplot as plt
+
 from .. import parallel
 from ..raster import read_auth_rasters, save_rasters
-from ..misc import nan_percentile, ttprint
+from ..misc import _warn_deps, _eval, nan_percentile, ttprint, find_files, GoogleSheet
 
 class GLADLandsat():
   """
@@ -330,3 +340,395 @@ class GLADLandsat():
     
     else:
       raise RuntimeError('All the images were read, but no clear_sky data was found.')
+
+try:
+  
+  from shapely.geometry import Polygon, mapping, shape
+  from minio import Minio
+  from itertools import chain
+  from PIL import Image
+  import pystac
+
+  class STACGenerator():
+    """
+    
+    TODO
+
+    :param gsheet: TODO
+    :param url_date_format: TODO
+    :param verbose: TODO
+
+    References
+    ==========
+
+    [1] TODO
+
+  """
+    def __init__(self,
+      gsheet:GoogleSheet,
+      url_date_format = '%Y.%m.%d',
+      verbose = False
+    ):
+
+      self.cog_level = 7
+      self.thumb_overwrite = False
+      self.gsheet = gsheet
+      self.url_date_format = url_date_format
+      self.verbose = verbose
+
+      coll_columns = gsheet.collections.columns
+      self.additional_url_cols = list(coll_columns[pd.Series(coll_columns).str.startswith('url')])
+
+      self.fields = {
+        'collection': ['id', 'title', 'description', 'license','keywords'],
+        'provider': ['name', 'description', 'roles', 'url'],
+        'catalog': ['id', 'title', 'description'],
+        'common_metadata': ['constellation', 'platform', 'instruments', 'gsd'],
+        'internal': ['start_date', 'end_date', 'date_step', 'date_unit', 'date_style', 'catalog', 'providers', 'main_url']
+      }
+
+      self.fields['internal'] += self.additional_url_cols
+
+      self.fields_lookup = dict.fromkeys(
+        set(chain(*[self.fields[key] for key in self.fields.keys()]))
+        , True
+      )
+
+      self.providers = self._providers()
+      self.catalogs = self._catalogs()
+      self._populate()
+
+    def _verbose(self, *args, **kwargs):
+      if self.verbose:
+        ttprint(*args, **kwargs)
+
+    def _providers(self):
+      providers = {}
+      for i,p in self.gsheet.providers.iterrows():
+        providers[p['name']] = pystac.Provider(**self._kargs(p, 'provider'))
+      return providers;
+
+    def _catalogs(self):
+      catalogs = {}
+      for i,p in self.gsheet.catalogs.iterrows():
+        catalogs[p['id']] = pystac.Catalog(**self._kargs(p, 'catalog'))
+      return catalogs;
+
+    def _populate(self):
+
+      groups = self.gsheet.collections.groupby('catalog')
+      
+      for key in groups.groups.keys():
+        for i, row in groups.get_group(key).iterrows():
+
+          self._verbose(f"Creating collection {row.id}")
+
+          items = []
+          for start_date, end_date in self._gen_dates(**row):
+            main_url = self._parse_url(row['main_url'], start_date, end_date, row['date_unit'], row['date_style'])
+
+            additional_urls = []
+            for ac_url in self.additional_url_cols:
+              if row[ac_url]:
+                additional_urls.append(self._parse_url(row[ac_url], start_date, end_date, row['date_unit']))
+            
+            items.append(self._new_item(row, start_date, end_date, main_url, additional_urls))
+
+          self._verbose(f" Total items: {len(items)}")        
+          collection = self._new_collection(row, items)
+          self.catalogs[key].add_child(collection)
+          self._verbose(f" Catalog: {key}")
+
+    def _get_val(self, dicty, key):
+      if key in dicty:
+        return dicty[key]
+      else:
+        return None
+
+    def _is_data(self, asset):
+      for r in asset.roles:
+        if r == 'data':
+          return True
+      return False
+
+    def _generate_thumbs(self, output_dir='./stac'):
+
+      for key, catalog in self.catalogs.items():
+        
+        args = []
+
+        for item in catalog.get_all_items():
+          
+          assets = [ a for a in item.assets.items() ]
+          collection = item.get_collection()
+          cmap = self._get_val(collection.extra_fields, 'thumb_cmap')
+          vmin = self._get_val(collection.extra_fields, 'thumb_vmin')
+          vmax = self._get_val(collection.extra_fields, 'thumb_vmax')
+          
+          for key, asset in assets:
+            if self._is_data(asset):
+              thumb_fn = Path(output_dir) \
+                .joinpath(catalog.id) \
+                .joinpath(item.collection_id) \
+                .joinpath(item.id) \
+                .joinpath(Path(asset.href).stem + '.png')
+              
+              thumb_fn.parent.mkdir(parents=True, exist_ok=True)
+              if 'main' in asset.extra_fields:
+                args.append((asset.href, thumb_fn, item.id, True, cmap, vmin, vmax))
+              else:
+                args.append((asset.href, thumb_fn, item.id, False))
+
+        self._verbose(f"Generating {len(args)} thumbnails for catalog {catalog.id}")
+
+        for thumb_fn, item_id, is_thumb_url in parallel.job(self._thumbnail, args, n_jobs=10):
+          item = catalog.get_item(item_id, True)
+          
+          if thumb_fn is not None:
+            thumd_id = thumb_fn.name
+            if is_thumb_url:
+              thumd_id = 'thumbnail'
+
+          item.add_asset(thumd_id, pystac.Asset(href=thumb_fn.name, media_type=pystac.MediaType.PNG, roles=['thumbnail']))
+              
+    def _thumbnail(self, url, thumb_fn, item_id, is_thumb_url=False, cmap = 'binary', vmin = None, vmax = None):
+      
+      if not self.thumb_overwrite and Path(thumb_fn).exists():
+        return (thumb_fn, item_id, is_thumb_url)
+
+      with rasterio.open(url) as src:
+
+        oviews = src.overviews(1)
+        if len(oviews) == 0:
+          return(None, item_id, is_thumb_url)
+
+        cog_level = self.cog_level
+        if cog_level >= len(oviews):
+          cog_level = -1
+        
+        oview = oviews[cog_level]
+
+        result = src.read(1, out_shape=(1, src.height // oview, src.width // oview)).astype('float32')
+        result[result==src.nodata] = np.nan
+
+        if vmin is None:
+          perc = np.nanpercentile(result,[8,92])
+          vmin, vmax = perc[0], perc[1]
+
+        fig, ax = plt.subplots(figsize=(1, 1))
+
+        ax.axis('off')
+        plt.imsave(thumb_fn, result, cmap=cmap, vmin=vmin, vmax=vmax)
+
+        basewidth = 675
+        img = Image.open(thumb_fn)
+        wpercent = (basewidth/float(img.size[0]))
+        hsize = int((float(img.size[1])*float(wpercent)))
+        img = img.resize((basewidth,hsize), Image.ANTIALIAS)
+        img.save(thumb_fn)
+
+        return (thumb_fn, item_id, is_thumb_url)
+
+    def _new_collection(self, row, items):  
+      
+      unioned_footprint = shape(items[0].geometry)
+      collection_bbox = list(unioned_footprint.bounds)
+      
+      start_date = items[0].properties['start_datetime']
+      end_date = items[-1].properties['end_datetime']
+
+      collection_interval = sorted([
+        datetime.strptime(start_date,"%Y-%m-%d"), 
+        datetime.strptime(end_date,"%Y-%m-%d")
+      ])
+
+      collection = pystac.Collection(
+        extent=pystac.Extent(
+          spatial=pystac.SpatialExtent(bboxes=[collection_bbox]), 
+          temporal=pystac.TemporalExtent(intervals=[collection_interval])
+        ),
+        providers=[ self.providers[p] for p in row['providers'] ],
+        **self._kargs(row, 'collection', True)
+      )
+
+      collection.add_items(items)
+      
+      return collection
+
+    def _new_item(self, row, start_date, end_date, main_url, additional_urls = []):
+    
+      bbox, footprint = self._bbox_and_footprint(main_url)
+      
+      start_date_str = start_date.strftime("%Y-%m-%d")
+      end_date_str = end_date.strftime("%Y-%m-%d")
+
+      start_date_url_str = start_date.strftime(self.url_date_format)
+      end_date_url_str = end_date.strftime(self.url_date_format)
+
+      item_id = f'{row["id"]}_{start_date_url_str}..{end_date_url_str}'
+
+      item = pystac.Item(id=item_id,
+                      geometry=footprint,
+                      bbox=bbox,
+                      datetime=start_date,
+                      properties={'start_datetime': start_date_str, 'end_datetime': end_date_str},
+                      stac_extensions=["https://stac-extensions.github.io/eo/v1.0.0/schema.json"])
+
+      item.common_metadata.gsd = row['gsd']
+      item.common_metadata.instruments = row['instruments']
+      
+      if 'platform' in row and row['platform']:
+        item.common_metadata.platform = row['platform']
+      if 'constellation' in row and row['constellation'][0]:
+        item.common_metadata.constellation = row['constellation']
+      
+      #eo_ext = EOExtension.ext(item)    
+      #eo_ext.apply(bands=[
+      #Band.create(name='EVI', description='Enhanced vegetation index', common_name='evi')
+      #])
+
+      item.add_asset(Path(main_url).name, pystac.Asset(href=main_url, media_type=pystac.MediaType.GEOTIFF, roles=['data'], extra_fields={'main': True}))
+      for aurl in additional_urls:
+        item.add_asset(Path(aurl).name, pystac.Asset(href=aurl, media_type=pystac.MediaType.GEOTIFF, roles=['data']))
+
+      return item
+
+    def _gen_dates(self, start_date, end_date, date_unit, date_step, **kwargs):
+
+      result = []
+      dt1 = start_date    
+      
+      while(dt1 < end_date):
+        delta_args = {}
+        delta_args[date_unit] = int(date_step) # TODO: Threat the value "month"
+        
+        dt1n = dt1 + relativedelta(**delta_args)
+        dt2 = dt1n + relativedelta(days=-1)
+        
+        if dt2.strftime("%d") == '29':
+            dt2 = dt2 + relativedelta(days=-1)
+        
+        result.append((dt1, dt2))       
+        dt1 = dt1n
+      
+      return result
+
+    def _kargs(self, row, key, add_extra_fields=False):
+      _args = {}
+      for f in self.fields[key]:
+        if f in row:
+          _args[f] = row[f]
+
+      if add_extra_fields:
+        _args['extra_fields'] = {}
+        for ef in row.keys():
+          if ef not in self.fields_lookup and row[ef]:
+            _args['extra_fields'][ef] = row[ef]
+
+      return _args
+
+    def _parse_url(self, url, dt1, dt2, date_unit = 'months', date_style = 'interval'):
+      
+      date_format = self.url_date_format
+      if date_unit == 'years':
+        date_format = '%Y'
+
+      if (date_style == 'start_date'):
+        dt = f'{dt1.strftime(date_format)}'
+      elif (date_style == 'end_date'):
+        dt = f'{dt2.strftime(date_format)}'
+      else:
+        dt = f'{dt1.strftime(date_format)}..{dt2.strftime(date_format)}'
+
+      return _eval(url, locals())
+
+    def _bbox_and_footprint(self, raster_fn):
+      with rasterio.open(raster_fn) as ds:
+        bounds = ds.bounds
+        bbox = [bounds.left, bounds.bottom, bounds.right, bounds.top]
+        footprint = Polygon([
+          [bounds.left, bounds.bottom],
+          [bounds.left, bounds.top],
+          [bounds.right, bounds.top],
+          [bounds.right, bounds.bottom]
+        ])
+
+        return (bbox, mapping(footprint))
+
+    def save_all(self,
+      output_dir:str = 'stac'
+    ):
+      """
+    
+      TODO
+
+      :param output_dir: TODO
+
+      """
+
+      output_dir = Path(output_dir)
+      self._generate_thumbs(output_dir)
+
+      for key, catalog in self.catalogs.items():
+        catalog.normalize_and_save(
+          root_href=str(output_dir.joinpath(catalog.id)), 
+          catalog_type=pystac.CatalogType.SELF_CONTAINED
+        )
+
+    def save_and_publish_all(self,
+      s3_host:str,
+      s3_access_key:str,
+      s3_access_secret:str,
+      s3_bucket_name:str,
+      s3_prefix:str = '',
+      output_dir:str = 'stac',
+    ):
+      """
+    
+      TODO
+
+      :param s3_host: TODO
+      :param s3_access_key: TODO
+      :param s3_access_secret: TODO
+      :param s3_bucket_name: TODO
+      :param s3_prefix: TODO
+      :param output_dir: TODO
+
+      Examples
+      ========
+
+      >>> s3_host = "<S3_HOST>"
+      >>> s3_access_key = "<s3_access_key>"
+      >>> s3_access_secret = "<s3_access_secret>"
+      >>> s3_bucket_name = 'stac'
+      >>>
+      >>> # Generate your key follow the instructions in https://docs.gspread.org/en/latest/oauth2.html
+      >>> key_file = '<GDRIVE_KEY>'
+      >>> # Public accessible Google Spreadsheet (Anyone on the internet with this link can view)
+      >>> url = 'https://docs.google.com/spreadsheets/d/1J0R2Sigkcz_N071PKKa5ccfprAH37tKUloaLbUGSJXA/edit#gid=1210168061'
+      >>> 
+      >>> gsheet = GoogleSheet(key_file, url)
+      >>> stac_generator = STACGenerator(gsheet, verbose=True)
+      >>> stac_generator.save_and_publish_all(s3_host, s3_access_key, s3_access_secret, s3_bucket_name)
+
+      """
+
+      self.save_all(output_dir)
+
+      output_dir = Path(output_dir)
+      client = Minio(s3_host, s3_access_key, s3_access_secret, secure=True)
+
+      files = find_files([output_dir, '*.*'])
+      self._verbose(f"Copying {len(files)} files to {s3_host}/{s3_bucket_name}/{s3_prefix}")
+
+      for f in find_files([output_dir, '*.*']):
+        if(f.is_file()):
+          object_name = f.relative_to(output_dir.name)
+          if s3_prefix:
+            object_name = Path(s3_prefix).joinpath(object_name)
+          content_type,_ = mimetypes.guess_type(f)
+          client.fput_object(s3_bucket_name, str(object_name), str(f), content_type=content_type)
+          #print(s3_bucket_name, object_name, f)
+
+except Exception as e:
+  _warn_deps(e, 'eo.STACGenerator')

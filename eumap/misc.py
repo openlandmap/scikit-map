@@ -8,6 +8,7 @@ from functools import reduce
 
 import rasterio
 import geopandas as gp
+import pandas as pd
 import numpy as np
 from pathlib import Path
 
@@ -296,3 +297,108 @@ def sample_groups(
         _add_group_elements,
         group_elements,
     )
+
+def _eval(str_val, args):
+  return eval("f'"+str_val+"'", args)
+
+try:
+  
+  import gspread
+  import pytz
+
+  class GoogleSheet():
+    """
+    Utility class able to convert a remote Google Spreadsheet file into a pandas.DataFrame.
+    Each sheet is converted to a separate pandas.DataFrame accessible by class attribute.
+
+    :param key_file: Authentication key to access spreadsheets via Google Sheets API
+    :param url: Complete URL referring to a Google Spreadsheet file (public accessible).
+    :param col_list_suffix: All the columns with this suffix are converted to a list of strings.
+    :param col_list_delim: Text delimiter used to separate the list elements.
+    :param col_date_suffix: All the columns with this suffix are converted to a date object.
+    :param col_date_format: Date format used to convert string values in date object.
+    :param verbose: Use ``True`` to print the progress of all steps.
+
+    Examples
+    ========
+
+    >>> # Generate your key follow the instructions in https://docs.gspread.org/en/latest/oauth2.html
+    >>> key_file = '<GDRIVE_KEY>'
+    >>> # Public accessible Google Spreadsheet (Anyone on the internet with this link can view)
+    >>> url = 'https://docs.google.com/spreadsheets/d/1O3n5O6MQ3OPX--ZbJEREC5fu-bLKK2AaTYDqeAPMRQY/edit?usp=sharing'
+    >>> 
+    >>> gsheet = GoogleSheet(key_file, url)
+    >>> print('Sheet points_nl: ', gsheet.points_nl.shape)
+    >>> print('Sheet tiles: ', gsheet.tiles.shape)
+
+    References
+    ==========
+
+      [1] `Authentication - gspread <https://docs.gspread.org/en/latest/oauth2.html>`_
+
+
+    """
+
+    def __init__(self,
+      key_file:str,
+      url:str,
+      col_list_suffix:str = '_list',
+      col_list_delim:str = ',',
+      col_date_suffix:str = '_date',
+      col_date_format:str = '%Y-%m-%d',
+      verbose:bool = False,
+    ):
+
+      self.key_file = key_file
+      self.url = url
+      self.verbose = verbose
+      
+      self.col_list_suffix = col_list_suffix
+      self.col_list_delim = col_list_delim
+      self.col_date_suffix = col_date_suffix
+      self.col_date_format = col_date_format
+
+      self._read_gsheet()
+
+    def _verbose(self, *args, **kwargs):
+      if self.verbose:
+        ttprint(*args, **kwargs)
+
+    def _read_gsheet(self):
+
+      gc = gspread.service_account(filename=self.key_file)
+      self._verbose(f"Accessing {self.url}")
+      sht = gc.open_by_url(self.url)
+
+      for wsht in sht.worksheets():
+        self._verbose(f"Retrieving the data from {wsht.title}")
+        rows = wsht.get_values()
+        title = wsht.title
+
+        setattr(self, title, self._parse_df(rows))
+
+    def _parse_df(self, rows):
+
+      pytz.timezone("UTC")
+
+      df = pd.DataFrame(rows[1:], columns=rows[0])
+      to_drop = []
+
+      for column in df.columns:
+        
+        self._verbose(f" Parsing column {column}")
+
+        if column.endswith(self.col_list_suffix):
+          new_column = column.replace(self.col_list_suffix, '')
+          df[new_column] = df[column].str.split(self.col_list_delim)
+          to_drop.append(column)
+
+        if column.endswith(self.col_date_suffix):
+          df[column] = pd.to_datetime(df[column], 
+            format=self.col_date_format, errors='coerce')
+
+      return df.drop(columns=to_drop)
+
+except ImportError as e:
+  from .misc import _warn_deps
+  _warn_deps(e, 'misc.GoogleSheet')
