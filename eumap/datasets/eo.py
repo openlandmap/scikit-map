@@ -20,6 +20,7 @@ import re
 import mimetypes
 from datetime import datetime
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 
 from .. import parallel
 from ..raster import read_auth_rasters, save_rasters
@@ -344,6 +345,7 @@ class GLADLandsat():
 try:
   
   from shapely.geometry import Polygon, mapping, shape
+  from pyproj import Transformer
   from minio import Minio
   from itertools import chain
   from PIL import Image
@@ -378,6 +380,15 @@ try:
 
       coll_columns = gsheet.collections.columns
       self.additional_url_cols = list(coll_columns[pd.Series(coll_columns).str.startswith('url')])
+
+      self.gdal_env = {
+        "GDAL_CACHEMAX": 1024_000_000,  # 1 Gb in bytes
+        "GDAL_DISABLE_READDIR_ON_OPEN": False,
+        "VSI_CACHE": True,
+        "VSI_CACHE_SIZE": 1024_000_000,
+        "GDAL_HTTP_MAX_RETRY": 3,
+        "GDAL_HTTP_RETRY_DELAY": 60
+      }
 
       self.fields = {
         'collection': ['id', 'title', 'description', 'license','keywords'],
@@ -465,6 +476,11 @@ try:
           vmin = self._get_val(collection.extra_fields, 'thumb_vmin')
           vmax = self._get_val(collection.extra_fields, 'thumb_vmax')
           
+          if ',' in cmap:
+            colors = cmap.split(',')
+            cmap = ListedColormap(colors)
+
+
           for key, asset in assets:
             if self._is_data(asset):
               thumb_fn = Path(output_dir) \
@@ -489,12 +505,16 @@ try:
             if is_thumb_url:
               thumd_id = 'thumbnail'
 
-          item.add_asset(thumd_id, pystac.Asset(href=thumb_fn.name, media_type=pystac.MediaType.PNG, roles=['thumbnail']))
+            item.add_asset(thumd_id, pystac.Asset(href=thumb_fn.name, media_type=pystac.MediaType.PNG, roles=['thumbnail']))
               
     def _thumbnail(self, url, thumb_fn, item_id, is_thumb_url=False, cmap = 'binary', vmin = None, vmax = None):
       
       if not self.thumb_overwrite and Path(thumb_fn).exists():
         return (thumb_fn, item_id, is_thumb_url)
+
+      r = requests.head(url)
+      if not (r.status_code == 200):
+        return(None, item_id, is_thumb_url)
 
       with rasterio.open(url) as src:
 
@@ -598,7 +618,7 @@ try:
       result = []
       dt1 = start_date    
       
-      while(dt1 < end_date):
+      while(dt1 <= end_date):
         delta_args = {}
         delta_args[date_unit] = int(date_step) # TODO: Threat the value "month"
         
@@ -643,17 +663,28 @@ try:
       return _eval(url, locals())
 
     def _bbox_and_footprint(self, raster_fn):
-      with rasterio.open(raster_fn) as ds:
-        bounds = ds.bounds
-        bbox = [bounds.left, bounds.bottom, bounds.right, bounds.top]
-        footprint = Polygon([
-          [bounds.left, bounds.bottom],
-          [bounds.left, bounds.top],
-          [bounds.right, bounds.top],
-          [bounds.right, bounds.bottom]
-        ])
 
-        return (bbox, mapping(footprint))
+      r = requests.head(raster_fn)
+      if not (r.status_code == 200):
+       return(None, None)
+      with rasterio.Env(**self.gdal_env) as rio_env:
+        with rasterio.open(raster_fn) as ds:
+
+          transformer = Transformer.from_crs(ds.crs, "epsg:4326", always_xy=True)
+
+          bounds = ds.bounds
+          left_wgs84, bottom_wgs84 = transformer.transform(bounds.bottom, bounds.left)
+          right_wgs84, top_wgs84 = transformer.transform(bounds.top, bounds.right)
+
+          bbox = [left_wgs84, bottom_wgs84, right_wgs84, top_wgs84]
+          footprint = Polygon([
+            [left_wgs84, bottom_wgs84],
+            [left_wgs84, top_wgs84],
+            [right_wgs84, top_wgs84],
+            [right_wgs84, bottom_wgs84]
+          ])
+
+          return (bbox, mapping(footprint))
 
     def save_all(self,
       output_dir:str = 'stac'
