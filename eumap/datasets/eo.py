@@ -425,30 +425,46 @@ try:
         catalogs[p['id']] = pystac.Catalog(**self._kargs(p, 'catalog'))
       return catalogs;
 
+    def _fetch_collection(self, key, i, row, bbox_footprint_results):
+
+      items = []
+      for start_date, end_date in self._gen_dates(**row):
+        main_url = self._parse_url(row['main_url'], start_date, end_date, row['date_unit'], row['date_style'])
+        additional_urls = []
+        for ac_url in self.additional_url_cols:
+          if row[ac_url]:
+            additional_urls.append(self._parse_url(row[ac_url], start_date, end_date, row['date_unit']))
+        
+        bbox, footprint = bbox_footprint_results[main_url]
+
+        items.append(self._new_item(row, start_date, end_date, main_url, bbox, footprint, additional_urls))
+
+      return (key, row, items)
+
     def _populate(self):
 
       groups = self.gsheet.collections.groupby('catalog')
       
+      args = []
       for key in groups.groups.keys():
         for i, row in groups.get_group(key).iterrows():
-
-          self._verbose(f"Creating collection {row.id}")
-
-          items = []
           for start_date, end_date in self._gen_dates(**row):
             main_url = self._parse_url(row['main_url'], start_date, end_date, row['date_unit'], row['date_style'])
+            args.append((main_url,))
 
-            additional_urls = []
-            for ac_url in self.additional_url_cols:
-              if row[ac_url]:
-                additional_urls.append(self._parse_url(row[ac_url], start_date, end_date, row['date_unit']))
-            
-            items.append(self._new_item(row, start_date, end_date, main_url, additional_urls))
+      bbox_footprint_results = {}
+      for url, bbox, footprint in parallel.job(self._bbox_and_footprint, args, n_jobs=-1):
+        bbox_footprint_results[url] = (bbox, footprint)
 
-          self._verbose(f" Total items: {len(items)}")        
-          collection = self._new_collection(row, items)
-          self.catalogs[key].add_child(collection)
-          self._verbose(f" Catalog: {key}")
+      collection_args = []
+      for key in groups.groups.keys():
+        for i, row in groups.get_group(key).iterrows():
+          collection_args.append((key, i, row, bbox_footprint_results))
+          
+      for key, row, items in parallel.job(self._fetch_collection, collection_args, n_jobs=-1):
+        collection = self._new_collection(row, items)
+        self.catalogs[key].add_child(collection)
+        self._verbose(f"Creating collection {collection.id} with {len(items)}")
 
     def _get_val(self, dicty, key):
       if key in dicty:
@@ -497,7 +513,7 @@ try:
 
         self._verbose(f"Generating {len(args)} thumbnails for catalog {catalog.id}")
 
-        for thumb_fn, item_id, is_thumb_url in parallel.job(self._thumbnail, args, n_jobs=10):
+        for thumb_fn, item_id, is_thumb_url in parallel.job(self._thumbnail, args, n_jobs=-1):
           item = catalog.get_item(item_id, True)
           
           if thumb_fn is not None:
@@ -575,9 +591,7 @@ try:
       
       return collection
 
-    def _new_item(self, row, start_date, end_date, main_url, additional_urls = []):
-    
-      bbox, footprint = self._bbox_and_footprint(main_url)
+    def _new_item(self, row, start_date, end_date, main_url, bbox, footprint, additional_urls = []):
       
       start_date_str = start_date.strftime("%Y-%m-%d")
       end_date_str = end_date.strftime("%Y-%m-%d")
@@ -619,17 +633,44 @@ try:
       dt1 = start_date    
       
       while(dt1 <= end_date):
-        delta_args = {}
-        delta_args[date_unit] = int(date_step) # TODO: Threat the value "month"
         
-        dt1n = dt1 + relativedelta(**delta_args)
-        dt2 = dt1n + relativedelta(days=-1)
+        if date_unit == 'custom':
+
+          for date_range in date_step.split(','):
+            date_step_arr = date_range.split('..')
+            start_dt = date_step_arr[0]
+            end_dt = date_step_arr[1]
+
+            year = int(dt1.strftime('%Y'))
+            y, y_m1, y_p1 = str(year), str((year - 1)), str((year + 1))
+
+            start_dt = start_dt.replace('{year}', y) \
+                               .replace('{year_minus_1}', y_m1) \
+                               .replace('{year_plus_1}', y_p1)
+
+            end_dt = end_dt.replace('{year}', y) \
+                           .replace('{year_minus_1}', y_m1) \
+                           .replace('{year_plus_1}', y_p1)
+
+            result.append((
+              datetime.strptime(start_dt, '%Y.%m.%d'),
+              datetime.strptime(end_dt, '%Y.%m.%d')
+            ))
+
+          dt1 = dt1 + relativedelta(years=+1)
+
+        else:
+          delta_args = {}
+          delta_args[date_unit] = int(date_step) # TODO: Threat the value "month"
+          
+          dt1n = dt1 + relativedelta(**delta_args)
+          dt2 = dt1n + relativedelta(days=-1)
+          
+          if dt2.strftime("%d") == '29':
+              dt2 = dt2 + relativedelta(days=-1)
         
-        if dt2.strftime("%d") == '29':
-            dt2 = dt2 + relativedelta(days=-1)
-        
-        result.append((dt1, dt2))       
-        dt1 = dt1n
+          result.append((dt1, dt2))       
+          dt1 = dt1n
       
       return result
 
@@ -664,9 +705,12 @@ try:
 
     def _bbox_and_footprint(self, raster_fn):
 
+      self._verbose(f'Accesing COG bounds ({raster_fn})')
+
       r = requests.head(raster_fn)
       if not (r.status_code == 200):
        return(None, None)
+
       with rasterio.Env(**self.gdal_env) as rio_env:
         with rasterio.open(raster_fn) as ds:
 
@@ -684,7 +728,7 @@ try:
             [right_wgs84, bottom_wgs84]
           ])
 
-          return (bbox, mapping(footprint))
+          return (raster_fn, bbox, mapping(footprint))
 
     def save_all(self,
       output_dir:str = 'stac'
