@@ -350,6 +350,7 @@ try:
   from itertools import chain
   from PIL import Image
   import pystac
+  from pystac.extensions.item_assets import ItemAssetsExtension
 
   class STACGenerator():
     """
@@ -377,6 +378,8 @@ try:
       self.gsheet = gsheet
       self.url_date_format = url_date_format
       self.verbose = verbose
+      self.asset_id_delim = '_'
+      self.asset_id_fields = [1,3]
 
       coll_columns = gsheet.collections.columns
       self.additional_url_cols = list(coll_columns[pd.Series(coll_columns).str.startswith('url')])
@@ -478,7 +481,7 @@ try:
           return True
       return False
 
-    def _generate_thumbs(self, output_dir='./stac'):
+    def _generate_thumbs(self, output_dir='./stac', thumb_base_url=None):
 
       for key, catalog in self.catalogs.items():
         
@@ -517,11 +520,16 @@ try:
           item = catalog.get_item(item_id, True)
           
           if thumb_fn is not None:
-            thumd_id = thumb_fn.name
+            thumd_id = self._asset_id(thumb_fn, self.asset_id_delim, self.asset_id_fields) + '_preview'
+            roles = []
             if is_thumb_url:
               thumd_id = 'thumbnail'
+              roles = ['thumbnail']
 
-            item.add_asset(thumd_id, pystac.Asset(href=thumb_fn.name, media_type=pystac.MediaType.PNG, roles=['thumbnail']))
+            if thumb_base_url is not None:
+              thumb_fn = str(thumb_fn).replace(str(output_dir), thumb_base_url)
+
+            item.add_asset(thumd_id, pystac.Asset(href=thumb_fn, media_type=pystac.MediaType.PNG, roles=roles))
               
     def _thumbnail(self, url, thumb_fn, item_id, is_thumb_url=False, cmap = 'binary', vmin = None, vmax = None):
       
@@ -584,12 +592,29 @@ try:
           temporal=pystac.TemporalExtent(intervals=[collection_interval])
         ),
         providers=[ self.providers[p] for p in row['providers'] ],
+        stac_extensions=['https://stac-extensions.github.io/item-assets/v1.0.0/schema.json'],
         **self._kargs(row, 'collection', True)
       )
+
+      #itemasset_ext = ItemAssetsExtension.ext(collection)
+      #print(itemasset_ext.item_assets)
 
       collection.add_items(items)
       
       return collection
+
+    def _asset_id(self, url, delim = None, id_fields = None):
+      
+      if delim is None:
+        return Path(url).name
+
+      fields = Path(url).name.split(delim)
+      result = []
+      for f in id_fields:
+        if f < len(fields):
+          result.append(fields[f])
+
+      return delim.join(result)
 
     def _new_item(self, row, start_date, end_date, main_url, bbox, footprint, additional_urls = []):
       
@@ -613,17 +638,19 @@ try:
       
       if 'platform' in row and row['platform']:
         item.common_metadata.platform = row['platform']
-      if 'constellation' in row and row['constellation'][0]:
+      if 'constellation' in row:
         item.common_metadata.constellation = row['constellation']
-      
-      #eo_ext = EOExtension.ext(item)    
+
+      #eo_ext = EOExtension.ext(item)
       #eo_ext.apply(bands=[
       #Band.create(name='EVI', description='Enhanced vegetation index', common_name='evi')
       #])
 
-      item.add_asset(Path(main_url).name, pystac.Asset(href=main_url, media_type=pystac.MediaType.GEOTIFF, roles=['data'], extra_fields={'main': True}))
+      item.add_asset(self._asset_id(main_url, self.asset_id_delim, self.asset_id_fields), \
+        pystac.Asset(href=main_url, media_type=pystac.MediaType.GEOTIFF, roles=['data'], extra_fields={'main': True}))
       for aurl in additional_urls:
-        item.add_asset(Path(aurl).name, pystac.Asset(href=aurl, media_type=pystac.MediaType.GEOTIFF, roles=['data']))
+        item.add_asset(self._asset_id(aurl, self.asset_id_delim, self.asset_id_fields), \
+          pystac.Asset(href=aurl, media_type=pystac.MediaType.GEOTIFF, roles=['data']))
 
       return item
 
@@ -701,6 +728,11 @@ try:
       else:
         dt = f'{dt1.strftime(date_format)}..{dt2.strftime(date_format)}'
 
+      item_id = str(Path(url).name) \
+                  .replace('{dt}','') \
+                  .replace('__', '_')
+
+
       return _eval(url, locals())
 
     def _bbox_and_footprint(self, raster_fn):
@@ -731,7 +763,9 @@ try:
           return (raster_fn, bbox, mapping(footprint))
 
     def save_all(self,
-      output_dir:str = 'stac'
+      output_dir:str = 'stac',
+      catalog_type = pystac.CatalogType.SELF_CONTAINED,
+      thumb_base_url = None
     ):
       """
     
@@ -742,12 +776,12 @@ try:
       """
 
       output_dir = Path(output_dir)
-      self._generate_thumbs(output_dir)
+      self._generate_thumbs(output_dir, thumb_base_url)
 
       for key, catalog in self.catalogs.items():
         catalog.normalize_and_save(
           root_href=str(output_dir.joinpath(catalog.id)), 
-          catalog_type=pystac.CatalogType.SELF_CONTAINED
+          catalog_type=catalog_type
         )
 
     def save_and_publish_all(self,
@@ -757,6 +791,7 @@ try:
       s3_bucket_name:str,
       s3_prefix:str = '',
       output_dir:str = 'stac',
+      catalog_type = pystac.CatalogType.SELF_CONTAINED
     ):
       """
     
@@ -768,6 +803,7 @@ try:
       :param s3_bucket_name: TODO
       :param s3_prefix: TODO
       :param output_dir: TODO
+      :param catalog_type: TODO
 
       Examples
       ========
@@ -788,7 +824,8 @@ try:
 
       """
 
-      self.save_all(output_dir)
+      thumb_base_url = f'https://{s3_host}/{s3_bucket_name}'
+      self.save_all(output_dir, catalog_type=catalog_type, thumb_base_url=thumb_base_url)
 
       output_dir = Path(output_dir)
       client = Minio(s3_host, s3_access_key, s3_access_secret, secure=True)
