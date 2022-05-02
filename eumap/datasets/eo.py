@@ -359,6 +359,10 @@ try:
 
     :param gsheet: TODO
     :param url_date_format: TODO
+    :param cog_level: TODO
+    :param thumb_overwrite: TODO
+    :param asset_id_delim: TODO
+    :param asset_id_fields: TODO
     :param verbose: TODO
 
     References
@@ -370,16 +374,20 @@ try:
     def __init__(self,
       gsheet:GoogleSheet,
       url_date_format = '%Y.%m.%d',
+      cog_level = 7,
+      thumb_overwrite = False,
+      asset_id_delim = '_',
+      asset_id_fields = [1,3],
       verbose = False
     ):
 
-      self.cog_level = 7
-      self.thumb_overwrite = False
+      self.cog_level = cog_level
+      self.thumb_overwrite = thumb_overwrite
       self.gsheet = gsheet
       self.url_date_format = url_date_format
       self.verbose = verbose
-      self.asset_id_delim = '_'
-      self.asset_id_fields = [1,3]
+      self.asset_id_delim = asset_id_delim
+      self.asset_id_fields = asset_id_fields
 
       coll_columns = gsheet.collections.columns
       self.additional_url_cols = list(coll_columns[pd.Series(coll_columns).str.startswith('url')])
