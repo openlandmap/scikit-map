@@ -375,7 +375,10 @@ try:
         rows = wsht.get_values()
         title = wsht.title
 
-        setattr(self, title, self._parse_df(rows))
+        try:
+          setattr(self, title, self._parse_df(rows))
+        except:
+          ttprint(f'ERROR: unable to parse {title}, ignoring it.')
 
     def _parse_df(self, rows):
 
