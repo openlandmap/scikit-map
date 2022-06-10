@@ -1,6 +1,7 @@
 '''
 Functions to plot raster data
 '''
+from typing import Iterable
 
 try:
 	import matplotlib.pyplot as plt
@@ -96,13 +97,13 @@ try:
 		if isinstance(cmaps, (str, ListedColormap)):
 			cmaps = [cmaps] * len(rasters)
 
-		if vmin is None or isinstance(vmin, (int, float)):
+		if not isinstance(vmin, Iterable):
 			vmin = [vmin] * len(rasters)
 
-		if vmax is None or isinstance(vmax, (int, float)):
+		if not isinstance(vmax, Iterable):
 			vmax = [vmax] * len(rasters)
 
-		if nodata is None or isinstance(nodata, (int, float)):
+		if not isinstance(nodata, Iterable):
 			nodata = [nodata] * len(rasters)
 
 		for i, r in enumerate(rasters):
@@ -173,7 +174,7 @@ try:
 					ax.set_title(titles[i])
 		if out_file is not None:
 			plt.savefig(out_file, bbox_inches='tight')
-			
+
 except ImportError as e:
     from .misc import _warn_deps
     _warn_deps(e, 'plotter')
