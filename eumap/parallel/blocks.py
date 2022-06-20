@@ -57,17 +57,17 @@ try:
 
         def __init__(self,
             func: Callable,
-            agg_func: Callable=_id,
+            # agg_func: Callable=_id, # should not be done here
             return_data_only: bool=False,
         ):
             self.func = func
-            self.agg_func = agg_func
+            # self.agg_func = agg_func # should not be done here
             self.return_data_only = return_data_only
 
         def __call__(self, args):
             data, mask, window = args
             result = self.func(*data)
-            result = self.agg_func(result)
+            # result = self.agg_func(result) # should not be done here
             if self.return_data_only:
                 return result
             return result, mask, window
@@ -109,6 +109,27 @@ try:
             self.reference = None
             if reference_file is not None:
                 self._build_rtree(reference_file)
+
+        def _open(self,
+            src_path,
+        ):
+            src = rio.open(src_path)
+            if all((
+                src.crs == self.reference.crs,
+                src.transform == self.reference.transform,
+                src.width == self.reference.width,
+                src.height == self.reference.height,
+            )):
+                return src
+
+            return rio.vrt.WarpedVRT(
+                src,
+                resampling=rio.enums.Resampling.nearest,
+                crs=self.reference.crs,
+                transform=self.reference.transform,
+                width=self.reference.width,
+                height=self.reference.height,
+            )
 
         def _build_rtree(self, reference_file):
             self.reference = rio.open(reference_file)
@@ -201,7 +222,7 @@ try:
                 tname = threading.current_thread().name
                 if tname not in sources:
                     sources[tname] = [
-                        rio.open(sp)
+                        self._open(sp)
                         for sp in src_path
                     ]
                 return _read_block(
@@ -348,7 +369,7 @@ try:
                 _RasterBlockFunction(
                     block_func,
                     return_data_only=True,
-                    agg_func=agg_func,
+                    # agg_func=agg_func, # should not be done here
                 ),
                 self.reader.read_overlay(
                     src_path,
@@ -437,7 +458,7 @@ try:
             ==========
 
             [1] `Writing datasets with Rasterio <https://rasterio.readthedocs.io/en/latest/quickstart.html#saving-raster-data>`_
-            
+
             [2] `Raster block processing tutorial <../notebooks/06_raster_block_processing.html>`_
 
             """
