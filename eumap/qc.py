@@ -36,7 +36,7 @@ class Test:
     >>> dataset_url = 'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_eumap_epsg3035_v0.1.tif'
     >>>
     >>> available = test.availability(dataset_url)
-    >>> coverage_fraction = test.raster_completeness(dataset_url, include_ice=True, include_wetlands=True)
+    >>> coverage_fraction = test.raster_land_coverage(dataset_url, include_ice=True, include_wetlands=True)
 
     """
 
@@ -49,7 +49,7 @@ class Test:
         self.verbose = verbose
         self.crs = crs
 
-    def availability(self,
+    def accessibility(self,
         dataset_url: str,
     ) -> bool:
         """
@@ -77,7 +77,7 @@ class Test:
 
         return result
 
-    def raster_completeness(self,
+    def raster_land_coverage(self,
         dataset_path: Union[str, Path],
         include_ice: bool=False,
         include_wetlands: bool=False,
@@ -133,18 +133,11 @@ class Test:
 
         _geom = g.mapping(_gdf.geometry[0])
 
-        def squish(results):
-            print('i have been called')
-            print(results)
-            return reduce(add, results)
-
         counts = agg.aggregate(
             [_LANDMASK_REF, dataset_path], _geom,
             block_func=_get_counts,
-            agg_func=squish,
+            agg_func=lambda results: reduce(add, results),
         )
-
-        print(counts)
 
         result = counts[0] / counts[1]
 
