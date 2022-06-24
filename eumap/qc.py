@@ -15,6 +15,7 @@ from operator import add
 from functools import reduce
 
 from .parallel import blocks
+from .datasets.catalogue import _Resource
 
 _LANDMASK_REF = '/data/work/geoharmonizer/lcv_landcover.12_pflugmacher2019_c_1m_s0..0m_2014..2016_eumap_epsg3035_v0.1.tif'
 
@@ -149,3 +150,28 @@ class Test:
             )
 
         return result
+    
+    def metadata_consistency(self,
+        resource:_Resource,
+    ) -> dict:
+        META_KEYS = (
+            'title',
+            'abstract',
+            'theme',
+        )
+        result = []
+        
+        for meta_key in META_KEYS:
+            try:
+                meta_val = resource.meta[meta_key]
+                assert meta_val.strip() != ''
+                result.append(True)
+            except (KeyError, AssertionError):
+                result.append(False)
+                if self.verbose:
+                    print('Missing metadata:', meta_key)
+        
+        if self.verbose:
+            print('All metadata present:', all(result))
+            
+        return dict(zip(META_KEYS, result))
