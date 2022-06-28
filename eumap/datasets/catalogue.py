@@ -63,6 +63,7 @@ class _Resource(str):
                 'theme',
                 'year',
                 'layer',
+                'authors',
             )
         })
         return self
@@ -320,7 +321,17 @@ class Catalogue:
             items = {
                 "title": self.csw.records[rec].identificationinfo[0].title,
                 "abstract": self.csw.records[rec].identificationinfo[0].abstract,
-                "urls": []
+                "urls": [],
+                "authors": [*map(
+                    lambda con: {
+                        k: con.__dict__[k]
+                        for k in (
+                            'name',
+                            'email',
+                        )
+                    },
+                    self.csw.records[rec].contact,
+                )],
             }
             # get theme (first keyword)
             for i in self.csw.records[rec].identificationinfo[0].keywords2:
