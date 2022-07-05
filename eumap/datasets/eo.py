@@ -959,3 +959,91 @@ try:
 
 except Exception as e:
   _warn_deps(e, 'eo.STACGenerator')
+
+try:
+
+  from pystac import Catalog
+  from whoosh.qparser import QueryParser
+  from whoosh.index import create_in
+  from whoosh import fields
+
+  class STACIndex():
+    """
+    
+    Enable full-text search for static SpatioTemporal Asset Catalogs (STAC) using whoosh.
+
+    :param catalog: STAC catalog instance ``pystac.catalog.Catalog``.
+    :param index_dir: Output folder to store the whoosh index files.
+    :param verbose: Use ``True`` to print the progress of all steps.
+
+
+  """
+    def __init__(self,
+      catalog:Catalog,
+      index_dir = 'stac_index',
+      verbose = False
+    ):
+
+      self.catalog = catalog
+      self.index_dir = index_dir
+      self.verbose = verbose
+
+      self.ix = self._index()
+
+    def _index(self):
+      Path(self.index_dir).mkdir(parents=True, exist_ok=True)
+      ix = create_in(self.index_dir, fields.Schema(title=fields.TEXT(stored=True), 
+                                                   id=fields.ID(stored=True), description=fields.TEXT))
+      
+      self._verbose(f'Retriving all collections from {self.catalog.title}')
+      collections = list(self.catalog.get_collections())
+      
+      self._verbose(f'Creating index for {len(collections)} collections')
+      writer = ix.writer()
+      for collection in collections:
+        writer.add_document(
+            title=collection.title, 
+            id=collection.id, 
+            description=collection.title + ' ' + collection.description
+        )
+
+      writer.commit()
+
+      return ix
+
+    def search(self, 
+      query, 
+      field='title'
+    ):
+    """
+    
+    Full-text Search over the title and / or description of the collections.
+
+    :param query: Search text.
+    :param field: Can be ``title`` or ``description``.
+
+
+    """
+    
+      result = []
+      with self.ix.searcher() as searcher:
+        parser = QueryParser(field, self.ix.schema)
+        myquery = parser.parse(query)
+        
+        i = 0
+        for r in searcher.search(myquery):
+            result.append({
+                'pos': i,
+                'id': r['id'],
+                'title': r['title']
+            })
+            i += 1
+      
+      return result
+
+    def _verbose(self, *args, **kwargs):
+      if self.verbose:
+        ttprint(*args, **kwargs)
+
+except Exception as e:
+  _warn_deps(e, 'eo.STACGenerator')

@@ -40,16 +40,18 @@ setuptools.setup(
     extras_require={
         'full': [
             'Bottleneck>=1.3',
+            'gspread>=5.3.2',
             'matplotlib>=3.3',
+            'minio>=7.1.0',
             'opencv_python>=4.5',
             'pqdm>=0.1',
-            'pyts>=0.11',
-            'Shapely>=1.7',
-            'scikit_image>=0.17',
             'pygeos>=0.8',
-            'minio>=7.1.0',
-            'gspread>=5.3.2',
-            'pytz>=0.11'
+            'pystac>=1.4.0',
+            'pyts>=0.11',
+            'pytz>=0.11',
+            'scikit_image>=0.17',
+            'Shapely>=1.7',
+            'whoosh>=2.7.4'
         ],
     },
 )

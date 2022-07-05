@@ -3,8 +3,10 @@ Functions to plot raster data
 '''
 
 try:
+	import math
 	import matplotlib.pyplot as plt
 	import skimage.exposure as exposure
+	from mpl_toolkits.axes_grid1 import ImageGrid
 	from matplotlib.colors import ListedColormap
 	from typing import Union, List, Iterable
 	import rasterio as rio
@@ -24,6 +26,50 @@ try:
 		data_equalized = np.stack(data_equalized, axis=2)
 		plt.imshow(data_equalized)
 
+	def plot_stac_collection(
+		collection, 
+		thumb_id='thumbnail',
+		ncols = 4, 
+		figsize=(15, 25), 
+		axes_pad=(0,0.4)
+	):
+		"""
+    
+	    Plot the asset thumbnails for all items of a STAC collection.
+
+	    :param collection: STAC collection instance ``pystac.collection.Collection``.
+	    :param thumb_id: Asset id of thumbnails.
+	    :param ncols: Number of columns used to define the grid.
+	    :param figsize: Print size of the horizontal axis of the plot (passed to ``matplotlib``).
+		:param axes_pad: Padding space between the plots of the grid.
+
+
+	    """
+		
+		items = list(collection.get_all_items())
+
+		nrows = math.ceil(len(items) / 4)
+
+		fig = plt.figure(figsize=figsize)
+		fig.tight_layout()
+		grid = ImageGrid(fig, 111, nrows_ncols=(nrows, ncols), axes_pad=axes_pad)
+
+		for ax, item in zip(grid, items):
+			thumbnail_url = item.assets[thumb_id].href
+
+			start_dt = item.properties['start_datetime']
+			end_dt = item.properties['end_datetime']
+			title = f'{start_dt} - {end_dt}'
+
+			ax.title.set_text(title)
+			ax.get_yaxis().set_ticks([])
+			ax.get_xaxis().set_ticks([])
+
+			im = plt.imread(thumbnail_url)
+			ax.imshow(im)
+
+		plt.show()
+
 	def plot_rasters(
 		*rasters: Union[Iterable[str], Iterable[np.ndarray], Iterable[Path]],
 		out_file: Union[str, Path]=None,
@@ -41,7 +87,7 @@ try:
 		perc_max: List[Union[int, float]]=98,
 	):
 		"""
-        Plots data from one or more rasters.
+		Plots data from one or more rasters.
 
 		Preserves pixel aspect ratio, removes axes and ensures transparency on nodata.
 
@@ -62,31 +108,31 @@ try:
 		:param perc_min:        Minimum percentile to clip with if ``perc_clip=True``.
 		:param perc_max:        Maximum percentile to clip with if ``perc_clip=True``.
 
-        Examples
-        ========
+		Examples
+		========
 
-        >>> from eumap import plotter
-        >>> import numpy as np
-        >>>
-        >>> singleband = np.random.randint(0, 255, [5, 5])
-        >>> multiband = np.random.randint(0, 255, [3, 5, 5])
-        >>>
-        >>> plotter.plot_rasters(
-        >>>     singleband,
-        >>>     multiband,
-        >>>     titles=['single band', 'RGB'],
-        >>>     figsize=4,
-        >>>     cmaps='Greens',
-        >>> )
+		>>> from eumap import plotter
+		>>> import numpy as np
+		>>>
+		>>> singleband = np.random.randint(0, 255, [5, 5])
+		>>> multiband = np.random.randint(0, 255, [3, 5, 5])
+		>>>
+		>>> plotter.plot_rasters(
+		>>>     singleband,
+		>>>     multiband,
+		>>>     titles=['single band', 'RGB'],
+		>>>     figsize=4,
+		>>>     cmaps='Greens',
+		>>> )
 
-        References
-        ==========
+		References
+		==========
 
-        [1] `Matplotlib imshow <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.imshow.html>`_
+		[1] `Matplotlib imshow <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.imshow.html>`_
 
-        [2] `Matplotlib colormaps <https://matplotlib.org/stable/tutorials/colors/colormaps.html>`_
+		[2] `Matplotlib colormaps <https://matplotlib.org/stable/tutorials/colors/colormaps.html>`_
 
-        """
+		"""
 
 		if isinstance(rasters, (str, Path, np.ndarray)):
 			rasters = [rasters]
@@ -175,5 +221,5 @@ try:
 			plt.savefig(out_file, bbox_inches='tight')
 			
 except ImportError as e:
-    from .misc import _warn_deps
-    _warn_deps(e, 'plotter')
+	from .misc import _warn_deps
+	_warn_deps(e, 'plotter')
