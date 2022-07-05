@@ -47,6 +47,7 @@ setuptools.setup(
             'Shapely>=1.7',
             'scikit_image>=0.17',
             'pygeos>=0.8',
+            'sentinelhub==3.4.4',
         ],
     },
 )

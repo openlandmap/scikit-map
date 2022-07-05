@@ -1,6 +1,3 @@
-"""
-Earth observation data acess
-"""
 from typing import List, Union
 
 import requests
@@ -11,9 +8,9 @@ from pathlib import Path
 import gc
 import os
 
-from .. import parallel
-from ..raster import read_auth_rasters, save_rasters
-from ..misc import nan_percentile, ttprint
+from ... import parallel
+from ...raster import read_auth_rasters, save_rasters
+from ...misc import nan_percentile, ttprint
 
 class GLADLandsat():
   """
