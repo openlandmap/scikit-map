@@ -507,6 +507,7 @@ try:
           if key not in self.new_collections:
             self.new_collections[key] = []
           self.new_collections[key].append(collection)
+
           self._verbose(f"Creating collection {collection.id} with {len(items)}")
 
     def _get_val(self, dicty, key):
@@ -711,8 +712,6 @@ try:
           start_date, 
           end_date
         ))
-
-
       elif date_unit == 'custom_multiannual': 
       ## Irregular/custom date iteration
         
