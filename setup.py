@@ -47,6 +47,9 @@ setuptools.setup(
             'Shapely>=1.7',
             'scikit_image>=0.17',
             'pygeos>=0.8',
+            'minio>=7.1.0',
+            'gspread>=5.3.2',
+            'pytz>=0.11'
         ],
     },
 )

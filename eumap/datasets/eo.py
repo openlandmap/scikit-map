@@ -361,8 +361,8 @@ try:
     local folder and / or remote S3 bucket [2,3].
 
     The COG files need to be publicly accessible to HTTP and compatible the Geo-harmonizer 
-    file naming convention [4]. The thumbnails are produced according for every COG 
-    according to color scheme defined by column. 
+    file naming convention [4]. The thumbnails are produced for every COG 
+    according to color scheme defined by columns ``thumb_cmap``, ``thumb_vmin``, ``thumb_vmax``. 
 
     :param gsheet: Object representation of a Google Spreadsheet containing the metadata.
     :param url_date_format: Date format expected in the COG URL (``strftime``).
@@ -378,11 +378,11 @@ try:
     References
     ==========
 
-    [2] `ODSE Raster layer metadata example <https://docs.google.com/spreadsheets/d/10tAhEpZ7TYPD0UWhrI0LHcuIzGZNt5AgSjx2Bu-FciU>`_  
+    [1] `ODSE Raster layer metadata example <https://docs.google.com/spreadsheets/d/10tAhEpZ7TYPD0UWhrI0LHcuIzGZNt5AgSjx2Bu-FciU>`_  
 
-    [2] `ODSE STAC Catalog - Open Data Science Europe <https://s3.eu-central-1.wasabisys.com/stac/odse/catalog.json>`_
+    [2] `ODSE STAC Catalog <https://s3.eu-central-1.wasabisys.com/stac/odse/catalog.json>`_
 
-    [3] `ODSE STAC Browser - Open Data Science Europe <http://stac.opendatascience.eu>`_
+    [3] `ODSE STAC Browser <http://stac.opendatascience.eu>`_
 
     [4] `Geo-harmonizer file naming convention <https://gitlab.com/geoharmonizer_inea/spatial-layers>`_
 
@@ -866,17 +866,17 @@ try:
       Examples
       ========
 
-      >> from eumap.misc import GoogleSheet
-      >> from eumap.datasets.eo import STACGenerator
-      >> 
+      >>> from eumap.misc import GoogleSheet
+      >>> from eumap.datasets.eo import STACGenerator
+      >>> 
       >>> # Generate your key follow the instructions in https://docs.gspread.org/en/latest/oauth2.html
       >>> key_file = '<GDRIVE_KEY>'
       >>> # Public accessible Google Spreadsheet (Anyone on the internet with this link can view)
       >>> url = 'https://docs.google.com/spreadsheets/d/10tAhEpZ7TYPD0UWhrI0LHcuIzGZNt5AgSjx2Bu-FciU'
-      >> 
-      >> gsheet = GoogleSheet(key_file, url, verbose=True)
-      >> stac_generator = STACGenerator(gsheet, asset_id_fields=[1,2,3,5], catalogs=catalogs, verbose=True)
-      >> stac_generator.save_all(output_dir='stac_odse', thumb_base_url=f'https://s3.eu-central-1.wasabisys.com/stac')
+      >>> 
+      >>> gsheet = GoogleSheet(key_file, url, verbose=True)
+      >>> stac_generator = STACGenerator(gsheet, asset_id_fields=[1,2,3,5], catalogs=catalogs, verbose=True)
+      >>> stac_generator.save_all(output_dir='stac_odse', thumb_base_url=f'https://s3.eu-central-1.wasabisys.com/stac')
 
       """
 
