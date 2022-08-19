@@ -17,10 +17,11 @@ import re
 import os
 
 from sklearn.model_selection import cross_val_predict, GridSearchCV, KFold, BaseCrossValidator
+from sklearn.utils.validation import has_fit_parameter
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.impute import SimpleImputer
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, is_classifier, is_regressor
 from sklearn.pipeline import Pipeline
 from sklearn import preprocessing
 from sklearn import metrics
@@ -335,7 +336,7 @@ class LandMapper():
       return None, None
 
   def _pred_method(self, pred_method):
-    if self.meta_estimator is not None:
+    if self.meta_estimator is not None and is_classifier(self.meta_estimator):
       return 'predict_proba'
     else:
       return pred_method
@@ -352,19 +353,20 @@ class LandMapper():
 
   def _target_transformation(self):
 
-    self._verbose(f"Transforming {self.target_col}:")
+    if self._is_classifier():
+      self._verbose(f"Transforming {self.target_col}:")
 
-    self.target_le = preprocessing.LabelEncoder()
-    # Change to starting from 1
-    self.target = self.target_le.fit_transform(self.target)
+      self.target_le = preprocessing.LabelEncoder()
+      # Change to starting from 1
+      self.target = self.target_le.fit_transform(self.target)
 
-    self.target_classes = {
-      'original': self.target_le.classes_,
-      'transformed': self.target_le.transform(self.target_le.classes_)
-    }
+      self.target_classes = {
+        'original': self.target_le.classes_,
+        'transformed': self.target_le.transform(self.target_le.classes_)
+      }
 
-    self._verbose(f" -Original classes: {self.target_classes['original']}")
-    self._verbose(f" -Transformed classes: {self.target_classes['transformed']}")
+      self._verbose(f" -Original classes: {self.target_classes['original']}")
+      self._verbose(f" -Transformed classes: {self.target_classes['transformed']}")
 
   def _impute_nodata(self, data, fit_and_tranform = False):
     nodata_idx = self._nodata_idx(data)
@@ -393,7 +395,7 @@ class LandMapper():
 
   def _best_params(self, hyperpar_selection):
 
-    means = hyperpar_selection.cv_results_['mean_test_score']*-1
+    means = hyperpar_selection.cv_results_['mean_test_score']
     stds = hyperpar_selection.cv_results_['std_test_score']
 
     for mean, std, params in zip(means, stds, hyperpar_selection.cv_results_['params']):
@@ -459,14 +461,24 @@ class LandMapper():
 
     return report
 
+  def _is_classifier(self):
+    if self.meta_estimator is not None:
+      return is_classifier(self.meta_estimator)
+    else:
+      return is_classifier(self.estimator_list[0])
+
   def _calc_eval_metrics(self):
 
     self.eval_metrics = {}
 
     if self.pred_method == 'predict':
-      self.eval_metrics['confusion_matrix'] = metrics.confusion_matrix(self.target, self.eval_pred)
-      self.eval_metrics['overall_acc'] = metrics.accuracy_score(self.target, self.eval_pred)
-      self.eval_report = metrics.classification_report(self.target, self.eval_pred)
+      if self._is_classifier():
+        self.eval_metrics['confusion_matrix'] = metrics.confusion_matrix(self.target, self.eval_pred)
+        self.eval_metrics['overall_acc'] = metrics.accuracy_score(self.target, self.eval_pred)
+        self.eval_report = metrics.classification_report(self.target, self.eval_pred)
+      else:
+        self.eval_metrics['r2'] = metrics.r2_score(self.target, self.eval_pred)  
+        self.eval_metrics['rmse'] = metrics.mean_squared_error(self.target, self.eval_pred, squared=False)  
     elif self.pred_method == 'predict_proba':
       self.eval_metrics['log_loss'] = metrics.log_loss(self.target, self.eval_pred)
       self.eval_report = self._classification_report_prob()
@@ -477,18 +489,24 @@ class LandMapper():
     if self.is_automl_estimator:
       ttprint('LandMapper is using AutoSklearnClassifier, which not supports fit_params (ex: sample_weight)')
       return {}
-    else:
+    elif has_fit_parameter(estimator, "sample_weight"):
       return {'sample_weight': self.samples_weight}
+    else:
+      return {}
 
-  def _is_keras_classifier(self, estimator):
+  def _is_keras_model(self, estimator):
     try:
-      from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
-      return isinstance(estimator, Pipeline) and isinstance(estimator['estimator'], KerasClassifier)
+      from tensorflow.keras.wrappers.scikit_learn import KerasClassifier, KerasRegressor
+      return isinstance(estimator, Pipeline) and ( 
+        isinstance(estimator['estimator'], KerasClassifier) 
+        or 
+        isinstance(estimator['estimator'], KerasRegressor) 
+      )
     except ImportError as e:
       return False
 
   def _binarizer_target_if_needed(self, estimator):
-    if  self.pred_method == 'predict_proba' and self._is_keras_classifier(estimator):
+    if  self.pred_method == 'predict_proba' and self._is_keras_model(estimator):
       le = preprocessing.LabelBinarizer()
       target = le.fit_transform(self.target)
       return target
@@ -549,7 +567,12 @@ class LandMapper():
     for estimator in self.estimator_list:
       self.meta_features.append(self._do_cv_prediction(estimator, self.features))
 
-    self.meta_features = np.concatenate(self.meta_features, axis=1)
+    if self._is_classifier():
+      self.meta_features = np.concatenate(self.meta_features, axis=1)
+    else:
+      self.meta_features = np.stack(self.meta_features, axis=1)
+
+    print(self.meta_features.shape)
     self._verbose(f' Meta-features shape: {self.meta_features.shape}')
 
   def _correction_factor(self, per_class = False):
@@ -623,7 +646,7 @@ class LandMapper():
 
   def _write_layer(self, fn_base_layer, fn_output, input_data_shape, output_data,
     nan_mask, separate_probs = True, spatial_win = None, scale=1,
-    dtype = 'uint8', new_suffix = None):
+    dtype = 'float32', new_suffix = None):
 
     if len(output_data.shape) < 2:
       n_classes = 1
@@ -661,7 +684,7 @@ class LandMapper():
     return fn_output_list
 
   def _write_layers(self, fn_base_layer, fn_output, input_data_shape, pred_result,
-    pred_uncer, nan_mask, spatial_win, separate_probs, hard_class):
+    pred_uncer, nan_mask, spatial_win, separate_probs, hard_class, dtype = 'float32'):
 
     fn_out_files = []
 
@@ -672,7 +695,7 @@ class LandMapper():
       scale = 100
 
     fn_pred_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_result, nan_mask,
-      separate_probs = separate_probs, spatial_win = spatial_win, scale = scale)
+      separate_probs = separate_probs, spatial_win = spatial_win, dtype = dtype, scale = scale)
     fn_out_files += fn_pred_files
 
     if self.pred_method == 'predict_proba':
@@ -680,7 +703,7 @@ class LandMapper():
       if pred_uncer is not None:
 
         fn_uncer_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_uncer, nan_mask,
-          separate_probs = separate_probs, spatial_win = spatial_win, scale=100, new_suffix = '_uncertainty')
+          separate_probs = separate_probs, spatial_win = spatial_win, dtype = 'uint8', scale=100, new_suffix = '_uncertainty')
         fn_out_files += fn_uncer_files
 
       if hard_class:
@@ -694,16 +717,16 @@ class LandMapper():
         pred_argmax += 1
 
         fn_hcl_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax, nan_mask,
-          separate_probs = False, spatial_win = spatial_win, new_suffix = '_hcl')
+          separate_probs = False, spatial_win = spatial_win, dtype = dtype, new_suffix = '_hcl')
         fn_out_files += fn_hcl_file
 
         fn_hcl_prob_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_prob, nan_mask,
-          separate_probs = False, spatial_win = spatial_win, scale=100, new_suffix = '_hcl_prob')
+          separate_probs = False, spatial_win = spatial_win, dtype = 'uint8', scale=100, new_suffix = '_hcl_prob')
         fn_out_files += fn_hcl_prob_files
 
         if pred_uncer is not None and pred_uncer.ndim > 2:
           fn_hcl_uncer_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_uncer, nan_mask,
-            separate_probs = False, spatial_win = spatial_win, scale=100, new_suffix = '_hcl_uncertainty')
+            separate_probs = False, spatial_win = spatial_win, dtype = 'uint8', scale=100, new_suffix = '_hcl_uncertainty')
           fn_out_files += fn_hcl_uncer_file
 
     return fn_out_files
@@ -762,7 +785,7 @@ class LandMapper():
       estimator_name = type(estimator).__name__
       self._verbose(f'Executing {estimator_name}')
 
-      if self._is_keras_classifier(estimator):
+      if self._is_keras_model(estimator):
 
         n_elements, _ = input_data.shape
         pred_batch_size = int(n_elements/2)
@@ -793,8 +816,12 @@ class LandMapper():
       meta_estimator_name = type(self.meta_estimator).__name__
       self._verbose(f'Executing {meta_estimator_name}')
 
-      input_meta_features = np.concatenate(estimators_pred, axis=1)
-      std_meta_features = np.std(np.stack(estimators_pred, axis=2), axis=2)
+      if self._is_classifier():
+        input_meta_features = np.concatenate(estimators_pred, axis=1)
+        std_meta_features = np.std(np.stack(estimators_pred, axis=2), axis=2)
+      else:
+        input_meta_features = np.stack(estimators_pred, axis=1)
+        std_meta_features = np.std(input_meta_features, axis=1)
 
       meta_estimator_pred_method = getattr(self.meta_estimator, self.pred_method)
       meta_estimator_pred = meta_estimator_pred_method(input_meta_features)
@@ -892,7 +919,7 @@ class LandMapper():
     pred_result, pred_uncer = self._predict(input_data)
 
     fn_out_files = self._write_layers(fn_base_layer, fn_output, input_data_shape, pred_result, \
-      pred_uncer, nan_mask, spatial_win, separate_probs, hard_class)
+      pred_uncer, nan_mask, spatial_win, separate_probs, hard_class, dtype = dtype)
 
     fn_out_files.sort()
 
@@ -973,10 +1000,10 @@ class LandMapper():
 
     landmapper = joblib.load(fn_joblib)
     for estimator in landmapper.estimator_list:
-      if landmapper._is_keras_classifier(estimator):
+      if landmapper._is_keras_model(estimator):
         from tensorflow.keras.models import load_model
 
-        fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
+        fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_keras.h5')
         estimator['estimator'].model = load_model(fn_keras)
 
     return landmapper
@@ -1009,19 +1036,19 @@ class LandMapper():
           delattr(self, prop)
 
     for estimator in self.estimator_list:
-      if self._is_keras_classifier(estimator):
+      if self._is_keras_model(estimator):
         basedir = fn_joblib.parent
-        fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
+        fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_keras.h5')
         estimator['estimator'].model.save(fn_keras)
         estimator['estimator'].model = None
 
     result = joblib.dump(self, fn_joblib, compress=compress)
 
     for estimator in self.estimator_list:
-      if self._is_keras_classifier(estimator):
+      if self._is_keras_model(estimator):
         from tensorflow.keras.models import load_model
         
-        fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_kerasclassifier.h5')
+        fn_keras = fn_joblib.parent.joinpath(f'{fn_joblib.stem}_keras.h5')
         estimator['estimator'].model = load_model(fn_keras)
 
 class _PredictionStrategy(ABC):
