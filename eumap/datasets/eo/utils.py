@@ -220,6 +220,28 @@ class GLADLandsat():
 
     return output_files
 
+  def _calc_save_count(self, data, max_val, base_raster, tile, start, output_dir):
+    band_data = data[0,:,:,:]
+    band_data = band_data.copy()
+    band_valid_mask = np.logical_and(band_data >= 1.0, band_data <= max_val)
+    band_data[~band_valid_mask] = np.nan
+
+    band_count = bc.nansum(np.logical_not(np.isnan(band_data)).astype('uint8'), axis=2)
+    band_count = np.stack([band_count], axis=2)
+
+    if not isinstance(output_dir, Path):
+      output_dir = Path(output_dir)
+
+    fn_raster = output_dir.joinpath(f'{start}') \
+                      .joinpath(f'B1_COUNT') \
+                      .joinpath(f'{tile}.tif')
+
+    dtype = 'uint8'
+    save_rasters(fn_base_raster=base_raster, data=band_count, fn_raster_list=[ fn_raster ], 
+      dtype=dtype, nodata=0, n_jobs=1, verbose=self.verbose)
+
+    return fn_raster
+
   def percentile_agg(self, 
     tile:str, 
     start:str, 
@@ -318,6 +340,10 @@ class GLADLandsat():
         if output_dir is not None:
           self._verbose(f'Saving the result in {output_dir}.')
           output_files = self._save_percentile_agg(result, base_raster, tile, start, p, output_dir, unit8)
+
+        self._verbose(f'Counting clear_sky pixels')
+        output_file_count = self._calc_save_count(data, self.max_spectral_val, base_raster, tile, start, output_dir)
+        output_files.append(output_file_count)
 
         del data
         gc.collect()
