@@ -7,6 +7,7 @@ import warnings
 import time
 import math
 import os
+import gc
 
 try:
     from itertools import cycle, islice, chain
@@ -415,6 +416,212 @@ try:
           del win_stacked
 
         return result
+
+    class TMWM2(ImageGapfill):
+
+      def __init__(self,
+        fn_files:List = None ,
+        data:np.array = None,
+        season_size = None,
+        time_win_size: int=9,
+        precomputed_flags:np.array = None, 
+        cpu_max_workers:int = multiprocessing.cpu_count(),
+        engine='CPU',
+        gpu_tile_size:int = 250,
+        outlier_remover:OutlierRemover = None,
+        std_win:int = 3,
+        std_env:int = 2,
+        perc_env:list = [2,98],
+        n_jobs_io = 4,
+        verbose = True
+      ):
+
+        super().__init__(fn_files=fn_files, data=data,
+          outlier_remover=outlier_remover, std_win=std_win,
+          std_env=std_env, perc_env=perc_env, n_jobs_io=n_jobs_io,
+          verbose=verbose)
+
+        self.cpu_max_workers = cpu_max_workers
+        self.time_win_size = time_win_size
+        self.engine = engine
+        self.gpu_tile_size = gpu_tile_size
+        self.season_size = season_size
+
+        self.data = self.data.transpose((2,0,1))
+        
+        self.time_series_size = self.data.shape[0]
+        self.tile_size = (self.data.shape[1], self.data.shape[2])
+        self.n_years = int(self.time_series_size / self.season_size)
+        self.precomputed_flags = precomputed_flags
+
+        self.summary_gaps = np.sum(
+          np.isnan(self.data).astype('int8'), 
+          axis=(1,2)
+        )
+
+        if (self.time_win_size % 2) == 0:
+          raise ValueError(f'The time_win_size argument must be an odd number')
+
+      def _sanitize_win(self, idx):
+        return idx[
+          np.logical_and(
+            idx >= 0,
+            idx < self.time_series_size
+          )
+        ]
+
+      def _season_win(self, i, t_margin):
+          
+        margin = (self.season_size * t_margin)
+        
+        return self._sanitize_win(
+            np.arange(
+              i - margin, 
+              i + margin + self.season_size,
+              self.season_size
+            )
+        )
+
+      def _annual_win(self, i, t_margin):
+          
+        start = int(i / self.season_size)
+        margin = t_margin * self.season_size
+        
+        return self._sanitize_win(
+            np.arange(
+              start - margin, 
+              start + margin, 
+              1
+            )
+        )
+
+      def _time_windows(self, i):
+
+        win_map = {}
+        win_idx = []
+
+        for t in range(self.time_win_size, self.n_years, self.time_win_size):
+          t_margin = int((t - 1) / 2)
+
+          same_season_idx = t
+          win_idx.append(same_season_idx)
+          win_map[same_season_idx] = self._season_win(i, t_margin)
+          
+          neib_season_idx = t + self.n_years
+          win_idx.append(neib_season_idx)
+          win_map[neib_season_idx] = np.concatenate([
+            self._season_win(i-1, t_margin),
+            self._season_win(i+1, t_margin)
+          ])
+          
+          annual_idx = t + (2 * self.n_years)
+          win_idx.append(annual_idx)
+          win_map[annual_idx] = self._annual_win(i, t_margin)
+
+        win_idx.sort()
+
+        return (win_idx, win_map)
+
+      def _win_choice(self, win_map, idx, i):
+        to_gapfill = self.data[i,:,:]
+        to_reduce = self.data[win_map[idx]]
+        
+        availability_mask = np.logical_and(
+          np.isnan(to_gapfill), 
+          ~np.isnan(bc.nanmin(to_reduce, axis=(0)))
+        )
+
+        r = np.empty(self.tile_size, dtype='float32')
+        r[:,:] = np.nan
+        r[availability_mask] = idx
+
+        return r
+
+      def _flags(self, i, win_idx, win_map):
+        args = [ (win_map, idx, i) for idx in win_idx ]
+
+        win_choice = []
+        for r in parallel.job(self._win_choice, args, n_jobs=4, joblib_args={'backend': 'threading'}):
+          win_choice.append(r)
+
+        win_choice = bc.nanmin(np.stack(win_choice, axis=0), axis=0)          
+        gc.collect()
+
+        return win_choice
+
+      def _gapfilled(self, win_map, win_choice, idx):
+              
+        data = self.data[win_map[idx]]
+        mask = (win_choice == idx)
+        mask_b = np.broadcast_to(mask, data.shape)
+        
+        data = data.copy()
+        data[~mask_b] = np.nan
+        r = bc.nanmedian(data, axis=(0))
+        
+        del data
+        del mask_b
+        gc.collect()
+        
+        return r
+
+      def _run(self, i):
+        
+        n_gaps = self.summary_gaps[i]
+
+        try:
+
+          if n_gaps > 0:
+              
+            win_idx, win_map = self._time_windows(i)
+            
+            if self.precomputed_flags is None:
+              flags = self._flags(i, win_idx, win_map)
+              flags[np.isnan(flags)] = 0
+              flags = flags.astype('uint8')
+            else:
+              flags = self.precomputed_flags[i,:,:]
+            
+            flags_uniq = np.unique(flags[flags != 0])
+            
+            args = [ (win_map, flags, idx) for idx in flags_uniq ]
+            
+            gapfilled = []
+            for g in parallel.job(self._gapfilled, args, n_jobs=4, joblib_args={'backend': 'threading'}):
+              gapfilled.append(g)
+            
+            del args
+            gc.collect()
+            
+            gapfilled = bc.nanmedian(np.stack(gapfilled, axis=0), axis=0)
+            
+            no_gap = (flags == 0)
+            gapfilled[no_gap] = self.data[i,:,:][no_gap]
+            
+            return gapfilled, flags
+          else:
+            return self.data[i,:,:], np.zeros(self.tile_size, dtype='int8')
+        except:
+          return self.data[i,:,:], np.zeros(self.tile_size, dtype='int8')
+
+        finally:
+          gc.collect()
+
+      def _gapfill(self):
+        args = [  (i,)  for i in range(self.time_series_size) ]
+
+        gapfilled_data = []
+        gapfilled_data_flag = []
+        
+        for gapfilled, flags in parallel.job(self._run, args, n_jobs=-1):
+          gapfilled_data.append(gapfilled)
+          gapfilled_data_flag.append(flags)
+
+        gapfilled_data = np.stack(gapfilled_data, axis=0)
+        gapfilled_data_flag = np.stack(gapfilled_data_flag, axis=0)
+
+        return(gapfilled_data, gapfilled_data_flag)
+
 
     class TMWM(ImageGapfill):
       """
