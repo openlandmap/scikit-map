@@ -425,6 +425,10 @@ try:
         season_size = None,
         time_win_size: int=9,
         precomputed_flags:np.array = None, 
+        max_same_season_win = None,
+        max_neib_season_win = None,
+        max_annual_win = None,
+        time_win_direction = 'both',
         cpu_max_workers:int = multiprocessing.cpu_count(),
         engine='CPU',
         gpu_tile_size:int = 250,
@@ -447,12 +451,26 @@ try:
         self.gpu_tile_size = gpu_tile_size
         self.season_size = season_size
 
-        self.data = self.data.transpose((2,0,1))
+        self.data = np.ascontiguousarray(self.data.transpose((2,0,1)))
         
         self.time_series_size = self.data.shape[0]
         self.tile_size = (self.data.shape[1], self.data.shape[2])
         self.n_years = int(self.time_series_size / self.season_size)
         self.precomputed_flags = precomputed_flags
+
+        self.time_win_direction = time_win_direction
+
+        self.max_same_season_win = max_same_season_win
+        if self.max_same_season_win is None:
+          self.max_same_season_win = self.n_years
+        
+        self.max_neib_season_win = max_neib_season_win
+        if self.max_neib_season_win is None:
+          self.max_neib_season_win = self.n_years
+
+        self.max_annual_win = max_annual_win
+        if self.max_annual_win is None:
+          self.max_annual_win = self.n_years
 
         self.summary_gaps = np.sum(
           np.isnan(self.data).astype('int8'), 
@@ -461,6 +479,15 @@ try:
 
         if (self.time_win_size % 2) == 0:
           raise ValueError(f'The time_win_size argument must be an odd number')
+
+        if (self.max_same_season_win < self.time_win_size):
+          raise ValueError(f'The max_same_season_win argument can not be less than {time_win_size} (time_win_size)')
+
+        if (self.max_neib_season_win < self.time_win_size):
+          raise ValueError(f'The max_neib_season_win argument can not be less than {time_win_size} (time_win_size)')
+
+        if (self.max_annual_win < self.time_win_size):
+          raise ValueError(f'The max_annual_win argument can not be less than {time_win_size} (time_win_size)')
 
       def _sanitize_win(self, idx):
         return idx[
@@ -474,12 +501,16 @@ try:
           
         margin = (self.season_size * t_margin)
         
+        i_past = i - margin
+        i_futu = i + margin + self.season_size
+
+        if self.time_win_direction == 'past':
+          i_futu = i
+        elif self.time_win_direction == 'future':
+          i_past = i
+
         return self._sanitize_win(
-            np.arange(
-              i - margin, 
-              i + margin + self.season_size,
-              self.season_size
-            )
+          np.arange(i_past, i_futu, self.season_size)
         )
 
       def _annual_win(self, i, t_margin):
@@ -487,12 +518,16 @@ try:
         start = int(i / self.season_size)
         margin = t_margin * self.season_size
         
+        i_past = start - margin
+        i_futu = start + margin 
+
+        if self.time_win_direction == 'past':
+          i_futu = i
+        elif self.time_win_direction == 'future':
+          i_past = i
+
         return self._sanitize_win(
-            np.arange(
-              start - margin, 
-              start + margin, 
-              1
-            )
+          np.arange(i_past, i_futu, 1)
         )
 
       def _time_windows(self, i):
@@ -500,23 +535,33 @@ try:
         win_map = {}
         win_idx = []
 
-        for t in range(self.time_win_size, self.n_years, self.time_win_size):
+        for j in range(0, self.n_years - self.time_win_size):
+          t = ((j * 2) + self.time_win_size)
           t_margin = int((t - 1) / 2)
 
-          same_season_idx = t
-          win_idx.append(same_season_idx)
-          win_map[same_season_idx] = self._season_win(i, t_margin)
+          if t <= self.max_same_season_win:
+            same_season_win = self._season_win(i, t_margin)
+            if len(same_season_win) > 0:
+              same_season_idx = t
+              win_idx.append(same_season_idx)
+              win_map[same_season_idx] = same_season_win
+
+          if t <= self.max_neib_season_win:
+            neib_season_win = np.concatenate([
+              self._season_win(i-1, t_margin),
+              self._season_win(i+1, t_margin)
+            ])
+            if len(neib_season_win) > 0:
+              neib_season_idx = t + self.n_years
+              win_idx.append(neib_season_idx)
+              win_map[neib_season_idx] = neib_season_win
           
-          neib_season_idx = t + self.n_years
-          win_idx.append(neib_season_idx)
-          win_map[neib_season_idx] = np.concatenate([
-            self._season_win(i-1, t_margin),
-            self._season_win(i+1, t_margin)
-          ])
-          
-          annual_idx = t + (2 * self.n_years)
-          win_idx.append(annual_idx)
-          win_map[annual_idx] = self._annual_win(i, t_margin)
+          if t <= self.max_annual_win:
+            annual_win = self._annual_win(i, t_margin)
+            if len(annual_win) > 0:
+              annual_idx = t + (2 * self.n_years)
+              win_idx.append(annual_idx)
+              win_map[annual_idx] = annual_win
 
         win_idx.sort()
 
@@ -541,7 +586,7 @@ try:
         args = [ (win_map, idx, i) for idx in win_idx ]
 
         win_choice = []
-        for r in parallel.job(self._win_choice, args, n_jobs=4, joblib_args={'backend': 'threading'}):
+        for r in parallel.job(self._win_choice, args, n_jobs=len(args), joblib_args={'backend': 'threading'}):
           win_choice.append(r)
 
         win_choice = bc.nanmin(np.stack(win_choice, axis=0), axis=0)          
@@ -549,21 +594,10 @@ try:
 
         return win_choice
 
-      def _gapfilled(self, win_map, win_choice, idx):
-              
-        data = self.data[win_map[idx]]
-        mask = (win_choice == idx)
-        mask_b = np.broadcast_to(mask, data.shape)
-        
-        data = data.copy()
-        data[~mask_b] = np.nan
-        r = bc.nanmedian(data, axis=(0))
-        
-        del data
-        del mask_b
-        gc.collect()
-        
-        return r
+      def _reduce(self, i, to_reduce, mask):
+        mask_b = np.broadcast_to(mask, to_reduce.shape)
+        to_reduce[~mask_b] = np.nan
+        return bc.nanmedian(to_reduce, axis=0), mask
 
       def _run(self, i):
         
@@ -584,23 +618,17 @@ try:
             
             flags_uniq = np.unique(flags[flags != 0])
             
-            args = [ (win_map, flags, idx) for idx in flags_uniq ]
-            
-            gapfilled = []
-            for g in parallel.job(self._gapfilled, args, n_jobs=4, joblib_args={'backend': 'threading'}):
-              gapfilled.append(g)
-            
-            del args
-            gc.collect()
-            
-            gapfilled = bc.nanmedian(np.stack(gapfilled, axis=0), axis=0)
-            
-            no_gap = (flags == 0)
-            gapfilled[no_gap] = self.data[i,:,:][no_gap]
-            
+            args = [ (i, self.data[win_map[idx]].copy(), (flags == idx)) for idx in flags_uniq ]
+
+            gapfilled = self.data[i,:,:].copy()
+            for reduced, mask in parallel.job(self._reduce, args, n_jobs=len(args), joblib_args={'backend': 'threading'}):
+              gapfilled[mask] = reduced[mask]
+
             return gapfilled, flags
+          
           else:
             return self.data[i,:,:], np.zeros(self.tile_size, dtype='int8')
+            
         except:
           return self.data[i,:,:], np.zeros(self.tile_size, dtype='int8')
 
@@ -613,7 +641,7 @@ try:
         gapfilled_data = []
         gapfilled_data_flag = []
         
-        for gapfilled, flags in parallel.job(self._run, args, n_jobs=-1):
+        for gapfilled, flags in parallel.job(self._run, args, n_jobs=-1, joblib_args={'backend': 'multiprocessing'}):
           gapfilled_data.append(gapfilled)
           gapfilled_data_flag.append(flags)
 
@@ -621,8 +649,7 @@ try:
         gapfilled_data_flag = np.stack(gapfilled_data_flag, axis=0)
 
         return(gapfilled_data, gapfilled_data_flag)
-
-
+        
     class TMWM(ImageGapfill):
       """
       Temporal Moving Window Median able to gapfill the missing pixels using the temporal neighborhood
