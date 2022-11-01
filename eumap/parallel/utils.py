@@ -559,11 +559,22 @@ class TilingProcessing():
         
         try:
           with rasterio.open(raster_layer_fn) as src:
-            out_image, out_transform = mask(src, shapes, crop=True)
-
-            values, counts = np.unique(out_image, return_counts=True)
-            m = counts.argmax()
-
+            out_image, out_transform = mask(src, shapes, crop=True, filled=True)
+            
+            out_image = out_image.astype('float32')
+            nodata_val = src.nodatavals[0]
+            
+            _values, _counts = np.unique(out_image, return_counts=True)
+            values, counts = [], []
+            for v,c in zip(_values, _counts):
+                if (v != nodata_val):
+                    values.append(v)
+                    counts.append(c)
+            
+            values = np.array(values)
+            counts = np.array(counts)
+            m = np.argmax(counts)
+            
             tile['raster_min'] = np.min(values)
             tile['raster_mode_value'] = values[m]
             tile['raster_mode_count'] = counts[m]
