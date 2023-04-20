@@ -110,35 +110,34 @@ def nan_percentile(
   [1] `Kersten's blog <https://krstn.eu/np.nanpercentile()-there-has-to-be-a-faster-way>`_
 
   """
-
-  if keep_original_vals:
-    arr = np.copy(arr)
-
-  nanall = np.all(np.isnan(arr), axis=0)
-  res_shape = (len(q), arr.shape[1], arr.shape[2])
-  nanall = np.broadcast_to(nanall, shape=res_shape)
-
-  # valid (non NaN) observations along the first axis
-  valid_obs = np.sum(np.isfinite(arr), axis=0)
-
-  # replace NaN with maximum
-  max_val = np.nanmax(arr)
-  arr[np.isnan(arr)] = max_val
-
-  # sort - former NaNs will move to the end
-  arr = np.sort(arr, axis=0)
-
   # loop over requested quantiles
   if type(q) is list:
     qs = []
     qs.extend(q)
   else:
-    qs = [q]
+      qs = [q]
+  # eliminate duplicate percentile
+  qs = list(set(qs))
+  if len(qs) != len(q):
+    print('duplicate percentile is eliminated')
+  if keep_original_vals:
+    arr = np.copy(arr)
+  nanall = np.all(np.isnan(arr), axis=0)
+  single_value = ~(np.sum(~np.isnan(arr),axis=0)-1).astype(bool)
+  res_shape = (len(qs), arr.shape[1], arr.shape[2])
+  nanall = np.broadcast_to(nanall, shape=res_shape)
+  # valid (non NaN) observations along the first axis
+  valid_obs = np.sum(np.isfinite(arr), axis=0)
+  # replace NaN with maximum
+  max_val = np.nanmax(arr)
+  arr[np.isnan(arr)] = max_val
+  # sort - former NaNs will move to the end
+  arr = np.sort(arr, axis=0)
+
   if len(qs) <= 2:
     quant_arr = np.zeros(shape=(arr.shape[1], arr.shape[2]))
   else:
     quant_arr = np.zeros(shape=(len(qs), arr.shape[1], arr.shape[2]))
-
   result = []
   for i in range(len(qs)):
     quant = qs[i]
@@ -147,21 +146,24 @@ def nan_percentile(
     f_arr = np.floor(k_arr).astype(np.int32)
     c_arr = np.ceil(k_arr).astype(np.int32)
     fc_equal_k_mask = f_arr == c_arr
-
+    
     # linear interpolation (like numpy percentile) takes the fractional part of desired position
     floor_val = _zvalueFromIndex(arr=arr, ind=f_arr) * (c_arr - k_arr)
     ceil_val = _zvalueFromIndex(arr=arr, ind=c_arr) * (k_arr - f_arr)
-
     quant_arr = floor_val + ceil_val
     quant_arr[fc_equal_k_mask] = _zvalueFromIndex(arr=arr, ind=k_arr.astype(np.int32))[fc_equal_k_mask]  # if floor == ceiling take floor value
-
     result.append(quant_arr)
-
-  result = np.stack(result, axis=0).astype('float16')
+  result = np.stack(result, axis=0)
   result[nanall] = np.nan
 
+  md = [i==50 for i in qs]
+  if sum(md)==1:
+    md_value = np.copy(result[md]) 
+    result[:,single_value] = np.nan
+    result[md] = md_value
+  else: 
+    result[:,single_value] = np.nan
   return result
-
 def _zvalueFromIndex(arr, ind):
   """private helper function to work around the limitation of np.choose() by employing np.take()
   arr has to be a 3D array
