@@ -112,16 +112,16 @@ def nan_percentile(
   """
   # loop over requested quantiles
   if type(q) is list:
-      qs = []
-      qs.extend(q)
+    qs = []
+    qs.extend(q)
   else:
       qs = [q]
   # eliminate duplicate percentile
   qs = list(set(qs))
   if len(qs) != len(q):
-      print('duplicate percentile is eliminated')
+    print('duplicate percentile is eliminated')
   if keep_original_vals:
-      arr = np.copy(arr)
+    arr = np.copy(arr)
   nanall = np.all(np.isnan(arr), axis=0)
   single_value = ~(np.sum(~np.isnan(arr),axis=0)-1).astype(bool)
   res_shape = (len(qs), arr.shape[1], arr.shape[2])
@@ -135,34 +135,34 @@ def nan_percentile(
   arr = np.sort(arr, axis=0)
 
   if len(qs) <= 2:
-      quant_arr = np.zeros(shape=(arr.shape[1], arr.shape[2]))
+    quant_arr = np.zeros(shape=(arr.shape[1], arr.shape[2]))
   else:
-      quant_arr = np.zeros(shape=(len(qs), arr.shape[1], arr.shape[2]))
+    quant_arr = np.zeros(shape=(len(qs), arr.shape[1], arr.shape[2]))
   result = []
   for i in range(len(qs)):
-      quant = qs[i]
-      # desired position as well as floor and ceiling of it
-      k_arr = (valid_obs - 1) * (quant / 100.0)
-      f_arr = np.floor(k_arr).astype(np.int32)
-      c_arr = np.ceil(k_arr).astype(np.int32)
-      fc_equal_k_mask = f_arr == c_arr
-      
-      # linear interpolation (like numpy percentile) takes the fractional part of desired position
-      floor_val = _zvalueFromIndex(arr=arr, ind=f_arr) * (c_arr - k_arr)
-      ceil_val = _zvalueFromIndex(arr=arr, ind=c_arr) * (k_arr - f_arr)
-      quant_arr = floor_val + ceil_val
-      quant_arr[fc_equal_k_mask] = _zvalueFromIndex(arr=arr, ind=k_arr.astype(np.int32))[fc_equal_k_mask]  # if floor == ceiling take floor value
-      result.append(quant_arr)
+    quant = qs[i]
+    # desired position as well as floor and ceiling of it
+    k_arr = (valid_obs - 1) * (quant / 100.0)
+    f_arr = np.floor(k_arr).astype(np.int32)
+    c_arr = np.ceil(k_arr).astype(np.int32)
+    fc_equal_k_mask = f_arr == c_arr
+    
+    # linear interpolation (like numpy percentile) takes the fractional part of desired position
+    floor_val = _zvalueFromIndex(arr=arr, ind=f_arr) * (c_arr - k_arr)
+    ceil_val = _zvalueFromIndex(arr=arr, ind=c_arr) * (k_arr - f_arr)
+    quant_arr = floor_val + ceil_val
+    quant_arr[fc_equal_k_mask] = _zvalueFromIndex(arr=arr, ind=k_arr.astype(np.int32))[fc_equal_k_mask]  # if floor == ceiling take floor value
+    result.append(quant_arr)
   result = np.stack(result, axis=0)
   result[nanall] = np.nan
 
   md = [i==50 for i in qs]
   if sum(md)==1:
-      md_value = np.copy(result[md]) 
-      result[:,single_value] = np.nan
-      result[md] = md_value
+    md_value = np.copy(result[md]) 
+    result[:,single_value] = np.nan
+    result[md] = md_value
   else: 
-      result[:,single_value] = np.nan
+    result[:,single_value] = np.nan
   return result
 def _zvalueFromIndex(arr, ind):
   """private helper function to work around the limitation of np.choose() by employing np.take()
