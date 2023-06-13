@@ -603,15 +603,6 @@ try:
         to_reduce[~mask_b] = np.nan
         return bc.nanmedian(to_reduce, axis=0), mask
 
-      @jit(nopython=True, fastmath=True)
-      def _tmwm_numba_reduce(to_reduce, mask):
-        x = np.zeros(len(to_reduce))
-        for i in prange(to_reduce.shape[0]):
-          to_reduce[i][~mask] = np.nan
-          x[i] = np.nanmedian(to_reduce[i])
-        
-        return x
-
       def _run(self, i):
         
         n_gaps = self.summary_gaps[i]
@@ -621,10 +612,7 @@ try:
           if n_gaps > 0:
               
             win_idx, win_map = self._time_windows(i)
-            #for key in win_map.keys():
-              #print(key, win_map[key])
-              #print(key, '####', len(win_map[key]), win_map[key])
-            
+
             if self.precomputed_flags is None:
               flags = self._flags(i, win_idx, win_map)
               flags[np.isnan(flags)] = 0
@@ -636,7 +624,6 @@ try:
             
             args = [ (i, self.data[win_map[idx]], (flags == idx)) for idx in flags_uniq ]
 
-            #gapfilled = self.data[i,:,:].copy()
             gapfilled = self.data[i,:,:].copy()
             #for reduced, mask in parallel.job(self._reduce, args, n_jobs=len(args), joblib_args={'backend': 'threading'}):
             for arg in args:
