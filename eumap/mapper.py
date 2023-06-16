@@ -494,6 +494,22 @@ class LandMapper():
     else:
       return {}
 
+  def _is_catboost_model(self,estimator):
+    ttprint("Checking for catboost model")
+    try:
+      from catboost import CatBoostClassifier, CatBoostRegressor
+    except ImportError as e:
+      return False
+
+    if isinstance(estimator,Pipeline):
+      return isinstance(estimator,Pipeline) and (
+        isinstance(estimator['estimator'], CatBoostClassifier)
+        or
+        isinstance(estimator['estimator'], CatBoostRegressor)
+      )
+    else:
+      return isinstance(estimator,CatBoostClassifier) or isinstance(estimator,CatBoostRegressor)
+
   def _is_keras_model(self, estimator):
     try:
       from tensorflow.keras.wrappers.scikit_learn import KerasClassifier, KerasRegressor
@@ -776,12 +792,11 @@ class LandMapper():
     return relative_entropy_pred
 
   def _predict(self, input_data):
-
+    start = time.time()
     estimators_pred = []
 
     for estimator in self.estimator_list:
 
-      start = time.time()
       estimator_name = type(estimator).__name__
       self._verbose(f'Executing {estimator_name}')
 
@@ -793,9 +808,19 @@ class LandMapper():
         self._verbose(f'batch_size={pred_batch_size}')
         estimator['estimator'].set_params(batch_size=pred_batch_size)
 
+      if self._is_catboost_model(estimator):
+        from catboost import Pool, FeaturesData
+        start_featuresdata = time.time()
+        input_data = FeaturesData(num_feature_data=input_data.astype(np.float32))
+        #ttprint(f"creating FeaturesData took {(time.time() - start_featuresdata):.2f} seconds")
+        start_pool = time.time()
+        input_data = Pool(data=input_data)
+        #ttprint(f"creating Pool from FeaturesData took {(time.time() - start_pool):.2f} seconds")
+      start_pred = time.time()
       estimator_pred_method = getattr(estimator, self.pred_method)
       estimators_pred.append(estimator_pred_method(input_data))
-      self._verbose(f'{estimator_name} prediction time: {(time.time() - start):.2f} segs')
+      self._verbose(f'{estimator_name} prediction time: {(time.time() - start_pred):.2f} seconds')
+    self._verbose(f'Total time: {(time.time() - start):.2f} seconds')
 
     if self.meta_estimator is None:
 
