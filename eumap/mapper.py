@@ -495,7 +495,6 @@ class LandMapper():
       return {}
 
   def _is_catboost_model(self,estimator):
-    ttprint("Checking for catboost model")
     try:
       from catboost import CatBoostClassifier, CatBoostRegressor
     except ImportError as e:
