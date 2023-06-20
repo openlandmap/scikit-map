@@ -804,7 +804,7 @@ class LandMapper():
         n_elements, _ = input_data.shape
         pred_batch_size = int(n_elements/2)
 
-        self._verbose(f'batch_size={pred_batch_size}')
+        self._verbose(f'###batch_size={pred_batch_size}')
         estimator['estimator'].set_params(batch_size=pred_batch_size)
 
       if self._is_catboost_model(estimator):
@@ -815,9 +815,13 @@ class LandMapper():
         start_pool = time.time()
         input_data = Pool(data=input_data)
         #ttprint(f"creating Pool from FeaturesData took {(time.time() - start_pool):.2f} seconds")
+      
       start_pred = time.time()
       estimator_pred_method = getattr(estimator, self.pred_method)
-      estimators_pred.append(estimator_pred_method(input_data))
+      if self._is_keras_model(estimator):
+        estimators_pred.append(estimator_pred_method(input_data, batch_size=pred_batch_size))
+      else:
+        estimators_pred.append(estimator_pred_method(input_data))
       self._verbose(f'{estimator_name} prediction time: {(time.time() - start_pred):.2f} seconds')
     self._verbose(f'Total time: {(time.time() - start):.2f} seconds')
 
