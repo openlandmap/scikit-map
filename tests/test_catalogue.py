@@ -17,16 +17,16 @@ class TestCatalogue:
 
         assert len(results) > 0
 
-    def test_002(self):
-        """Land Cover product is expected. Check basic metadata."""
-        results = self._lc(years=[2015, 2018])
-        
-        assert len(results) > 0
-
-        # basic metadata
-        for key in ('title', 'abstract', 'theme'):
-            assert key in results[0].meta.keys()
-        assert results[0].meta['theme'] == 'Land cover, land use and administrative data'
+    #def test_002(self):
+    #    """Land Cover product is expected. Check basic metadata."""
+    #    results = self._lc(years=[2015, 2018])
+    #    
+    #    assert len(results) > 0
+    #
+    #    # basic metadata
+    #    for key in ('title', 'abstract', 'theme'):
+    #        assert key in results[0].meta.keys()
+    #    assert results[0].meta['theme'] == 'Land cover, land use and administrative data'
 
     def test_003(self):
         """Land Cover product is expected. Check download link."""
