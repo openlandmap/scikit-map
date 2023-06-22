@@ -2,16 +2,11 @@ import setuptools
 from skmap import __version__
 from pathlib import Path
 
-root_dir = Path(__file__).parent
-
-with open(root_dir.joinpath('skmap', 'README.md'), 'r') as fh:
-    long_description = fh.read()
-
 setuptools.setup(
     name='scikit-map',
     version=__version__,
     description='scikit-learn applied to mapping and spatial prediction',
-    long_description=long_description,
+    long_description="Python module to produce maps using machine learning, reference samples and raster data.",
     long_description_content_type='text/markdown',
     url='https://github.com/scikit-map/scikit-map',
     packages=setuptools.find_packages(),
@@ -26,16 +21,14 @@ setuptools.setup(
     install_requires=[
         'GDAL>=3.1',
         'affine>=2.3',
-        'geopandas>=0.8',
+        'geopandas>=0.13',
         'joblib>=1.1.0',
         'numpy>=1.19',
         'pyproj>=3.1',
-        'OWSLib==0.22',
         'pandas>=2.0',
         'requests>=2.24',
-        'scikit_learn>=1.0',
-        'rasterio>=1.1',
-        'psutil>=5.8'
+        'scikit-learn>=1.0',
+        'rasterio>=1.1'
     ],
     extras_require={
         'full': [
