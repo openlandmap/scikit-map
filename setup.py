@@ -31,9 +31,9 @@ setuptools.setup(
         'numpy>=1.19',
         'pyproj>=3.1',
         'OWSLib==0.22',
-        'pandas>=1.1',
+        'pandas>=2.0',
         'requests>=2.24',
-        'scikit_learn>=0.24',
+        'scikit_learn>=1.0',
         'rasterio>=1.1',
         'psutil>=5.8'
     ],

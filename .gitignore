@@ -1,13 +1,9 @@
-.Rproj.user
-.Rhistory
-.RData
-.Ruserdata
 __pycache__
 build
 dist
 *.egg*
 .ipynb_checkpoints
-eumap_data
+skmap_data
 gapfilled
 *.tif
 tmp*
