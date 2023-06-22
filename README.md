@@ -46,7 +46,7 @@ Installation
 If you already have a working installation of `gdal`, `scikit-learn` and `numpy`, you can install `scikit-map` is using pip:
 
 ```bash
-pip install -e 'git+https://github.com/scikit-map/scikit-map#egg=eumap[full]'
+pip install -e 'git+https://github.com/scikit-map/scikit-map#egg=scikit-map[full]'
 ```
 
 License
