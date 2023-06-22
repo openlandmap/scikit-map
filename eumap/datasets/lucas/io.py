@@ -18,7 +18,7 @@ from owslib.wfs import WebFeatureService
 from owslib.util import ServiceException
 from owslib import __version__ as owslib_version
 
-from eumap import __version__
+from skmap import __version__
 from .logger import Logger
 from .exceptions import LucasDownloadError, LucasDataError
 
@@ -66,7 +66,7 @@ class LucasIO:
     @staticmethod
     def __get_tempfile_name(extension):
         return os.path.join(tempfile.gettempdir(),
-                            "eumap_lucas_{n}.{e}".format(
+                            "skmap_lucas_{n}.{e}".format(
                                 n=next(tempfile._get_candidate_names()),
                                 e=extension)
                             )
@@ -177,7 +177,7 @@ class LucasIO:
             #  values are provided as strings due to GDAL < 3.3 limitation
             #  -> Dictionary must contain tuples of strings
             metadata = ({
-                "EUMAP_VERSION": str(__version__),
+                "skmap_VERSION": str(__version__),
                 "LUCAS_TABLE": self._request.typename.split(":")[1],
                 "LUCAS_ST": str(int(self._request.st_aggregated)),
                 "LUCAS_VERSION": str(lucas_metadata["version"]),

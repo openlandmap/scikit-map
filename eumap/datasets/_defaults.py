@@ -1,1 +1,1 @@
-DATA_ROOT_NAME = 'eumap_data'
+DATA_ROOT_NAME = 'skmap_data'

@@ -85,10 +85,10 @@ try:
         Examples
         ========
 
-        >>> from eumap.parallel.blocks import RasterBlockReader
-        >>> from eumap.misc import ttprint
+        >>> from skmap.parallel.blocks import RasterBlockReader
+        >>> from skmap.misc import ttprint
         >>>
-        >>> fp = 'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_eumap_epsg3035_v0.1.tif'
+        >>> fp = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_skmap_epsg3035_v0.1.tif'
         >>>
         >>> ttprint('initializing reader')
         >>> reader = RasterBlockReader(fp)
@@ -290,9 +290,9 @@ try:
         Examples
         ========
 
-        >>> from eumap.parallel.blocks import RasterBlockReader, RasterBlockAggregator
+        >>> from skmap.parallel.blocks import RasterBlockReader, RasterBlockAggregator
         >>>
-        >>> fp = 'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_eumap_epsg3035_v0.1.tif'
+        >>> fp = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_skmap_epsg3035_v0.1.tif'
         >>>
         >>> reader = RasterBlockReader(fp)
         >>> aggregator = RasterBlockAggregator(reader)
@@ -392,9 +392,9 @@ try:
         Examples
         ========
 
-        >>> from eumap.parallel.blocks import RasterBlockReader, RasterBlockWriter
+        >>> from skmap.parallel.blocks import RasterBlockReader, RasterBlockWriter
         >>>
-        >>> fp = 'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_eumap_epsg3035_v0.1.tif'
+        >>> fp = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_skmap_epsg3035_v0.1.tif'
         >>>
         >>> reader = RasterBlockReader(fp)
         >>> writer = RasterBlockWriter(reader)

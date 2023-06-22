@@ -1,6 +1,6 @@
 import pytest
 import requests
-from eumap.datasets import Catalogue
+from skmap.datasets import Catalogue
 from owslib.wms import WebMapService
 
 class TestCatalogue:

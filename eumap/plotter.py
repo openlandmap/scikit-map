@@ -112,7 +112,7 @@ try:
 		Examples
 		========
 
-		>>> from eumap import plotter
+		>>> from skmap import plotter
 		>>> import numpy as np
 		>>>
 		>>> singleband = np.random.randint(0, 255, [5, 5])

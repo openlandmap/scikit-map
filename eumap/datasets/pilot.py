@@ -1,5 +1,5 @@
 '''
-Access to eumap demo datasets hosted in Zenodo.
+Access to skmap demo datasets hosted in Zenodo.
 '''
 import requests
 import tarfile
@@ -71,7 +71,7 @@ def get_datasets(keywords: Union[str, List[str]]='') -> list:
     """
     Get dataset filenames by keyword(s).
 
-    :param keywords: One or more keywords to find datasets by. All recognized keywords are stored in ``eumap.datasets.pilot.KEYWORDS``
+    :param keywords: One or more keywords to find datasets by. All recognized keywords are stored in ``skmap.datasets.pilot.KEYWORDS``
 
     :returns: List of datasets
     :rtype: List[str]
@@ -79,7 +79,7 @@ def get_datasets(keywords: Union[str, List[str]]='') -> list:
     Examples
     ========
 
-    >>> from eumap.datasets import pilot
+    >>> from skmap.datasets import pilot
     >>>
     >>> print('all datasets:\\n', pilot.DATASETS)
     >>> print('all keywords:\\n', pilot.KEYWORDS)
@@ -169,7 +169,7 @@ def get_data(datasets: Union[str, list], download_dir: str=''):
     """
     Download dataset(s).
 
-    Files will be stored in an ``eumap_data`` subdirectory under the destination download directory. Archives are automatically unpacked.
+    Files will be stored in an ``skmap_data`` subdirectory under the destination download directory. Archives are automatically unpacked.
     While the files are ultimately stored in the specified directory, the downloader uses the OS default temporary file path for partial downloads before copying (and unpacking if applicable) the complete downloads to the destination. Thus it is required to have sufficient free storage on both the destination drive and the default temporary file drive.
 
     :param datasets: One or more datasets to download. If datasets is ``'all'``, all files will be downloaded.
@@ -178,7 +178,7 @@ def get_data(datasets: Union[str, list], download_dir: str=''):
     Examples
     ========
 
-    >>> from eumap.datasets import pilot
+    >>> from skmap.datasets import pilot
     >>>
     >>> datasets = pilot.get_datasets('landcover')
     >>> pilot.get_data(datasets)

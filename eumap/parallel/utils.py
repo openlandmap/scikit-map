@@ -66,7 +66,7 @@ def ThreadGeneratorLazy(
   Examples
   ========
 
-  >>> from eumap.parallel import ThreadGeneratorLazy
+  >>> from skmap.parallel import ThreadGeneratorLazy
   >>>
   >>> def worker(i, msg):
   >>>   print(f'{i}: {msg}')
@@ -127,7 +127,7 @@ def ProcessGeneratorLazy(
   Examples
   ========
 
-  >>> from eumap.parallel import ProcessGeneratorLazy
+  >>> from skmap.parallel import ProcessGeneratorLazy
   >>>
   >>> def worker(i, msg):
   >>>   print(f'{i}: {msg}')
@@ -186,7 +186,7 @@ def job(
   Examples
   ========
 
-  >>> from eumap import parallel
+  >>> from skmap import parallel
   >>>
   >>> def worker(i, msg):
   >>>   print(f'{i}: {msg}')
@@ -235,7 +235,7 @@ def apply_along_axis(
   Examples
   ========
 
-  >>> from eumap import parallel
+  >>> from skmap import parallel
   >>>
   >>> def fn(arr, const):
   >>>   return np.sum(arr) + const
@@ -294,8 +294,8 @@ class TilingProcessing():
   """
 
   def __init__(self,
-    tiling_system_fn = 'http://s3.eu-central-1.wasabisys.com/eumap/tiling_system_30km.gpkg',
-    base_raster_fn = 'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_eumap_epsg3035_v1.0.tif',
+    tiling_system_fn = 'http://s3.eu-central-1.wasabisys.com/skmap/tiling_system_30km.gpkg',
+    base_raster_fn = 'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif',
     verbose:bool = False,
     epsg_checking:bool = True
   ):
@@ -344,18 +344,18 @@ class TilingProcessing():
     Examples
     ========
 
-    >>> from eumap.parallel import TilingProcessing
-    >>> from eumap.raster import read_rasters
+    >>> from skmap.parallel import TilingProcessing
+    >>> from skmap.raster import read_rasters
     >>>
     >>> def run(idx, tile, window, raster_files):
     >>>     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
     >>>     print(f'Tile {idx}: data read {data.shape}')
     >>>
     >>> raster_files = [
-    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_eumap_epsg3035_v1.0.tif', # winter
-    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_eumap_epsg3035_v1.0.tif', # spring
-    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_eumap_epsg3035_v1.0.tif', # summer
-    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_eumap_epsg3035_v1.0.tif'  # fall
+    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
+    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
+    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
+    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
     >>> ]
     >>>
     >>> tiling= TilingProcessing(verbose=True)
@@ -390,18 +390,18 @@ class TilingProcessing():
     Examples
     ========
 
-    >>> from eumap.parallel import TilingProcessing
-    >>> from eumap.raster import read_rasters
+    >>> from skmap.parallel import TilingProcessing
+    >>> from skmap.raster import read_rasters
     >>>
     >>> def run(idx, tile, window, raster_files):
     >>>     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
     >>>     print(f'Tile {idx}: data read {data.shape}')
     >>>
     >>> raster_files = [
-    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_eumap_epsg3035_v1.0.tif', # winter
-    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_eumap_epsg3035_v1.0.tif', # spring
-    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_eumap_epsg3035_v1.0.tif', # summer
-    >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_eumap_epsg3035_v1.0.tif'  # fall
+    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
+    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
+    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
+    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
     >>> ]
     >>>
     >>> tiling= TilingProcessing(verbose=True)
@@ -463,8 +463,8 @@ class TilingProcessing():
     Examples
     ========
 
-    >>> from eumap.parallel import TilingProcessing
-    >>> from eumap.raster import read_rasters
+    >>> from skmap.parallel import TilingProcessing
+    >>> from skmap.raster import read_rasters
     >>>
     >>> def run(idx, tile, window, msg):
     >>>     print(f'Tile {idx} => {msg}')
@@ -515,8 +515,8 @@ class TilingProcessing():
     Examples
     ========
 
-    >>> eumap_extent = (900000, 930010, 6540000, 5460010)
-    >>> tiling_system = TilingProcessing.generate_tiles(30000, eumap_extent, 'epsg:3035')
+    >>> skmap_extent = (900000, 930010, 6540000, 5460010)
+    >>> tiling_system = TilingProcessing.generate_tiles(30000, skmap_extent, 'epsg:3035')
     >>> tiling_system.to_file(tiling_system_fn,  driver="GPKG")
 
     """
@@ -620,7 +620,7 @@ class TaskSequencer():
   Examples
   ========
   
-  >>> from eumap.parallel import TaskSequencer
+  >>> from skmap.parallel import TaskSequencer
   >>> 
   >>> output = TaskSequencer(
   >>> tasks=[ 
@@ -692,8 +692,8 @@ class TaskSequencer():
     Examples
     ========
 
-    >>> from eumap.misc import ttprint
-    >>> from eumap.parallel import TaskSequencer
+    >>> from skmap.misc import ttprint
+    >>> from skmap.parallel import TaskSequencer
     >>> import time
     >>> 
     >>> def rnd_data(const, size):

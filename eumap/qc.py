@@ -17,7 +17,7 @@ from functools import reduce
 from .parallel import blocks
 from .datasets.catalogue import _Resource
 
-_LANDMASK_REF = 'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_land.mask_pflugmacher2019.landcover.12_f_30m_s0..0m_2014..2016_eumap_epsg3035_v0.1.tif'
+_LANDMASK_REF = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_land.mask_pflugmacher2019.landcover.12_f_30m_s0..0m_2014..2016_skmap_epsg3035_v0.1.tif'
 
 def _test_field_nonempty(val):
     if isinstance(val, str):
@@ -35,11 +35,11 @@ class Test:
     Examples
     ========
 
-    >>> from eumap.qc import Test
+    >>> from skmap.qc import Test
     >>>
     >>> bounds = (4751935.0, 2420238.0, 4772117.0, 2444223.0)
     >>> test = Test(bounds, verbose=True)
-    >>> dataset_url = 'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_eumap_epsg3035_v0.1.tif'
+    >>> dataset_url = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_skmap_epsg3035_v0.1.tif'
     >>>
     >>> available = test.availability(dataset_url)
     >>> coverage_fraction = test.raster_land_coverage(dataset_url, include_ice=True, include_wetlands=True)

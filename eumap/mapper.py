@@ -92,7 +92,7 @@ def build_ann(
   Examples
   ========
 
-  >>> from eumap.mapper import build_ann
+  >>> from skmap.mapper import build_ann
   >>> from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
   >>>
   >>> ann = KerasClassifier(build_ann, input_shape=(-1, 180), output_shape=33,
@@ -193,7 +193,7 @@ class LandMapper():
     :param verbose:bool: Use ``True`` to print the progress of all steps.
     :param \*\*autosklearn_kwargs: Named arguments supported by ``auto-sklearn`` [2].
 
-    For **usage examples** access the ``eumap`` tutorials [5,6].
+    For **usage examples** access the ``skmap`` tutorials [5,6].
 
     References
     ==========
@@ -906,7 +906,7 @@ class LandMapper():
     :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
       converted to ``np.nan``.
     :param fill_nodata: Use the ``nodata_imputer`` to fill all ``np.nan`` values. By default is ``False``
-      because for almost all the cases it's preferable use the ``eumap.gapfiller module`` to perform this task.
+      because for almost all the cases it's preferable use the ``skmap.gapfiller module`` to perform this task.
     :param separate_probs: Use ``True`` to save the predict probabilities in a separate raster, otherwise it's
       write as multiple bands of a single raster file. For ``pred_method='predict'`` it's ignored.
     :param hard_class: When ``pred_method='predict_proba'`` use ``True`` to save the predict dominant
@@ -981,7 +981,7 @@ class LandMapper():
     :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
       converted to ``np.nan``.
     :param fill_nodata: Use the ``nodata_imputer`` to fill all ``np.nan`` values. By default is ``False``
-      because for almost all the cases it's preferable use the ``eumap.gapfiller module`` to perform this task.
+      because for almost all the cases it's preferable use the ``skmap.gapfiller module`` to perform this task.
     :param separate_probs: Use ``True`` to save the predict probabilities in a separate raster, otherwise it's
       write as multiple bands of a single raster file. For ``pred_method='predict'`` it's ignored.
     :param hard_class: When ``pred_method='predict_proba'`` use ``True`` to save the predict dominant
@@ -1604,7 +1604,7 @@ class SpaceOverlay():
   Examples
   ========
 
-  >>> from eumap.mapper import SpaceOverlay
+  >>> from skmap.mapper import SpaceOverlay
   >>>
   >>> spc_overlay = SpaceOverlay('./my_points.gpkg', ['./raster_dir_1', './raster_dir_2'])
   >>> result = spc_overlay.run()
@@ -1677,7 +1677,7 @@ class SpaceTimeOverlay():
   Examples
   ========
 
-  >>> from eumap.mapper import SpaceTimeOverlay
+  >>> from skmap.mapper import SpaceTimeOverlay
   >>>
   >>> fn_layers = [ 'raster_{year_minus_1}1202..{year}0320.tif' ] # raster_20101202..20110320.tif, ...
   >>> spt_overlay = SpaceTimeOverlay('./my_points.gpkg', 'survey_date' fn_layers)

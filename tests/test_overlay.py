@@ -9,7 +9,7 @@ import pygeos as pg
 from functools import reduce
 from operator import and_
 
-from eumap.mapper import SpaceOverlay, SpaceTimeOverlay
+from skmap.mapper import SpaceOverlay, SpaceTimeOverlay
 
 N_POINTS = 1000
 YEARS = np.arange(2000, 2022)

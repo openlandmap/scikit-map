@@ -14,18 +14,18 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('../'))  # Source code dir relative to this file
 
-import eumap
+import skmap
 
 # -- Project information -----------------------------------------------------
 
-project = 'Eumap library'
+project = 'skmap library'
 copyright = '2019-2021, Geo-harmonizer project team'
 author = 'Geo-harmonizer project team'
 
 # The short X.Y version
-version = '.'.join(eumap.__version__.split('.')[:-1])
+version = '.'.join(skmap.__version__.split('.')[:-1])
 # The full version, including alpha/beta/rc tags
-release = eumap.__version__
+release = skmap.__version__
 
 # -- General configuration ---------------------------------------------------
 
@@ -121,7 +121,7 @@ html_theme_options = {
     "icon_links": [
         {
             "name": "GitLab",
-            "url": "https://gitlab.com/geoharmonizer_inea/eumap",
+            "url": "https://gitlab.com/geoharmonizer_inea/skmap",
             "icon": "fab fa-gitlab",
         }
     ],

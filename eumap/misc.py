@@ -17,7 +17,7 @@ def _warn_deps(e, module_name):
     warnings.warn(
         f'ERROR: {e}\n\n' \
         f'Encountered because {module_name} has additional dependencies, please try:\n\n' \
-        '\tpip install eumap[full]\n'
+        '\tpip install skmap[full]\n'
     )
 
 def ttprint(*args, **kwargs):
@@ -27,8 +27,8 @@ def ttprint(*args, **kwargs):
   Examples
   ========
 
-  >>> from eumap.misc import ttprint
-  >>> ttprint('eumap rocks!')
+  >>> from skmap.misc import ttprint
+  >>> ttprint('skmap rocks!')
 
   """
   from datetime import datetime
@@ -53,7 +53,7 @@ def find_files(
   Examples
   ========
 
-  >>> from eumap.misc import find_files
+  >>> from skmap.misc import find_files
   >>> libs_so = find_files(['/lib', '/usr/lib64/'], f'*.so')
   >>> print(f'{len(libs_so)} files found')
 
@@ -97,7 +97,7 @@ def nan_percentile(
   ========
 
   >>> import numpy as np
-  >>> from eumap.misc import nan_percentile
+  >>> from skmap.misc import nan_percentile
   >>>
   >>> data = np.random.rand(10, 10, 10)
   >>> data[2:5,0:10,0] = np.nan
@@ -222,7 +222,7 @@ def sample_groups(
     >>> from sklearn.linear_model import LogisticRegression
     >>> from sklearn.model_selection import cross_val_score, GroupKFold
     >>>
-    >>> from eumap.misc import sample_groups
+    >>> from skmap.misc import sample_groups
     >>>
     >>> # construct some synthetic point data
     >>> coords = np.random.random((1000, 2)) * 4000

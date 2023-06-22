@@ -10,9 +10,9 @@ import gc
 import os
 
 import warnings
-from eumap import parallel
-from eumap.raster import read_auth_rasters, save_rasters
-from eumap.misc import _warn_deps, _eval, nan_percentile, ttprint, find_files, GoogleSheet
+from skmap import parallel
+from skmap.raster import read_auth_rasters, save_rasters
+from skmap.misc import _warn_deps, _eval, nan_percentile, ttprint, find_files, GoogleSheet
 
 class GLADLandsat():
   """
@@ -109,7 +109,7 @@ class GLADLandsat():
     Examples
     ========
 
-    >>> from eumap.datasets.eo import GLADLandsat
+    >>> from skmap.datasets.eo import GLADLandsat
     >>> 
     >>> # Do the registration in
     >>> # https://glad.umd.edu/ard/user-registration
@@ -282,7 +282,7 @@ class GLADLandsat():
     Examples
     ========
     
-    >>> from eumap.datasets.eo import GLADLandsat
+    >>> from skmap.datasets.eo import GLADLandsat
     >>> 
     >>> # Do the registration here
     >>> # https://glad.umd.edu/ard/user-registration
@@ -886,8 +886,8 @@ try:
       Examples
       ========
 
-      >>> from eumap.misc import GoogleSheet
-      >>> from eumap.datasets.eo import STACGenerator
+      >>> from skmap.misc import GoogleSheet
+      >>> from skmap.datasets.eo import STACGenerator
       >>> 
       >>> # Generate your key follow the instructions in https://docs.gspread.org/en/latest/oauth2.html
       >>> key_file = '<GDRIVE_KEY>'

@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from eumap import gapfiller
+from skmap import gapfiller
 
 DATA_SHAPE = (128, 128)
 TIMESERIES_LEN = 80

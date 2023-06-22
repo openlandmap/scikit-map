@@ -1,19 +1,19 @@
 import setuptools
-from eumap import __version__
+from skmap import __version__
 from pathlib import Path
 
 root_dir = Path(__file__).parent
 
-with open(root_dir.joinpath('eumap', 'README.md'), 'r') as fh:
+with open(root_dir.joinpath('skmap', 'README.md'), 'r') as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='eumap',
+    name='scikit-map',
     version=__version__,
-    description='eumap Python package',
+    description='scikit-learn applied to mapping and spatial prediction',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://gitlab.com/geoharmonizer_inea/eumap',
+    url='https://github.com/scikit-map/scikit-map',
     packages=setuptools.find_packages(),
     package_data={},
     scripts=[],

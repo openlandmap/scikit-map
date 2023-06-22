@@ -107,7 +107,7 @@ class Catalogue:
     Examples
     ========
 
-    >>> from eumap.datasets import Catalogue
+    >>> from skmap.datasets import Catalogue
     >>>
     >>> cat = Catalogue()
     >>> results = cat.search('land-cover')

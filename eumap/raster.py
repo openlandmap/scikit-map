@@ -135,14 +135,14 @@ def read_rasters(
   ========
 
   >>> import rasterio
-  >>> from eumap.raster import read_rasters
+  >>> from skmap.raster import read_rasters
   >>>
-  >>> # EUMAP COG layers - NDVI seasons for 2000
+  >>> # skmap COG layers - NDVI seasons for 2000
   >>> raster_files = [
-  >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200003_eumap_epsg3035_v1.0.tif', # winter
-  >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200006_eumap_epsg3035_v1.0.tif', # spring
-  >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200009_eumap_epsg3035_v1.0.tif', # summer
-  >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200012_eumap_epsg3035_v1.0.tif'  # fall
+  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200003_skmap_epsg3035_v1.0.tif', # winter
+  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200006_skmap_epsg3035_v1.0.tif', # spring
+  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200009_skmap_epsg3035_v1.0.tif', # summer
+  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200012_skmap_epsg3035_v1.0.tif'  # fall
   >>> ]
   >>>
   >>> # Transform for the EPSG:3035
@@ -265,7 +265,7 @@ def read_auth_rasters(
   Examples
   ========
 
-  >>> from eumap.raster import read_auth_rasters
+  >>> from skmap.raster import read_auth_rasters
   >>>
   >>> # Do the registration in
   >>> # https://glad.umd.edu/ard/user-registration
@@ -422,14 +422,14 @@ def save_rasters(
   ========
 
   >>> import rasterio
-  >>> from eumap.raster import read_rasters, save_rasters
+  >>> from skmap.raster import read_rasters, save_rasters
   >>>
-  >>> # EUMAP COG layers - NDVI seasons for 2019
+  >>> # skmap COG layers - NDVI seasons for 2019
   >>> raster_files = [
-  >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_eumap_epsg3035_v1.0.tif', # winter
-  >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_eumap_epsg3035_v1.0.tif', # spring
-  >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_eumap_epsg3035_v1.0.tif', # summer
-  >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_eumap_epsg3035_v1.0.tif'  # fall
+  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
+  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
+  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
+  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
   >>> ]
   >>>
   >>> # Transform for the EPSG:3035
@@ -516,11 +516,11 @@ def write_new_raster(
   ========
 
   >>> import rasterio
-  >>> from eumap.raster import read_rasters, save_rasters
+  >>> from skmap.raster import read_rasters, save_rasters
   >>>
-  >>> # EUMAP COG layers - NDVI seasons for 2019
+  >>> # skmap COG layers - NDVI seasons for 2019
   >>> raster_files = [
-  >>>     'http://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_eumap_epsg3035_v1.0.tif', # winter
+  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
   >>> ]
   >>>
   >>> # Transform for the EPSG:3035

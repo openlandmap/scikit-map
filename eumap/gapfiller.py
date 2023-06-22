@@ -691,7 +691,7 @@ try:
       Examples
       ========
 
-      >>> from eumap import gapfiller
+      >>> from skmap import gapfiller
       >>>
       >>> # For a 4-season time series
       >>> tmwm = gapfiller.TMWM(fn_files=fn_rasters, season_size=4, time_win_size=4)
@@ -913,7 +913,7 @@ try:
       Examples
       ========
 
-      >>> from eumap import gapfiller
+      >>> from skmap import gapfiller
       >>>
       >>> tli = gapfiller.TLI(fn_files=fn_rasters)
       >>> data_tli = tli.run()
@@ -1005,7 +1005,7 @@ try:
       Examples
       ========
 
-      >>> from eumap import gapfiller
+      >>> from skmap import gapfiller
       >>>
       >>> # For a 4-season time series
       >>> ssa = gapfiller.SSA(fn_files=fn_rasters, season_size=4)
@@ -1138,7 +1138,7 @@ try:
       Examples
       ========
 
-      >>> from eumap import gapfiller
+      >>> from skmap import gapfiller
       >>>
       >>> # Considerer land_mask as 2D numpy array where 1 indicates land
       >>> inPainting = gapfiller.InPainting(fn_files=fn_rasters, space_win = 10, data_mask=land_mask)
@@ -1251,7 +1251,7 @@ try:
       Examples
       ========
 
-      >>> from eumap import gapfiller
+      >>> from skmap import gapfiller
       >>>
       >>> # For a 4-season time series
       >>> tfsl = gapfiller.time_first_space_later(
