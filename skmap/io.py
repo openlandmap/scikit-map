@@ -1,7 +1,8 @@
 '''
-Functions to read/write raster data
+Raster data input and output
 '''
 from osgeo import gdal
+from pathlib import Path
 import numpy
 import numpy as np
 import requests
@@ -18,6 +19,8 @@ from affine import Affine
 import rasterio
 from rasterio.windows import Window
 
+print(Path(__file__).parent)
+
 _INT_DTYPE = (
   'uint8', 'uint8',
   'int16', 'uint16',
@@ -28,7 +31,7 @@ _INT_DTYPE = (
 
 def _nodata_replacement(dtype):
   if dtype in _INT_DTYPE:
-    return np.iinfo(dtype).min
+    return np.iinfo(dtype).max
   else:
     return np.nan
 
@@ -50,20 +53,102 @@ def _fit_in_dtype(data, dtype, nodata):
 
   return data
 
-def _new_raster(fn_base_raster, fn_raster, data, spatial_win = None,
+def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_shape, try_without_window):
+  raster_file = raster_files[raster_idx]
+  ds, band_data = None, None
+  nodata = None
+
+  try:
+    ds = rasterio.open(raster_file)
+
+    band_data = ds.read(1, window=window)
+    if band_data.size == 0 and try_without_window:
+      band_data = ds.read(1)
+
+    band_data = band_data.astype(dtype)
+    nodata = ds.nodatavals[0]
+  except:
+    if window is not None:
+      if verbose:
+        ttprint(f'ERROR: Failed to read {raster_file} window {window}.')
+      band_data = np.empty((int(window.width), int(window.height)))
+      band_data[:] = _nodata_replacement(dtype)
+
+    if expected_shape is not None:
+      if verbose:
+        ttprint(f'Full nan image for {raster_file}')
+      band_data = np.empty(expected_shape)
+      band_data[:] = _nodata_replacement(dtype)
+
+  if data_mask is not None:
+
+    if (data_mask.shape == band_data.shape):
+      band_data[np.logical_not(data_mask)] = np.nan
+    else:
+      ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
+
+  return raster_idx, band_data, nodata
+
+def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, nodata):
+
+  url = raster_files[url_pos]
+
+  data = None
+  ds_params = None
+
+  try:
+    data = requests.get(url, auth=(username, password), stream=True)
+
+    with rasterio.io.MemoryFile(data.content) as memfile:
+
+      if verbose:
+        ttprint(f'Reading {url} to {memfile.name}')
+
+      with memfile.open() as ds:
+        if bands is None:
+          bands = range(1, ds.count+1)
+
+        if nodata is None:
+          nodata = ds.nodatavals[0]
+
+        data = ds.read(bands)
+        if (isinstance(data, np.ndarray)):
+          data = data.astype(dtype)
+          data[data == nodata] = _nodata_replacement(dtype)
+
+        nbands, x_size, y_size = data.shape
+
+        ds_params = {
+          'driver': ds.driver,
+          'width': x_size,
+          'height': y_size,
+          'count': nbands,
+          'dtype': ds.dtypes[0],
+          'crs': ds.crs,
+          'transform': ds.transform
+        }
+
+  except:
+    ttprint(f'Invalid raster file {url}')
+    #traceback.print_exc()
+    pass
+
+  return url_pos, data, ds_params
+
+def _new_raster(base_raster, raster_file, data, window = None,
   dtype = None, nodata = None):
 
-  if (not isinstance(fn_raster, Path)):
-    fn_raster = Path(fn_raster)
+  if (not isinstance(raster_file, Path)):
+    raster_file = Path(raster_file)
 
-  fn_raster.parent.mkdir(parents=True, exist_ok=True)
+  raster_file.parent.mkdir(parents=True, exist_ok=True)
 
   if len(data.shape) < 3:
     data = np.stack([data], axis=2)
 
   x_size, y_size, nbands = data.shape
 
-  with rasterio.open(fn_base_raster, 'r') as base_raster:
+  with rasterio.open(base_raster, 'r') as base_raster:
     if dtype is None:
       dtype = base_raster.dtypes[0]
 
@@ -72,10 +157,10 @@ def _new_raster(fn_base_raster, fn_raster, data, spatial_win = None,
 
     transform = base_raster.transform
 
-    if spatial_win is not None:
-      transform = rasterio.windows.transform(spatial_win, transform)
+    if window is not None:
+      transform = rasterio.windows.transform(window, transform)
 
-    return rasterio.open(fn_raster, 'w',
+    return rasterio.open(raster_file, 'w',
             driver='GTiff',
             height=x_size,
             width=y_size,
@@ -86,15 +171,43 @@ def _new_raster(fn_base_raster, fn_raster, data, spatial_win = None,
             transform=transform,
             nodata=nodata)
 
-def read_rasters(
-  raster_dirs:List = [],
-  raster_files:List = [],
-  raster_ext:str = 'tif',
+def _save_raster(
+  fn_base_raster:str,
+  fn_new_raster:str,
+  data:numpy.array,
   spatial_win:Window = None,
-  dtype:str = 'float16',
+  dtype:str = None,
+  nodata = None,
+  fit_in_dtype = False
+):
+
+  if len(data.shape) < 3:
+    data = np.stack([data], axis=2)
+
+  _, _, nbands = data.shape
+
+  with _new_raster(fn_base_raster, fn_new_raster, data, spatial_win, dtype, nodata) as new_raster:
+
+    for band in range(0, nbands):
+
+      band_data = data[:,:,band]
+      band_dtype = new_raster.dtypes[band]
+
+      if fit_in_dtype:
+        band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
+
+      band_data[np.isnan(band_data)] = new_raster.nodata
+      new_raster.write(band_data.astype(band_dtype), indexes=(band+1))
+
+  return fn_new_raster
+
+def read_rasters(
+  raster_files:List = [],
+  window:Window = None,
+  dtype:str = 'float32',
   n_jobs:int = 4,
   data_mask:numpy.array = None,
-  expected_img_size = None,
+  expected_shape = None,
   try_without_window = False,
   verbose = False
 ):
@@ -106,12 +219,9 @@ def read_rasters(
   and for ``dtype=*int*`` it's replaced by the the lowest possible value
   inside the range (for ``int16`` this value is ``-32768``).
 
-  :param raster_dirs: A list of folders where the raster files are located. The raster
-    are selected according to the ``raster_ext``.
   :param raster_files: A list with the raster paths. Provide it and the ``raster_dirs``
     is ignored.
-  :param raster_ext: The raster file extension.
-  :param spatial_win: Read the data according to the spatial window. By default is ``None``,
+  :param window: Read the data according to the spatial window. By default is ``None``,
     reading all the raster data.
   :param dtype: Convert the read data to specific ``dtype``. By default it reads in
     ``float16`` to save memory, however pay attention in the precision limitations for
@@ -119,11 +229,11 @@ def read_rasters(
   :param n_jobs: Number of parallel jobs used to read the raster files.
   :param data_mask: A array with the same space dimensions of the read data, where
     all the values equal ``0`` are converted to ``np.nan``.
-  :param expected_img_size: The expected size (space dimension) of the read data.
+  :param expected_shape: The expected size (space dimension) of the read data.
     In case of error in reading any of the raster files, this is used to create a
     empty 2D array. By default is ``None``, throwing a exception if the raster
     doesn't exists.
-  :param try_without_window: First, try to read using ``spatial_win``, if fails
+  :param try_without_window: First, try to read using ``window``, if fails
     try to read without it.
   :param verbose: Use ``True`` to print the reading progress.
 
@@ -150,7 +260,7 @@ def read_rasters(
   >>> # Bounding box window over Wageningen, NL
   >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform)
   >>>
-  >>> data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
+  >>> data, _ = read_rasters(raster_files=raster_files, window=window, verbose=True)
   >>> print(f'Data shape: {data.shape}')
 
   References
@@ -159,55 +269,21 @@ def read_rasters(
   [1] `Float16 Precision <https://github.com/numpy/numpy/issues/8063>`_
 
   """
-  if len(raster_dirs) == 0 and len(raster_files) == 0:
-    raise Exception('The raster_dirs and raster_files params can not be empty at same time.')
-
-  if len(raster_files) == 0:
-    raster_files = find_files(raster_dirs, f'*.{raster_ext}')
+  if data_mask is not None and dtype not in ('float16', 'float32'):
+    raise Exception('The data_mask requires dtype as float')
 
   if verbose:
     ttprint(f'Reading {len(raster_files)} raster files using {n_jobs} workers')
 
-  def _read_raster(raster_pos):
-    raster_file = raster_files[raster_pos]
-    raster_ds, band_data = None, None
-    nodata = None
-
-    try:
-      raster_ds = rasterio.open(raster_file)
-
-      band_data = raster_ds.read(1, window=spatial_win)
-      if band_data.size == 0 and try_without_window:
-        band_data = raster_ds.read(1)
-
-      band_data = band_data.astype(dtype)
-      nodata = raster_ds.nodatavals[0]
-    except:
-      if spatial_win is not None:
-        if verbose:
-          ttprint(f'ERROR: Failed to read {raster_file} window {spatial_win}.')
-        band_data = np.empty((int(spatial_win.width), int(spatial_win.height)))
-        band_data[:] = _nodata_replacement(dtype)
-
-      if expected_img_size is not None:
-        if verbose:
-          ttprint(f'Full nan image for {raster_file}')
-        band_data = np.empty(expected_img_size)
-        band_data[:] = _nodata_replacement(dtype)
-
-    if data_mask is not None:
-      if (data_mask.shape == band_data.shape):
-        band_data[np.logical_not(data_mask)] = np.nan
-      else:
-        ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
-
-    return raster_pos, band_data, nodata
-
   raster_data = {}
-  args = [ (raster_pos,) for raster_pos in range(0,len(raster_files)) ]
+  args = [ 
+    (raster_idx, raster_files, window, dtype, 
+    data_mask, expected_shape, try_without_window) 
+    for raster_idx in range(0,len(raster_files)) 
+  ]
 
-  for raster_pos, band_data, nodata in parallel.job(_read_raster, args, n_jobs=n_jobs):
-    raster_file = raster_files[raster_pos]
+  for raster_idx, band_data, nodata in parallel.job(_read_raster, args, n_jobs=n_jobs):
+    raster_file = raster_files[raster_idx]
 
     if (isinstance(band_data, np.ndarray)):
 
@@ -215,12 +291,12 @@ def read_rasters(
         band_data[band_data == nodata] = _nodata_replacement(dtype)
 
     else:
-      raise Exception(f'The raster {raster_file} was not found.')
-    raster_data[raster_pos] = band_data
+      raise Exception(f'The raster {raster_file} not exists')
+    raster_data[raster_idx] = band_data
 
   raster_data = [raster_data[i] for i in range(0,len(raster_files))]
   raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
-  return raster_data, raster_files
+  return raster_data
 
 def read_auth_rasters(
   raster_files:List,
@@ -291,58 +367,12 @@ def read_auth_rasters(
   if verbose:
     ttprint(f'Reading {len(raster_files)} remote raster files using {n_jobs} workers')
 
-  def _read_raster(raster_files, url_pos, bands, username, password, dtype, nodata):
-
-    url = raster_files[url_pos]
-
-    data = None
-    ds_params = None
-
-    try:
-      data = requests.get(url, auth=(username, password), stream=True)
-
-      with rasterio.io.MemoryFile(data.content) as memfile:
-
-        if verbose:
-          ttprint(f'Reading {url} to {memfile.name}')
-
-        with memfile.open() as ds:
-          if bands is None:
-            bands = range(1, ds.count+1)
-
-          if nodata is None:
-            nodata = ds.nodatavals[0]
-
-          data = ds.read(bands)
-          if (isinstance(data, np.ndarray)):
-            data = data.astype(dtype)
-            data[data == nodata] = _nodata_replacement(dtype)
-
-          nbands, x_size, y_size = data.shape
-
-          ds_params = {
-            'driver': ds.driver,
-            'width': x_size,
-            'height': y_size,
-            'count': nbands,
-            'dtype': ds.dtypes[0],
-            'crs': ds.crs,
-            'transform': ds.transform
-          }
-
-    except:
-      ttprint(f'Invalid raster file {url}')
-      #traceback.print_exc()
-      pass
-
-    return url_pos, data, ds_params
-
   args = [ (raster_files, url_pos, bands, username, password, dtype, nodata) for url_pos in range(0,len(raster_files)) ]
 
   raster_data = {}
   fn_base_raster = None
 
-  for url_pos, data, ds_params in parallel.job(_read_raster, args, n_jobs=n_jobs):
+  for url_pos, data, ds_params in parallel.job(_read_auth_raster, args, n_jobs=n_jobs):
     url = raster_files[url_pos]
 
     if data is not None:
@@ -377,10 +407,10 @@ def read_auth_rasters(
     return raster_data
 
 def save_rasters(
-  fn_base_raster:str,
-  fn_raster_list:List,
+  base_raster:str,
+  raster_files:List,
   data:numpy.array,
-  spatial_win:Window = None,
+  window:Window = None,
   dtype:str = None,
   nodata = None,
   fit_in_dtype:bool = False,
@@ -393,13 +423,13 @@ def save_rasters(
   the only output format supported. It always replaces the ``np.nan`` value
   by the specified ``nodata``.
 
-  :param fn_base_raster: The base raster path used to retrieve the
+  :param base_raster: The base raster path used to retrieve the
     parameters ``(height, width, n_bands, crs, dtype, transform)`` for the
     new rasters.
-  :param fn_raster_list: A list containing the paths for the new raster. It creates
+  :param raster_files: A list containing the paths for the new raster. It creates
     the folder hierarchy if not exists.
   :param data: 3D data array.
-  :param spatial_win: Save the data considering a spatial window, even if the ``fn_base_rasters``
+  :param window: Save the data considering a spatial window, even if the ``base_rasters``
     refers to a bigger area. For example, it's possible to have a base raster covering the whole
     Europe and save the data using a window that cover just part of Wageningen. By default is
     ``None`` saving the raster data in position ``0, 0`` of the raster grid.
@@ -437,122 +467,42 @@ def save_rasters(
   >>> # Bounding box window over Wageningen, NL
   >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform)
   >>>
-  >>> data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
+  >>> data, _ = read_rasters(raster_files=raster_files, window=window, verbose=True)
   >>>
   >>> # Save in the current execution folder
-  >>> fn_raster_list = [
+  >>> raster_files = [
   >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_wageningen_epsg3035_v1.0.tif',
   >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_wageningen_epsg3035_v1.0.tif',
   >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_wageningen_epsg3035_v1.0.tif',
   >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_wageningen_epsg3035_v1.0.tif'
   >>> ]
   >>>
-  >>> save_rasters(raster_files[0], fn_raster_list, data, spatial_win=window, verbose=True)
+  >>> save_rasters(raster_files[0], raster_files, data, window=window, verbose=True)
 
   """
 
+  if type(raster_files) == str: 
+    raster_files = [ raster_files ]
+
   if len(data.shape) < 3:
     data = np.stack([data], axis=2)
-  else:
-    n_files = data.shape[2]
-    if n_files != len(fn_raster_list):
-      raise Exception(f'The data dimension {data.shape} is incompatible with the fn_raster_list size {len(fn_raster_list)}.')
+  
+  n_files = data.shape[-1]
+  if n_files != len(raster_files):
+    raise Exception(f'The data shape {data.shape} is incompatible with the raster_files size {len(raster_files)}.')
 
   if verbose:
-    ttprint(f'Writing {len(fn_raster_list)} raster files using {n_jobs} workers')
+    ttprint(f'Saving {len(raster_files)} raster files using {n_jobs} workers')
 
   args = [ \
-    (fn_base_raster, fn_raster_list[i], data[:,:,i], spatial_win, dtype,
+    (base_raster, raster_files[i], data[:,:,i], window, dtype,
       nodata, fit_in_dtype) \
-    for i in range(0,len(fn_raster_list))
+    for i in range(0,len(raster_files))
   ]
 
-  result = []
-  for fn_new_raster in parallel.job(write_new_raster, args, n_jobs=n_jobs):
-    result.append(fn_new_raster)
+  out_files = []
+  for out_raster in parallel.job(_save_raster, args, n_jobs=n_jobs):
+    out_files.append(out_raster)
     continue
 
-  return result
-
-def write_new_raster(
-  fn_base_raster:str,
-  fn_new_raster:str,
-  data:numpy.array,
-  spatial_win:Window = None,
-  dtype:str = None,
-  nodata = None,
-  fit_in_dtype = False
-):
-  """
-  Save an array to a raster file using as reference a base raster. GeoTIFF is
-  the only output format supported. It always replaces the ``np.nan`` value
-  by the specified ``nodata``.
-
-  :param fn_base_raster: The base raster path used to retrieve the
-    parameters ``(height, width, n_bands, crs, dtype, transform)`` for the
-    new raster.
-  :param fn_new_raster: The path for the new raster. It creates the
-    folder hierarchy if not exists.
-  :param data: 3D data array where the last dimension is the number of bands for the new raster.
-    For 2D array it saves only one band.
-  :param spatial_win: Save the data considering a spatial window, even if the ``fn_base_rasters``
-    refers to a bigger area. For example, it's possible to have a base raster covering the whole
-    Europe and save the data using a window that cover just part of Wageningen. By default is
-    ``None`` saving the raster data in position ``0, 0`` of the raster grid.
-  :param dtype: Convert the data to a specific ``dtype`` before save it. By default is ``None``
-    using the same ``dtype`` from the base raster.
-  :param nodata: Use the specified value as ``nodata`` for the new raster. By default is ``None``
-    using the same ``nodata`` from the base raster.
-  :param fit_in_dtype: If ``True`` the values outside of ``dtype`` range are truncated to the minimum
-    and maximum representation. It's also change the minimum and maximum data values, if they exist,
-    to avoid overlap with ``nodata`` (see the ``_fit_in_dtype`` function). For example, if
-    ``dtype='uint8'`` and ``nodata=0``, all data values equal to ``0`` are re-scaled to ``1`` in the
-    new rasters.
-
-  :returns: The path of the new raster.
-  :rtype: Path
-
-  Examples
-  ========
-
-  >>> import rasterio
-  >>> from skmap.raster import read_rasters, save_rasters
-  >>>
-  >>> # skmap COG layers - NDVI seasons for 2019
-  >>> raster_files = [
-  >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
-  >>> ]
-  >>>
-  >>> # Transform for the EPSG:3035
-  >>> eu_transform = rasterio.open(raster_files[0]).transform
-  >>> # Bounding box window over Wageningen, NL
-  >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform)
-  >>>
-  >>> data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
-  >>>
-  >>> # Save in the current execution folder
-  >>> fn_new_raster = './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_wageningen_epsg3035_v1.0.tif',
-  >>>
-  >>> write_new_raster(raster_files[0], fn_new_raster, data, spatial_win=window)
-
-  """
-
-  if len(data.shape) < 3:
-    data = np.stack([data], axis=2)
-
-  _, _, nbands = data.shape
-
-  with _new_raster(fn_base_raster, fn_new_raster, data, spatial_win, dtype, nodata) as new_raster:
-
-    for band in range(0, nbands):
-
-      band_data = data[:,:,band]
-      band_dtype = new_raster.dtypes[band]
-
-      if fit_in_dtype:
-        band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
-
-      band_data[np.isnan(band_data)] = new_raster.nodata
-      new_raster.write(band_data.astype(band_dtype), indexes=(band+1))
-
-  return fn_new_raster
+  return out_files
