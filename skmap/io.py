@@ -8,18 +8,15 @@ import numpy as np
 import requests
 import tempfile
 import traceback
-from uuid import uuid4
+import math
 
 from typing import List, Union
-from .misc import ttprint, find_files
+from .misc import ttprint
 from . import parallel
 
 from pathlib import Path
-from affine import Affine
 import rasterio
 from rasterio.windows import Window
-
-print(Path(__file__).parent)
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -53,15 +50,22 @@ def _fit_in_dtype(data, dtype, nodata):
 
   return data
 
-def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_shape, try_without_window):
+def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_shape, 
+  try_without_window, overview):
+
   raster_file = raster_files[raster_idx]
   ds, band_data = None, None
   nodata = None
 
   try:
     ds = rasterio.open(raster_file)
+    overviews = ds.overviews(1)
 
-    band_data = ds.read(1, window=window)
+    if overview is not None and overview in overviews:
+      band_data = ds.read(1, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
+    else:
+      band_data = ds.read(1, window=window)
+
     if band_data.size == 0 and try_without_window:
       band_data = ds.read(1)
 
@@ -202,13 +206,14 @@ def _save_raster(
   return fn_new_raster
 
 def read_rasters(
-  raster_files:List = [],
+  raster_files:Union[List,str] = [],
   window:Window = None,
   dtype:str = 'float32',
   n_jobs:int = 4,
   data_mask:numpy.array = None,
   expected_shape = None,
   try_without_window = False,
+  overview = None,
   verbose = False
 ):
   """
@@ -235,6 +240,7 @@ def read_rasters(
     doesn't exists.
   :param try_without_window: First, try to read using ``window``, if fails
     try to read without it.
+  :param overview: Overview level to be read. In COG files are usually `[2, 4, 8, 16, 32, 64, 128, 256]`.
   :param verbose: Use ``True`` to print the reading progress.
 
   :returns: A 3D array, where the last dimension refers to the read files, and a list
@@ -272,13 +278,19 @@ def read_rasters(
   if data_mask is not None and dtype not in ('float16', 'float32'):
     raise Exception('The data_mask requires dtype as float')
 
+  if isinstance(raster_files, str):
+    raster_files = [ raster_files ]
+
+  if len(raster_files) < n_jobs:
+    n_jobs = len(raster_files)
+
   if verbose:
-    ttprint(f'Reading {len(raster_files)} raster files using {n_jobs} workers')
+    ttprint(f'Reading {len(raster_files)} raster file(s) using {n_jobs} workers')
 
   raster_data = {}
   args = [ 
     (raster_idx, raster_files, window, dtype, 
-    data_mask, expected_shape, try_without_window) 
+    data_mask, expected_shape, try_without_window, overview) 
     for raster_idx in range(0,len(raster_files)) 
   ]
 
@@ -506,3 +518,45 @@ def save_rasters(
     continue
 
   return out_files
+
+"""
+class RasterData(SKMapBase):
+    
+  def __init__(self,
+    static_rasters:List = [],
+    temporal_rasters:List = [],
+    dtype:str = 'float32',
+    n_jobs:int = 4,
+    verbose = False
+  ):
+
+    self.dtype = dtype
+    self.n_jobs = n_jobs
+    self.verbose = verbose
+
+    self.static_rasters = static_rasters
+    self.temporal_rasters = temporal_rasters
+
+  def _fill_time(self, raster_file, year = None):
+    y, y_m1, y_p1 = ('', '', '')
+    if year != None:
+      y, y_m1, y_p1 = str(year), str((year - 1)), str((year + 1))
+
+    raster_file = str(raster_file)
+
+    return raster_file \
+        .replace('{year}', y) \
+        .replace('{year_minus_1}', y_m1) \
+        .replace('{year_plus_1}', y_p1) \
+
+  def read(self,
+    year:int = None,
+    window:Window = None,
+    data_mask:numpy.array = None
+  ):
+
+    raster_files = self.static_rasters
+    raster_files += [ self._fill_time(year) for r in self.temporal_rasters ]
+    
+    read_rasters(raster_files, window=window, data_mask=data_mask)
+"""
