@@ -23,7 +23,6 @@ import time
 import gc
 
 from ..misc import ttprint
-from .. import datasets
 
 CPU_COUNT = multiprocessing.cpu_count()
 """
