@@ -3,20 +3,27 @@ Raster data input and output
 '''
 from osgeo import gdal
 from pathlib import Path
+from hashlib import sha256
+from pandas import DataFrame, to_datetime
 import numpy
 import numpy as np
 import requests
 import tempfile
 import traceback
 import math
+import re
 
 from typing import List, Union
-from .misc import ttprint
+from .misc import ttprint, _eval
 from . import parallel
+from . import SKMapBase
+
+from datetime import datetime
 
 from pathlib import Path
 import rasterio
 from rasterio.windows import Window
+from dateutil.relativedelta import relativedelta
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -519,13 +526,79 @@ def save_rasters(
 
   return out_files
 
-"""
 class RasterData(SKMapBase):
+  
+  NAME_COL = 'name'
+  PATH_COL = 'path'
+  
+  def __init__(self,
+    array:numpy.array,
+    label:DataFrame
+  ):
+    self.array = array
+    self.label = label
+
+  def filter_contains(self, text, return_label=False):
+    return self.filter(f'{self.NAME_COL}.str.contains("{text}")', return_label=return_label)
+
+  def filter(self, expr, return_label=False):
+    label_filtered = self.label.query(expr)
+    
+    if return_label:
+      return self.array[:,:,label_filtered.index], label_filtered
+    else:
+      return self.array[:,:,label_filtered.index]
+
+class RasterDataT(RasterData):
+  
+  DT_COL = 'date'
+  START_DT_COL = 'start_date'
+  END_DT_COL = 'end_date'
+
+  def __init__(self,
+    array:numpy.array,
+    label:DataFrame,
+    date_format:str,
+  ):
+    super().__init__(array, label)
+    
+    self.date_format = date_format
+
+  def filter_date(self, 
+    dt1, 
+    dt2 = None, 
+    date_format = None,
+    return_label=False
+  ):
+
+    if date_format is None:
+      date_format = self.date_format
+
+    dt1_col, dt2_col = (RasterDataT.START_DT_COL, RasterDataT.END_DT_COL)
+    
+    if RasterDataT.DT_COL in self.label.columns:
+      dt1_col, dt2_col = (RasterDataT.DT_COL, None)
+
+    dt_mask = self.label[dt1_col] >= to_datetime(dt1, format=date_format)
+    if dt2 is not None and dt2_col is not None:
+      dt_mask = np.logical_and(
+        dt_mask,
+        self.label[dt2_col] <= to_datetime(dt2, format=date_format),
+      )
+
+    label_filtered = self.label[dt_mask]
+
+    if return_label:
+      return self.array[:,:,label_filtered.index], label_filtered
+    else:
+      return self.array[:,:,label_filtered.index]
+
+class RasterCube(SKMapBase):
     
   def __init__(self,
-    static_rasters:List = [],
-    temporal_rasters:List = [],
+    raster_files:List = [],
     dtype:str = 'float32',
+    expected_shape = None,
     n_jobs:int = 4,
     verbose = False
   ):
@@ -534,29 +607,222 @@ class RasterData(SKMapBase):
     self.n_jobs = n_jobs
     self.verbose = verbose
 
-    self.static_rasters = static_rasters
-    self.temporal_rasters = temporal_rasters
+    self.raster_files = raster_files
+    self.expected_shape = expected_shape
+    self.raster_data = {}
 
-  def _fill_time(self, raster_file, year = None):
-    y, y_m1, y_p1 = ('', '', '')
-    if year != None:
-      y, y_m1, y_p1 = str(year), str((year - 1)), str((year + 1))
+  def _label(self, raster_files):
+    rows = []
+    
+    for raster_file in raster_files:
+      row_data = {}
+      row_data[RasterData.PATH_COL] = raster_file
+      row_data[RasterData.NAME_COL] = Path(raster_file).stem
+      rows.append(row_data)
+    
+    return DataFrame(rows)
 
-    raster_file = str(raster_file)
+  def _key(self, obj):
+    return sha256(str(obj).encode('UTF-8'))
 
-    return raster_file \
-        .replace('{year}', y) \
-        .replace('{year_minus_1}', y_m1) \
-        .replace('{year_plus_1}', y_p1) \
+  def _new_raster_data(self, 
+    array, 
+    raster_files
+  ):
+    return RasterData(
+      array, self._label(raster_files)
+    )
 
-  def read(self,
-    year:int = None,
+  def _read(self,
+    raster_files,
     window:Window = None,
     data_mask:numpy.array = None
   ):
 
-    raster_files = self.static_rasters
-    raster_files += [ self._fill_time(year) for r in self.temporal_rasters ]
+    key = self._key(window)         
+
+    if key not in self.raster_data:
+      self._verbose("Reading data")
+      array = read_rasters(
+        raster_files,
+        window=window, data_mask=data_mask,
+        dtype=self.dtype, expected_shape=self.expected_shape,
+        n_jobs=self.n_jobs, verbose=self.verbose
+      )
+
+      self.raster_data[key] = self._new_raster_data(array, raster_files)
+
+    return self.raster_data[key]
+
+  def read(self,
+    window:Window = None,
+    data_mask:numpy.array = None
+  ):
+    return self._read(self.raster_files)
+
+class RasterCubeT(RasterCube):
+
+  def __init__(self,
+    raster_files:List = [],
+    date_style:str = 'interval',
+    date_format:str = '%Y%m%d',
+    date_path_regex:str = None,
+    interval_sep:str = '_',
+    dtype:str = 'float32',
+    expected_shape = None,
+    n_jobs:int = 4,
+    verbose = False
+  ):
+    super().__init__(
+      raster_files, dtype, 
+      expected_shape, n_jobs,
+      verbose
+    )
+
+    self.date_style = date_style
+    self.date_format = date_format
+    self.interval_sep = interval_sep
+
+    self._regex_dt = {
+      '%Y%m%d': r'\d{4}(\/|-)?\d{2}(\/|-)?\d{2}',
+      '%Y-%m-%d': r'\d{4}(\/|-)?\d{2}(\/|-)?\d{2}',
+      '%Y/%m/%d': r'\d{4}(\/|-)?\d{2}(\/|-)?\d{2}',
+      '%y%m%d': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
+      '%y-%m-%d': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
+      '%y-%m-%d': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
+      '%d%m%Y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{4}',
+      '%d-%m-%Y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{4}',
+      '%d/%m/%Y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{4}',
+      '%d%m%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
+      '%d-%m-%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
+      '%d/%m/%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}'
+    }
+
+  def _new_raster_data(self, 
+    array, 
+    raster_files
+  ):
+    return RasterDataT(
+      array, self._label(raster_files),
+      date_format=self.date_format
+    )
+
+  def _label(self, 
+    raster_files
+  ):
+    rows = []
     
-    read_rasters(raster_files, window=window, data_mask=data_mask)
-"""
+    regex_dt = self._regex_dt[self.date_format]
+
+    for raster_file in raster_files:
+      dates = []
+      for r in re.finditer(regex_dt, raster_file):
+        dates.append(r.group(0))
+      
+      row_data = {}
+      row_data[RasterData.PATH_COL] = raster_file
+      row_data[RasterData.NAME_COL] = Path(raster_file).stem
+
+      if len(dates) == 1:
+        row_data[RasterDataT.DT_COL] = datetime.strptime(dates[0], self.date_format)
+      elif len(dates) > 1:
+        row_data[RasterDataT.START_DT_COL] = datetime.strptime(dates[0], self.date_format)
+        row_data[RasterDataT.END_DT_COL] = datetime.strptime(dates[1], self.date_format)
+
+      rows.append(row_data)
+    
+    return DataFrame(rows)
+
+  def _fill_date(self, 
+    raster_file, 
+    dt1, 
+    dt2
+  ):
+      
+    if (self.date_style == 'start_date'):
+      dt = f'{dt1.strftime(self.date_format)}'
+    elif (self.date_style == 'end_date'):
+      dt = f'{dt2.strftime(self.date_format)}'
+    else:
+      dt = f'{dt1.strftime(self.date_format)}'
+      dt += f'{self.interval_sep}'
+      dt += f'{dt2.strftime(self.date_format)}'
+
+    return _eval(str(raster_file), locals())
+
+  def _date_step(self, 
+    date_step, 
+    i = 0
+  ):
+    if isinstance(date_step, list):
+      if i >= len(date_step):
+        i = 0
+      date_step_cur = int(date_step[i])
+      i += 1
+      return i, date_step_cur
+    else:
+      int(date_step)
+
+  def _gen_dates(self, 
+    start_date, 
+    end_date, 
+    date_unit, 
+    date_step, 
+    ignore_29feb
+  ):
+
+    result = []
+
+    dt1 = start_date
+    date_step_i = 0
+
+    while(dt1 <= end_date):
+      delta_args = {}
+      date_step_i, date_step_cur = self._date_step(date_step, date_step_i)
+      delta_args[date_unit] = date_step_cur # TODO: Threat the value "month"
+      
+      dt1n = dt1 + relativedelta(**delta_args)
+      dt_feb = (datetime.strptime(f'{dt1n.year}0228', '%Y%m%d'))
+
+      if (dt_feb > dt1 and dt_feb <= dt1n):
+        dt1n = dt1n + relativedelta(leapdays=+1)
+
+      dt2 = dt1n + relativedelta(days=-1)
+    
+      if ignore_29feb:
+        if dt2.month == 2 and dt2.day == 29:
+          dt2 = dt2 + relativedelta(days=-1)
+          
+      result.append((dt1, dt2))       
+      dt1 = dt1n
+    
+    return result
+
+  def read(self,
+    start_date,
+    end_date,
+    date_unit,
+    date_step,
+    ignore_29feb = True,
+    window:Window = None,
+    data_mask:numpy.array = None
+  ):
+
+    start_date = datetime.strptime(start_date, self.date_format)
+    end_date = datetime.strptime(end_date, self.date_format)
+    
+    dates = self._gen_dates(start_date, end_date, date_unit, date_step, ignore_29feb)
+
+    rasters_filled = []
+
+    for raster_file in self.raster_files:
+      for dt1, dt2 in dates:
+        raster_filled = self._fill_date(raster_file, dt1, dt2)
+        self._verbose(f"Preparing {raster_filled}")
+        rasters_filled.append(raster_filled)
+
+    return self._read(
+      rasters_filled,
+      window=window, 
+      data_mask=data_mask
+    )
