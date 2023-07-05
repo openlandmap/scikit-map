@@ -95,5 +95,5 @@ try:
         return parallel.apply_along_axis(self._process_ts, 2, data, n_jobs=self.n_jobs)
 
 except ImportError as e:
-    from .misc import _warn_deps
+    from skmap.misc import _warn_deps
     _warn_deps(e, 'gapfiller')

@@ -222,5 +222,5 @@ try:
 			plt.savefig(out_file, bbox_inches='tight')
 
 except ImportError as e:
-	from .misc import _warn_deps
+	from skmap.misc import _warn_deps
 	_warn_deps(e, 'plotter')
