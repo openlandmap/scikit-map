@@ -212,8 +212,9 @@ def job(
 
 def apply_along_axis(
   worker:Callable,
-  axis,
+  axis:int,
   arr:numpy.array,
+  n_jobs:int = CPU_COUNT,
   *args:any,
   **kwargs:any
 ):
@@ -226,6 +227,7 @@ def apply_along_axis(
     at least one argument (``numpy.array``).
   :param axis: Axis used to execute the worker.
   :param arr: The input array.
+  :param n_jobs: Number of parallel jobs to run the worker function
   :param args: Additional arguments to the worker.
   :param kwargs: Additional named arguments to the worker.
   :returns: The output array with one dimension less than the input array.
@@ -269,7 +271,7 @@ def apply_along_axis(
 
   # Chunks for the mapping (only a few chunks):
   chunks = [(worker, effective_axis, sub_arr, args, kwargs)
-            for sub_arr in np.array_split(arr, CPU_COUNT)]
+            for sub_arr in np.array_split(arr, n_jobs)]
 
   result = []
   for r in job(run, chunks):

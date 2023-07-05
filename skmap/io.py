@@ -5,6 +5,7 @@ from osgeo import gdal
 from pathlib import Path
 from hashlib import sha256
 from pandas import DataFrame, to_datetime
+import pandas as pd
 import numpy
 import numpy as np
 import requests
@@ -12,18 +13,23 @@ import tempfile
 import traceback
 import math
 import re
+import os
+import time
+import tempfile
 
-from typing import List, Union
+from typing import List, Union, Callable
 from .misc import ttprint, _eval
 from . import parallel
+from skmap.transform import SKMapTransformer
+from skmap.misc import gen_dates
 from . import SKMapBase
 
 from datetime import datetime
+from minio import Minio
 
 from pathlib import Path
 import rasterio
 from rasterio.windows import Window
-from dateutil.relativedelta import relativedelta
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -58,7 +64,7 @@ def _fit_in_dtype(data, dtype, nodata):
   return data
 
 def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_shape, 
-  try_without_window, overview):
+  try_without_window, overview, verbose):
 
   raster_file = raster_files[raster_idx]
   ds, band_data = None, None
@@ -92,6 +98,9 @@ def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_sh
       band_data[:] = _nodata_replacement(dtype)
 
   if data_mask is not None:
+
+    if len(data_mask.shape) == 3:
+      data_mask = data_mask[:,:,0]
 
     if (data_mask.shape == band_data.shape):
       band_data[np.logical_not(data_mask)] = np.nan
@@ -189,7 +198,8 @@ def _save_raster(
   spatial_win:Window = None,
   dtype:str = None,
   nodata = None,
-  fit_in_dtype = False
+  fit_in_dtype = False,
+  on_each_outfile:Callable = None
 ):
 
   if len(data.shape) < 3:
@@ -209,6 +219,8 @@ def _save_raster(
 
       band_data[np.isnan(band_data)] = new_raster.nodata
       new_raster.write(band_data.astype(band_dtype), indexes=(band+1))
+
+  on_each_outfile(fn_new_raster)
 
   return fn_new_raster
 
@@ -296,8 +308,8 @@ def read_rasters(
 
   raster_data = {}
   args = [ 
-    (raster_idx, raster_files, window, dtype, 
-    data_mask, expected_shape, try_without_window, overview) 
+    (raster_idx, raster_files, window, dtype, data_mask, 
+      expected_shape, try_without_window, overview, verbose) 
     for raster_idx in range(0,len(raster_files)) 
   ]
 
@@ -434,6 +446,7 @@ def save_rasters(
   nodata = None,
   fit_in_dtype:bool = False,
   n_jobs:int = 4,
+  on_each_outfile:Callable = None,
   verbose:bool = False
 ):
   """
@@ -515,7 +528,7 @@ def save_rasters(
 
   args = [ \
     (base_raster, raster_files[i], data[:,:,i], window, dtype,
-      nodata, fit_in_dtype) \
+      nodata, fit_in_dtype, on_each_outfile) \
     for i in range(0,len(raster_files))
   ]
 
@@ -528,75 +541,22 @@ def save_rasters(
 
 class RasterData(SKMapBase):
   
+  PLACEHOLDER_DT = '{dt}'
+  INTERVAL_DT_SEP = '_'
+
   NAME_COL = 'name'
-  PATH_COL = 'path'
-  
-  def __init__(self,
-    array:numpy.array,
-    label:DataFrame
-  ):
-    self.array = array
-    self.label = label
-
-  def filter_contains(self, text, return_label=False):
-    return self.filter(f'{self.NAME_COL}.str.contains("{text}")', return_label=return_label)
-
-  def filter(self, expr, return_label=False):
-    label_filtered = self.label.query(expr)
-    
-    if return_label:
-      return self.array[:,:,label_filtered.index], label_filtered
-    else:
-      return self.array[:,:,label_filtered.index]
-
-class RasterDataT(RasterData):
-  
+  PATH_COL = 'input_path'
   DT_COL = 'date'
   START_DT_COL = 'start_date'
   END_DT_COL = 'end_date'
+  
+  TRANSFORM_SEP = '.'
 
   def __init__(self,
-    array:numpy.array,
-    label:DataFrame,
-    date_format:str,
-  ):
-    super().__init__(array, label)
-    
-    self.date_format = date_format
-
-  def filter_date(self, 
-    dt1, 
-    dt2 = None, 
-    date_format = None,
-    return_label=False
-  ):
-
-    if date_format is None:
-      date_format = self.date_format
-
-    dt1_col, dt2_col = (RasterDataT.START_DT_COL, RasterDataT.END_DT_COL)
-    
-    if RasterDataT.DT_COL in self.label.columns:
-      dt1_col, dt2_col = (RasterDataT.DT_COL, None)
-
-    dt_mask = self.label[dt1_col] >= to_datetime(dt1, format=date_format)
-    if dt2 is not None and dt2_col is not None:
-      dt_mask = np.logical_and(
-        dt_mask,
-        self.label[dt2_col] <= to_datetime(dt2, format=date_format),
-      )
-
-    label_filtered = self.label[dt_mask]
-
-    if return_label:
-      return self.array[:,:,label_filtered.index], label_filtered
-    else:
-      return self.array[:,:,label_filtered.index]
-
-class RasterCube(SKMapBase):
-    
-  def __init__(self,
-    raster_files:List = [],
+    raster_files:Union[List,str],
+    raster_mask:str = None,
+    raster_mask_val = np.nan,
+    name_append_strategy:tuple = None,
     dtype:str = 'float32',
     expected_shape = None,
     n_jobs:int = 4,
@@ -607,81 +567,29 @@ class RasterCube(SKMapBase):
     self.n_jobs = n_jobs
     self.verbose = verbose
 
-    self.raster_files = raster_files
+    if not isinstance(raster_files, List):
+      raster_files = [ raster_files ]
+
+    self.raster_mask = raster_mask
+    self.raster_mask_val = raster_mask_val
     self.expected_shape = expected_shape
+    self.name_append_strategy = name_append_strategy
     self.raster_data = {}
 
-  def _label(self, raster_files):
-    rows = []
-    
-    for raster_file in raster_files:
-      row_data = {}
-      row_data[RasterData.PATH_COL] = raster_file
-      row_data[RasterData.NAME_COL] = Path(raster_file).stem
-      rows.append(row_data)
-    
-    return DataFrame(rows)
+    self.rasters_static = []
+    self.rasters_temporal = []
 
-  def _key(self, obj):
-    return sha256(str(obj).encode('UTF-8'))
-
-  def _new_raster_data(self, 
-    array, 
-    raster_files
-  ):
-    return RasterData(
-      array, self._label(raster_files)
-    )
-
-  def _read(self,
-    raster_files,
-    window:Window = None,
-    data_mask:numpy.array = None
-  ):
-
-    key = self._key(window)         
-
-    if key not in self.raster_data:
-      self._verbose("Reading data")
-      array = read_rasters(
-        raster_files,
-        window=window, data_mask=data_mask,
-        dtype=self.dtype, expected_shape=self.expected_shape,
-        n_jobs=self.n_jobs, verbose=self.verbose
+    if self.name_append_strategy is not None:
+      self.name_append_strategy = (
+        int(self.name_append_strategy[0]), 
+        str(self.name_append_strategy[1])
       )
 
-      self.raster_data[key] = self._new_raster_data(array, raster_files)
-
-    return self.raster_data[key]
-
-  def read(self,
-    window:Window = None,
-    data_mask:numpy.array = None
-  ):
-    return self._read(self.raster_files)
-
-class RasterCubeT(RasterCube):
-
-  def __init__(self,
-    raster_files:List = [],
-    date_style:str = 'interval',
-    date_format:str = '%Y%m%d',
-    date_path_regex:str = None,
-    interval_sep:str = '_',
-    dtype:str = 'float32',
-    expected_shape = None,
-    n_jobs:int = 4,
-    verbose = False
-  ):
-    super().__init__(
-      raster_files, dtype, 
-      expected_shape, n_jobs,
-      verbose
-    )
-
-    self.date_style = date_style
-    self.date_format = date_format
-    self.interval_sep = interval_sep
+    for r in raster_files:
+      if RasterData.PLACEHOLDER_DT in str(r):
+        self.rasters_temporal.append(r)
+      else:
+        self.rasters_static.append(r)
 
     self._regex_dt = {
       '%Y%m%d': r'\d{4}(\/|-)?\d{2}(\/|-)?\d{2}',
@@ -698,23 +606,14 @@ class RasterCubeT(RasterCube):
       '%d/%m/%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}'
     }
 
-  def _new_raster_data(self, 
-    array, 
-    raster_files
-  ):
-    return RasterDataT(
-      array, self._label(raster_files),
-      date_format=self.date_format
-    )
+    self.info = self._info_static()
 
-  def _label(self, 
-    raster_files
-  ):
+  def _info_temporal(self, date_format):
     rows = []
     
-    regex_dt = self._regex_dt[self.date_format]
+    regex_dt = self._regex_dt[date_format]
 
-    for raster_file in raster_files:
+    for raster_file in self.rasters_temporal:
       dates = []
       for r in re.finditer(regex_dt, raster_file):
         dates.append(r.group(0))
@@ -724,105 +623,304 @@ class RasterCubeT(RasterCube):
       row_data[RasterData.NAME_COL] = Path(raster_file).stem
 
       if len(dates) == 1:
-        row_data[RasterDataT.DT_COL] = datetime.strptime(dates[0], self.date_format)
+        row_data[RasterData.DT_COL] = datetime.strptime(dates[0], date_format)
       elif len(dates) > 1:
-        row_data[RasterDataT.START_DT_COL] = datetime.strptime(dates[0], self.date_format)
-        row_data[RasterDataT.END_DT_COL] = datetime.strptime(dates[1], self.date_format)
+        row_data[RasterData.START_DT_COL] = datetime.strptime(dates[0], date_format)
+        row_data[RasterData.END_DT_COL] = datetime.strptime(dates[1], date_format)
 
       rows.append(row_data)
     
     return DataFrame(rows)
 
-  def _fill_date(self, 
+  def _info_static(self):
+    rows = []
+    
+    for raster_file in self.rasters_static:
+      row_data = {}
+      row_data[RasterData.PATH_COL] = raster_file
+      row_data[RasterData.NAME_COL] = Path(raster_file).stem
+      rows.append(row_data)
+    
+    return DataFrame(rows)
+
+  def _set_date(self, 
     raster_file, 
     dt1, 
-    dt2
+    dt2,
+    date_format,
+    date_style
   ):
       
-    if (self.date_style == 'start_date'):
-      dt = f'{dt1.strftime(self.date_format)}'
-    elif (self.date_style == 'end_date'):
-      dt = f'{dt2.strftime(self.date_format)}'
+    if (date_style == 'start_date'):
+      dt = f'{dt1.strftime(date_format)}'
+    elif (date_style == 'end_date'):
+      dt = f'{dt2.strftime(date_format)}'
     else:
-      dt = f'{dt1.strftime(self.date_format)}'
-      dt += f'{self.interval_sep}'
-      dt += f'{dt2.strftime(self.date_format)}'
+      dt = f'{dt1.strftime(date_format)}'
+      dt += f'{RasterData.INTERVAL_DT_SEP}'
+      dt += f'{dt2.strftime(date_format)}'
 
     return _eval(str(raster_file), locals())
 
-  def _date_step(self, 
-    date_step, 
-    i = 0
-  ):
-    if isinstance(date_step, list):
-      if i >= len(date_step):
-        i = 0
-      date_step_cur = int(date_step[i])
-      i += 1
-      return i, date_step_cur
-    else:
-      int(date_step)
-
-  def _gen_dates(self, 
-    start_date, 
-    end_date, 
-    date_unit, 
-    date_step, 
-    ignore_29feb
-  ):
-
-    result = []
-
-    dt1 = start_date
-    date_step_i = 0
-
-    while(dt1 <= end_date):
-      delta_args = {}
-      date_step_i, date_step_cur = self._date_step(date_step, date_step_i)
-      delta_args[date_unit] = date_step_cur # TODO: Threat the value "month"
-      
-      dt1n = dt1 + relativedelta(**delta_args)
-      dt_feb = (datetime.strptime(f'{dt1n.year}0228', '%Y%m%d'))
-
-      if (dt_feb > dt1 and dt_feb <= dt1n):
-        dt1n = dt1n + relativedelta(leapdays=+1)
-
-      dt2 = dt1n + relativedelta(days=-1)
-    
-      if ignore_29feb:
-        if dt2.month == 2 and dt2.day == 29:
-          dt2 = dt2 + relativedelta(days=-1)
-          
-      result.append((dt1, dt2))       
-      dt1 = dt1n
-    
-    return result
-
-  def read(self,
+  def fill_time(self,
     start_date,
     end_date,
     date_unit,
     date_step,
+    date_style:str = 'interval',
+    date_format:str = '%Y%m%d',
     ignore_29feb = True,
-    window:Window = None,
-    data_mask:numpy.array = None
+    window:Window = None
   ):
 
-    start_date = datetime.strptime(start_date, self.date_format)
-    end_date = datetime.strptime(end_date, self.date_format)
+    start_date = datetime.strptime(start_date, date_format)
+    end_date = datetime.strptime(end_date, date_format)
     
-    dates = self._gen_dates(start_date, end_date, date_unit, date_step, ignore_29feb)
-
-    rasters_filled = []
-
-    for raster_file in self.raster_files:
+    dates = gen_dates(start_date, end_date, date_unit, date_step, ignore_29feb)
+    
+    for raster_file in self.rasters_temporal.copy():
+      self.rasters_temporal.remove(raster_file)
+      
+      count = 0
       for dt1, dt2 in dates:
-        raster_filled = self._fill_date(raster_file, dt1, dt2)
-        self._verbose(f"Preparing {raster_filled}")
-        rasters_filled.append(raster_filled)
+        raster_temporal = self._set_date(raster_file, dt1, dt2, date_format, date_style)
+        
+        if count == 0:
+          self._verbose(f"First temporal raster: {raster_temporal}")
+        
+        self.rasters_temporal.append(raster_temporal)
+        count += 1
+      
+      self._verbose(f"Last temporal raster: {raster_temporal}")
+      self._verbose(f"{count} temporal rasters added ")
+    
+    self.info = pd.concat([self.info, self._info_temporal(date_format)])
 
-    return self._read(
-      rasters_filled,
-      window=window, 
-      data_mask=data_mask
+    return self
+
+  def read(self,
+    window:Window = None
+  ):
+
+    self.window = window
+    
+    data_mask = None
+    if self.raster_mask is not None:
+      self._verbose(f"Masking {self.raster_mask_val} values considering {Path(self.raster_mask).name}")
+      data_mask = read_rasters([self.raster_mask], window=window)
+      if self.raster_mask_val is np.nan:
+        data_mask = np.logical_not(np.isnan(data_mask))
+      else:
+        data_mask = (data_mask != self.raster_mask_val)
+
+    np.unique(data_mask, return_counts=True)
+
+    raster_files = self.rasters_temporal + self.rasters_static
+    
+    self._verbose(
+        f"RasterData with {len(self.rasters_temporal)} temporal" 
+      + f" and {len(self.rasters_static)} static rasters" 
     )
+    self.array = read_rasters(
+      raster_files,
+      window=self.window, data_mask=data_mask,
+      dtype=self.dtype, expected_shape=self.expected_shape,
+      n_jobs=self.n_jobs, verbose=self.verbose
+    )
+
+    self._verbose(f"Read array shape: {self.array.shape}")
+
+    return self
+
+  def _tranform_info(self, 
+    transformer:SKMapTransformer, 
+    inplace = False,
+    suffix = ''
+  ):
+    name_t = transformer.__class__.__name__
+    name_t = re.sub(r'(?<!^)(?=[A-Z])', '.', name_t).lower()
+
+    if suffix != '':
+      name_t += RasterData.TRANSFORM_SEP + suffix
+
+    for index, row in self.info.iterrows():
+      if row['main']:
+
+        if self.name_append_strategy is not None:
+          position, separator = self.name_append_strategy
+          split = row['name'].split(separator)
+          split[position] = split[position]  +  RasterData.TRANSFORM_SEP + name_t
+          row['name'] = separator.join(split)
+        else:
+          row['name'] = row['name'] +  RasterData.TRANSFORM_SEP + name_t
+
+        i = len(self.info)
+        if inplace:
+          i = index
+        else:
+          row['main'] = False
+        self.info.loc[i] = row
+
+  def transform(self, transformer:SKMapTransformer, inplace = False):
+    if ('main' not in self.info.columns):
+      self.info['main'] = True
+
+    info_main = self.info.query('main == True')
+    transformer_name = transformer.__class__.__name__
+    
+    start = time.time()
+    self._verbose(f"Executing tranformer {transformer_name}")
+    array_t = transformer.run(self.array[:,:,info_main.index])
+    self._verbose(f"Tranformer {transformer_name} execution time: {(time.time() - start):.2f} segs")
+
+    if isinstance(array_t, tuple) and len(array_t) >= 2:
+      self.array = np.concatenate([self.array, array_t[1]], axis=-1)
+      self._tranform_info(transformer, inplace=False, suffix='qa')
+      array_t = array_t[0]
+
+    if inplace:
+      self.array[:,:,info_main.index] = array_t
+    else:
+      self.array = np.concatenate([self.array, array_t], axis=-1)
+
+    self._tranform_info(transformer, inplace)
+
+    return self
+
+  def filter_date(self, 
+    start_date, 
+    end_date = None, 
+    date_format = '%Y-%m-%d',
+    return_array=False, return_copy=False
+  ):
+
+    start_dt_col, end_dt_col = (RasterData.START_DT_COL, RasterData.END_DT_COL)
+    
+    if RasterData.DT_COL in self.info.columns:
+      start_dt_col, end_dt_col = (RasterData.DT_COL, None)
+
+    dt_mask = self.info[start_dt_col] >= to_datetime(start_date, format=date_format)
+    if end_date is not None and end_dt_col is not None:
+      dt_mask = np.logical_and(
+        dt_mask,
+        self.info[end_dt_col] <= to_datetime(end_date, format=date_format),
+      )
+
+    self._filter(self.info[dt_mask],
+      return_array=False, return_copy=False
+    )
+
+  def filter_contains(self, 
+    text, 
+    return_array=False, 
+    return_copy=False
+  ):
+    return self.filter(f'{self.NAME_COL}.str.contains("{text}")', 
+      return_array=False, return_copy=False
+    )
+
+  def filter(self, 
+    expr, 
+    return_array=False, 
+    return_copy=False
+  ):
+    self._filter(self.info.query(expr),
+      return_array=False, return_copy=False
+    )
+
+  def _filter(self, 
+    info, 
+    return_array=False, 
+    return_copy=False
+  ):
+    if return_array:
+      return self.array[:,:,info.index]
+    elif return_copy:
+      rdata = self.copy()
+      rdata.array = self.array[:,:,info.index]
+      rdata.info = info
+      return rdata
+    else:
+      self.array = self.array[:,:,info.index]
+      self.info = info
+      return self
+
+  def to_dir(self,
+    out_dir:Union[Path,str],
+    dtype:str = None,
+    nodata = None,
+    fit_in_dtype:bool = False,
+    n_jobs:int = 4,
+    return_outfiles = False,
+    on_each_outfile:Callable = None,
+  ):
+
+    if isinstance(out_dir,str):
+      out_dir = Path(out_dir)
+
+    base_raster = self.info.iloc[-1][RasterData.PATH_COL]
+    outfiles = [
+      out_dir.joinpath(f'{name}.tif')
+      for name in list(self.info[RasterData.NAME_COL])
+    ]
+    
+    self._verbose(f"Saving rasters in {out_dir}")
+
+    save_rasters(
+      base_raster, outfiles,
+      self.array, self.window,
+      dtype=dtype, nodata=nodata,
+      fit_in_dtype=fit_in_dtype, n_jobs=n_jobs,
+      on_each_outfile = on_each_outfile, verbose = self.verbose
+    )
+
+    if return_outfiles:
+      return outfiles
+    else:
+      return self
+
+  def to_s3(self,
+    host:str,
+    access_key:str,
+    secret_key:str,
+    path:str,
+    secure:bool = True,
+    tmp_dir:str = None,
+    dtype:str = None,
+    nodata = None,
+    fit_in_dtype:bool = False,
+    n_jobs:int = 4,
+    verbose_cp = False,
+  ):
+
+    bucket = path.split('/')[0]
+    prefix = '/'.join(path.split('/')[1:])
+
+    if tmp_dir is None:
+      tmp_dir = Path(tempfile.TemporaryDirectory().name)
+      tmp_dir = tmp_dir.joinpath(prefix)
+
+    def _to_s3(outfile):
+      
+      client = Minio(host, access_key, secret_key, secure=secure)
+      name = f'{outfile.name}'
+      
+      if verbose_cp:
+        ttprint(f"Copying {outfile} to http://{host}/{bucket}/{prefix}/{name}")
+      
+      client.fput_object(bucket, f'{prefix}/{name}', outfile)
+      os.remove(outfile)
+    
+    outfiles = self.to_dir(
+      tmp_dir, dtype=dtype, nodata=nodata, 
+      fit_in_dtype=fit_in_dtype, n_jobs=n_jobs, 
+      return_outfiles=True, on_each_outfile = _to_s3
+    )
+
+    name = outfiles[len(outfiles)-1].name
+    last_url = f'http://{host}/{bucket}/{prefix}/{name}'
+    
+    self._verbose(f"{len(outfiles)} rasters copied to s3")
+    self._verbose(f"Last raster in s3: {last_url}")
+
+    return self

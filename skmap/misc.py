@@ -11,6 +11,7 @@ import geopandas as gp
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from dateutil.relativedelta import relativedelta
 
 def _warn_deps(e, module_name):
     import warnings
@@ -302,6 +303,54 @@ def sample_groups(
 
 def _eval(str_val, args):
   return eval("f'"+str_val+"'", args)
+
+def _date_step( 
+  date_step, 
+  i = 0
+):
+  if isinstance(date_step, list):
+    if i >= len(date_step):
+      i = 0
+    date_step_cur = int(date_step[i])
+    i += 1
+    return i, date_step_cur
+  else:
+    return i, int(date_step)
+
+def gen_dates(
+  start_date, 
+  end_date, 
+  date_unit, 
+  date_step, 
+  ignore_29feb
+):
+
+  result = []
+
+  dt1 = start_date
+  date_step_i = 0
+
+  while(dt1 <= end_date):
+    delta_args = {}
+    date_step_i, date_step_cur = _date_step(date_step, date_step_i)
+    delta_args[date_unit] = date_step_cur # TODO: Threat the value "month"
+    
+    dt1n = dt1 + relativedelta(**delta_args)
+    dt_feb = (datetime.strptime(f'{dt1n.year}0228', '%Y%m%d'))
+
+    if (dt_feb > dt1 and dt_feb <= dt1n and ignore_29feb):
+      dt1n = dt1n + relativedelta(leapdays=+1)
+
+    dt2 = dt1n + relativedelta(days=-1)
+  
+    if ignore_29feb:
+      if dt2.month == 2 and dt2.day == 29:
+        dt2 = dt2 + relativedelta(days=-1)
+        
+    result.append((dt1, dt2))       
+    dt1 = dt1n
+  
+  return result
 
 try:
   
