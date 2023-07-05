@@ -318,12 +318,18 @@ def _date_step(
     return i, int(date_step)
 
 def gen_dates(
-  start_date, 
-  end_date, 
-  date_unit, 
-  date_step, 
-  ignore_29feb
+  start_date:str, 
+  end_date:str, 
+  date_unit:str, 
+  date_step:int,
+  date_offset:int = 0,
+  date_format = '%Y-%m-%d',
+  ignore_29feb = False,
+  return_str = False
 ):
+  
+  start_date = datetime.strptime(start_date, date_format)
+  end_date = datetime.strptime(end_date, date_format)
 
   result = []
 
@@ -338,6 +344,7 @@ def gen_dates(
     dt1n = dt1 + relativedelta(**delta_args)
     dt_feb = (datetime.strptime(f'{dt1n.year}0228', '%Y%m%d'))
 
+    ## FIXME: bug on ignore_29feb=True ending in feb.
     if (dt_feb > dt1 and dt_feb <= dt1n and ignore_29feb):
       dt1n = dt1n + relativedelta(leapdays=+1)
 
@@ -346,11 +353,33 @@ def gen_dates(
     if ignore_29feb:
       if dt2.month == 2 and dt2.day == 29:
         dt2 = dt2 + relativedelta(days=-1)
-        
-    result.append((dt1, dt2))       
+    
+    if return_str:
+      result.append((dt1.strftime(date_format), dt2.strftime(date_format)))
+    else:
+      result.append((dt1, dt2))
+    
+    if date_offset > 0:
+      delta_args = {}
+      delta_args[date_unit] = date_offset
+      dt1n = dt1n + relativedelta(**delta_args)
+
     dt1 = dt1n
   
   return result
+
+def update_by_separator(
+  text:str, 
+  separator:str, 
+  position:int, 
+  new_text:str, 
+  suffix=False
+):
+  split = text.split(separator)
+  if suffix:
+    new_text = split[position] + new_text
+  split[position] = new_text
+  return separator.join(split)
 
 try:
   

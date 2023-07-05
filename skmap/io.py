@@ -5,6 +5,7 @@ from osgeo import gdal
 from pathlib import Path
 from hashlib import sha256
 from pandas import DataFrame, to_datetime
+import copy
 import pandas as pd
 import numpy
 import numpy as np
@@ -18,7 +19,7 @@ import time
 import tempfile
 
 from typing import List, Union, Callable
-from .misc import ttprint, _eval
+from .misc import ttprint, _eval, update_by_separator
 from . import parallel
 from skmap.transform import SKMapTransformer
 from skmap.misc import gen_dates
@@ -549,6 +550,7 @@ class RasterData(SKMapBase):
   DT_COL = 'date'
   START_DT_COL = 'start_date'
   END_DT_COL = 'end_date'
+  MAIN_TS_COL = 'main_ts'
   
   TRANSFORM_SEP = '.'
 
@@ -621,6 +623,7 @@ class RasterData(SKMapBase):
       row_data = {}
       row_data[RasterData.PATH_COL] = raster_file
       row_data[RasterData.NAME_COL] = Path(raster_file).stem
+      row_data[RasterData.MAIN_TS_COL] = True
 
       if len(dates) == 1:
         row_data[RasterData.DT_COL] = datetime.strptime(dates[0], date_format)
@@ -672,11 +675,10 @@ class RasterData(SKMapBase):
     ignore_29feb = True,
     window:Window = None
   ):
-
-    start_date = datetime.strptime(start_date, date_format)
-    end_date = datetime.strptime(end_date, date_format)
     
-    dates = gen_dates(start_date, end_date, date_unit, date_step, ignore_29feb)
+    dates = gen_dates(start_date, end_date, 
+      date_unit=date_unit, date_step=date_step, 
+      date_format=date_format, ignore_29feb=ignore_29feb)
     
     for raster_file in self.rasters_temporal.copy():
       self.rasters_temporal.remove(raster_file)
@@ -744,34 +746,37 @@ class RasterData(SKMapBase):
       name_t += RasterData.TRANSFORM_SEP + suffix
 
     for index, row in self.info.iterrows():
-      if row['main']:
+      if row[RasterData.MAIN_TS_COL]:
 
         if self.name_append_strategy is not None:
           position, separator = self.name_append_strategy
-          split = row['name'].split(separator)
-          split[position] = split[position]  +  RasterData.TRANSFORM_SEP + name_t
-          row['name'] = separator.join(split)
+          new_text = RasterData.TRANSFORM_SEP + name_t
+          row[RasterData.NAME_COL] = update_by_separator(
+            row[RasterData.NAME_COL],
+            separator, position, new_text, suffix=True
+          )
         else:
-          row['name'] = row['name'] +  RasterData.TRANSFORM_SEP + name_t
+          row[RasterData.NAME_COL] = row[RasterData.NAME_COL] +  RasterData.TRANSFORM_SEP + name_t
 
         i = len(self.info)
         if inplace:
           i = index
         else:
-          row['main'] = False
+          row[RasterData.MAIN_TS_COL] = False
         self.info.loc[i] = row
 
   def transform(self, transformer:SKMapTransformer, inplace = False):
-    if ('main' not in self.info.columns):
-      self.info['main'] = True
-
-    info_main = self.info.query('main == True')
+    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
     transformer_name = transformer.__class__.__name__
     
     start = time.time()
-    self._verbose(f"Executing tranformer {transformer_name}")
+    self._verbose(f"Executing tranformer {transformer_name}"
+      + f" on {self.array[:,:,info_main.index].shape}")
+
     array_t = transformer.run(self.array[:,:,info_main.index])
-    self._verbose(f"Tranformer {transformer_name} execution time: {(time.time() - start):.2f} segs")
+    
+    self._verbose(f"Tranformer {transformer_name} execution"
+      + f" time: {(time.time() - start):.2f} segs")
 
     if isinstance(array_t, tuple) and len(array_t) >= 2:
       self.array = np.concatenate([self.array, array_t[1]], axis=-1)
@@ -791,52 +796,55 @@ class RasterData(SKMapBase):
     start_date, 
     end_date = None, 
     date_format = '%Y-%m-%d',
-    return_array=False, return_copy=False
+    return_array=False, 
+    return_copy=True
   ):
 
     start_dt_col, end_dt_col = (RasterData.START_DT_COL, RasterData.END_DT_COL)
-    
-    if RasterData.DT_COL in self.info.columns:
+    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
+
+    if RasterData.DT_COL in info_main.columns:
       start_dt_col, end_dt_col = (RasterData.DT_COL, None)
 
-    dt_mask = self.info[start_dt_col] >= to_datetime(start_date, format=date_format)
+    dt_mask = info_main[start_dt_col] >= to_datetime(start_date, format=date_format)
     if end_date is not None and end_dt_col is not None:
       dt_mask = np.logical_and(
         dt_mask,
-        self.info[end_dt_col] <= to_datetime(end_date, format=date_format),
+        info_main[end_dt_col] <= to_datetime(end_date, format=date_format),
       )
 
-    self._filter(self.info[dt_mask],
-      return_array=False, return_copy=False
+    return self._filter(info_main[dt_mask],
+      return_array=return_array, return_copy=return_copy
     )
 
   def filter_contains(self, 
     text, 
     return_array=False, 
-    return_copy=False
+    return_copy=True
   ):
     return self.filter(f'{self.NAME_COL}.str.contains("{text}")', 
-      return_array=False, return_copy=False
+      return_array=return_array, return_copy=return_copy
     )
 
   def filter(self, 
     expr, 
     return_array=False, 
-    return_copy=False
+    return_copy=True
   ):
-    self._filter(self.info.query(expr),
-      return_array=False, return_copy=False
+    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
+    return self._filter(info_main.query(expr),
+      return_array=return_array, return_copy=return_copy
     )
 
   def _filter(self, 
     info, 
     return_array=False, 
-    return_copy=False
+    return_copy=True
   ):
     if return_array:
       return self.array[:,:,info.index]
     elif return_copy:
-      rdata = self.copy()
+      rdata = copy.copy(self)
       rdata.array = self.array[:,:,info.index]
       rdata.info = info
       return rdata
