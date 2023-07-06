@@ -191,6 +191,7 @@ try:
         
         filled[valid_mask] = data[valid_mask]
         filled_qa[valid_mask] = 1.0
+        filled_qa = filled_qa * 100
         
         # Return the reconstructed time series and the quality assesment layer
         return np.reshape(filled.T, orig_shape), np.reshape(filled_qa.T, orig_shape) 
