@@ -89,7 +89,7 @@ def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_sh
     if window is not None:
       if verbose:
         ttprint(f'ERROR: Failed to read {raster_file} window {window}.')
-      band_data = np.empty((int(window.width), int(window.height)))
+      band_data = np.empty((int(window.height), int(window.width)))
       band_data[:] = _nodata_replacement(dtype)
 
     if expected_shape is not None:
@@ -714,8 +714,6 @@ class RasterData(SKMapBase):
         data_mask = np.logical_not(np.isnan(data_mask))
       else:
         data_mask = (data_mask != self.raster_mask_val)
-
-    np.unique(data_mask, return_counts=True)
 
     raster_files = self.rasters_temporal + self.rasters_static
     
