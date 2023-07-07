@@ -89,8 +89,8 @@ try:
       
       def __init__(self,
         season_size:int,
-        att_seas:float = 40,
-        att_env:float = 30,
+        att_seas:float = 60,
+        att_env:float = 20,
         n_jobs:int = os.cpu_count(),
         verbose = False
       ):

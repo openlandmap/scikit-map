@@ -43,7 +43,7 @@ try:
       """
       
       def __init__(self,
-        lmbd, 
+        lmbd = 1, 
         d = 2,
         n_jobs:int = os.cpu_count(),
         verbose = False

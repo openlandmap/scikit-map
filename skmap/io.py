@@ -221,7 +221,8 @@ def _save_raster(
       band_data[np.isnan(band_data)] = new_raster.nodata
       new_raster.write(band_data.astype(band_dtype), indexes=(band+1))
 
-  on_each_outfile(fn_new_raster)
+  if on_each_outfile is not None:
+    on_each_outfile(fn_new_raster)
 
   return fn_new_raster
 
@@ -559,22 +560,16 @@ class RasterData(SKMapBase):
     raster_mask:str = None,
     raster_mask_val = np.nan,
     name_append_strategy:tuple = None,
-    dtype:str = 'float32',
-    expected_shape = None,
-    n_jobs:int = 4,
     verbose = False
   ):
-
-    self.dtype = dtype
-    self.n_jobs = n_jobs
-    self.verbose = verbose
 
     if not isinstance(raster_files, List):
       raster_files = [ raster_files ]
 
+    self.verbose = verbose
+
     self.raster_mask = raster_mask
     self.raster_mask_val = raster_mask_val
-    self.expected_shape = expected_shape
     self.name_append_strategy = name_append_strategy
     self.raster_data = {}
 
@@ -605,31 +600,36 @@ class RasterData(SKMapBase):
       '%d/%m/%Y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{4}',
       '%d%m%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
       '%d-%m-%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%d/%m/%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}'
+      '%d/%m/%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
+      '%Y%j': r'\d{4}\d{3}',
+      '%Y-%j': r'\d{4}(\/|-)?\d{3}',
+      '%Y/%j': r'\d{4}(\/|-)?\d{3}'
     }
 
     self.info = self._info_static()
 
-  def _info_temporal(self, date_format):
+  def _info_temporal(self, date_format, date_style):
     rows = []
     
     regex_dt = self._regex_dt[date_format]
 
     for raster_file in self.rasters_temporal:
+      name = Path(raster_file).stem
+
       dates = []
-      for r in re.finditer(regex_dt, raster_file):
+      for r in re.finditer(regex_dt, name):
         dates.append(r.group(0))
       
       row_data = {}
       row_data[RasterData.PATH_COL] = raster_file
-      row_data[RasterData.NAME_COL] = Path(raster_file).stem
+      row_data[RasterData.NAME_COL] = name
       row_data[RasterData.MAIN_TS_COL] = True
 
-      if len(dates) == 1:
-        row_data[RasterData.DT_COL] = datetime.strptime(dates[0], date_format)
-      elif len(dates) > 1:
+      if date_style == 'interval':
         row_data[RasterData.START_DT_COL] = datetime.strptime(dates[0], date_format)
         row_data[RasterData.END_DT_COL] = datetime.strptime(dates[1], date_format)
+      else:
+        row_data[RasterData.DT_COL] = datetime.strptime(dates[0], date_format)
 
       rows.append(row_data)
     
@@ -665,15 +665,14 @@ class RasterData(SKMapBase):
 
     return _eval(str(raster_file), locals())
 
-  def fill_time(self,
+  def timespan(self,
     start_date,
     end_date,
     date_unit,
     date_step,
     date_style:str = 'interval',
     date_format:str = '%Y%m%d',
-    ignore_29feb = True,
-    window:Window = None
+    ignore_29feb = True
   ):
     
     dates = gen_dates(start_date, end_date, 
@@ -696,12 +695,15 @@ class RasterData(SKMapBase):
       self._verbose(f"Last temporal raster: {raster_temporal}")
       self._verbose(f"{count} temporal rasters added ")
     
-    self.info = pd.concat([self.info, self._info_temporal(date_format)])
+    self.info = pd.concat([self.info, self._info_temporal(date_format, date_style)])
 
     return self
 
   def read(self,
-    window:Window = None
+    window:Window = None,
+    dtype:str = 'float32',
+    expected_shape = None,
+    n_jobs:int = 4,
   ):
 
     self.window = window
@@ -724,8 +726,8 @@ class RasterData(SKMapBase):
     self.array = read_rasters(
       raster_files,
       window=self.window, data_mask=data_mask,
-      dtype=self.dtype, expected_shape=self.expected_shape,
-      n_jobs=self.n_jobs, verbose=self.verbose
+      dtype=dtype, expected_shape=expected_shape,
+      n_jobs=n_jobs, verbose=self.verbose
     )
 
     self._verbose(f"Read array shape: {self.array.shape}")
