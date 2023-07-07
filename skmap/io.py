@@ -559,7 +559,6 @@ class RasterData(SKMapBase):
     raster_files:Union[List,str],
     raster_mask:str = None,
     raster_mask_val = np.nan,
-    name_append_strategy:tuple = None,
     verbose = False
   ):
 
@@ -570,17 +569,10 @@ class RasterData(SKMapBase):
 
     self.raster_mask = raster_mask
     self.raster_mask_val = raster_mask_val
-    self.name_append_strategy = name_append_strategy
     self.raster_data = {}
 
     self.rasters_static = []
     self.rasters_temporal = []
-
-    if self.name_append_strategy is not None:
-      self.name_append_strategy = (
-        int(self.name_append_strategy[0]), 
-        str(self.name_append_strategy[1])
-      )
 
     for r in raster_files:
       if RasterData.PLACEHOLDER_DT in str(r):
@@ -647,13 +639,14 @@ class RasterData(SKMapBase):
     return DataFrame(rows)
 
   def _set_date(self, 
-    raster_file, 
+    text, 
     dt1, 
     dt2,
     date_format,
-    date_style
+    date_style,
+    **kwargs
   ):
-      
+    
     if (date_style == 'start_date'):
       dt = f'{dt1.strftime(date_format)}'
     elif (date_style == 'end_date'):
@@ -663,7 +656,7 @@ class RasterData(SKMapBase):
       dt += f'{RasterData.INTERVAL_DT_SEP}'
       dt += f'{dt2.strftime(date_format)}'
 
-    return _eval(str(raster_file), locals())
+    return _eval(str(text), {**kwargs,**locals()})
 
   def timespan(self,
     start_date,
@@ -675,6 +668,9 @@ class RasterData(SKMapBase):
     ignore_29feb = True
   ):
     
+    self.date_style = date_style
+    self.date_format = date_format
+
     dates = gen_dates(start_date, end_date, 
       date_unit=date_unit, date_step=date_step, 
       date_format=date_format, ignore_29feb=ignore_29feb)
@@ -737,26 +733,27 @@ class RasterData(SKMapBase):
   def _tranform_info(self, 
     transformer:SKMapTransformer, 
     inplace = False,
+    outname = None,
     suffix = ''
   ):
-    name_t = transformer.__class__.__name__
-    name_t = re.sub(r'(?<!^)(?=[A-Z])', '.', name_t).lower()
+    tr = transformer.__class__.__name__
+    tr = re.sub(r'(?<!^)(?=[A-Z])', '.', tr).lower()
 
     if suffix != '':
-      name_t += RasterData.TRANSFORM_SEP + suffix
+      tr += RasterData.TRANSFORM_SEP + suffix
 
     for index, row in self.info.iterrows():
       if row[RasterData.MAIN_TS_COL]:
-
-        if self.name_append_strategy is not None:
-          position, separator = self.name_append_strategy
-          new_text = RasterData.TRANSFORM_SEP + name_t
-          row[RasterData.NAME_COL] = update_by_separator(
-            row[RasterData.NAME_COL],
-            separator, position, new_text, suffix=True
-          )
+        if outname is not None:
+          if RasterData.START_DT_COL in self.info.columns:
+            row[RasterData.NAME_COL] = self._set_date(outname, 
+              row[RasterData.START_DT_COL], row[RasterData.END_DT_COL], 
+              self.date_format, self.date_style, tr=tr
+            )
+          else:
+            row[RasterData.NAME_COL] = _eval(outname, locals())
         else:
-          row[RasterData.NAME_COL] = row[RasterData.NAME_COL] +  RasterData.TRANSFORM_SEP + name_t
+          row[RasterData.NAME_COL] = row[RasterData.NAME_COL] +  RasterData.TRANSFORM_SEP + tr
 
         i = len(self.info)
         if inplace:
@@ -765,7 +762,11 @@ class RasterData(SKMapBase):
           row[RasterData.MAIN_TS_COL] = False
         self.info.loc[i] = row
 
-  def transform(self, transformer:SKMapTransformer, inplace = False):
+  def transform(self, 
+    transformer:SKMapTransformer, 
+    inplace = False,
+    outname:str = None
+  ):
     info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
     transformer_name = transformer.__class__.__name__
     
@@ -780,7 +781,8 @@ class RasterData(SKMapBase):
 
     if isinstance(array_t, tuple) and len(array_t) >= 2:
       self.array = np.concatenate([self.array, array_t[1]], axis=-1)
-      self._tranform_info(transformer, inplace=False, suffix='qa')
+      self._tranform_info(transformer, inplace=False, 
+        outname=outname, suffix='qa')
       array_t = array_t[0]
 
     if inplace:
@@ -788,7 +790,7 @@ class RasterData(SKMapBase):
     else:
       self.array = np.concatenate([self.array, array_t], axis=-1)
 
-    self._tranform_info(transformer, inplace)
+    self._tranform_info(transformer, inplace, outname=outname)
 
     return self
 

@@ -336,6 +336,8 @@ def gen_dates(
   dt1 = start_date
   date_step_i = 0
 
+  watchdog = 0
+
   while(dt1 <= end_date):
     delta_args = {}
     date_step_i, date_step_cur = _date_step(date_step, date_step_i)
@@ -365,6 +367,13 @@ def gen_dates(
       dt1n = dt1n + relativedelta(**delta_args)
 
     dt1 = dt1n
+
+    if watchdog >= 365000:
+      raise Exception('Infinite loop avoided.'
+        + ' Check the date arguments.'
+      ) 
+
+    watchdog += 1
   
   return result
 
