@@ -666,25 +666,28 @@ class RasterData(SKMapBase):
 
     return row
 
+  def _change_leap_year_doy(self, dt):
+    dt_str = f'{dt.strftime(self.date_format)}'
+    if ((self.date_format == '%Y-%j') | (self.date_format == '%Y%j') | (self.date_format == '%Y/%j')) & (self.ignore_29feb == True) & (dt.year%4 == 0) & (dt.month > 2):
+      return dt_str[:-3] + str(int(dt.strftime("%j"))-1).zfill(3)
+    else:
+      return dt_str
+
   def _set_date(self, 
     text, 
     dt1, 
     dt2,
-    date_format,
-    date_style,
     **kwargs
   ):
-    
-    if (date_style == 'start_date'):
-      dt = f'{dt1.strftime(date_format)}'
-    elif (date_style == 'end_date'):
-      dt = f'{dt2.strftime(date_format)}'
+    dt1_ = self._change_leap_year_doy(dt1)
+    dt2_ = self._change_leap_year_doy(dt2)
+    if (self.date_style == 'start_date'):
+      dt = dt1_
+    elif (self.date_style == 'end_date'):
+      dt = dt2_
     else:
-      dt = f'{dt1.strftime(date_format)}'
-      dt += f'{RasterData.INTERVAL_DT_SEP}'
-      dt += f'{dt2.strftime(date_format)}'
-
-    return _eval(str(text), {**kwargs,**locals()})
+      dt = dt1_ + f'{RasterData.INTERVAL_DT_SEP}' + dt2_
+    return eval("f'"+text+"'", {**kwargs,**locals()})
 
   def timespan(self,
     start_date,
@@ -698,6 +701,7 @@ class RasterData(SKMapBase):
     
     self.date_style = date_style
     self.date_format = date_format
+    self.ignore_29feb = ignore_29feb
 
     dates = gen_dates(start_date, end_date, 
       date_unit=date_unit, date_step=date_step, 
@@ -708,7 +712,7 @@ class RasterData(SKMapBase):
       
       count = 0
       for dt1, dt2 in dates:
-        raster_temporal = self._set_date(raster_file, dt1, dt2, date_format, date_style)
+        raster_temporal = self._set_date(raster_file, dt1, dt2)
         
         if count == 0:
           self._verbose(f"First temporal raster: {raster_temporal}")
@@ -775,9 +779,7 @@ class RasterData(SKMapBase):
         if outname is not None:
           if RasterData.START_DT_COL in self.info.columns:
             row[RasterData.NAME_COL] = self._set_date(outname, 
-              row[RasterData.START_DT_COL], row[RasterData.END_DT_COL], 
-              self.date_format, self.date_style, tr=tr
-            )
+              row[RasterData.START_DT_COL], row[RasterData.END_DT_COL], tr=tr)
           else:
             row[RasterData.NAME_COL] = _eval(outname, locals())
         else:
@@ -847,7 +849,6 @@ class RasterData(SKMapBase):
     start_date, 
     end_date = None, 
     date_format = '%Y-%m-%d',
-    date_overlap = False,
     return_array=False, 
     return_copy=True
   ):
@@ -860,12 +861,7 @@ class RasterData(SKMapBase):
 
     dt_mask = info_main[start_dt_col] >= to_datetime(start_date, format=date_format)
     if end_date is not None and end_dt_col is not None:
-      
-      filter_method = np.logical_and
-      if date_overlap:
-        filter_method = np.logical_or
-
-      dt_mask = filter_method(
+      dt_mask = np.logical_and(
         dt_mask,
         info_main[end_dt_col] <= to_datetime(end_date, format=date_format),
       )
@@ -910,18 +906,6 @@ class RasterData(SKMapBase):
       self.info = info
       return self
 
-  def _base_raster(self):
-    for _, row  in self.info.iterrows():
-      path = row[RasterData.PATH_COL]
-      if 'http:' in str(path):
-        res = requests.head(path)
-        if (res.status_code == 200):
-          return path
-      elif os.path.isfile(path):
-        return path
-
-    raise Exception(f'No base raster is available.')
-
   def to_dir(self,
     out_dir:Union[Path,str],
     dtype:str = None,
@@ -935,7 +919,7 @@ class RasterData(SKMapBase):
     if isinstance(out_dir,str):
       out_dir = Path(out_dir)
 
-    base_raster = self._base_raster()
+    base_raster = self.info.iloc[-1][RasterData.PATH_COL]
     outfiles = [
       out_dir.joinpath(f'{name}.tif')
       for name in list(self.info[RasterData.NAME_COL])
