@@ -598,10 +598,10 @@ class RasterData(SKMapBase):
 
     self.info = self._info_static()
 
-  def _info_temporal(self, date_format, date_style):
+  def _info_temporal(self):
     rows = []
     
-    regex_dt = self._regex_dt[date_format]
+    regex_dt = self._regex_dt[self.date_format]
 
     for raster_file in self.rasters_temporal:
       name = Path(raster_file).stem
@@ -610,18 +610,9 @@ class RasterData(SKMapBase):
       for r in re.finditer(regex_dt, name):
         dates.append(r.group(0))
       
-      row_data = {}
-      row_data[RasterData.PATH_COL] = raster_file
-      row_data[RasterData.NAME_COL] = name
-      row_data[RasterData.MAIN_TS_COL] = True
-
-      if date_style == 'interval':
-        row_data[RasterData.START_DT_COL] = datetime.strptime(dates[0], date_format)
-        row_data[RasterData.END_DT_COL] = datetime.strptime(dates[1], date_format)
-      else:
-        row_data[RasterData.DT_COL] = datetime.strptime(dates[0], date_format)
-
-      rows.append(row_data)
+      rows.append(
+        self._new_info_row(raster_file, name, dates, main_ts=True)
+      )
     
     return DataFrame(rows)
 
@@ -629,12 +620,51 @@ class RasterData(SKMapBase):
     rows = []
     
     for raster_file in self.rasters_static:
-      row_data = {}
-      row_data[RasterData.PATH_COL] = raster_file
-      row_data[RasterData.NAME_COL] = Path(raster_file).stem
-      rows.append(row_data)
+      name = Path(raster_file).stem
+      rows.append(
+        self._new_info_row(raster_file, name)
+      )
     
     return DataFrame(rows)
+
+  def _new_info_row(self, 
+    raster_file:str,
+    name:str,
+    dates:list = [],
+    main_ts:bool = False,
+  ):
+
+    row = {}
+
+    if len(dates) > 0 and self.date_style is not None:
+      row[RasterData.PATH_COL] = raster_file
+      row[RasterData.NAME_COL] = name
+      row[RasterData.MAIN_TS_COL] = True
+
+      if self.date_style == 'interval':
+        
+        dt1, dt2 = (dates[0], dates[1] )
+        
+        if isinstance(dt1, str):
+          dt1 = datetime.strptime(dt1, self.date_format)
+        if isinstance(dt2, str):
+          dt2 = datetime.strptime(dt2, self.date_format)
+
+        row[RasterData.START_DT_COL] = dt1
+        row[RasterData.END_DT_COL] = dt2
+      else:
+        dt1 = dates[0]
+
+        if isinstance(dt1, str):
+          dt1 = datetime.strptime(dt1, self.date_format)
+
+        row[RasterData.DT_COL] = dt1
+
+    else:
+      row[RasterData.PATH_COL] = raster_file
+      row[RasterData.NAME_COL] = name
+
+    return row
 
   def _set_date(self, 
     text, 
@@ -689,7 +719,7 @@ class RasterData(SKMapBase):
       self._verbose(f"Last temporal raster: {raster_temporal}")
       self._verbose(f"{count} temporal rasters added ")
     
-    self.info = pd.concat([self.info, self._info_temporal(date_format, date_style)])
+    self.info = pd.concat([self.info, self._info_temporal()])
 
     return self
 
@@ -789,6 +819,27 @@ class RasterData(SKMapBase):
       self.array = np.concatenate([self.array, array_t], axis=-1)
 
     self._tranform_info(transformer, inplace, outname=outname)
+
+    return self
+
+  def derive(self, 
+    derivator:SKMapRunner,
+    outname:str = None
+  ):
+    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
+    derivator_name = derivator.__class__.__name__
+    
+    start = time.time()
+    self._verbose(f"Deriving new data using {derivator_name}"
+      + f" on {self.array[:,:,info_main.index].shape}")
+
+    new_array, new_info = derivator.run(self, outname)
+    
+    self.array = np.concatenate([self.array, new_array], axis=-1)
+    self.info = pd.concat([self.info, new_info])
+    
+    self._verbose(f"Derivator {derivator_name} execution"
+      + f" time: {(time.time() - start):.2f} segs")
 
     return self
 
@@ -930,36 +981,5 @@ class RasterData(SKMapBase):
     
     self._verbose(f"{len(outfiles)} rasters copied to s3")
     self._verbose(f"Last raster in s3: {last_url}")
-
-    return self
-
-  def derive(self, 
-    derivative:SKMapRunner,
-    outname:str = None
-  ):
-    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
-    derivative_name = derivative.__class__.__name__
-    
-    start = time.time()
-    self._verbose(f"Deriving new data using {derivative_name}"
-      + f" on {self.array[:,:,info_main.index].shape}")
-
-    array_t = derivative.run(self.array[:,:,info_main.index])
-    
-    self._verbose(f"Derivator {derivative_name} execution"
-      + f" time: {(time.time() - start):.2f} segs")
-
-    if isinstance(array_t, tuple) and len(array_t) >= 2:
-      self.array = np.concatenate([self.array, array_t[1]], axis=-1)
-      self._tranform_info(derivative, inplace=False, 
-        outname=outname, suffix='qa')
-      array_t = array_t[0]
-
-    if inplace:
-      self.array[:,:,info_main.index] = array_t
-    else:
-      self.array = np.concatenate([self.array, array_t], axis=-1)
-
-    self._tranform_info(derivative, inplace, outname=outname)
 
     return self
