@@ -5,6 +5,7 @@ from osgeo import gdal
 from pathlib import Path
 from hashlib import sha256
 from pandas import DataFrame, to_datetime
+
 import copy
 import pandas as pd
 import numpy
@@ -19,11 +20,8 @@ import time
 import tempfile
 
 from typing import List, Union, Callable
-from .misc import ttprint, _eval, update_by_separator
-from . import parallel
-from skmap.transform import SKMapTransformer
-from skmap.misc import gen_dates
-from . import SKMapBase
+from skmap.misc import ttprint, _eval, update_by_separator, gen_dates
+from skmap import SKMapRunner, SKMapBase, parallel
 
 from datetime import datetime
 from minio import Minio
@@ -731,7 +729,7 @@ class RasterData(SKMapBase):
     return self
 
   def _tranform_info(self, 
-    transformer:SKMapTransformer, 
+    transformer:SKMapRunner, 
     inplace = False,
     outname = None,
     suffix = ''
@@ -763,7 +761,7 @@ class RasterData(SKMapBase):
         self.info.loc[i] = row
 
   def transform(self, 
-    transformer:SKMapTransformer, 
+    transformer:SKMapRunner, 
     inplace = False,
     outname:str = None
   ):
@@ -771,7 +769,7 @@ class RasterData(SKMapBase):
     transformer_name = transformer.__class__.__name__
     
     start = time.time()
-    self._verbose(f"Executing tranformer {transformer_name}"
+    self._verbose(f"Transforming data using {transformer_name}"
       + f" on {self.array[:,:,info_main.index].shape}")
 
     array_t = transformer.run(self.array[:,:,info_main.index])
@@ -932,5 +930,36 @@ class RasterData(SKMapBase):
     
     self._verbose(f"{len(outfiles)} rasters copied to s3")
     self._verbose(f"Last raster in s3: {last_url}")
+
+    return self
+
+  def derive(self, 
+    derivative:SKMapRunner,
+    outname:str = None
+  ):
+    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
+    derivative_name = derivative.__class__.__name__
+    
+    start = time.time()
+    self._verbose(f"Deriving new data using {derivative_name}"
+      + f" on {self.array[:,:,info_main.index].shape}")
+
+    array_t = derivative.run(self.array[:,:,info_main.index])
+    
+    self._verbose(f"Derivator {derivative_name} execution"
+      + f" time: {(time.time() - start):.2f} segs")
+
+    if isinstance(array_t, tuple) and len(array_t) >= 2:
+      self.array = np.concatenate([self.array, array_t[1]], axis=-1)
+      self._tranform_info(derivative, inplace=False, 
+        outname=outname, suffix='qa')
+      array_t = array_t[0]
+
+    if inplace:
+      self.array[:,:,info_main.index] = array_t
+    else:
+      self.array = np.concatenate([self.array, array_t], axis=-1)
+
+    self._tranform_info(derivative, inplace, outname=outname)
 
     return self

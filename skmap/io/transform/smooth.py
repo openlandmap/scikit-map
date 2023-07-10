@@ -12,15 +12,15 @@ try:
     import scipy.sparse as sparse
     from scipy.sparse.linalg import splu
 
-    from skmap.transform import SKMapTransformer
-    from skmap import parallel
+    from skmap import SKMapRunner, parallel
 
-    class Smoother(SKMapTransformer, ABC):
+    class Smoother(SKMapRunner, ABC):
       
       def __init__(self,
-        verbose:bool = True
+        verbose:bool = True,
+        temporal = False
       ):
-        self.verbose = verbose
+        super().__init__(verbose=verbose, temporal=temporal)
 
       def run(self, data):
         """
@@ -49,7 +49,7 @@ try:
         verbose = False
       ):
 
-        super().__init__(verbose=verbose)
+        super().__init__(verbose=verbose, temporal=True)
 
         self.lmbd = lmbd
         self.d = d
@@ -95,5 +95,5 @@ try:
         return parallel.apply_along_axis(self._process_ts, 2, data, n_jobs=self.n_jobs)
 
 except ImportError as e:
-    from skmap.misc import _warn_deps
-    _warn_deps(e, 'gapfiller')
+  from skmap.misc import _warn_deps
+  _warn_deps(e, 'gapfiller')

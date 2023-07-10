@@ -22,10 +22,9 @@ try:
     import pyfftw
 
     from skmap.misc import ttprint
-    from skmap.transform import SKMapTransformer
-    from skmap import parallel
+    from skmap import parallel, SKMapRunner
 
-    class Filler(SKMapTransformer, ABC):
+    class Filler(SKMapRunner, ABC):
       """
       Abstract class responsible for read/write the raster files in
       all implemented gapfilling methods.
@@ -43,9 +42,10 @@ try:
       :param verbose: Use ``True`` to print the progress of the gapfilled.
       """
       def __init__(self,
-        verbose:bool = True
+        verbose:bool = True,
+        temporal = False
       ):
-        self.verbose = verbose
+        super().__init__(verbose=verbose, temporal=temporal)
 
       def _n_gaps(self, data = None):
         nan_data = np.isnan(data)
@@ -95,7 +95,7 @@ try:
         verbose = False
       ):
 
-        super().__init__(verbose=verbose)
+        super().__init__(verbose=verbose, temporal=True)
 
         self.season_size = season_size
         self.att_seas = att_seas
@@ -208,7 +208,7 @@ try:
         verbose = True
       ):
 
-        super().__init__(verbose=verbose)
+        super().__init__(verbose=verbose, temporal=True)
 
         self.time_win_size = time_win_size
         self.season_size = season_size
@@ -470,7 +470,7 @@ try:
         mode = cv.INPAINT_TELEA,
         verbose = True
       ):
-        super().__init__(verbose=verbose)
+        super().__init__(verbose=verbose, temporal=False)
 
         self.data_mask = data_mask
         self.space_win = space_win
