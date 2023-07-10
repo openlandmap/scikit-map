@@ -48,6 +48,7 @@ try:
       yealy = True,
       operations = ['p25', 'p50', 'p75', 'std'],
       rename_operations:dict = {},
+      date_overlap:bool = False,
       n_jobs:int = os.cpu_count(),
       verbose = False
     ):
@@ -57,6 +58,7 @@ try:
       self.yealy = yealy
       self.operations = operations
       self.rename_operations = rename_operations
+      self.date_overlap = date_overlap
       self.n_jobs = n_jobs
 
       self.percs = []
@@ -121,7 +123,8 @@ try:
           'months', 1, date_offset=11, return_str=True, 
           ignore_29feb=False, date_format=date_format):
           in_array.append(
-            rdata.filter_date(dt1, dt2, return_array=True, date_format=date_format)
+            rdata.filter_date(dt1, dt2, return_array=True, 
+              date_format=date_format, date_overlap=self.date_overlap)
           )
 
         tm = f'm{month}'
@@ -134,7 +137,8 @@ try:
           date_format=date_format):
 
           tm = 'yearly'
-          in_array = rdata.filter_date(dt1, dt2, return_array=True, date_format=date_format)
+          in_array = rdata.filter_date(dt1, dt2, return_array=True, 
+            date_format=date_format, date_overlap=self.date_overlap)
           args += [ (in_array, tm) ]
 
       new_array = []

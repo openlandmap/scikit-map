@@ -847,6 +847,7 @@ class RasterData(SKMapBase):
     start_date, 
     end_date = None, 
     date_format = '%Y-%m-%d',
+    date_overlap = False,
     return_array=False, 
     return_copy=True
   ):
@@ -859,7 +860,12 @@ class RasterData(SKMapBase):
 
     dt_mask = info_main[start_dt_col] >= to_datetime(start_date, format=date_format)
     if end_date is not None and end_dt_col is not None:
-      dt_mask = np.logical_and(
+      
+      filter_method = np.logical_and
+      if date_overlap:
+        filter_method = np.logical_or
+
+      dt_mask = filter_method(
         dt_mask,
         info_main[end_dt_col] <= to_datetime(end_date, format=date_format),
       )
@@ -904,6 +910,18 @@ class RasterData(SKMapBase):
       self.info = info
       return self
 
+  def _base_raster(self):
+    for _, row  in self.info.iterrows():
+      path = row[RasterData.PATH_COL]
+      if 'http:' in str(path):
+        res = requests.head(path)
+        if (res.status_code == 200):
+          return path
+      elif os.path.isfile(path):
+        return path
+
+    raise Exception(f'No base raster is available.')
+
   def to_dir(self,
     out_dir:Union[Path,str],
     dtype:str = None,
@@ -917,7 +935,7 @@ class RasterData(SKMapBase):
     if isinstance(out_dir,str):
       out_dir = Path(out_dir)
 
-    base_raster = self.info.iloc[-1][RasterData.PATH_COL]
+    base_raster = self._base_raster()
     outfiles = [
       out_dir.joinpath(f'{name}.tif')
       for name in list(self.info[RasterData.NAME_COL])
