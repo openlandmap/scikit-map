@@ -12,6 +12,7 @@ try:
   
   import numpy as np
   import bottleneck as bn
+  from datetime import datetime
   from pandas import DataFrame
 
   class Derivator(SKMapRunner, ABC):
@@ -79,7 +80,7 @@ try:
       else:
         return op
 
-    def _aggregate(self, in_array, tm):
+    def _aggregate(self, in_array, tm, dt1, dt2):
 
       out_array = []
       ops = []
@@ -100,7 +101,7 @@ try:
 
       out_array = np.concatenate(out_array, axis=-1)
 
-      return out_array, ops, tm
+      return (out_array, ops, tm, dt1, dt2)
 
     def _run(self, 
       rdata:RasterData,
@@ -122,13 +123,15 @@ try:
           f'{start_dt.year}{month}01',f'{end_dt.year}{month}01', 
           'months', 1, date_offset=11, return_str=True, 
           ignore_29feb=False, date_format=date_format):
-          in_array.append(
-            rdata.filter_date(dt1, dt2, return_array=True, 
+          array = rdata.filter_date(dt1, dt2, return_array=True, 
               date_format=date_format, date_overlap=self.date_overlap)
-          )
+          
+          if array.size > 0:
+            in_array.append(array)
 
         tm = f'm{month}'
-        args += [ (np.concatenate(in_array, axis=-1), tm) ]
+        if len(in_array) > 0:
+          args += [ (np.concatenate(in_array, axis=-1), tm, start_dt, end_dt) ]
 
       if self.yealy:
         for dt1, dt2 in gen_dates(
@@ -139,7 +142,9 @@ try:
           tm = 'yearly'
           in_array = rdata.filter_date(dt1, dt2, return_array=True, 
             date_format=date_format, date_overlap=self.date_overlap)
-          args += [ (in_array, tm) ]
+          
+          if in_array.size > 0:  
+            args += [ (in_array, tm, datetime.strptime(dt1, date_format), datetime.strptime(dt2, date_format)) ]
 
       new_array = []
       new_info = []
@@ -148,10 +153,10 @@ try:
         + f"time aggregates from {start_dt.year} to {end_dt.year}"
       )
 
-      for out_array, ops, tm in parallel.job(self._aggregate, args, joblib_args={'backend': 'threading'}):
+      for out_array, ops, tm, dt1, dt2 in parallel.job(self._aggregate, args, joblib_args={'backend': 'threading'}):
         for op in ops:
           name = rdata._set_date(outname, 
-                start_dt, end_dt, 
+                dt1, dt2, 
                 rdata.date_format, rdata.date_style, 
                 op=op, tm=tm
               )

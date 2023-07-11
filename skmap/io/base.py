@@ -858,17 +858,28 @@ class RasterData(SKMapBase):
     if RasterData.DT_COL in info_main.columns:
       start_dt_col, end_dt_col = (RasterData.DT_COL, None)
 
-    dt_mask = info_main[start_dt_col] >= to_datetime(start_date, format=date_format)
+    if date_overlap:
+      dt_mask = np.logical_or(
+        info_main[start_dt_col] >= to_datetime(start_date, format=date_format),
+        info_main[end_dt_col] >= to_datetime(start_date, format=date_format)
+      )
+    else:
+      dt_mask = info_main[start_dt_col] >= to_datetime(start_date, format=date_format)
+
     if end_date is not None and end_dt_col is not None:
       
-      filter_method = np.logical_and
       if date_overlap:
-        filter_method = np.logical_or
+        dt_mask_end = np.logical_or(
+          info_main[end_dt_col] <= to_datetime(end_date, format=date_format),
+          info_main[start_dt_col] <= to_datetime(end_date, format=date_format)
+        )
+      else:
+        dt_mask_end = info_main[end_dt_col] <= to_datetime(end_date, format=date_format)
 
-      dt_mask = filter_method(
+      dt_mask = np.logical_and(
         dt_mask,
-        info_main[end_dt_col] <= to_datetime(end_date, format=date_format),
-      )
+        dt_mask_end
+      )  
 
     return self._filter(info_main[dt_mask],
       return_array=return_array, return_copy=return_copy
