@@ -848,6 +848,7 @@ class RasterData(SKMapBase):
     end_date = None, 
     date_format = '%Y-%m-%d',
     date_overlap = False,
+    main_ts = True,
     return_array=False, 
     return_copy=True
   ):
@@ -882,33 +883,39 @@ class RasterData(SKMapBase):
       )  
 
     return self._filter(info_main[dt_mask],
-      return_array=return_array, return_copy=return_copy
+      main_ts=main_ts, return_array=return_array, return_copy=return_copy
     )
 
   def filter_contains(self, 
     text, 
+    main_ts=False, 
     return_array=False, 
     return_copy=True
   ):
     return self.filter(f'{self.NAME_COL}.str.contains("{text}")', 
-      return_array=return_array, return_copy=return_copy
+       main_ts=main_ts, return_array=return_array, return_copy=return_copy
     )
 
   def filter(self, 
     expr, 
+    main_ts=False,
     return_array=False, 
     return_copy=True
   ):
-    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
-    return self._filter(info_main.query(expr),
+    return self._filter(self.info.query(expr), main_ts=main_ts,
       return_array=return_array, return_copy=return_copy
     )
 
   def _filter(self, 
     info, 
+    main_ts,
     return_array=False, 
     return_copy=True
   ):
+
+    if main_ts:
+      info = info.query(f'{RasterData.MAIN_TS_COL} == True')
+
     if return_array:
       return self.array[:,:,info.index]
     elif return_copy:
