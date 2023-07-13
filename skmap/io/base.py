@@ -1086,7 +1086,21 @@ class RasterData(SKMapBase):
     except KeyError:
       print(f"{cmap} is not valid. Please choose one of the following colormap {mpl.colormaps()}")
 
-  def _get_grid(data_size):
+  def grid_plot(self, cmap=None, legend_title="", image_tags=None, save=False):
+    """
+    Generates a square grid plot to view and save with colorscale.
+
+    :param cmap: colormap name one of the `matplotlib.colormaps()`
+    :param legend_title: title of the colorbar that will be used within the animation
+      default is an empty string
+    :param image_tags: this could be `name`,`date`, `index` or None. Default value 
+      is None
+    :param save: this is a save option to save on the disk `./` location. It should 
+      be either True or False. Default value is False.
+
+    
+    """
+    def _get_grid(data_size):
       if data_size <= 4:
         row, col = 1, data_size
       else:
@@ -1094,6 +1108,7 @@ class RasterData(SKMapBase):
         col = np.floor(data_size/row).astype(int)
         if row * col != data_size: col += 1
       return [row, col]
+
 
     colorbar_opt = {
         'orientation':'horizontal',
