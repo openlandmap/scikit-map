@@ -1020,6 +1020,29 @@ class RasterData(SKMapBase):
 
     return self
 
+  def _get_colorbar(self, img_label):
+    cbar_opt = {
+      'orientation':'horizontal',
+      'location':'top'
+    }
+    if img_label == "name":
+     cbar_opt = {
+      'orientation':'vertical',
+      'location':'right'
+    } 
+    return cbar_opt
+    
+  def _get_titles(self, img_label):
+    if img_label == 'date':
+      titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
+    elif img_label == 'index':
+      titles = [i for i in range(self.info.shape[0])]
+    elif img_label == 'name':
+      titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
+    else:
+      titles = [''] * self.info.shape[0]
+    return titles
+
   def animate(self, cmap=None, legend_title="", image_tags=None, save=False):
 
     """
@@ -1045,22 +1068,8 @@ class RasterData(SKMapBase):
     HTML(animation.to_jshtml())
 
     """
-    colorbar_opt = {
-        'orientation':'horizontal',
-        'location':'top'
-        }
-    if image_tags == 'date':
-      titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
-    elif image_tags == 'index':
-      titles = [i for i in range(self.info.shape[0])]
-    elif image_tags == 'name':
-      titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
-      colorbar_opt = {
-        'orientation':'vertical',
-        'location':'right'
-        }
-    else:
-      titles = [''] * self.info.shape[0]
+    colorbar_opt = self._get_colorbar(image_tags)
+    titles = self._get_titles(image_tags)
 
     fig, ax = pyplot.subplots(figsize=(8,8))
     [vmin, vmax] = [np.nanmin(self.array), np.nanmax(self.array)]
@@ -1110,22 +1119,8 @@ class RasterData(SKMapBase):
       return [row, col]
 
 
-    colorbar_opt = {
-        'orientation':'horizontal',
-        'location':'top'
-        }
-    if image_tags == 'date':
-      titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
-    elif image_tags == 'index':
-      titles = [i for i in range(self.info.shape[0])]
-    elif image_tags == 'name':
-      titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
-      colorbar_opt = {
-        'orientation':'vertical',
-        'location':'right'
-        }
-    else:
-      titles = [''] * self.info.shape[0]
+    colorbar_opt = self._get_colorbar(image_tags)
+    titles = self._get_titles(image_tags)
 
     canvas = []
     img_count = self.info.shape[0]
