@@ -30,6 +30,12 @@ from pathlib import Path
 import rasterio
 from rasterio.windows import Window
 
+import matplotlib as mpl
+from matplotlib import pyplot
+from matplotlib.animation import FuncAnimation
+
+
+
 _INT_DTYPE = (
   'uint8', 'uint8',
   'int16', 'uint16',
