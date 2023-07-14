@@ -1145,7 +1145,12 @@ class RasterData(SKMapBase):
     [nrow, ncol] = _get_grid(img_count)
     [vmin, vmax] = [np.nanmin(self.array), np.nanmax(self.array)]
     titles = self._get_titles(image_tags)
-    if image_tags == 'name': pyplot.rcParams['font.size'] = 6
+    if image_tags == 'name': 
+      pyplot.rcParams['font.size'] = 8
+      pyplot.rcParams['axes.titlepad']=0
+    # this font size seems ok but the bottom ofset of the title has 
+    # more space then th top if the text is in between two subfigures
+    # bottom offset of each title should be decreased
     fig,axs = pyplot.subplots(
       nrows=nrow, ncols=ncol, figsize=(16,16),
       sharex=True, sharey=True
