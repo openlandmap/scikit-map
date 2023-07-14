@@ -1113,8 +1113,17 @@ class RasterData(SKMapBase):
       is None
     :param save: this is a save option to save on the disk `./` location. It should 
       be either True or False. Default value is False.
-      
-         
+
+    Examples
+    ========
+    from skmap.data import toy
+    %matplotlib # to stop pouring out when calling the function. 
+
+    data = toy.ndvi(gappy=True, verbose=True)
+    gridplot = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", image_tags='date', save=True)
+    
+    # to view in jupyter notebook  
+    gridplot.show()   
     """
     def _get_grid(data_size):
       if data_size <= 4:
