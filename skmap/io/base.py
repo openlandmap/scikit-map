@@ -1044,7 +1044,13 @@ class RasterData(SKMapBase):
     elif img_label == 'index':
       titles = [i for i in range(self.info.shape[0])]
     elif img_label == 'name':
-      titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
+      #titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
+      titles = [
+        ('-').join(np.array(i.split('_'))[[0,2,3,4]]) + \
+        "\n" + \
+        ('-').join(np.array(i.split('_'))[[5,6]])  \
+        for i in list(self.info["name"])
+      ]
     else:
       titles = [''] * self.info.shape[0]
     return titles
@@ -1134,15 +1140,12 @@ class RasterData(SKMapBase):
         if row * col != data_size: col += 1
       return [row, col]
 
-
-    colorbar_opt = self._get_colorbar(image_tags)
-    titles = self._get_titles(image_tags)
-
     canvas = []
     img_count = self.info.shape[0]
     [nrow, ncol] = _get_grid(img_count)
     [vmin, vmax] = [np.nanmin(self.array), np.nanmax(self.array)]
-    
+    titles = self._get_titles(image_tags)
+    if image_tags == 'name': pyplot.rcParams['font.size'] = 6
     fig,axs = pyplot.subplots(
       nrows=nrow, ncols=ncol, figsize=(16,16),
       sharex=True, sharey=True
@@ -1184,6 +1187,7 @@ class RasterData(SKMapBase):
           axs[row, col].axis('off')
           img_indx += 1
     
+    pyplot.rcParams['font.size']=10
     fig.colorbar(
       canvas[0], ax=axs, orientation="horizontal", shrink=0.3,
       aspect=10, label=legend_title, location="top"
@@ -1193,4 +1197,4 @@ class RasterData(SKMapBase):
     
     return fig
     # TODO
-    # find a better way to parse and write the image name
+    # find a more detailed way to parse and write the image name 
