@@ -1095,6 +1095,7 @@ class RasterData(SKMapBase):
         ax.set_title(label=titles[i])
         #if image_tags is not None:
       animation = FuncAnimation(fig, _animate, interval=250, frames=self.array.shape[2])
+      pyplot.close(animation._fig)
       if save is True:
         animation.save("./animation.gif")
       return animation
@@ -1112,8 +1113,8 @@ class RasterData(SKMapBase):
       is None
     :param save: this is a save option to save on the disk `./` location. It should 
       be either True or False. Default value is False.
-
-    
+      
+         
     """
     def _get_grid(data_size):
       if data_size <= 4:
@@ -1180,6 +1181,7 @@ class RasterData(SKMapBase):
     )
     if save is True:
       fig.savefig("./grid_plot.png", dpi=300)
+    
     return fig
     # TODO
     # find a better way to parse and write the image name
