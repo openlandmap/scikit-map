@@ -18,6 +18,9 @@ import re
 import os
 import time
 import tempfile
+import matplotlib as mpl
+from matplotlib import pyplot
+from matplotlib.animation import FuncAnimation
 
 from typing import List, Union, Callable
 from skmap.misc import ttprint, _eval, update_by_separator, gen_dates
@@ -30,11 +33,9 @@ from pathlib import Path
 import rasterio
 from rasterio.windows import Window
 
-import matplotlib as mpl
-from matplotlib import pyplot
-from matplotlib.animation import FuncAnimation
+import bottleneck as bn
 
-
+from IPython.display import HTML
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -1055,7 +1056,15 @@ class RasterData(SKMapBase):
       titles = [''] * self.info.shape[0]
     return titles
 
-  def animate(self, cmap=None, legend_title="", image_tags=None, save=False):
+  def animate(self, 
+    cmap:str = 'Spectral_r', 
+    legend_title:str = "", 
+    img_title:str ="index", 
+    interval:int = 250,
+    figsize:tuple = (8,8),
+    v_minmax:tuple = None,
+    to_gif:str = None
+  ):
 
     """
     Generates an animation to view and save.
@@ -1063,62 +1072,91 @@ class RasterData(SKMapBase):
     :param cmap: colormap name one of the `matplotlib.colormaps()`
     :param legend_title: title of the colorbar that will be used within the animation
       default is an empty string
-    :param image_tags: this could be `name`,`date`, `index` or None. Default value 
+    :param img_title: this could be `name`,`date`, `index` or None. Default value 
       is None
-    :param save: this is a save option to save on the disk `./` location. It should 
-      be either True or False. Default value is False.
+    :param interval: TODO
+    :param figsize: TODO
+    :param v_minmax: TODO
+    :param v_minmax: TODO
+    :param to_gif: TODO
     
     Examples
     ========
     from skmap.data import toy
-    from IPython.display import HTML
 
-    data = toy.ndvi(gappy=True, verbose=True)
-    animation = data.animate(cmap='Spectral_r', legend_title="NDVI", image_tags='date', save=True)
-
-    # to view in jupyter notebook  
-    HTML(animation.to_jshtml())
+    data = toy.ndvi_data(gappy=True, verbose=True)
+    data.animate(cmap='Spectral_r', legend_title="NDVI", img_title='date')
 
     """
-    colorbar_opt = self._get_colorbar(image_tags)
-    titles = self._get_titles(image_tags)
+    colorbar_opt = {
+      'orientation':'horizontal',
+      'location':'top'
+    }
 
-    fig, ax = pyplot.subplots(figsize=(8,8))
-    [vmin, vmax] = [np.nanmin(self.array), np.nanmax(self.array)]
+    if img_title == 'date':
+      titles = list(
+        self.info[RasterData.START_DT_COL].astype(str) 
+        + ' - ' 
+        + self.info[RasterData.START_DT_COL].astype(str))
+    elif img_title == 'index':
+      titles = [i for i in range(self.info.shape[0])]
+    elif img_title == 'name':
+      titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
+      colorbar_opt = {
+        'orientation':'vertical',
+        'location':'right'
+      }
+
+    else:
+      titles = [''] * self.info.shape[0]
+
+    fig, ax = pyplot.subplots(figsize=figsize)
+    
+    if v_minmax is None:
+      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+    else:
+      vmin, vmax = v_minmax
     
     try:
+      
       mymap = ax.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap)
-      fig.colorbar(
-        mymap, 
-        aspect=15,
-        shrink=0.6,
-        label=legend_title,
-        location=colorbar_opt['location'], 
-        orientation=colorbar_opt['orientation'],
-        )
+      
       def _animate(i):
         mymap.set_array(self.array[:,:,i])
         ax.set_title(label=titles[i])
-        #if image_tags is not None:
-      animation = FuncAnimation(fig, _animate, interval=250, frames=self.array.shape[2])
-      pyplot.close(animation._fig)
-      if save is True:
-        animation.save("./animation.gif")
-      return animation
+      
+      animation = FuncAnimation(fig, _animate, interval=interval, frames=self.array.shape[2])
+      
+      if to_gif is not None:
+        animation.save(to_gif)
+        return to_gif
+      else:
+        return HTML(animation.to_jshtml())
+    
     except KeyError:
       print(f"{cmap} is not valid. Please choose one of the following colormap {mpl.colormaps()}")
 
-  def grid_plot(self, cmap=None, legend_title="", image_tags=None, save=False):
+  def plot(self, 
+    cmap:str = 'Spectral_r',
+    legend_title:str = "", 
+    img_title:str = 'index',
+    figsize:tuple = (16,16),
+    v_minmax:tuple = None,
+    to_img:str = None,
+    dpi:int = 300
+  ):
     """
     Generates a square grid plot to view and save with colorscale.
 
     :param cmap: colormap name one of the `matplotlib.colormaps()`
     :param legend_title: title of the colorbar that will be used within the animation
       default is an empty string
-    :param image_tags: this could be `name`,`date`, `index` or None. Default value 
+    :param img_title: this could be `name`,`date`, `index` or None. Default value 
       is None
-    :param save: this is a save option to save on the disk `./` location. It should 
-      be either True or False. Default value is False.
+    :param figsize: TODO
+    :param v_minmax: TODO
+    :param to_img: TODO
+    :param dpi: TODO
 
     Examples
     ========
@@ -1126,7 +1164,7 @@ class RasterData(SKMapBase):
     %matplotlib # to stop pouring out when calling the function. 
 
     data = toy.ndvi(gappy=True, verbose=True)
-    gridplot = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", image_tags='date', save=True)
+    gridplot = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
     
     # to view in jupyter notebook  
     gridplot.show()   
@@ -1143,16 +1181,21 @@ class RasterData(SKMapBase):
     canvas = []
     img_count = self.info.shape[0]
     [nrow, ncol] = _get_grid(img_count)
-    [vmin, vmax] = [np.nanmin(self.array), np.nanmax(self.array)]
-    titles = self._get_titles(image_tags)
-    if image_tags == 'name': 
+    
+    if v_minmax is None:
+      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+    else:
+      vmin, vmax = v_minmax
+
+    titles = self._get_titles(img_title)
+    if img_title == 'name': 
       pyplot.rcParams['font.size'] = 8
       pyplot.rcParams['axes.titlepad']=0
     # this font size seems ok but the bottom ofset of the title has 
     # more space then th top if the text is in between two subfigures
     # bottom offset of each title should be decreased
     fig,axs = pyplot.subplots(
-      nrows=nrow, ncols=ncol, figsize=(16,16),
+      nrows=nrow, ncols=ncol, figsize=figsize,
       sharex=True, sharey=True
     )
 
@@ -1181,25 +1224,26 @@ class RasterData(SKMapBase):
       for row in range(nrow):
         for col in range(ncol):
           if img_indx >= img_count:
-              for ax in axs[row:, col]: ax.set_visible(False)
-              #axs[row, col].axis('off')
-              #img_indx += 1
+            for ax in axs[row:, col]: ax.set_visible(False)
+            #axs[row, col].axis('off')
+            #img_indx += 1
           else:                    
-              canvas.append(axs[row,col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
-              axs[row, col].set_title(titles[img_indx])
-              #axs[row, col].axis('off')
-              #img_indx += 1
+            canvas.append(axs[row,col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
+            axs[row, col].set_title(titles[img_indx])
+            #axs[row, col].axis('off')
+            #img_indx += 1
           axs[row, col].axis('off')
           img_indx += 1
     
     pyplot.rcParams['font.size']=10
+
     fig.colorbar(
       canvas[0], ax=axs, orientation="horizontal", shrink=0.3,
       aspect=10, label=legend_title, location="top"
     )
-    if save is True:
-      fig.savefig("./grid_plot.png", dpi=300, bbox_inches='tight')
     
-    return fig
-    # TODO
-    # find a more detailed way to parse and write the image name 
+    if to_img is not None:
+      fig.savefig(to_img, dpi=dpi)
+      return to_img
+    else:
+      return fig
