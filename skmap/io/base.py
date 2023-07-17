@@ -1119,8 +1119,8 @@ class RasterData(SKMapBase):
       vmin, vmax = v_minmax
     
     try:
-      
       mymap = ax.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap)
+      fig.colorbar(mymap, aspect=15, shrink=0.6, label=legend_title, location=colorbar_opt['location'], orientation=colorbar_opt['orientation'])
       
       def _animate(i):
         mymap.set_array(self.array[:,:,i])
