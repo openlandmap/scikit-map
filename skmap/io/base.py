@@ -1027,30 +1027,29 @@ class RasterData(SKMapBase):
 
     return self
 
-  def _get_colorbar(self, img_label):
+  def _get_colorbar(self, img_title):
     cbar_opt = {
       'orientation':'horizontal',
       'location':'top'
     }
-    if img_label == "name":
+    if img_title == "name":
      cbar_opt = {
       'orientation':'vertical',
       'location':'right'
     } 
     return cbar_opt
     
-  def _get_titles(self, img_label):
-    if img_label == 'date':
+  def _get_titles(self, img_title):
+    if img_title == 'date':
       titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
-    elif img_label == 'index':
+    elif img_title == 'index':
       titles = [i for i in range(self.info.shape[0])]
-    elif img_label == 'name':
+    elif img_title == 'name':
       #titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
       titles = [
-        ('-').join(np.array(i.split('_'))[[0,2,3,4]]) + \
-        "\n" + \
-        ('-').join(np.array(i.split('_'))[[5,6]])  \
-        for i in list(self.info["name"])
+        ('-').join(np.array(i.split('_'))[[0,2,3,4]]) + '\n' + \
+        ('-').join(np.array(i.split('_'))[[5,6]]) \
+        for i in list(self.info[RasterData.NAME_COL])
       ]
     else:
       titles = [''] * self.info.shape[0]
@@ -1090,26 +1089,14 @@ class RasterData(SKMapBase):
 
     """
     colorbar_opt = {
-      'orientation':'horizontal',
-      'location':'top'
+      'orientation':'vertical',
+      'location':'right'
     }
 
-    if img_title == 'date':
-      titles = list(
-        self.info[RasterData.START_DT_COL].astype(str) 
-        + ' - ' 
-        + self.info[RasterData.START_DT_COL].astype(str))
-    elif img_title == 'index':
-      titles = [i for i in range(self.info.shape[0])]
-    elif img_title == 'name':
-      titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
-      colorbar_opt = {
-        'orientation':'vertical',
-        'location':'right'
-      }
-
-    else:
-      titles = [''] * self.info.shape[0]
+    titles = self._get_titles(img_title)
+    if img_title == 'name':
+      pyplot.rcParams['font.size']=8
+      pyplot.rcParams['axes.titlepad']=0
 
     fig, ax = pyplot.subplots(figsize=figsize)
     
@@ -1120,7 +1107,9 @@ class RasterData(SKMapBase):
     
     try:
       mymap = ax.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap)
-      fig.colorbar(mymap, aspect=15, shrink=0.6, label=legend_title, location=colorbar_opt['location'], orientation=colorbar_opt['orientation'])
+      fig.colorbar(
+        mymap, aspect=15, shrink=0.6, label=legend_title, 
+        location='right', orientation='vertical')
       
       def _animate(i):
         mymap.set_array(self.array[:,:,i])
