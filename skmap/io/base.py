@@ -1127,7 +1127,7 @@ class RasterData(SKMapBase):
         ax.set_title(label=titles[i])
       
       animation = FuncAnimation(fig, _animate, interval=interval, frames=self.array.shape[2])
-      
+      pyplot.close(animation._fig)
       if to_gif is not None:
         animation.save(to_gif)
         return to_gif
