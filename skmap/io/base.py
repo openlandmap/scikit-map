@@ -1198,7 +1198,7 @@ class RasterData(SKMapBase):
       aspect=10, label=legend_title, location="top"
     )
     if save is True:
-      fig.savefig("./grid_plot.png", dpi=300)
+      fig.savefig("./grid_plot.png", dpi=300, bbox_inches='tight')
     
     return fig
     # TODO
