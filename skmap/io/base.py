@@ -1077,7 +1077,7 @@ class RasterData(SKMapBase):
     :param figsize: figure size that will be generated. Default value is `(8,8)`
     :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
       it will be derived from the dataset if not defined.
-    :param to_gif: this should be directory taht indicating the location where user want to
+    :param to_gif: this should be directory that indicating the location where user want to
       save the animation. Default is None
     
     Examples
@@ -1143,10 +1143,13 @@ class RasterData(SKMapBase):
       default is an empty string
     :param img_title: this could be `name`,`date`, `index` or None. Default value 
       is None
-    :param figsize: TODO
-    :param v_minmax: TODO
-    :param to_img: TODO
-    :param dpi: TODO
+    :param figsize: figure size that will be generated. Default value is `(16,16)`
+    :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
+      it will be derived from the dataset if not defined.
+    :param to_img:  this should be directory that indicating the location where user want to
+      save the image. Default is None
+    :param dpi: Dot per inch. This params used for to save the image with a required DPI.
+      Default is 300. 
 
     Examples
     ========
@@ -1236,4 +1239,5 @@ class RasterData(SKMapBase):
       fig.savefig(to_img, dpi=dpi)
       return to_img
     else:
+      pyplot.close()
       return fig
