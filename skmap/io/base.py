@@ -1076,10 +1076,6 @@ class RasterData(SKMapBase):
     data.animate(cmap='Spectral_r', legend_title="NDVI", img_title='date')
 
     """
-    colorbar_opt = {
-      'orientation':'vertical',
-      'location':'right'
-    }
 
     titles = self._get_titles(img_title)
     if img_title == 'name':
@@ -1216,7 +1212,7 @@ class RasterData(SKMapBase):
     )
     
     if to_img is not None:
-      fig.savefig(to_img, dpi=dpi)
+      fig.savefig(to_img, dpi=dpi, bbox_inches='tight')
       return to_img
     else:
       pyplot.close()
