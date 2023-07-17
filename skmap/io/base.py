@@ -1073,12 +1073,13 @@ class RasterData(SKMapBase):
     :param legend_title: title of the colorbar that will be used within the animation
       default is an empty string
     :param img_title: this could be `name`,`date`, `index` or None. Default value 
-      is None
-    :param interval: TODO
-    :param figsize: TODO
-    :param v_minmax: TODO
-    :param v_minmax: TODO
-    :param to_gif: TODO
+      is `index`
+    :param interval: delay-time in between two images in miliseconds. Default is 250 ms
+    :param figsize: figure size that will be generated. Default value is `(8,8)`
+    :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
+      it will be derived from the dataset if not defined.
+    :param to_gif: this should be directory taht indicating the location where user want to
+      save the animation. Default is None
     
     Examples
     ========
