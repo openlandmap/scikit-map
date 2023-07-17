@@ -18,6 +18,8 @@ import re
 import os
 import time
 import tempfile
+from matplotlib import pyplot
+from matplotlib.animation import FuncAnimation
 
 from typing import List, Union, Callable
 from skmap.misc import ttprint, _eval, update_by_separator, gen_dates
@@ -29,6 +31,10 @@ from minio import Minio
 from pathlib import Path
 import rasterio
 from rasterio.windows import Window
+
+import bottleneck as bn
+
+from IPython.display import HTML
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -1020,7 +1026,15 @@ class RasterData(SKMapBase):
 
     return self
 
-  def animate(self, cmap=None, legend_title="", image_tags=None, save=False):
+  def animate(self, 
+    cmap:str = 'Spectral_r', 
+    legend_title:str = "", 
+    frame_title:str ="index", 
+    interval:int = 250,
+    figsize:tuple = (8,8),
+    v_minmax:tuple = None,
+    to_gif:str = None
+  ):
 
     """
     Generates an animation to view and save.
@@ -1028,142 +1042,66 @@ class RasterData(SKMapBase):
     :param cmap: colormap name one of the `matplotlib.colormaps()`
     :param legend_title: title of the colorbar that will be used within the animation
       default is an empty string
-    :param image_tags: this could be `name`,`date`, `index` or None. Default value 
+    :param frame_title: this could be `name`,`date`, `index` or None. Default value 
       is None
-    :param save: this is a save option to save on the disk `./` location. It should 
-      be either True or False. Default value is False.
+    :param interval: TODO
+    :param figsize: TODO
+    :param v_minmax: TODO
+    :param v_minmax: TODO
+    :param to_gif: TODO
     
     Examples
     ========
     from skmap.data import toy
-    from IPython.display import HTML
 
-    data = toy.ndvi(gappy=True, verbose=True)
-    animation = data.animate(cmap='Spectral_r', legend_title="NDVI", image_tags='date', save=True)
-
-    # to view in jupyter notebook  
-    HTML(animation.to_jshtml())
+    data = toy.ndvi_data(gappy=True, verbose=True)
+    data.animate(cmap='Spectral_r', legend_title="NDVI", frame_title='date')
 
     """
     colorbar_opt = {
-        'orientation':'horizontal',
-        'location':'top'
-        }
-    if image_tags == 'date':
-      titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
-    elif image_tags == 'index':
+      'orientation':'horizontal',
+      'location':'top'
+    }
+
+    if frame_title == 'date':
+      titles = list(
+        self.info[RasterData.START_DT_COL].astype(str) 
+        + ' - ' 
+        + self.info[RasterData.START_DT_COL].astype(str))
+    elif frame_title == 'index':
       titles = [i for i in range(self.info.shape[0])]
-    elif image_tags == 'name':
+    elif frame_title == 'name':
       titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
       colorbar_opt = {
         'orientation':'vertical',
         'location':'right'
-        }
+      }
+
     else:
       titles = [''] * self.info.shape[0]
 
-    fig, ax = pyplot.subplots(figsize=(8,8))
-    [vmin, vmax] = [np.nanmin(self.array), np.nanmax(self.array)]
+    fig, ax = pyplot.subplots(figsize=figsize)
+    
+    if v_minmax is None:
+      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+    else:
+      vmin, vmax = v_minmax
     
     try:
+      
       mymap = ax.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap)
-      fig.colorbar(
-        mymap, 
-        aspect=15,
-        shrink=0.6,
-        label=legend_title,
-        location=colorbar_opt['location'], 
-        orientation=colorbar_opt['orientation'],
-        )
+      
       def _animate(i):
         mymap.set_array(self.array[:,:,i])
         ax.set_title(label=titles[i])
-        #if image_tags is not None:
-      animation = FuncAnimation(fig, _animate, interval=250, frames=self.array.shape[2])
-      if save is True:
-        animation.save("./animation.gif")
-      return animation
+      
+      animation = FuncAnimation(fig, _animate, interval=interval, frames=self.array.shape[2])
+      
+      if to_gif is not None:
+        animation.save(to_gif)
+        return to_gif
+      else:
+        return HTML(animation.to_jshtml())
+    
     except KeyError:
       print(f"{cmap} is not valid. Please choose one of the following colormap {mpl.colormaps()}")
-
-  def _get_grid(data_size):
-      if data_size <= 4:
-        row, col = 1, data_size
-      else:
-        row = np.round(np.sqrt(data_size)).astype(int)
-        col = np.floor(data_size/row).astype(int)
-        if row * col != data_size: col += 1
-      return [row, col]
-
-    colorbar_opt = {
-        'orientation':'horizontal',
-        'location':'top'
-        }
-    if image_tags == 'date':
-      titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
-    elif image_tags == 'index':
-      titles = [i for i in range(self.info.shape[0])]
-    elif image_tags == 'name':
-      titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
-      colorbar_opt = {
-        'orientation':'vertical',
-        'location':'right'
-        }
-    else:
-      titles = [''] * self.info.shape[0]
-
-    canvas = []
-    img_count = self.info.shape[0]
-    [nrow, ncol] = _get_grid(img_count)
-    [vmin, vmax] = [np.nanmin(self.array), np.nanmax(self.array)]
-    
-    fig,axs = pyplot.subplots(
-      nrows=nrow, ncols=ncol, figsize=(16,16),
-      sharex=True, sharey=True
-    )
-
-    pyplot.axis('off')
-
-    if cmap is None: cmap='Spectral_r'
-    img_indx = 0
-    if nrow == 1:
-      if ncol == 1:
-        canvas.append(
-          axs[col].imshow(self.array[:,:,img_indx], 
-          cmap=cmap, 
-          vmin=vmin,
-          vmax=vmax
-          )
-        )
-        axs.set_title(titles[img_indx])
-        axs.axis('off')
-      else:
-        for col in range(ncol):
-          canvas.append(axs[col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
-          axs[col].set_title(titles[img_indx])
-          axs[col].axis('off')
-          img_indx += 1
-    else:
-      for row in range(nrow):
-        for col in range(ncol):
-          if img_indx >= img_count:
-              for ax in axs[row:, col]: ax.set_visible(False)
-              #axs[row, col].axis('off')
-              #img_indx += 1
-          else:                    
-              canvas.append(axs[row,col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
-              axs[row, col].set_title(titles[img_indx])
-              #axs[row, col].axis('off')
-              #img_indx += 1
-          axs[row, col].axis('off')
-          img_indx += 1
-    
-    fig.colorbar(
-      canvas[0], ax=axs, orientation="horizontal", shrink=0.3,
-      aspect=10, label=legend_title, location="top"
-    )
-    if save is True:
-      fig.savefig("./grid_plot.png", dpi=300)
-    return fig
-    # TODO
-    # find a better way to parse and write the image name
