@@ -1027,18 +1027,6 @@ class RasterData(SKMapBase):
 
     return self
 
-  def _get_colorbar(self, img_title):
-    cbar_opt = {
-      'orientation':'horizontal',
-      'location':'top'
-    }
-    if img_title == "name":
-     cbar_opt = {
-      'orientation':'vertical',
-      'location':'right'
-    } 
-    return cbar_opt
-    
   def _get_titles(self, img_title):
     if img_title == 'date':
       titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
@@ -1198,13 +1186,7 @@ class RasterData(SKMapBase):
     img_indx = 0
     if nrow == 1:
       if ncol == 1:
-        canvas.append(
-          axs[col].imshow(self.array[:,:,img_indx], 
-          cmap=cmap, 
-          vmin=vmin,
-          vmax=vmax
-          )
-        )
+        canvas.append(axs[col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
         axs.set_title(titles[img_indx])
         axs.axis('off')
       else:
@@ -1218,13 +1200,11 @@ class RasterData(SKMapBase):
         for col in range(ncol):
           if img_indx >= img_count:
             for ax in axs[row:, col]: ax.set_visible(False)
-            #axs[row, col].axis('off')
-            #img_indx += 1
+
           else:                    
             canvas.append(axs[row,col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
             axs[row, col].set_title(titles[img_indx])
-            #axs[row, col].axis('off')
-            #img_indx += 1
+
           axs[row, col].axis('off')
           img_indx += 1
     
