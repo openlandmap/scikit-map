@@ -1034,30 +1034,17 @@ class RasterData(SKMapBase):
 
     return self
 
-  def _get_colorbar(self, img_label):
-    cbar_opt = {
-      'orientation':'horizontal',
-      'location':'top'
-    }
-    if img_label == "name":
-     cbar_opt = {
-      'orientation':'vertical',
-      'location':'right'
-    } 
-    return cbar_opt
-    
-  def _get_titles(self, img_label):
-    if img_label == 'date':
+  def _get_titles(self, img_title):
+    if img_title == 'date':
       titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
-    elif img_label == 'index':
+    elif img_title == 'index':
       titles = [i for i in range(self.info.shape[0])]
-    elif img_label == 'name':
+    elif img_title == 'name':
       #titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
       titles = [
-        ('-').join(np.array(i.split('_'))[[0,2,3,4]]) + \
-        "\n" + \
-        ('-').join(np.array(i.split('_'))[[5,6]])  \
-        for i in list(self.info["name"])
+        ('-').join(np.array(i.split('_'))[[0,2,3,4]]) + '\n' + \
+        ('-').join(np.array(i.split('_'))[[5,6]]) \
+        for i in list(self.info[RasterData.NAME_COL])
       ]
     else:
       titles = [''] * self.info.shape[0]
@@ -1080,12 +1067,13 @@ class RasterData(SKMapBase):
     :param legend_title: title of the colorbar that will be used within the animation
       default is an empty string
     :param img_title: this could be `name`,`date`, `index` or None. Default value 
-      is None
-    :param interval: TODO
-    :param figsize: TODO
-    :param v_minmax: TODO
-    :param v_minmax: TODO
-    :param to_gif: TODO
+      is `index`
+    :param interval: delay-time in between two images in miliseconds. Default is 250 ms
+    :param figsize: figure size that will be generated. Default value is `(8,8)`
+    :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
+      it will be derived from the dataset if not defined.
+    :param to_gif: this should be directory that indicating the location where user want to
+      save the animation. Default is None
     
     Examples
     ========
@@ -1095,27 +1083,11 @@ class RasterData(SKMapBase):
     data.animate(cmap='Spectral_r', legend_title="NDVI", img_title='date')
 
     """
-    colorbar_opt = {
-      'orientation':'horizontal',
-      'location':'top'
-    }
 
-    if img_title == 'date':
-      titles = list(
-        self.info[RasterData.START_DT_COL].astype(str) 
-        + ' - ' 
-        + self.info[RasterData.START_DT_COL].astype(str))
-    elif img_title == 'index':
-      titles = [i for i in range(self.info.shape[0])]
-    elif img_title == 'name':
-      titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
-      colorbar_opt = {
-        'orientation':'vertical',
-        'location':'right'
-      }
-
-    else:
-      titles = [''] * self.info.shape[0]
+    titles = self._get_titles(img_title)
+    if img_title == 'name':
+      pyplot.rcParams['font.size']=8
+      pyplot.rcParams['axes.titlepad']=0
 
     fig, ax = pyplot.subplots(figsize=figsize)
     
@@ -1125,15 +1097,17 @@ class RasterData(SKMapBase):
       vmin, vmax = v_minmax
     
     try:
-      
       mymap = ax.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap)
+      fig.colorbar(
+        mymap, aspect=15, shrink=0.6, label=legend_title, 
+        location='right', orientation='vertical')
       
       def _animate(i):
         mymap.set_array(self.array[:,:,i])
         ax.set_title(label=titles[i])
       
       animation = FuncAnimation(fig, _animate, interval=interval, frames=self.array.shape[2])
-      
+      pyplot.close(animation._fig)
       if to_gif is not None:
         animation.save(to_gif)
         return to_gif
@@ -1160,10 +1134,13 @@ class RasterData(SKMapBase):
       default is an empty string
     :param img_title: this could be `name`,`date`, `index` or None. Default value 
       is None
-    :param figsize: TODO
-    :param v_minmax: TODO
-    :param to_img: TODO
-    :param dpi: TODO
+    :param figsize: figure size that will be generated. Default value is `(16,16)`
+    :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
+      it will be derived from the dataset if not defined.
+    :param to_img:  this should be directory that indicating the location where user want to
+      save the image. Default is None
+    :param dpi: Dot per inch. This params used for to save the image with a required DPI.
+      Default is 300. 
 
     Examples
     ========
@@ -1212,13 +1189,7 @@ class RasterData(SKMapBase):
     img_indx = 0
     if nrow == 1:
       if ncol == 1:
-        canvas.append(
-          axs[col].imshow(self.array[:,:,img_indx], 
-          cmap=cmap, 
-          vmin=vmin,
-          vmax=vmax
-          )
-        )
+        canvas.append(axs[col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
         axs.set_title(titles[img_indx])
         axs.axis('off')
       else:
@@ -1232,13 +1203,11 @@ class RasterData(SKMapBase):
         for col in range(ncol):
           if img_indx >= img_count:
             for ax in axs[row:, col]: ax.set_visible(False)
-            #axs[row, col].axis('off')
-            #img_indx += 1
+
           else:                    
             canvas.append(axs[row,col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
             axs[row, col].set_title(titles[img_indx])
-            #axs[row, col].axis('off')
-            #img_indx += 1
+
           axs[row, col].axis('off')
           img_indx += 1
     
@@ -1250,7 +1219,8 @@ class RasterData(SKMapBase):
     )
     
     if to_img is not None:
-      fig.savefig(to_img, dpi=dpi)
+      fig.savefig(to_img, dpi=dpi, bbox_inches='tight')
       return to_img
     else:
+      pyplot.close()
       return fig
