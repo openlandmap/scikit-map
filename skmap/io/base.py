@@ -18,6 +18,9 @@ import re
 import os
 import time
 import tempfile
+import matplotlib as mpl
+from matplotlib import pyplot
+from matplotlib.animation import FuncAnimation
 
 from typing import List, Union, Callable
 from skmap.misc import ttprint, _eval, update_by_separator, gen_dates
@@ -29,6 +32,10 @@ from minio import Minio
 from pathlib import Path
 import rasterio
 from rasterio.windows import Window
+
+import bottleneck as bn
+
+from IPython.display import HTML
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -849,6 +856,8 @@ class RasterData(SKMapBase):
     start_date, 
     end_date = None, 
     date_format = '%Y-%m-%d',
+    date_overlap = False,
+    main_ts = True,
     return_array=False, 
     return_copy=True
   ):
@@ -859,41 +868,63 @@ class RasterData(SKMapBase):
     if RasterData.DT_COL in info_main.columns:
       start_dt_col, end_dt_col = (RasterData.DT_COL, None)
 
-    dt_mask = info_main[start_dt_col] >= to_datetime(start_date, format=date_format)
+    if date_overlap:
+      dt_mask = np.logical_or(
+        info_main[start_dt_col] >= to_datetime(start_date, format=date_format),
+        info_main[end_dt_col] >= to_datetime(start_date, format=date_format)
+      )
+    else:
+      dt_mask = info_main[start_dt_col] >= to_datetime(start_date, format=date_format)
+
     if end_date is not None and end_dt_col is not None:
+      
+      if date_overlap:
+        dt_mask_end = np.logical_or(
+          info_main[end_dt_col] <= to_datetime(end_date, format=date_format),
+          info_main[start_dt_col] <= to_datetime(end_date, format=date_format)
+        )
+      else:
+        dt_mask_end = info_main[end_dt_col] <= to_datetime(end_date, format=date_format)
+
       dt_mask = np.logical_and(
         dt_mask,
-        info_main[end_dt_col] <= to_datetime(end_date, format=date_format),
-      )
+        dt_mask_end
+      )  
 
     return self._filter(info_main[dt_mask],
-      return_array=return_array, return_copy=return_copy
+      main_ts=main_ts, return_array=return_array, return_copy=return_copy
     )
 
   def filter_contains(self, 
     text, 
+    main_ts=False, 
     return_array=False, 
     return_copy=True
   ):
     return self.filter(f'{self.NAME_COL}.str.contains("{text}")', 
-      return_array=return_array, return_copy=return_copy
+       main_ts=main_ts, return_array=return_array, return_copy=return_copy
     )
 
   def filter(self, 
     expr, 
+    main_ts=False,
     return_array=False, 
     return_copy=True
   ):
-    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
-    return self._filter(info_main.query(expr),
+    return self._filter(self.info.query(expr), main_ts=main_ts,
       return_array=return_array, return_copy=return_copy
     )
 
   def _filter(self, 
     info, 
+    main_ts,
     return_array=False, 
     return_copy=True
   ):
+
+    if main_ts:
+      info = info.query(f'{RasterData.MAIN_TS_COL} == True')
+
     if return_array:
       return self.array[:,:,info.index]
     elif return_copy:
@@ -985,3 +1016,224 @@ class RasterData(SKMapBase):
     self._verbose(f"Last raster in s3: {last_url}")
 
     return self
+
+  def _get_colorbar(self, img_label):
+    cbar_opt = {
+      'orientation':'horizontal',
+      'location':'top'
+    }
+    if img_label == "name":
+     cbar_opt = {
+      'orientation':'vertical',
+      'location':'right'
+    } 
+    return cbar_opt
+    
+  def _get_titles(self, img_label):
+    if img_label == 'date':
+      titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
+    elif img_label == 'index':
+      titles = [i for i in range(self.info.shape[0])]
+    elif img_label == 'name':
+      #titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
+      titles = [
+        ('-').join(np.array(i.split('_'))[[0,2,3,4]]) + \
+        "\n" + \
+        ('-').join(np.array(i.split('_'))[[5,6]])  \
+        for i in list(self.info["name"])
+      ]
+    else:
+      titles = [''] * self.info.shape[0]
+    return titles
+
+  def animate(self, 
+    cmap:str = 'Spectral_r', 
+    legend_title:str = "", 
+    img_title:str ="index", 
+    interval:int = 250,
+    figsize:tuple = (8,8),
+    v_minmax:tuple = None,
+    to_gif:str = None
+  ):
+
+    """
+    Generates an animation to view and save.
+
+    :param cmap: colormap name one of the `matplotlib.colormaps()`
+    :param legend_title: title of the colorbar that will be used within the animation
+      default is an empty string
+    :param img_title: this could be `name`,`date`, `index` or None. Default value 
+      is None
+    :param interval: TODO
+    :param figsize: TODO
+    :param v_minmax: TODO
+    :param v_minmax: TODO
+    :param to_gif: TODO
+    
+    Examples
+    ========
+    from skmap.data import toy
+
+    data = toy.ndvi_data(gappy=True, verbose=True)
+    data.animate(cmap='Spectral_r', legend_title="NDVI", img_title='date')
+
+    """
+    colorbar_opt = {
+      'orientation':'horizontal',
+      'location':'top'
+    }
+
+    if img_title == 'date':
+      titles = list(
+        self.info[RasterData.START_DT_COL].astype(str) 
+        + ' - ' 
+        + self.info[RasterData.START_DT_COL].astype(str))
+    elif img_title == 'index':
+      titles = [i for i in range(self.info.shape[0])]
+    elif img_title == 'name':
+      titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
+      colorbar_opt = {
+        'orientation':'vertical',
+        'location':'right'
+      }
+
+    else:
+      titles = [''] * self.info.shape[0]
+
+    fig, ax = pyplot.subplots(figsize=figsize)
+    
+    if v_minmax is None:
+      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+    else:
+      vmin, vmax = v_minmax
+    
+    try:
+      
+      mymap = ax.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap)
+      
+      def _animate(i):
+        mymap.set_array(self.array[:,:,i])
+        ax.set_title(label=titles[i])
+      
+      animation = FuncAnimation(fig, _animate, interval=interval, frames=self.array.shape[2])
+      
+      if to_gif is not None:
+        animation.save(to_gif)
+        return to_gif
+      else:
+        return HTML(animation.to_jshtml())
+    
+    except KeyError:
+      print(f"{cmap} is not valid. Please choose one of the following colormap {mpl.colormaps()}")
+
+  def plot(self, 
+    cmap:str = 'Spectral_r',
+    legend_title:str = "", 
+    img_title:str = 'index',
+    figsize:tuple = (16,16),
+    v_minmax:tuple = None,
+    to_img:str = None,
+    dpi:int = 300
+  ):
+    """
+    Generates a square grid plot to view and save with colorscale.
+
+    :param cmap: colormap name one of the `matplotlib.colormaps()`
+    :param legend_title: title of the colorbar that will be used within the animation
+      default is an empty string
+    :param img_title: this could be `name`,`date`, `index` or None. Default value 
+      is None
+    :param figsize: TODO
+    :param v_minmax: TODO
+    :param to_img: TODO
+    :param dpi: TODO
+
+    Examples
+    ========
+    from skmap.data import toy
+    %matplotlib # to stop pouring out when calling the function. 
+
+    data = toy.ndvi(gappy=True, verbose=True)
+    gridplot = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
+    
+    # to view in jupyter notebook  
+    gridplot.show()   
+    """
+    def _get_grid(data_size):
+      if data_size <= 4:
+        row, col = 1, data_size
+      else:
+        row = np.round(np.sqrt(data_size)).astype(int)
+        col = np.floor(data_size/row).astype(int)
+        if row * col != data_size: col += 1
+      return [row, col]
+
+    canvas = []
+    img_count = self.info.shape[0]
+    [nrow, ncol] = _get_grid(img_count)
+    
+    if v_minmax is None:
+      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+    else:
+      vmin, vmax = v_minmax
+
+    titles = self._get_titles(img_title)
+    if img_title == 'name': 
+      pyplot.rcParams['font.size'] = 8
+      pyplot.rcParams['axes.titlepad']=0
+    # this font size seems ok but the bottom ofset of the title has 
+    # more space then th top if the text is in between two subfigures
+    # bottom offset of each title should be decreased
+    fig,axs = pyplot.subplots(
+      nrows=nrow, ncols=ncol, figsize=figsize,
+      sharex=True, sharey=True
+    )
+
+    pyplot.axis('off')
+
+    if cmap is None: cmap='Spectral_r'
+    img_indx = 0
+    if nrow == 1:
+      if ncol == 1:
+        canvas.append(
+          axs[col].imshow(self.array[:,:,img_indx], 
+          cmap=cmap, 
+          vmin=vmin,
+          vmax=vmax
+          )
+        )
+        axs.set_title(titles[img_indx])
+        axs.axis('off')
+      else:
+        for col in range(ncol):
+          canvas.append(axs[col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
+          axs[col].set_title(titles[img_indx])
+          axs[col].axis('off')
+          img_indx += 1
+    else:
+      for row in range(nrow):
+        for col in range(ncol):
+          if img_indx >= img_count:
+            for ax in axs[row:, col]: ax.set_visible(False)
+            #axs[row, col].axis('off')
+            #img_indx += 1
+          else:                    
+            canvas.append(axs[row,col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
+            axs[row, col].set_title(titles[img_indx])
+            #axs[row, col].axis('off')
+            #img_indx += 1
+          axs[row, col].axis('off')
+          img_indx += 1
+    
+    pyplot.rcParams['font.size']=10
+
+    fig.colorbar(
+      canvas[0], ax=axs, orientation="horizontal", shrink=0.3,
+      aspect=10, label=legend_title, location="top"
+    )
+    
+    if to_img is not None:
+      fig.savefig(to_img, dpi=dpi)
+      return to_img
+    else:
+      return fig
