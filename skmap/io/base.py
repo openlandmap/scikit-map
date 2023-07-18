@@ -23,9 +23,10 @@ from matplotlib import pyplot
 from matplotlib.animation import FuncAnimation
 
 from typing import List, Union, Callable
-from skmap.misc import ttprint, _eval, update_by_separator, gen_dates
+from skmap.misc import ttprint, _eval, update_by_separator, date_range
 from skmap import SKMapRunner, SKMapBase, parallel
 
+from dateutil.relativedelta import relativedelta
 from datetime import datetime
 from minio import Minio
 
@@ -682,6 +683,10 @@ class RasterData(SKMapBase):
     **kwargs
   ):
     
+    if self.ignore_29feb and '%j' in date_format:
+      dt1 = dt1 + relativedelta(leapdays=-1)
+      dt2 = dt2 + relativedelta(leapdays=-1)
+
     if (date_style == 'start_date'):
       dt = f'{dt1.strftime(date_format)}'
     elif (date_style == 'end_date'):
@@ -705,8 +710,9 @@ class RasterData(SKMapBase):
     
     self.date_style = date_style
     self.date_format = date_format
+    self.ignore_29feb = ignore_29feb
 
-    dates = gen_dates(start_date, end_date, 
+    dates = date_range(start_date, end_date, 
       date_unit=date_unit, date_step=date_step, 
       date_format=date_format, ignore_29feb=ignore_29feb)
     
@@ -734,6 +740,7 @@ class RasterData(SKMapBase):
     window:Window = None,
     dtype:str = 'float32',
     expected_shape = None,
+    overview:int = None,
     n_jobs:int = 4,
   ):
 
@@ -742,7 +749,7 @@ class RasterData(SKMapBase):
     data_mask = None
     if self.raster_mask is not None:
       self._verbose(f"Masking {self.raster_mask_val} values considering {Path(self.raster_mask).name}")
-      data_mask = read_rasters([self.raster_mask], window=window)
+      data_mask = read_rasters([self.raster_mask], window=window, overview=overview)
       if self.raster_mask_val is np.nan:
         data_mask = np.logical_not(np.isnan(data_mask))
       else:
@@ -758,7 +765,7 @@ class RasterData(SKMapBase):
       raster_files,
       window=self.window, data_mask=data_mask,
       dtype=dtype, expected_shape=expected_shape,
-      n_jobs=n_jobs, verbose=self.verbose
+      n_jobs=n_jobs, overview=overview, verbose=self.verbose
     )
 
     self._verbose(f"Read array shape: {self.array.shape}")
