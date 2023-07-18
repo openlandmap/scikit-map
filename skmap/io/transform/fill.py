@@ -134,31 +134,39 @@ try:
         N_ext = N_samp*2
         N_fft = (np.floor(N_ext/2)+1).astype(int)
         N_imag = data.shape[1]
-        a_w = pyfftw.empty_aligned((N_ext,N_imag), dtype='float32')
-        a_w_fft = pyfftw.empty_aligned((N_fft,N_imag), dtype='complex64')
-        c_w = pyfftw.empty_aligned(N_ext, dtype='float32')
-        c_w_fft = pyfftw.empty_aligned(N_fft, dtype='complex64')
-        b_w_fft = pyfftw.empty_aligned((N_fft,N_imag), dtype='complex64')
-        b_w = pyfftw.empty_aligned((N_ext,N_imag), dtype='float32')
-        fft_object_a = pyfftw.FFTW(a_w, a_w_fft, axes=(0,), flags=(plan,), direction='FFTW_FORWARD',threads=self.n_jobs)
-        fft_object_c = pyfftw.FFTW(c_w, c_w_fft, axes=(0,), flags=(plan,), direction='FFTW_FORWARD',threads=self.n_jobs)
-        fft_object_b = pyfftw.FFTW(b_w_fft, b_w, axes=(0,), flags=(plan,), direction='FFTW_BACKWARD',threads=self.n_jobs)
-        c_w = np.zeros(N_ext)
-        c_w[0:N_samp] = conv_vec
-        c_w[N_samp:] = np.roll(conv_vec[::-1],1)
-        fft_object_c(c_w)
-        a_w = np.concatenate((data,np.zeros((N_samp,N_imag))))
-        fft_object_a(a_w)
-        b_w_fft = c_w_fft.reshape(-1,1) * a_w_fft
-        fft_object_b(b_w_fft)
-        conv = b_w[0:N_samp,:].copy()
-        a_w = np.concatenate((valid_mask,np.zeros((N_samp,N_imag))))
-        fft_object_a(a_w)
-        b_w_fft = c_w_fft.reshape(-1,1) * a_w_fft
-        fft_object_b(b_w_fft)
-        filled_qa = b_w[0:N_samp,:]
+        in_ts_forward = pyfftw.empty_aligned((N_ext,N_imag), dtype='float32')
+        out_ts_forward = pyfftw.empty_aligned((N_fft,N_imag), dtype='complex64')
+        in_conv_forward = pyfftw.empty_aligned(N_ext, dtype='float32')
+        out_conv_forward = pyfftw.empty_aligned(N_fft, dtype='complex64')
+        out_conv_backward = pyfftw.empty_aligned(N_ext, dtype='float32')
+        in_ts_backward = pyfftw.empty_aligned((N_fft,N_imag), dtype='complex64')
+        out_ts_backward = pyfftw.empty_aligned((N_ext,N_imag), dtype='float32')
+        plan_conv_forward = pyfftw.FFTW(in_conv_forward, out_conv_forward, axes=(0,), flags=(plan,), direction='FFTW_FORWARD',threads=self.n_jobs)
+        plan_conv_backward = pyfftw.FFTW(out_conv_forward, out_conv_backward, axes=(0,), flags=(plan,), direction='FFTW_BACKWARD',threads=self.n_jobs)
+        plan_ts_forward = pyfftw.FFTW(in_ts_forward, out_ts_forward, axes=(0,), flags=(plan,), direction='FFTW_FORWARD',threads=self.n_jobs)
+        plan_ts_backward = pyfftw.FFTW(in_ts_backward, out_ts_backward, axes=(0,), flags=(plan,), direction='FFTW_BACKWARD',threads=self.n_jobs)
+        in_conv_forward = np.zeros(N_ext)
+        in_conv_forward[0:N_samp] = conv_vec
+        in_conv_forward[N_samp:] = np.roll(conv_vec[::-1],1)
+        plan_conv_forward(in_conv_forward)
+        conv_fft = out_conv_forward.copy()
+        in_conv_forward = np.zeros(N_ext)
+        in_conv_forward[0:N_samp] = 1
+        plan_conv_forward(in_conv_forward)
+        out_conv_forward = conv_fft * out_conv_forward
+        plan_conv_backward(out_conv_forward)
+        in_ts_forward = np.concatenate((data,np.zeros((N_samp,N_imag))))
+        plan_ts_forward(in_ts_forward)
+        in_ts_backward = conv_fft.reshape(-1,1) * out_ts_forward
+        plan_ts_backward(in_ts_backward)
+        conv = out_ts_backward[0:N_samp,:].copy()
+        in_ts_forward = np.concatenate((valid_mask,np.zeros((N_samp,N_imag))))
+        plan_ts_forward(in_ts_forward)
+        in_ts_backward = conv_fft.reshape(-1,1) * out_ts_forward
+        plan_ts_backward(in_ts_backward)
+        filled_qa = out_ts_backward[0:N_samp,:]
         filled = conv/filled_qa
-        filled_qa /= np.sum(c_w)
+        filled_qa /= out_conv_backward.reshape(-1,1)[0:N_samp] # Renormalization of the quality assesmtent vector
         return filled, filled_qa
       
       def _run(self, data):
