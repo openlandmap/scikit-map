@@ -317,7 +317,7 @@ def _date_step(
   else:
     return i, int(date_step)
 
-def gen_dates(
+def date_range(
   start_date:str, 
   end_date:str, 
   date_unit:str, 
@@ -337,26 +337,56 @@ def gen_dates(
   date_step_i = 0
 
   watchdog = 0
+  add_leapday = True
 
   while(dt1 <= end_date):
     delta_args = {}
     date_step_i, date_step_cur = _date_step(date_step, date_step_i)
-    delta_args[date_unit] = date_step_cur # TODO: Threat the value "month"
+    delta_args[date_unit] = date_step_cur
+
+    if ignore_29feb and 'months' == date_unit and dt1.month == 2 and dt1.day == 29:
+      dt1 = dt1 + relativedelta(leapdays=-1)
+    elif ignore_29feb and 'days' == date_unit and (dt1.year % 4 == 0) and dt1.month > 2 and add_leapday:
+      dt1 = dt1 + relativedelta(days=+1)
+      add_leapday = False
     
+    if dt1.year % 4 != 0:
+      add_leapday = True
+
     dt1n = dt1 + relativedelta(**delta_args)
-    dt_feb = (datetime.strptime(f'{dt1n.year}0228', '%Y%m%d'))
 
-    ## FIXME: bug on ignore_29feb=True ending in feb.
-    if (dt_feb > dt1 and dt_feb <= dt1n and ignore_29feb):
-      dt1n = dt1n + relativedelta(leapdays=+1)
+    if ignore_29feb and 'months' == date_unit and dt1n.month == 3 and dt1n.day == 1:
+      dt2 = dt1n + relativedelta(leapdays=-1)
+    elif ignore_29feb and 'days' == date_unit and (dt1.year % 4 == 0) and dt1.month <= 2 and dt1n.month > 2:
+      dt2 = dt1n + relativedelta(days=+1)
+    else:
+      dt2 = dt1n
 
-    dt2 = dt1n + relativedelta(days=-1)
-  
-    if ignore_29feb:
-      if dt2.month == 2 and dt2.day == 29:
-        dt2 = dt2 + relativedelta(days=-1)
-    
+    """
+    Legacy code
+    if ignore_29feb and 'months' == date_unit and dt1n.month == 3 and dt1n.day == 1:
+      dt2 = dt1n + relativedelta(leapdays=-1)
+    elif ignore_29feb and 'days' == date_unit:
+      _year = dt1.year 
+      dt1 = dt1 + relativedelta(leapdays=+1)
+      if _year != dt1.year:
+        dt2 = dt1n + relativedelta(days=+1)
+        dt1n = dt1n + relativedelta(days=+1)
+      else:
+        dt2 = dt1n + relativedelta(leapdays=+1)
+    else:
+      dt2 = dt1n
+    """
+
+    dt2 = dt2 + relativedelta(days=-1)
+
+    if ignore_29feb and 'days' == date_unit and (dt1.year % 4 != 0) and (dt2.year % 4 == 0):
+      dt2 = dt2 + relativedelta(days=+1)
+
     if return_str:
+      if ignore_29feb and '%j' in date_format:
+        dt1 = dt1 + relativedelta(leapdays=-1)
+        dt2 = dt2 + relativedelta(leapdays=-1)
       result.append((dt1.strftime(date_format), dt2.strftime(date_format)))
     else:
       result.append((dt1, dt2))
