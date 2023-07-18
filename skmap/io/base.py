@@ -740,6 +740,7 @@ class RasterData(SKMapBase):
     window:Window = None,
     dtype:str = 'float32',
     expected_shape = None,
+    overview:int = None,
     n_jobs:int = 4,
   ):
 
@@ -748,7 +749,7 @@ class RasterData(SKMapBase):
     data_mask = None
     if self.raster_mask is not None:
       self._verbose(f"Masking {self.raster_mask_val} values considering {Path(self.raster_mask).name}")
-      data_mask = read_rasters([self.raster_mask], window=window)
+      data_mask = read_rasters([self.raster_mask], window=window, overview=overview)
       if self.raster_mask_val is np.nan:
         data_mask = np.logical_not(np.isnan(data_mask))
       else:
@@ -764,7 +765,7 @@ class RasterData(SKMapBase):
       raster_files,
       window=self.window, data_mask=data_mask,
       dtype=dtype, expected_shape=expected_shape,
-      n_jobs=n_jobs, verbose=self.verbose
+      n_jobs=n_jobs, overview=overview, verbose=self.verbose
     )
 
     self._verbose(f"Read array shape: {self.array.shape}")
