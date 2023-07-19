@@ -853,11 +853,7 @@ class RasterData(SKMapBase):
     self._verbose(f"Deriving new data using {derivator_name}"
       + f" on {self.array[:,:,info_main.index].shape}")
 
-    kwargs = {'rdata': self}
-    if outname is not None:
-      kwargs[outname] = outname
-
-    new_array, new_info = derivator.run(**kwargs)
+    new_array, new_info = derivator.run(self, outname)
     
     self.array = np.concatenate([self.array, new_array], axis=-1)
     self.info = pd.concat([self.info, new_info])
