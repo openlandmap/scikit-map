@@ -38,7 +38,7 @@ try:
 
       kwargs = {'rdata': rdata}
       if outname is not None:
-        kwargs[outname] = outname
+        kwargs['outname'] = outname
 
       start = time.time()
       new_array, new_info = self._run(**kwargs)
@@ -205,7 +205,7 @@ try:
               )
           
           new_info.append(
-            rdata._new_info_row('', name, [start_dt, end_dt])
+            rdata._new_info_row('', name=name, dates=[start_dt, end_dt])
           )
 
         new_array.append(out_array)
@@ -313,7 +313,7 @@ try:
           start_dt, end_dt, nm=f'trend', pr='m')
 
         new_info.append(
-          rdata._new_info_row('', name, [start_dt, end_dt])
+          rdata._new_info_row('', name=name, dates=[start_dt, end_dt])
         )
 
       ts_size = array.shape[2]
@@ -326,7 +326,7 @@ try:
           end_dt_max, nm=nm, pr=pr)
 
         new_info.append(
-          rdata._new_info_row('', name, [start_dt_min, end_dt_max])
+          rdata._new_info_row('', name=name, dates=[start_dt_min, end_dt_max])
         )
 
       return new_array, DataFrame(new_info)
