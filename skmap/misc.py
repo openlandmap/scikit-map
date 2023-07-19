@@ -362,22 +362,6 @@ def date_range(
     else:
       dt2 = dt1n
 
-    """
-    Legacy code
-    if ignore_29feb and 'months' == date_unit and dt1n.month == 3 and dt1n.day == 1:
-      dt2 = dt1n + relativedelta(leapdays=-1)
-    elif ignore_29feb and 'days' == date_unit:
-      _year = dt1.year 
-      dt1 = dt1 + relativedelta(leapdays=+1)
-      if _year != dt1.year:
-        dt2 = dt1n + relativedelta(days=+1)
-        dt1n = dt1n + relativedelta(days=+1)
-      else:
-        dt2 = dt1n + relativedelta(leapdays=+1)
-    else:
-      dt2 = dt1n
-    """
-
     dt2 = dt2 + relativedelta(days=-1)
 
     if ignore_29feb and 'days' == date_unit and (dt1.year % 4 != 0) and (dt2.year % 4 == 0):
