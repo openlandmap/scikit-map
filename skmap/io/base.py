@@ -678,11 +678,17 @@ class RasterData(SKMapBase):
     text, 
     dt1, 
     dt2,
-    date_format,
-    date_style,
+    date_format = None,
+    date_style = None,
     **kwargs
   ):
     
+    if date_format is None:
+      date_format = self.date_format
+
+    if date_style is None:
+      date_style = self.date_style
+
     if self.ignore_29feb and '%j' in date_format:
       dt1 = dt1 + relativedelta(leapdays=-1)
       dt2 = dt2 + relativedelta(leapdays=-1)
@@ -847,7 +853,11 @@ class RasterData(SKMapBase):
     self._verbose(f"Deriving new data using {derivator_name}"
       + f" on {self.array[:,:,info_main.index].shape}")
 
-    new_array, new_info = derivator.run(self, outname)
+    kwargs = {'rdata': self}
+    if outname is not None:
+      kwargs[outname] = outname
+
+    new_array, new_info = derivator.run(**kwargs)
     
     self.array = np.concatenate([self.array, new_array], axis=-1)
     self.info = pd.concat([self.info, new_info])
@@ -1040,12 +1050,10 @@ class RasterData(SKMapBase):
     elif img_title == 'index':
       titles = [i for i in range(self.info.shape[0])]
     elif img_title == 'name':
-      #titles = [("\n").join(i.split('.')) for i in list(self.info['name'])]
-      titles = [
-        ('-').join(np.array(i.split('_'))[[0,2,3,4]]) + '\n' + \
-        ('-').join(np.array(i.split('_'))[[5,6]]) \
-        for i in list(self.info[RasterData.NAME_COL])
-      ]
+      titles = []
+      n = 20
+      for name in list(self.info['name']):
+        titles.append('\n'.join(name[i:i+n] for i in range(0, len(name), n)))
     else:
       titles = [''] * self.info.shape[0]
     return titles
