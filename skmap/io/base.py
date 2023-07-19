@@ -4,7 +4,8 @@ Raster data input and output
 from osgeo import gdal
 from pathlib import Path
 from hashlib import sha256
-from pandas import DataFrame, to_datetime
+from pandas import DataFrame, Series, to_datetime
+from types import MappingProxyType
 
 import copy
 import pandas as pd
@@ -552,8 +553,10 @@ class RasterData(SKMapBase):
   PLACEHOLDER_DT = '{dt}'
   INTERVAL_DT_SEP = '_'
 
+  GROUP_COL = 'group'
   NAME_COL = 'name'
   PATH_COL = 'input_path'
+  TEMPORAL_COL = 'temporal'
   DT_COL = 'date'
   START_DT_COL = 'start_date'
   END_DT_COL = 'end_date'
@@ -562,82 +565,41 @@ class RasterData(SKMapBase):
   TRANSFORM_SEP = '.'
 
   def __init__(self,
-    raster_files:Union[List,str],
+    raster_files:Union[List,str,dict],
     raster_mask:str = None,
     raster_mask_val = np.nan,
     verbose = False
   ):
 
-    if not isinstance(raster_files, List):
-      raster_files = [ raster_files ]
+    if isinstance(raster_files, str):
+      raster_files = { 'default': [raster_files] } 
+    elif isinstance(raster_files, list):
+      raster_files = { 'default': raster_files }
+
+    self.raster_files = raster_files
 
     self.verbose = verbose
 
     self.raster_mask = raster_mask
     self.raster_mask_val = raster_mask_val
-    self.raster_data = {}
 
-    self.rasters_static = []
-    self.rasters_temporal = []
-
-    for r in raster_files:
-      if RasterData.PLACEHOLDER_DT in str(r):
-        self.rasters_temporal.append(r)
+    rows = []
+    for group in raster_files.keys():
+      if isinstance(raster_files[group], str):
+        rows.append([group,raster_files[group]])
       else:
-        self.rasters_static.append(r)
+        for r in raster_files[group]:
+          rows.append([group,r])
 
-    self._regex_dt = {
-      '%Y%m%d': r'\d{4}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%Y-%m-%d': r'\d{4}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%Y/%m/%d': r'\d{4}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%y%m%d': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%y-%m-%d': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%y-%m-%d': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%d%m%Y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{4}',
-      '%d-%m-%Y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{4}',
-      '%d/%m/%Y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{4}',
-      '%d%m%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%d-%m-%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%d/%m/%y': r'\d{2}(\/|-)?\d{2}(\/|-)?\d{2}',
-      '%Y%j': r'\d{4}\d{3}',
-      '%Y-%j': r'\d{4}(\/|-)?\d{3}',
-      '%Y/%j': r'\d{4}(\/|-)?\d{3}'
-    }
-
-    self.info = self._info_static()
-
-  def _info_temporal(self):
-    rows = []
-    
-    regex_dt = self._regex_dt[self.date_format]
-
-    for raster_file in self.rasters_temporal:
-      name = Path(raster_file).stem
-
-      dates = []
-      for r in re.finditer(regex_dt, name):
-        dates.append(r.group(0))
-      
-      rows.append(
-        self._new_info_row(raster_file, name, dates, main_ts=True)
-      )
-    
-    return DataFrame(rows)
-
-  def _info_static(self):
-    rows = []
-    
-    for raster_file in self.rasters_static:
-      name = Path(raster_file).stem
-      rows.append(
-        self._new_info_row(raster_file, name)
-      )
-    
-    return DataFrame(rows)
+    self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL])
+    self.info[RasterData.TEMPORAL_COL] = self.info.apply(lambda r: RasterData.PLACEHOLDER_DT in r[RasterData.PATH_COL], axis=1)
+    self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
+    self.info.reset_index(drop=True, inplace=True)
 
   def _new_info_row(self, 
     raster_file:str,
     name:str,
+    group:str = None,
     dates:list = [],
     main_ts:bool = False,
   ):
@@ -647,7 +609,7 @@ class RasterData(SKMapBase):
     if len(dates) > 0 and self.date_style is not None:
       row[RasterData.PATH_COL] = raster_file
       row[RasterData.NAME_COL] = name
-      row[RasterData.MAIN_TS_COL] = True
+      row[RasterData.MAIN_TS_COL] = main_ts
 
       if self.date_style == 'interval':
         
@@ -657,7 +619,6 @@ class RasterData(SKMapBase):
           dt1 = datetime.strptime(dt1, self.date_format)
         if isinstance(dt2, str):
           dt2 = datetime.strptime(dt2, self.date_format)
-
         row[RasterData.START_DT_COL] = dt1
         row[RasterData.END_DT_COL] = dt2
       else:
@@ -722,23 +683,24 @@ class RasterData(SKMapBase):
       date_unit=date_unit, date_step=date_step, 
       date_format=date_format, ignore_29feb=ignore_29feb)
     
-    for raster_file in self.rasters_temporal.copy():
-      self.rasters_temporal.remove(raster_file)
-      
-      count = 0
-      for dt1, dt2 in dates:
-        raster_temporal = self._set_date(raster_file, dt1, dt2, date_format, date_style)
-        
-        if count == 0:
-          self._verbose(f"First temporal raster: {raster_temporal}")
-        
-        self.rasters_temporal.append(raster_temporal)
-        count += 1
-      
-      self._verbose(f"Last temporal raster: {raster_temporal}")
-      self._verbose(f"{count} temporal rasters added ")
-    
-    self.info = pd.concat([self.info, self._info_temporal()])
+    def fun(r):
+      if r[RasterData.TEMPORAL_COL]:
+        names, start, end, main = [], [], [], []
+        for dt1, dt2 in dates:
+          names.append(self._set_date(r[RasterData.PATH_COL], dt1, dt2, date_format, date_style))
+          start.append(dt1)
+          end.append(dt2)
+          main.append(True)
+        return Series([names, start, end, main])
+      else:
+        return Series([[r[RasterData.PATH_COL]],[None],[None],[None]])
+
+    temporal_cols = [RasterData.PATH_COL, RasterData.START_DT_COL, RasterData.END_DT_COL, RasterData.MAIN_TS_COL]
+
+    self.info[temporal_cols] = self.info.apply(fun, axis=1)
+    self.info = self.info.explode(temporal_cols)
+    self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL]).stem, axis=1)
+    self.info.reset_index(drop=True, inplace=True)
 
     return self
 
@@ -761,11 +723,11 @@ class RasterData(SKMapBase):
       else:
         data_mask = (data_mask != self.raster_mask_val)
 
-    raster_files = self.rasters_temporal + self.rasters_static
+    raster_files = [ Path(r) for r in self.info[RasterData.PATH_COL] ]
     
     self._verbose(
-        f"RasterData with {len(self.rasters_temporal)} temporal" 
-      + f" and {len(self.rasters_static)} static rasters" 
+        f"RasterData with {len(raster_files)} rasters" 
+      + f" and {len(self.info[RasterData.GROUP_COL].unique())} groups" 
     )
     self.array = read_rasters(
       raster_files,
@@ -789,26 +751,29 @@ class RasterData(SKMapBase):
 
     if suffix != '':
       tr += RasterData.TRANSFORM_SEP + suffix
-
-    for index, row in self.info.iterrows():
-      if row[RasterData.MAIN_TS_COL]:
-        if outname is not None:
-          if RasterData.START_DT_COL in self.info.columns:
-            row[RasterData.NAME_COL] = self._set_date(outname, 
-              row[RasterData.START_DT_COL], row[RasterData.END_DT_COL], 
+    print(suffix, tr)
+    def fun(r):
+      if outname is not None:
+        if r[RasterData.TEMPORAL_COL]:
+          r[RasterData.NAME_COL] = self._set_date(outname, 
+              r[RasterData.START_DT_COL], r[RasterData.END_DT_COL], 
               self.date_format, self.date_style, tr=tr
             )
-          else:
-            row[RasterData.NAME_COL] = _eval(outname, locals())
         else:
-          row[RasterData.NAME_COL] = row[RasterData.NAME_COL] +  RasterData.TRANSFORM_SEP + tr
+          r[RasterData.NAME_COL] = _eval(outname, locals())
+      else:
+        r[RasterData.NAME_COL] = r[RasterData.NAME_COL] +  RasterData.TRANSFORM_SEP + tr
 
-        i = len(self.info)
-        if inplace:
-          i = index
-        else:
-          row[RasterData.MAIN_TS_COL] = False
-        self.info.loc[i] = row
+      return r
+
+    main_mask = (self.info[RasterData.MAIN_TS_COL] == True)
+    new_info = self.info[main_mask].apply(fun, axis=1)
+    
+    if inplace:
+      self.info[main_mask] = new_info
+    else:
+      new_info[RasterData.MAIN_TS_COL] = False
+      self.info = pd.concat([self.info, new_info])
 
   def transform(self, 
     transformer:SKMapRunner, 
