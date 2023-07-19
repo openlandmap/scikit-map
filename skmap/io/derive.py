@@ -1,5 +1,6 @@
 import time
 import os
+from enum import Enum
 
 try:
 
@@ -7,7 +8,7 @@ try:
   from skmap import parallel
 
   from skmap import SKMapRunner, parallel
-  from skmap.misc import gen_dates, nan_percentile
+  from skmap.misc import date_range, nan_percentile
   from skmap.io import RasterData
   
   import numpy as np
@@ -43,10 +44,23 @@ try:
     ):
       pass
 
+  class TimeEnum(Enum):
+    
+    MONTHLY = 1
+    MONTHLY_15P = 1
+    MONTHLY_LONGTERM = 3
+
+    BIMONTHLY = 1
+    BIMONTHLY_15P = 1
+    BIMONTHLY_LONGTERM = 3
+
+    QUARTERLY = 1
+    YEARLY = 2
+
   class TimeAggregate(Derivator):
     
     def __init__(self,
-      yealy = True,
+      time:list = [ TimeEnum.YEARLY, TimeEnum.MONTHLY_LONGTERM ],
       operations = ['p25', 'p50', 'p75', 'std'],
       rename_operations:dict = {},
       date_overlap:bool = False,
@@ -56,7 +70,7 @@ try:
 
       super().__init__(verbose=verbose, temporal=True)
 
-      self.yealy = yealy
+      self.time = time
       self.operations = operations
       self.rename_operations = rename_operations
       self.date_overlap = date_overlap
@@ -103,6 +117,50 @@ try:
 
       return (out_array, ops, tm, dt1, dt2)
 
+    def _args_yearly(self, rdata, start_dt, end_dt, date_format):
+      
+      args = []
+
+      for dt1, dt2 in date_range(
+        f'{start_dt.year}0101',f'{end_dt.year}1201', 
+        'years', 1, return_str=True, ignore_29feb=False, 
+        date_format=date_format):
+
+        tm = 'yearly'
+        in_array = rdata.filter_date(dt1, dt2, return_array=True, 
+          date_format=date_format, date_overlap=self.date_overlap)
+        
+        if in_array.size > 0:  
+          args += [ (in_array, tm, datetime.strptime(dt1, date_format), datetime.strptime(dt2, date_format)) ]
+
+      return args
+
+    def _args_monthly_longterm(self, rdata, start_dt, end_dt, date_format):
+
+      args = []
+
+      for month in range(1,13):
+        
+        in_array = []
+        month = str(month).zfill(2)
+
+        for dt1, dt2 in date_range(
+          f'{start_dt.year}{month}01',f'{end_dt.year}{month}01', 
+          'months', 1, date_offset=11, return_str=True, 
+          ignore_29feb=False, date_format=date_format):
+          
+          array = rdata.filter_date(dt1, dt2, return_array=True, 
+              date_format=date_format, date_overlap=self.date_overlap)
+          
+          if array.size > 0:
+            in_array.append(array)
+
+        tm = f'm{month}'
+        if len(in_array) > 0:
+          args += [ (np.concatenate(in_array, axis=-1), tm, start_dt, end_dt) ]
+
+      return args
+
     def _run(self, 
       rdata:RasterData,
       outname:str = 'skmap_derivative.{tm}_{op}_{dt}.tif'
@@ -114,38 +172,15 @@ try:
 
       args = []
 
-      for month in range(1,13):
-        
-        in_array = []
-        month = str(month).zfill(2)
+      for t in self.time:
 
-        for dt1, dt2 in gen_dates(
-          f'{start_dt.year}{month}01',f'{end_dt.year}{month}01', 
-          'months', 1, date_offset=11, return_str=True, 
-          ignore_29feb=False, date_format=date_format):
-          array = rdata.filter_date(dt1, dt2, return_array=True, 
-              date_format=date_format, date_overlap=self.date_overlap)
-          
-          if array.size > 0:
-            in_array.append(array)
-
-        tm = f'm{month}'
-        if len(in_array) > 0:
-          args += [ (np.concatenate(in_array, axis=-1), tm, start_dt, end_dt) ]
-
-      if self.yealy:
-        for dt1, dt2 in gen_dates(
-          f'{start_dt.year}0101',f'{end_dt.year}1201', 
-          'years', 1, return_str=True, ignore_29feb=False, 
-          date_format=date_format):
-
-          tm = 'yearly'
-          in_array = rdata.filter_date(dt1, dt2, return_array=True, 
-            date_format=date_format, date_overlap=self.date_overlap)
-          
-          if in_array.size > 0:  
-            args += [ (in_array, tm, datetime.strptime(dt1, date_format), datetime.strptime(dt2, date_format)) ]
-
+        if t == TimeEnum.MONTHLY_LONGTERM:
+          args += self._args_monthly_longterm(rdata, start_dt, end_dt, date_format)
+        elif TimeEnum.YEARLY in self.time:
+          args += self._args_yearly(rdata, start_dt, end_dt, date_format)
+        else:
+          raise Exception(f"Aggregation by {t} not implemented")
+      
       new_array = []
       new_info = []
 
