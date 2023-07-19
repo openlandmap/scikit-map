@@ -10,6 +10,10 @@ try:
   from skmap import SKMapRunner, parallel
   from skmap.misc import date_range, nan_percentile
   from skmap.io import RasterData
+
+  from scipy.special import log1p
+  from statsmodels.tsa.seasonal import STL
+  import statsmodels.api as sm
   
   import numpy as np
   import bottleneck as bn
@@ -26,14 +30,18 @@ try:
 
     def run(self, 
       rdata:RasterData,
-      outname:str = 'skmap_derivative_{op}_{dt}.tif'
+      outname:str = None
     ):
       """
       Execute the gapfilling approach.
       """
 
+      kwargs = {'rdata': rdata}
+      if outname is not None:
+        kwargs[outname] = outname
+
       start = time.time()
-      new_array, new_info = self._run(rdata, outname)
+      new_array, new_info = self._run(**kwargs)
 
       return new_array, new_info
 
@@ -206,6 +214,123 @@ try:
 
       return new_array, DataFrame(new_info)
 
+  class TrendLinearRegression(Derivator):
+    
+    def __init__(self,
+      season_size:int,
+      season_smoother:int = None,
+      trend_smoother:int = None,
+      trend_log1p:bool = True,
+      scale_factor:int = 10000,
+      n_jobs:int = os.cpu_count(),
+      verbose = False
+    ):
+
+      super().__init__(verbose=verbose, temporal=True)
+      
+      self.season_size = season_size
+      self.season_smoother = season_smoother
+      self.trend_smoother = trend_smoother
+      self.trend_log1p = trend_log1p
+      self.n_jobs = n_jobs
+
+      self.name_misc = [
+        ('alpha', 'm', scale_factor), ('alpha', 'sd', scale_factor), 
+        ('alpha', 'tv', scale_factor), ('alpha', 'pv', scale_factor), 
+        ('beta', 'm', scale_factor), ('beta', 'sd', scale_factor), 
+        ('beta', 'tv', scale_factor), ('beta', 'pv', scale_factor), 
+        ('r2', 'm', scale_factor)
+      ]
+
+      if self.season_smoother is None:
+        self.season_smoother = self.season_size + 1
+      if self.trend_smoother is None:
+        self.trend_smoother = (2 * self.season_size) + 1
+
+    def _trend_regression(self, data):
+
+      has_nan = np.sum(np.isnan(data).astype('int'))
+      
+      ts_size = data.shape[0]
+      out_size = ts_size + 9 # fixed number of ols return values
+
+      if has_nan == 0:
+        
+        res = STL(data.copy(), period=self.season_size, 
+          seasonal=self.season_smoother, trend=self.trend_smoother, robust=True).fit()
+        
+        y = res.trend
+        if self.trend_log1p:
+          y = log1p(res.trend)
+        
+        y_size = y.shape[0]
+        X = np.array(range(0, y_size)) / y_size
+        
+        X = sm.add_constant(X)
+        model = sm.OLS(y,X)
+        results = model.fit()
+
+        result_stack = np.stack([
+          results.params,
+          results.bse,
+          results.tvalues,
+          results.pvalues
+        ],axis=1)
+        
+        return np.concatenate([
+          res.trend,
+          result_stack[0,:],
+          result_stack[1,:],
+          np.stack([results.rsquared])
+        ])
+      
+      else: 
+        nan_result = np.empty(out_size)
+        nan_result[:] = np.nan
+        return nan_result
+
+    def _run(self, 
+      rdata:RasterData,
+      outname:str = 'skmap_derivative.{nm}_{pr}_{dt}.tif'
+    ):
+
+      array = rdata.array
+      info = rdata.info
+
+      start_dt_min = rdata.info[RasterData.START_DT_COL].min()
+      end_dt_max = rdata.info[RasterData.END_DT_COL].max()
+
+      new_array = parallel.apply_along_axis(self._trend_regression, 
+        axis=2, arr=array, n_jobs=self.n_jobs)
+
+      new_info = []
+
+      for index, row in info.iterrows():
+        start_dt = row[RasterData.START_DT_COL]
+        end_dt = row[RasterData.END_DT_COL]
+
+        name = rdata._set_date(outname, 
+          start_dt, end_dt, nm=f'trend', pr='m')
+
+        new_info.append(
+          rdata._new_info_row('', name, [start_dt, end_dt])
+        )
+
+      ts_size = array.shape[2]
+
+      for i, (nm, pr, scale) in zip(range(0, len(self.name_misc)), self.name_misc):
+        
+        new_array[:,:,ts_size + i] *= scale
+        
+        name = rdata._set_date(outname, start_dt_min, 
+          end_dt_max, nm=nm, pr=pr)
+
+        new_info.append(
+          rdata._new_info_row('', name, [start_dt_min, end_dt_max])
+        )
+
+      return new_array, DataFrame(new_info)
+
 except ImportError as e:
   from skmap.misc import _warn_deps
-  _warn_deps(e, 'gapfiller')
+  _warn_deps(e, 'skmap.io.derive')
