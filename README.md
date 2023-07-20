@@ -28,6 +28,49 @@ Main functionalities
 - ML training, evaluation and spatial prediction
 - Parallel tilling processing 
 
+## Raster data processing
+
+Example of NDVI quarterly time-series processing: 
+
+```python
+from skmap.data import toy
+from skmap.io import process
+
+# Loading NDVI quarterly time-series with gaps
+toy.ndvi_rdata(gappy=True 
+    # Gapfilling time-series by seasonal convolution 
+    ).run(process.SeasConvFill(season_size=4), drop_input=True
+    # Smoothing time-series by Whittaker
+    ).run(process.WhittakerSmooth(), group='ndvi.seasconv', drop_input=True
+    # Setting smoothed time-series as main input
+    ).rename(groups={'ndvi.seasconv.whittaker': 'ndvi'}
+    # Running yearly aggregation by std. and percentile 50th
+    ).run(process.TimeAggregate(time=[process.TimeEnum.YEARLY], operations = ['p50', 'std']), group=['ndvi']
+    # Running trend analysis using per-pixel linear regression  
+    ).run(process.TrendAnalysis(season_size=4), group='ndvi'
+    # Ploting all raster data
+    ).plot(v_minmax=[0,100])
+```
+
+Output in `verbose` mode:
+```
+[20:57:02] RasterData with 24 rasters and 1 groups
+[20:57:02] Reading 24 raster file(s) using 4 workers
+[20:57:07] Read array shape: (256, 256, 24)
+[20:57:07] Running SeasConvFill on (256, 256, 24) for ndvi group
+[20:57:07] Dropping data and info for ndvi group
+[20:57:07] Execution time for SeasConvFill: 0.15 segs
+[20:57:07] Running WhittakerSmooth on (256, 256, 24) for ndvi.seasconv group
+[20:57:15] Dropping data and info for ndvi.seasconv group
+[20:57:15] Execution time for WhittakerSmooth: 8.07 segs
+[20:57:15] Running TimeAggregate on (256, 256, 24) for ndvi group
+[20:57:15] Execution time for TimeAggregate: 0.12 segs
+[20:57:15] Running TrendAnalysis on (256, 256, 24) for ndvi group
+[20:57:24] Execution time for TrendAnalysis: 8.69 segs
+```
+
+![Plot output](docs/img/plot_output.png)
+
 Installation
 -------
 
