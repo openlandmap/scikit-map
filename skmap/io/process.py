@@ -22,6 +22,7 @@ try:
   import bottleneck as bn
   from datetime import datetime
   from pandas import DataFrame
+  import pandas as pd
 
   import cv2 as cv
   import pyfftw
@@ -60,14 +61,14 @@ try:
     def run(self, 
       rdata:RasterData,
       group:str,
-      outname:str = 'skmap_derivative.{nm}_{gr}_{dt}.tif'
+      outname:str = 'skmap_{nm}_{gr}_{dt}.tif'
     ):
       """
       Execute the gapfilling approach.
       """
 
       if outname is None:
-        outname = 'skmap_derivative.{nm}_{gr}_{dt}.tif'
+        outname = 'skmap_{nm}_{gr}_{dt}.tif'
 
       array = rdata._array()
 
@@ -80,10 +81,8 @@ try:
         new_array, new_array_qa = result, None
 
       new_info = self._new_info(rdata, group, outname, self.name)
-      if new_array_qa is None:
-        new_info = pd.concat([
-          new_info, self._new_info(rdata, group, outname, self.name_qa)
-        ])
+      if new_array_qa is not None:
+        new_info += self._new_info(rdata, group, outname, self.name_qa)
         new_array = np.concatenate([new_array, new_array_qa], axis=-1)
 
       return new_array, DataFrame(new_info)
@@ -185,6 +184,7 @@ try:
       season_size:int,
       att_seas:float = 60,
       att_env:float = 20,
+      return_qa:bool = False,
       n_jobs:int = os.cpu_count(),
       verbose = False
     ):
@@ -192,6 +192,7 @@ try:
       super().__init__(name='seasconv', verbose=verbose, temporal=True)
 
       self.season_size = season_size
+      self.return_qa = return_qa
       self.att_seas = att_seas
       self.att_env = att_env
       self.n_jobs = n_jobs
@@ -297,7 +298,10 @@ try:
       filled_qa[filled_qa == 0.0] = np.nan
       
       # Return the reconstructed time series and the quality assesment layer
-      return np.reshape(filled.T, orig_shape), np.reshape(filled_qa.T, orig_shape) 
+      if self.return_qa:
+        return np.reshape(filled.T, orig_shape), np.reshape(filled_qa.T, orig_shape) 
+      else:
+        return np.reshape(filled.T, orig_shape)
 
   class InPaintingFill(Filler):
     """
@@ -458,15 +462,15 @@ try:
   class TimeEnum(Enum):
     
     MONTHLY = 1
-    MONTHLY_15P = 1
+    MONTHLY_15P = 2
     MONTHLY_LONGTERM = 3
 
-    BIMONTHLY = 1
-    BIMONTHLY_15P = 1
-    BIMONTHLY_LONGTERM = 3
+    BIMONTHLY = 4
+    BIMONTHLY_15P = 5
+    BIMONTHLY_LONGTERM = 6
 
-    QUARTERLY = 1
-    YEARLY = 2
+    QUARTERLY = 7
+    YEARLY = 8
 
   class TimeAggregate(Derivator):
     
@@ -575,7 +579,7 @@ try:
     def _run(self, 
       rdata:RasterData,
       group:str,
-      outname:str = 'skmap_derivative.{gr}.{tm}_{op}_{dt}.tif'
+      outname:str = 'skmap_aggregate.{gr}.{tm}_{op}_{dt}.tif'
     ):
 
       date_format = '%Y%m%d'
@@ -588,7 +592,7 @@ try:
 
         if t == TimeEnum.MONTHLY_LONGTERM:
           args += self._args_monthly_longterm(rdata, start_dt, end_dt, date_format)
-        elif TimeEnum.YEARLY in self.time:
+        elif t == TimeEnum.YEARLY:
           args += self._args_yearly(rdata, start_dt, end_dt, date_format)
         else:
           raise Exception(f"Aggregation by {t} not implemented")
@@ -698,11 +702,11 @@ try:
     def _run(self, 
       rdata:RasterData,
       group:str,
-      outname:str = 'skmap_derivative.{gr}.{nm}_{pr}_{dt}.tif'
+      outname:str = 'skmap_{gr}.{nm}_{pr}_{dt}.tif'
     ):
 
-      array = rdata.array
-      info = rdata.info
+      array = rdata._array()
+      info = rdata._info()
 
       start_dt_min = rdata.info[RasterData.START_DT_COL].min()
       end_dt_max = rdata.info[RasterData.END_DT_COL].max()
@@ -739,7 +743,7 @@ try:
         new_group = f'{group}.{nm}.{pr}'
 
         new_info.append(
-          rdata._new_info_row('', new_group=new_group, name=name, dates=[start_dt_min, end_dt_max])
+          rdata._new_info_row('', group=new_group, name=name, dates=[start_dt_min, end_dt_max])
         )
 
       return new_array, DataFrame(new_info)

@@ -796,6 +796,11 @@ class RasterData(SKMapBase):
 
     return self
 
+  def rename(self, groups:dict):
+    self.info[RasterData.GROUP_COL] = self.info[RasterData.GROUP_COL].replace(groups)
+    self.info[RasterData.NAME_COL] = self.info[RasterData.NAME_COL].replace(groups)
+    return self
+
   def filter_date(self, 
     start_date, 
     end_date = None, 
