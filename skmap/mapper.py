@@ -35,9 +35,9 @@ import pandas as pd
 import numpy as np
 import rasterio
 
-from . import parallel
-from .misc import ttprint, find_files
-from .raster import read_rasters, write_new_raster
+from skmap import parallel
+from skmap.misc import ttprint, find_files
+from skmap.io import read_rasters
 
 import warnings
 # warnings.filterwarnings('ignore') # should not ignore all warnings

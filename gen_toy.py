@@ -7,11 +7,16 @@ import geopandas as gpd
 import rasterio
 from rasterio.windows import Window, bounds
 
-from skmap.raster import read_rasters, save_rasters
+from skmap.io import read_rasters, save_rasters
 from skmap.mapper import SpaceTimeOverlay
 from skmap.misc import ttprint
 
 DEFAULT = {
+    'static_rasters': [
+        'https://s3.eu-central-1.wasabisys.com/eumap/dtm/dtm_topidx_gedi.eml_m_50m_0..0cm_2000..2018_eumap_epsg3035_v0.2.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/dtm/dtm_elev.lowestmode_gedi.eml_mf_30m_0..0cm_2000..2018_eumap_epsg3035_v0.3.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/dtm/dtm_slope.percent_gedi.eml_m_30m_0..0cm_2000..2018_eumap_epsg3035_v0.3.tif'
+    ],
     'ndvi_rasters': [
         'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_2014.12.02..2015.03.20_eumap_epsg3035_v1.1.tif',
         'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_2015.03.21..2015.06.24_eumap_epsg3035_v1.1.tif',
@@ -37,6 +42,32 @@ DEFAULT = {
         'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_2020.03.21..2020.06.24_eumap_epsg3035_v1.1.tif',
         'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_2020.06.25..2020.09.12_eumap_epsg3035_v1.1.tif',
         'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_2020.09.13..2020.12.01_eumap_epsg3035_v1.1.tif'
+    ],
+    'swir1_rasters': [
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2014.12.02..2015.03.20_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2015.03.21..2015.06.24_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2015.06.25..2015.09.12_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2015.09.13..2015.12.01_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2015.12.02..2016.03.20_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2016.03.21..2016.06.24_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2016.06.25..2016.09.12_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2016.09.13..2016.12.01_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2016.12.02..2017.03.20_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2017.03.21..2017.06.24_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2017.06.25..2017.09.12_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2017.09.13..2017.12.01_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2017.12.02..2018.03.20_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2018.03.21..2018.06.24_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2018.06.25..2018.09.12_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2018.09.13..2018.12.01_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2018.12.02..2019.03.20_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2019.03.21..2019.06.24_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2019.06.25..2019.09.12_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2019.09.13..2019.12.01_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2019.12.02..2020.03.20_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2020.03.21..2020.06.24_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2020.06.25..2020.09.12_eumap_epsg3035_v1.1.tif',
+        'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_swir1_landsat.glad.ard_p50_30m_0..0cm_2020.09.13..2020.12.01_eumap_epsg3035_v1.1.tif'
     ],
     'qa_ndvi_rasters': [
         'https://s3.eu-central-1.wasabisys.com/eumap/lcv/lcv_qa_landsat.glad.ard_f_30m_0..0cm_2014.12.02..2015.03.20_eumap_epsg3035_v1.1.tif',
@@ -161,8 +192,10 @@ DEFAULT = {
         '43': '522',
         '48': '523'
     },
-    'ndvi_outdir': Path('skmap/datasets/data/ndvi'),
-    'lc_outdir': Path('skmap/datasets/data/lc')
+    'static_outdir': Path('skmap/data/toy/static'),
+    'ndvi_outdir': Path('skmap/data/toy/ndvi'),
+    'swir1_outdir': Path('skmap/data/toy/swir1'),
+    'samples_outdir': Path('skmap/data/toy/samples')
 }
 
 def _out_rasters(raster_files, basedir = 'data'):
@@ -171,10 +204,13 @@ def _out_rasters(raster_files, basedir = 'data'):
 
     for f in [ 
         Path(basedir).joinpath(Path(f).name.replace('lcv_','')
+                              .replace('dtm_','')
+                              .replace('v0.2','v20230720')
+                              .replace('2000..2018','20000101_20181231')
                               .replace('0..0cm','s')
                               .replace('..','_')
                               .replace('eumap','nl')
-                              .replace('v1.1','v20230622')
+                              .replace('v1.1','v20230720')
                               .replace('epsg','epsg.')
                               .replace('glad.','')
                               .replace('ard','ard1')
@@ -187,23 +223,33 @@ def _out_rasters(raster_files, basedir = 'data'):
 
     return out_files
 
-def gen_dataset(start_year, end_year, ndvi_rasters, qa_ndvi_rasters, window, n_samples, 
-                 lc_raster, lc_label_remap, lc_code_remap, ndvi_outdir, lc_outdir):
+def gen_dataset(start_year, end_year, static_rasters, swir1_rasters, ndvi_rasters, qa_ndvi_rasters, window, n_samples, 
+                 lc_raster, lc_label_remap, lc_code_remap, static_outdir, swir1_outdir, ndvi_outdir, samples_outdir):
     
     ds = rasterio.open(ndvi_rasters[0])
     
-    ttprint("Reading NDVI time series")
 
-    ndvi_data, _ = read_rasters(raster_files=ndvi_rasters, spatial_win=window)
+    ttprint("Reading static rasters")
+    static_data = read_rasters(raster_files=static_rasters, window=window)
+
+    ttprint("Reading temporal rasters")
+    swir1_data = read_rasters(raster_files=swir1_rasters, window=window)
+
+    ndvi_data = read_rasters(raster_files=ndvi_rasters, window=window)
     ndvi_data = np.where(ndvi_data < 100, 100, ndvi_data) - 100
 
-    qa_data, _ = read_rasters(raster_files=qa_ndvi_rasters, spatial_win=window)
+    qa_data = read_rasters(raster_files=qa_ndvi_rasters, window=window)
     qa_mask = ~np.isnan(qa_data)
 
-    ttprint("Saving NDVI time series")
-    save_rasters(ndvi_rasters[0], _out_rasters(ndvi_rasters, ndvi_outdir.joinpath('filled')), ndvi_data,  spatial_win=window, nodata = 255)
+    ttprint("Saving static rasters")
+    save_rasters(static_rasters[0], _out_rasters(static_rasters, static_outdir), static_data,  window=window, nodata = 255)
+
+    ttprint("Saving temporal rasters")
+    save_rasters(swir1_rasters[0], _out_rasters(swir1_rasters, swir1_outdir), swir1_data,  window=window, nodata = 255)
+
+    save_rasters(ndvi_rasters[0], _out_rasters(ndvi_rasters, ndvi_outdir.joinpath('filled')), ndvi_data,  window=window, nodata = 255)
     ndvi_data[qa_mask] = np.nan
-    save_rasters(ndvi_rasters[0], _out_rasters(ndvi_rasters,  ndvi_outdir.joinpath('gappy')), ndvi_data,  spatial_win=window, nodata = 255)
+    save_rasters(ndvi_rasters[0], _out_rasters(ndvi_rasters,  ndvi_outdir.joinpath('gappy')), ndvi_data,  window=window, nodata = 255)
 
     ttprint("Generating random LC samples")
     x_min, y_min, x_max, y_max = bounds(window, ds.transform)
@@ -230,7 +276,7 @@ def gen_dataset(start_year, end_year, ndvi_rasters, qa_ndvi_rasters, window, n_s
     samples_overlaid['code'] = samples_overlaid['target'].astype('int').astype('str').replace(lc_code_remap)
 
     ttprint("Saving land-cover samples")
-    lc_outdir.mkdir(parents=True, exist_ok=True)
-    samples_overlaid[['date','label','code','target','geometry']].to_file(lc_outdir.joinpath('samples.gpkg'))
+    samples_outdir.mkdir(parents=True, exist_ok=True)
+    samples_overlaid[['date','label','code','target','geometry']].to_file(samples_outdir.joinpath('samples.gpkg'))
 
 gen_dataset(**DEFAULT)
