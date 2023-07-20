@@ -13,7 +13,6 @@ from skmap.misc import ttprint
 
 DEFAULT = {
     'static_rasters': [
-        'https://s3.eu-central-1.wasabisys.com/eumap/dtm/dtm_topidx_gedi.eml_m_50m_0..0cm_2000..2018_eumap_epsg3035_v0.2.tif',
         'https://s3.eu-central-1.wasabisys.com/eumap/dtm/dtm_elev.lowestmode_gedi.eml_mf_30m_0..0cm_2000..2018_eumap_epsg3035_v0.3.tif',
         'https://s3.eu-central-1.wasabisys.com/eumap/dtm/dtm_slope.percent_gedi.eml_m_30m_0..0cm_2000..2018_eumap_epsg3035_v0.3.tif'
     ],
@@ -242,7 +241,7 @@ def gen_dataset(start_year, end_year, static_rasters, swir1_rasters, ndvi_raster
     qa_mask = ~np.isnan(qa_data)
 
     ttprint("Saving static rasters")
-    save_rasters(static_rasters[0], _out_rasters(static_rasters, static_outdir), static_data,  window=window, nodata = 255)
+    save_rasters(static_rasters[0], _out_rasters(static_rasters, static_outdir), static_data,  window=window)
 
     ttprint("Saving temporal rasters")
     save_rasters(swir1_rasters[0], _out_rasters(swir1_rasters, swir1_outdir), swir1_data,  window=window, nodata = 255)

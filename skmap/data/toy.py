@@ -11,7 +11,7 @@ DATA_DIR = BASE_DIR.joinpath('toy')
 TOY_DATE_STEP = [109, 96, 80, 80]
 
 def _static_raster():
-  return find_files(DATA_DIR.joinpath('stic'), '*.tif')
+  return find_files(DATA_DIR.joinpath('static'), '*.tif')
 
 def _temporal_raster(type, subpath = None):
   
@@ -28,7 +28,7 @@ def rdata(verbose=True):
   return RasterData({
     'ndvi': _temporal_raster('ndvi', 'filled'),
     'swir1': _temporal_raster('swir1'),
-    'static': _temporal_raster('swir1')
+    'static': _static_raster()
     }, verbose=verbose
   ).timespan('20141202', '20201201', 'days', 
     TOY_DATE_STEP, ignore_29feb=True
