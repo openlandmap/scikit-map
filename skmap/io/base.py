@@ -596,6 +596,8 @@ class RasterData(SKMapBase):
     self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
     self.info.reset_index(drop=True, inplace=True)
 
+    self._active_group = None
+
   def _new_info_row(self, 
     raster_file:str,
     name:str,
@@ -606,10 +608,16 @@ class RasterData(SKMapBase):
 
     row = {}
 
+    if group is None or 'default' in group:
+      group = 'default'
+
+    row[RasterData.PATH_COL] = raster_file
+    row[RasterData.NAME_COL] = name
+    row[RasterData.GROUP_COL] = group
+
     if len(dates) > 0 and self.date_style is not None:
-      row[RasterData.PATH_COL] = raster_file
-      row[RasterData.NAME_COL] = name
       row[RasterData.MAIN_TS_COL] = main_ts
+      row[RasterData.TEMPORAL_COL] = True
 
       if self.date_style == 'interval':
         
@@ -644,6 +652,9 @@ class RasterData(SKMapBase):
     **kwargs
   ):
     
+    if 'gr' in kwargs and 'default' in kwargs.get('gr'):
+      gr = ''
+
     if date_format is None:
       date_format = self.date_format
 
@@ -742,6 +753,8 @@ class RasterData(SKMapBase):
 
   def _tranform_info(self, 
     transformer:SKMapRunner, 
+    group,
+    ginfo,
     inplace = False,
     outname = None,
     suffix = ''
@@ -751,13 +764,15 @@ class RasterData(SKMapBase):
 
     if suffix != '':
       tr += RasterData.TRANSFORM_SEP + suffix
-    print(suffix, tr)
+    
+    gr = group
+
     def fun(r):
       if outname is not None:
         if r[RasterData.TEMPORAL_COL]:
           r[RasterData.NAME_COL] = self._set_date(outname, 
               r[RasterData.START_DT_COL], r[RasterData.END_DT_COL], 
-              self.date_format, self.date_style, tr=tr
+              self.date_format, self.date_style, tr=tr, gr=gr
             )
         else:
           r[RasterData.NAME_COL] = _eval(outname, locals())
@@ -766,65 +781,85 @@ class RasterData(SKMapBase):
 
       return r
 
-    main_mask = (self.info[RasterData.MAIN_TS_COL] == True)
-    new_info = self.info[main_mask].apply(fun, axis=1)
-    
+    new_info = ginfo.apply(fun, axis=1)
+
     if inplace:
-      self.info[main_mask] = new_info
+      self.info.loc[ginfo.index] = new_info
     else:
       new_info[RasterData.MAIN_TS_COL] = False
       self.info = pd.concat([self.info, new_info])
+      self.info.reset_index(drop=True, inplace=True)
 
   def transform(self, 
     transformer:SKMapRunner, 
     inplace = False,
     outname:str = None
   ):
-    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
-    transformer_name = transformer.__class__.__name__
-    
-    start = time.time()
-    self._verbose(f"Transforming data using {transformer_name}"
-      + f" on {self.array[:,:,info_main.index].shape}")
+    for group, ginfo in self.info.groupby(RasterData.GROUP_COL):
 
-    array_t = transformer.run(self.array[:,:,info_main.index])
-    
-    self._verbose(f"Tranformer {transformer_name} execution"
-      + f" time: {(time.time() - start):.2f} segs")
+      ginfo = ginfo.query(f'{RasterData.MAIN_TS_COL} == True')
+      transformer_name = transformer.__class__.__name__
+      
+      start = time.time()
+      self._verbose(f"Group {group}: Transforming data using {transformer_name}"
+        + f" on {self.array[:,:,ginfo.index].shape}")
 
-    if isinstance(array_t, tuple) and len(array_t) >= 2:
-      self.array = np.concatenate([self.array, array_t[1]], axis=-1)
-      self._tranform_info(transformer, inplace=False, 
-        outname=outname, suffix='qa')
-      array_t = array_t[0]
+      new_array = transformer.run(self.array[:,:,ginfo.index])
+      
+      self._verbose(f"Group {group}: Tranformer {transformer_name} execution"
+        + f" time: {(time.time() - start):.2f} segs")
 
-    if inplace:
-      self.array[:,:,info_main.index] = array_t
-    else:
-      self.array = np.concatenate([self.array, array_t], axis=-1)
+      if isinstance(new_array, tuple) and len(new_array) >= 2:
+        self.array = np.concatenate([self.array, new_array[1]], axis=-1)
+        self._tranform_info(transformer, group, ginfo, inplace=False, 
+          outname=outname, suffix='qa')
+        new_array = new_array[0]
 
-    self._tranform_info(transformer, inplace, outname=outname)
+      if inplace:
+        self.array[:,:,ginfo.index] = new_array
+      else:
+        self.array = np.concatenate([self.array, new_array], axis=-1)
+
+      self._tranform_info(transformer, group, ginfo, inplace, outname=outname)
 
     return self
 
   def derive(self, 
     derivator:SKMapRunner,
+    group:[list,str] = [],
     outname:str = None
   ):
-    info_main = self.info.query(f'{RasterData.MAIN_TS_COL} == True')
-    derivator_name = derivator.__class__.__name__
     
-    start = time.time()
-    self._verbose(f"Deriving new data using {derivator_name}"
-      + f" on {self.array[:,:,info_main.index].shape}")
+    if isinstance(group, str):
+      group = [ group ]
 
-    new_array, new_info = derivator.run(self, outname)
-    
-    self.array = np.concatenate([self.array, new_array], axis=-1)
-    self.info = pd.concat([self.info, new_info])
-    
-    self._verbose(f"Derivator {derivator_name} execution"
-      + f" time: {(time.time() - start):.2f} segs")
+    for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
+
+      if len(group) > 0 and _group not in group:
+        self._verbose(f"Skipping group {_group}")
+        continue
+
+      self._active_group = _group
+
+      expr_group = f'{RasterData.MAIN_TS_COL} == True ' \
+        + f' and {RasterData.GROUP_COL} == "{self._active_group}"'
+      ginfo = self.info.query(expr_group)
+
+      derivator_name = derivator.__class__.__name__
+      
+      start = time.time()
+      self._verbose(f"Group {_group}: Deriving new data using {derivator_name}"
+        + f" on {self.array[:,:,ginfo.index].shape}")
+
+      new_array, new_info = derivator.run(self, _group, outname)
+      
+      self.array = np.concatenate([self.array, new_array], axis=-1)
+      self.info = pd.concat([self.info, new_info])
+      
+      self._verbose(f"Derivator {derivator_name} execution"
+        + f" time: {(time.time() - start):.2f} segs")
+
+      self._active_group = None
 
     return self
 
@@ -900,6 +935,8 @@ class RasterData(SKMapBase):
 
     if main_ts:
       info = info.query(f'{RasterData.MAIN_TS_COL} == True')
+    if self._active_group is not None:
+      info = info.query(f'{RasterData.GROUP_COL} == "{self._active_group}"')
 
     if return_array:
       return self.array[:,:,info.index]

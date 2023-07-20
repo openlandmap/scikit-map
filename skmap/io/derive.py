@@ -30,13 +30,14 @@ try:
 
     def run(self, 
       rdata:RasterData,
+      group:str,
       outname:str = None
     ):
       """
       Execute the gapfilling approach.
       """
 
-      kwargs = {'rdata': rdata}
+      kwargs = {'rdata': rdata, 'group': group}
       if outname is not None:
         kwargs['outname'] = outname
 
@@ -48,6 +49,7 @@ try:
     @abstractmethod
     def _run(self, 
       rdata:RasterData, 
+      group:str,
       outname:str
     ):
       pass
@@ -171,7 +173,8 @@ try:
 
     def _run(self, 
       rdata:RasterData,
-      outname:str = 'skmap_derivative.{tm}_{op}_{dt}.tif'
+      group:str,
+      outname:str = 'skmap_derivative.{gr}.{tm}_{op}_{dt}.tif'
     ):
 
       date_format = '%Y%m%d'
@@ -201,11 +204,13 @@ try:
           name = rdata._set_date(outname, 
                 dt1, dt2, 
                 rdata.date_format, rdata.date_style, 
-                op=op, tm=tm
+                op=op, tm=tm, gr=group
               )
           
+          new_group = f'{group}.{tm}.{op}'
+
           new_info.append(
-            rdata._new_info_row('', name=name, dates=[start_dt, end_dt])
+            rdata._new_info_row('', name=name, group=new_group, dates=[start_dt, end_dt])
           )
 
         new_array.append(out_array)
@@ -291,7 +296,8 @@ try:
 
     def _run(self, 
       rdata:RasterData,
-      outname:str = 'skmap_derivative.{nm}_{pr}_{dt}.tif'
+      group:str,
+      outname:str = 'skmap_derivative.{gr}.{nm}_{pr}_{dt}.tif'
     ):
 
       array = rdata.array
@@ -309,11 +315,15 @@ try:
         start_dt = row[RasterData.START_DT_COL]
         end_dt = row[RasterData.END_DT_COL]
 
+        nm, pr = ('trend', 'm')
+
         name = rdata._set_date(outname, 
-          start_dt, end_dt, nm=f'trend', pr='m')
+          start_dt, end_dt, nm=nm, pr=pr, gr=group)
+
+        new_group = f'{group}.{nm}.{pr}'
 
         new_info.append(
-          rdata._new_info_row('', name=name, dates=[start_dt, end_dt])
+          rdata._new_info_row('', group=new_group, name=name, dates=[start_dt, end_dt])
         )
 
       ts_size = array.shape[2]
@@ -321,12 +331,14 @@ try:
       for i, (nm, pr, scale) in zip(range(0, len(self.name_misc)), self.name_misc):
         
         new_array[:,:,ts_size + i] *= scale
-        
+
         name = rdata._set_date(outname, start_dt_min, 
-          end_dt_max, nm=nm, pr=pr)
+          end_dt_max, nm=nm, pr=pr, gr=group)
+
+        new_group = f'{group}.{nm}.{pr}'
 
         new_info.append(
-          rdata._new_info_row('', name=name, dates=[start_dt_min, end_dt_max])
+          rdata._new_info_row('', new_group=new_group, name=name, dates=[start_dt_min, end_dt_max])
         )
 
       return new_array, DataFrame(new_info)
