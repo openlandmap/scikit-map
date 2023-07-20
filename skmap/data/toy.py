@@ -36,8 +36,9 @@ def rdata(verbose=True):
 
 def ndvi_rdata(gappy=False, verbose=True):
   subpath = 'gappy' if gappy else 'filled'
-  return RasterData( _temporal_raster('ndvi', subpath),
-    verbose=verbose
+  return RasterData( {
+    'ndvi':_temporal_raster('ndvi', subpath)
+    }, verbose=verbose
   ).timespan('20141202', '20201201', 'days', 
     TOY_DATE_STEP, ignore_29feb=True
   ).read()
