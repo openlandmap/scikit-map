@@ -2,6 +2,10 @@ import setuptools
 from skmap import __version__
 from pathlib import Path
 
+
+module_seasconv = setuptools.Extension('seasconv', sources=['src/seasconv.cpp'], libraries=['fftw3_threads', 'fftw3', 'm'])
+
+
 setuptools.setup(
     name='scikit-map',
     version=__version__,
@@ -30,6 +34,7 @@ setuptools.setup(
         'scikit-learn>=1.0',
         'rasterio>=1.1'
     ],
+    ext_modules = [module_seasconv],
     extras_require={
         'full': [
             'Bottleneck>=1.3',
