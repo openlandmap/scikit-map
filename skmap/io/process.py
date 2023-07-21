@@ -652,7 +652,7 @@ try:
         ('alpha', 'tv', scale_factor), ('alpha', 'pv', scale_factor), 
         ('beta', 'm', scale_factor), ('beta', 'sd', scale_factor), 
         ('beta', 'tv', scale_factor), ('beta', 'pv', scale_factor), 
-        ('r2', 'm', scale_factor)
+        ('r2', 'm', 100)
       ]
 
       if self.season_smoother is None:
