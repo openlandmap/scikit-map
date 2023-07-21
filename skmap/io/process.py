@@ -669,6 +669,11 @@ try:
 
       if has_nan == 0:
         
+        if np.std(data) == 0:
+          nan_result = np.empty(out_size)
+          nan_result[:] = np.nan
+          return nan_result
+
         res = STL(data.copy(), period=self.season_size, 
           seasonal=self.season_smoother, trend=self.trend_smoother, robust=True).fit()
         
