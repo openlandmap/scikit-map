@@ -616,23 +616,14 @@ class RasterData(SKMapBase):
     if len(dates) > 0 and self.date_style is not None:
       row[RasterData.TEMPORAL_COL] = True
 
-      if self.date_style == 'interval':
-        
-        dt1, dt2 = (dates[0], dates[1] )
-        
-        if isinstance(dt1, str):
-          dt1 = datetime.strptime(dt1, self.date_format)
-        if isinstance(dt2, str):
-          dt2 = datetime.strptime(dt2, self.date_format)
-        row[RasterData.START_DT_COL] = dt1
-        row[RasterData.END_DT_COL] = dt2
-      else:
-        dt1 = dates[0]
-
-        if isinstance(dt1, str):
-          dt1 = datetime.strptime(dt1, self.date_format)
-
-        row[RasterData.DT_COL] = dt1
+      dt1, dt2 = (dates[0], dates[1] )
+      
+      if isinstance(dt1, str):
+        dt1 = datetime.strptime(dt1, self.date_format)
+      if isinstance(dt2, str):
+        dt2 = datetime.strptime(dt2, self.date_format)
+      row[RasterData.START_DT_COL] = dt1
+      row[RasterData.END_DT_COL] = dt2
 
     else:
       row[RasterData.PATH_COL] = raster_file
