@@ -630,7 +630,7 @@ try:
       season_size:int,
       season_smoother:int = None,
       trend_smoother:int = None,
-      trend_log1p:bool = True,
+      log_rescale:tuple = None,
       scale_factor:int = 10000,
       n_jobs:int = os.cpu_count(),
       verbose = False
@@ -641,8 +641,11 @@ try:
       self.season_size = season_size
       self.season_smoother = season_smoother
       self.trend_smoother = trend_smoother
-      self.trend_log1p = trend_log1p
       self.n_jobs = n_jobs
+
+      self.vmin, self.vmax = None, None
+      if log_rescale is not None:
+        self.vmin, self.vmax = log_rescale
 
       self.name_misc = [
         ('alpha', 'm', scale_factor), ('alpha', 'sd', scale_factor), 
@@ -670,8 +673,11 @@ try:
           seasonal=self.season_smoother, trend=self.trend_smoother, robust=True).fit()
         
         y = res.trend
-        if self.trend_log1p:
-          y = log1p(res.trend)
+
+        if self.vmin is not None:
+          y[y > self.vmax] = self.vmax
+          y[y < self.vmin] = self.vmin
+          y = log1p(y / self.vmax)
         
         y_size = y.shape[0]
         X = np.array(range(0, y_size)) / y_size
