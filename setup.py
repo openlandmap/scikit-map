@@ -3,7 +3,7 @@ from skmap import __version__
 from pathlib import Path
 
 
-module_seasconv = setuptools.Extension('seasconv', sources=['src/seasconv.cpp'], libraries=['fftw3_threads', 'fftw3', 'm'])
+module_seasconv = setuptools.Extension('seasconv', sources=['src/seasconv.cpp'], include_dirs=['/opt/conda/include/eigen3'], libraries=['fftw3', 'm'])
 
 
 setuptools.setup(
