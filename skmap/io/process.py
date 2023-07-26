@@ -27,6 +27,8 @@ try:
   from pandas import DataFrame
   import pandas as pd
 
+  from dateutil.relativedelta import relativedelta
+
   import cv2 as cv
   import pyfftw
 
@@ -64,14 +66,14 @@ try:
     def run(self, 
       rdata:RasterData,
       group:str,
-      outname:str = 'skmap_{nm}_{gr}_{dt}.tif'
+      outname:str = 'skmap_{nm}_{gr}_{dt}'
     ):
       """
       Execute the gapfilling approach.
       """
 
       if outname is None:
-        outname = 'skmap_{nm}_{gr}_{dt}.tif'
+        outname = 'skmap_{nm}_{gr}_{dt}'
 
       array = rdata._array()
 
@@ -656,6 +658,32 @@ try:
 
       return (out_array, ops, tm, dt1, dt2)
 
+    def _args_montly(self, rdata, start_dt, end_dt, date_format, months = 1, daysp = None):
+      
+      args = []
+
+      for dt1, dt2 in date_range(
+        f'{start_dt.year}0101',f'{end_dt.year}1201', 
+        'months', months, return_str=True, ignore_29feb=True,
+        date_format=date_format):
+          
+        dt1a, dt2a = dt1, dt2
+        if daysp is not None:
+          dt1a = datetime.strptime(dt1, date_format)
+          dt2a = datetime.strptime(dt2, date_format)
+          dt1a = (dt1a - relativedelta(days=daysp)).strftime(date_format)
+          dt2a = (dt2a + relativedelta(days=daysp)).strftime(date_format)
+
+        tm = ''
+        in_array = rdata.filter_date(dt1a, dt2a, return_array=True, 
+          date_format=date_format, date_overlap=self.date_overlap)
+        
+        
+        if in_array.size > 0:  
+          args += [ (in_array, tm, datetime.strptime(dt1, date_format), datetime.strptime(dt2, date_format)) ]
+
+      return args
+
     def _args_yearly(self, rdata, start_dt, end_dt, date_format):
       
       args = []
@@ -703,7 +731,7 @@ try:
     def _run(self, 
       rdata:RasterData,
       group:str,
-      outname:str = 'skmap_aggregate.{gr}.{tm}_{op}_{dt}.tif'
+      outname:str = 'skmap_aggregate.{gr}.{tm}_{op}_{dt}'
     ):
 
       date_format = '%Y%m%d'
@@ -718,6 +746,16 @@ try:
           args += self._args_monthly_longterm(rdata, start_dt, end_dt, date_format)
         elif t == TimeEnum.YEARLY:
           args += self._args_yearly(rdata, start_dt, end_dt, date_format)
+        elif t == TimeEnum.MONTHLY:
+          args += self._args_montly(rdata, start_dt, end_dt, date_format, 1)
+        elif t == TimeEnum.MONTHLY_15P:
+          args += self._args_montly(rdata, start_dt, end_dt, date_format, 1, 15)
+        elif t == TimeEnum.BIMONTHLY:
+          args += self._args_montly(rdata, start_dt, end_dt, date_format, 2)
+        elif t == TimeEnum.BIMONTHLY_15P:
+          args += self._args_montly(rdata, start_dt, end_dt, date_format, 2, 15)
+        elif t == TimeEnum.QUARTERLY:
+          args += self._args_montly(rdata, start_dt, end_dt, date_format, 2)
         else:
           raise Exception(f"Aggregation by {t} not implemented")
       
@@ -754,7 +792,7 @@ try:
       season_size:int,
       season_smoother:int = None,
       trend_smoother:int = None,
-      trend_log1p:bool = True,
+      log_rescale:tuple = None,
       scale_factor:int = 10000,
       n_jobs:int = os.cpu_count(),
       verbose = False
@@ -765,15 +803,18 @@ try:
       self.season_size = season_size
       self.season_smoother = season_smoother
       self.trend_smoother = trend_smoother
-      self.trend_log1p = trend_log1p
       self.n_jobs = n_jobs
+
+      self.vmin, self.vmax = None, None
+      if log_rescale is not None:
+        self.vmin, self.vmax = log_rescale
 
       self.name_misc = [
         ('alpha', 'm', scale_factor), ('alpha', 'sd', scale_factor), 
         ('alpha', 'tv', scale_factor), ('alpha', 'pv', scale_factor), 
         ('beta', 'm', scale_factor), ('beta', 'sd', scale_factor), 
         ('beta', 'tv', scale_factor), ('beta', 'pv', scale_factor), 
-        ('r2', 'm', scale_factor)
+        ('r2', 'm', 100)
       ]
 
       if self.season_smoother is None:
@@ -790,12 +831,20 @@ try:
 
       if has_nan == 0:
         
+        if np.std(data) == 0:
+          nan_result = np.empty(out_size)
+          nan_result[:] = np.nan
+          return nan_result
+
         res = STL(data.copy(), period=self.season_size, 
           seasonal=self.season_smoother, trend=self.trend_smoother, robust=True).fit()
         
         y = res.trend
-        if self.trend_log1p:
-          y = log1p(res.trend)
+
+        if self.vmin is not None:
+          y[y > self.vmax] = self.vmax
+          y[y < self.vmin] = self.vmin
+          y = log1p(y / self.vmax)
         
         y_size = y.shape[0]
         X = np.array(range(0, y_size)) / y_size
@@ -826,7 +875,7 @@ try:
     def _run(self, 
       rdata:RasterData,
       group:str,
-      outname:str = 'skmap_{gr}.{nm}_{pr}_{dt}.tif'
+      outname:str = 'skmap_{gr}.{nm}_{pr}_{dt}'
     ):
 
       array = rdata._array()

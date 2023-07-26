@@ -616,23 +616,14 @@ class RasterData(SKMapBase):
     if len(dates) > 0 and self.date_style is not None:
       row[RasterData.TEMPORAL_COL] = True
 
-      if self.date_style == 'interval':
-        
-        dt1, dt2 = (dates[0], dates[1] )
-        
-        if isinstance(dt1, str):
-          dt1 = datetime.strptime(dt1, self.date_format)
-        if isinstance(dt2, str):
-          dt2 = datetime.strptime(dt2, self.date_format)
-        row[RasterData.START_DT_COL] = dt1
-        row[RasterData.END_DT_COL] = dt2
-      else:
-        dt1 = dates[0]
-
-        if isinstance(dt1, str):
-          dt1 = datetime.strptime(dt1, self.date_format)
-
-        row[RasterData.DT_COL] = dt1
+      dt1, dt2 = (dates[0], dates[1] )
+      
+      if isinstance(dt1, str):
+        dt1 = datetime.strptime(dt1, self.date_format)
+      if isinstance(dt2, str):
+        dt2 = datetime.strptime(dt2, self.date_format)
+      row[RasterData.START_DT_COL] = dt1
+      row[RasterData.END_DT_COL] = dt2
 
     else:
       row[RasterData.PATH_COL] = raster_file
@@ -906,6 +897,7 @@ class RasterData(SKMapBase):
 
   def to_dir(self,
     out_dir:Union[Path,str],
+    group_expr:str = None,
     dtype:str = None,
     nodata = None,
     fit_in_dtype:bool = False,
@@ -917,17 +909,25 @@ class RasterData(SKMapBase):
     if isinstance(out_dir,str):
       out_dir = Path(out_dir)
 
+    info = self.info
+    if group_expr is not None:
+      info = self.info.query(group_expr)
+
+    if info.size == 0:
+      ttprint("No rasters to save. Double check group_expr arg.")
+      return self
+
     base_raster = self._base_raster()
     outfiles = [
       out_dir.joinpath(f'{name}.tif')
-      for name in list(self.info[RasterData.NAME_COL])
+      for name in list(info[RasterData.NAME_COL])
     ]
     
     self._verbose(f"Saving rasters in {out_dir}")
 
     save_rasters(
       base_raster, outfiles,
-      self.array, self.window,
+      self.array[:,:,info.index], self.window,
       dtype=dtype, nodata=nodata,
       fit_in_dtype=fit_in_dtype, n_jobs=n_jobs,
       on_each_outfile = on_each_outfile, verbose = self.verbose
@@ -945,6 +945,7 @@ class RasterData(SKMapBase):
     path:str,
     secure:bool = True,
     tmp_dir:str = None,
+    group_expr:str = None,
     dtype:str = None,
     nodata = None,
     fit_in_dtype:bool = False,
@@ -971,7 +972,7 @@ class RasterData(SKMapBase):
       os.remove(outfile)
     
     outfiles = self.to_dir(
-      tmp_dir, dtype=dtype, nodata=nodata, 
+      tmp_dir, group_expr=group_expr, dtype=dtype, nodata=nodata, 
       fit_in_dtype=fit_in_dtype, n_jobs=n_jobs, 
       return_outfiles=True, on_each_outfile = _to_s3
     )

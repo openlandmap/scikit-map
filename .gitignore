@@ -5,7 +5,6 @@ dist
 .ipynb_checkpoints
 skmap_data
 gapfilled
-*.tif
 tmp*
 docs/_build/
 docs/_autosummary/
