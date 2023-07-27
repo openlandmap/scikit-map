@@ -38,6 +38,13 @@ from rasterio.windows import Window
 import bottleneck as bn
 
 from IPython.display import HTML
+from joblib import Parallel, delayed
+from tempfile import TemporaryDirectory
+from io import BytesIO
+from base64 import encodebytes, b64decode
+from uuid import uuid4
+from contextlib import ExitStack
+from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -1004,7 +1011,7 @@ class RasterData(SKMapBase):
     legend_title:str = "", 
     img_title:str ="index", 
     interval:int = 250,
-    figsize:tuple = (8,8),
+    figsize:tuple = None,
     v_minmax:tuple = None,
     to_gif:str = None
   ):
@@ -1034,37 +1041,74 @@ class RasterData(SKMapBase):
     """
 
     titles = self._get_titles(img_title)
-    if img_title == 'name':
-      pyplot.rcParams['font.size']=8
-      pyplot.rcParams['axes.titlepad']=0
+    fontsize = 10 if img_title == 'name' else 14
 
-    fig, ax = pyplot.subplots(figsize=figsize)
-    
+    if figsize is None:
+      width, height = self.array.shape[:2]
+      ratio_width = width/height if width>height else height/width
+      ratio_height = 1 if ratio_width < 2 else 2
+      figsize = (6*ratio_width,6*ratio_height)
+
     if v_minmax is None:
-      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+      vmin , vmax = np.nanquantile(self.array.flatten(), [.1, .9])
+      #vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
     else:
       vmin, vmax = v_minmax
     
-    try:
-      mymap = ax.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap)
+    def _populateImages(ind):
+      fig, ax = pyplot.subplots(figsize=figsize)
       fig.colorbar(
-        mymap, aspect=15, shrink=0.6, label=legend_title, 
-        location='right', orientation='vertical')
-      
-      def _animate(i):
-        mymap.set_array(self.array[:,:,i])
-        ax.set_title(label=titles[i])
-      
-      animation = FuncAnimation(fig, _animate, interval=interval, frames=self.array.shape[2])
-      pyplot.close(animation._fig)
-      if to_gif is not None:
-        animation.save(to_gif)
-        return to_gif
-      else:
-        return HTML(animation.to_jshtml())
+        ax.imshow(self.array[:,:,ind], vmin=vmin, vmax=vmax, cmap=cmap), 
+        aspect=12, shrink=0.8, 
+        label=legend_title, 
+        orientation='vertical',
+        location='right'
+      )
+      ax.axis('off')
+      pyplot.suptitle(titles[ind], fontsize=fontsize, y=0.95)
+      f = BytesIO()
+      pyplot.tight_layout()
+      fig.savefig(f, format='png')
+      imgdata64 = encodebytes(f.getvalue()).decode('ascii')
+      return imgdata64
     
-    except KeyError:
-      print(f"{cmap} is not valid. Please choose one of the following colormap {mpl.colormaps()}")
+    # find a way to optimize processor count
+    images = Parallel(n_jobs=3)(delayed(_populateImages)(i) for i in range(self.array.shape[2]))
+    
+    if to_gif is not None:
+      with ExitStack() as stack:
+        imgs = (
+          stack.enter_context(Image.open(BytesIO(b64decode(f))))
+          for f in images
+        )
+        img = next(imgs)
+        img.save(to_gif, format="GIF", append_images=imgs, save_all=True, duration= interval, loop=0)
+
+    template = '  frames[{0}] = "data:image/{1};base64,{2}"\n'
+
+    embedded_frames = "\n" + "".join(
+      template.format(i, 'png', imgdata.replace("\n","\\\n"))
+      for i, imgdata in enumerate(images)
+    )
+    mode_dict = dict(
+      once_checked="",
+      loop_checked="checked",
+      reflect_checked=""
+    )
+    
+    with TemporaryDirectory() as tmpdir:
+      path = Path(tmpdir, 'temp.html')
+      with open(path, 'w') as of:
+        of.write(JS_INCLUDE + STYLE_INCLUDE)
+        of.write(DISPLAY_TEMPLATE.format(
+          id=uuid4().hex,
+          Nframes=self.array.shape[2],
+          fill_frames = embedded_frames,
+          interval = interval,
+          **mode_dict
+        ))
+      html_rep = path.read_text()
+    return HTML(html_rep)
 
   def plot(self, 
     cmap:str = 'Spectral_r',
@@ -1084,7 +1128,7 @@ class RasterData(SKMapBase):
     :param img_title: this could be `name`,`date`, `index` or None. Default value 
       is None
     :param figsize: figure size that will be generated. Default value is `(16,16)`
-    :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
+    :param v_minmax: minimum and maximum boundaries of corethe colorscale. Default is None and 
       it will be derived from the dataset if not defined.
     :param to_img:  this should be directory that indicating the location where user want to
       save the image. Default is None
