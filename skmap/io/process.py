@@ -207,7 +207,6 @@ try:
     def _parallel_compute(self, num_threads, ts_array, qa_array, N_years, N_ipy, att_seas, att_env):
       def compute_slice(ts_array_slice, qa_array_slice, N_years, N_ipy, att_seas, att_env):
           libfile = glob.glob('build/*/seasconv*.so')[0]
-          # libfile = glob.glob('../../build/*/seasconv*.so')[0]
           seasconv = ctypes.CDLL(libfile)
           seasconv.runFloat.restype = ctypes.c_int
           seasconv.runFloat.argtypes = [ctypes.c_uint,
