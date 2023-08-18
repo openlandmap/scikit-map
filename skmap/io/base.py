@@ -39,6 +39,13 @@ from rasterio.windows import Window
 import bottleneck as bn
 
 from IPython.display import HTML
+from joblib import Parallel, delayed
+from tempfile import TemporaryDirectory
+from io import BytesIO
+from base64 import encodebytes, b64decode
+from uuid import uuid4
+from contextlib import ExitStack
+from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -1034,7 +1041,7 @@ class RasterData(SKMapBase):
     legend_title:str = "", 
     img_title:str ="index", 
     interval:int = 250,
-    figsize:tuple = (8,8),
+    figsize:tuple = None,
     v_minmax:tuple = None,
     to_gif:str = None
   ):
@@ -1064,43 +1071,80 @@ class RasterData(SKMapBase):
     """
 
     titles = self._get_titles(img_title)
-    if img_title == 'name':
-      pyplot.rcParams['font.size']=8
-      pyplot.rcParams['axes.titlepad']=0
+    fontsize = 10 if img_title == 'name' else 14
 
-    fig, ax = pyplot.subplots(figsize=figsize)
-    
+    if figsize is None:
+      width, height = self.array.shape[:2]
+      ratio_width = width/height if width>height else height/width
+      ratio_height = 1 if ratio_width < 2 else 2
+      figsize = (6*ratio_width,6*ratio_height)
+
     if v_minmax is None:
-      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+      vmin , vmax = np.nanquantile(self.array.flatten(), [.1, .9])
+      #vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
     else:
       vmin, vmax = v_minmax
     
-    try:
-      mymap = ax.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap)
+    def _populateImages(array, tile):
+      fig, ax = pyplot.subplots(figsize=figsize)
       fig.colorbar(
-        mymap, aspect=15, shrink=0.6, label=legend_title, 
-        location='right', orientation='vertical')
-      
-      def _animate(i):
-        mymap.set_array(self.array[:,:,i])
-        ax.set_title(label=titles[i])
-      
-      animation = FuncAnimation(fig, _animate, interval=interval, frames=self.array.shape[2])
-      pyplot.close(animation._fig)
-      if to_gif is not None:
-        animation.save(to_gif)
-        return to_gif
-      else:
-        return HTML(animation.to_jshtml())
+        ax.imshow(array, vmin=vmin, vmax=vmax, cmap=cmap), 
+        aspect=12, shrink=0.8, 
+        label=legend_title, 
+        orientation='vertical',
+        location='right'
+      )
+      ax.axis('off')
+      pyplot.suptitle(tile, fontsize=fontsize, y=0.9)
+      f = BytesIO()
+      pyplot.tight_layout()
+      fig.savefig(f, format='png')
+      imgdata64 = encodebytes(f.getvalue()).decode('ascii')
+      return imgdata64
     
-    except KeyError:
-      print(f"{cmap} is not valid. Please choose one of the following colormap {mpl.colormaps()}")
+    # find a way to optimize processor count
+    images = Parallel(n_jobs=3)(delayed(_populateImages)(self.array[:,:,i],titles[i]) for i in range(self.array.shape[2]))
+    
+    if to_gif is not None:
+      with ExitStack() as stack:
+        imgs = (
+          stack.enter_context(Image.open(BytesIO(b64decode(f))))
+          for f in images
+        )
+        img = next(imgs)
+        img.save(to_gif, format="GIF", append_images=imgs, save_all=True, duration= interval, loop=0)
+
+    template = '  frames[{0}] = "data:image/{1};base64,{2}"\n'
+
+    embedded_frames = "\n" + "".join(
+      template.format(i, 'png', imgdata.replace("\n","\\\n"))
+      for i, imgdata in enumerate(images)
+    )
+    mode_dict = dict(
+      once_checked="",
+      loop_checked="checked",
+      reflect_checked=""
+    )
+    
+    with TemporaryDirectory() as tmpdir:
+      path = Path(tmpdir, 'temp.html')
+      with open(path, 'w') as of:
+        of.write(JS_INCLUDE + STYLE_INCLUDE)
+        of.write(DISPLAY_TEMPLATE.format(
+          id=uuid4().hex,
+          Nframes=self.array.shape[2],
+          fill_frames = embedded_frames,
+          interval = interval,
+          **mode_dict
+        ))
+      html_rep = path.read_text()
+    return HTML(html_rep)
 
   def plot(self, 
     cmap:str = 'Spectral_r',
     legend_title:str = "", 
     img_title:str = 'index',
-    figsize:tuple = (16,16),
+    figsize:tuple = None,
     v_minmax:tuple = None,
     to_img:str = None,
     dpi:int = 300
@@ -1108,13 +1152,16 @@ class RasterData(SKMapBase):
     """
     Generates a square grid plot to view and save with colorscale.
 
-    :param cmap: colormap name one of the `matplotlib.colormaps()`
-    :param legend_title: title of the colorbar that will be used within the animation
-      default is an empty string
-    :param img_title: this could be `name`,`date`, `index` or None. Default value 
-      is None
-    :param figsize: figure size that will be generated. Default value is `(16,16)`
-    :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
+    :param cmap: Default is Spectral_r
+      colormap name one of the `matplotlib.colormaps()`
+    :param legend_title: Default is an empty string
+      title of the colorbar that will be used within the animation
+    :param img_title: Default value is None
+      this could be `name`,`date`, `index` or None. 
+    :param figsize: Default is None. 
+      Default size for figure will be calculated dynamically respect to the
+      data volume.
+    :param v_minmax: minimum and maximum boundaries of corethe colorscale. Default is None and 
       it will be derived from the dataset if not defined.
     :param to_img:  this should be directory that indicating the location where user want to
       save the image. Default is None
@@ -1127,75 +1174,37 @@ class RasterData(SKMapBase):
     %matplotlib # to stop pouring out when calling the function. 
 
     data = toy.ndvi(gappy=True, verbose=True)
-    gridplot = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
+    figure = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
     
     # to view in jupyter notebook  
-    gridplot.show()   
+    figure.show()   
     """
-    def _get_grid(data_size):
-      if data_size <= 4:
-        row, col = 1, data_size
-      else:
-        row = np.round(np.sqrt(data_size)).astype(int)
-        col = np.floor(data_size/row).astype(int)
-        if row * col != data_size: col += 1
-      return [row, col]
-
-    canvas = []
-    img_count = self.info.shape[0]
-    [nrow, ncol] = _get_grid(img_count)
+    gridsize = math.ceil(math.sqrt(self.array.shape[2]))
     
     if v_minmax is None:
-      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+      vmin , vmax = np.nanquantile(self.array.flatten(), [.1, .9])
     else:
       vmin, vmax = v_minmax
-
+    figsize = (5*gridsize, 5*gridsize) if figsize is None else figsize
     titles = self._get_titles(img_title)
-    if img_title == 'name': 
-      pyplot.rcParams['font.size'] = 8
-      pyplot.rcParams['axes.titlepad']=0
-    # this font size seems ok but the bottom ofset of the title has 
-    # more space then th top if the text is in between two subfigures
-    # bottom offset of each title should be decreased
-    fig,axs = pyplot.subplots(
-      nrows=nrow, ncols=ncol, figsize=figsize,
-      sharex=True, sharey=True
-    )
-
-    pyplot.axis('off')
-
-    if cmap is None: cmap='Spectral_r'
-    img_indx = 0
-    if nrow == 1:
-      if ncol == 1:
-        canvas.append(axs[col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
-        axs.set_title(titles[img_indx])
-        axs.axis('off')
-      else:
-        for col in range(ncol):
-          canvas.append(axs[col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
-          axs[col].set_title(titles[img_indx])
-          axs[col].axis('off')
-          img_indx += 1
-    else:
-      for row in range(nrow):
-        for col in range(ncol):
-          if img_indx >= img_count:
-            for ax in axs[row:, col]: ax.set_visible(False)
-
-          else:                    
-            canvas.append(axs[row,col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
-            axs[row, col].set_title(titles[img_indx])
-
-          axs[row, col].axis('off')
-          img_indx += 1
+    fig, axs = pyplot.subplots(ncols=gridsize, nrows=gridsize, figsize= figsize)
     
-    pyplot.rcParams['font.size']=10
+    for i, ax in enumerate(axs.flatten()):
+      try:
+        ax.imshow(self.array[:,:,i], vmin=vmin, vmax=vmax, cmap=cmap)
+        ax.set_title(titles[i], fontsize= 3.5 * gridsize)
+        ax.axis('off')
+      except IndexError:
+        ax.axis('off')
 
-    fig.colorbar(
-      canvas[0], ax=axs, orientation="horizontal", shrink=0.3,
-      aspect=10, label=legend_title, location="top"
-    )
+    pyplot.tight_layout()
+    fig.subplots_adjust(bottom=0, top=1, left=0, right=.82)
+    cbar_ax = fig.add_axes([0.83, 0.2, 0.02, 0.6])
+    cbar_ax.tick_params(labelsize=3.5 * gridsize)
+    cbar = fig.colorbar(
+      pyplot.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap),
+      cax=cbar_ax
+    ).set_label(label=legend_title, size = 4 * gridsize, weight = 'bold')
     
     if to_img is not None:
       fig.savefig(to_img, dpi=dpi, bbox_inches='tight')
