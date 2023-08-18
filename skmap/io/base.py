@@ -18,6 +18,7 @@ import math
 import re
 import os
 import time
+import gc
 import tempfile
 import matplotlib as mpl
 from matplotlib import pyplot
@@ -71,7 +72,7 @@ def _fit_in_dtype(data, dtype, nodata):
 
   return data
 
-def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_shape, 
+def _read_raster(raster_idx, raster_files, band, window, dtype, data_mask, expected_shape, 
   try_without_window, overview, verbose):
 
   raster_file = raster_files[raster_idx]
@@ -80,15 +81,18 @@ def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_sh
 
   try:
     ds = rasterio.open(raster_file)
-    overviews = ds.overviews(1)
-
-    if overview is not None and overview in overviews:
-      band_data = ds.read(1, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
+    
+    if overview is not None:
+      overviews = ds.overviews(band)
+      if overview in overviews:
+          band_data = ds.read(band, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
+      else:
+        band_data = ds.read(band, window=window)
     else:
-      band_data = ds.read(1, window=window)
+      band_data = ds.read(band, window=window)
 
     if band_data.size == 0 and try_without_window:
-      band_data = ds.read(1)
+      band_data = ds.read(band)
 
     band_data = band_data.astype(dtype)
     nodata = ds.nodatavals[0]
@@ -114,8 +118,11 @@ def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_sh
       band_data[np.logical_not(data_mask)] = np.nan
     else:
       ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
-
-  return raster_idx, band_data, nodata
+  
+  if nodata is not None:
+    band_data[band_data == nodata] = _nodata_replacement(dtype)
+    
+  return raster_idx, band_data
 
 def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, nodata):
 
@@ -235,6 +242,7 @@ def _save_raster(
 
 def read_rasters(
   raster_files:Union[List,str] = [],
+  band = 1,
   window:Window = None,
   dtype:str = 'float32',
   n_jobs:int = 4,
@@ -315,27 +323,30 @@ def read_rasters(
   if verbose:
     ttprint(f'Reading {len(raster_files)} raster file(s) using {n_jobs} workers')
 
-  raster_data = {}
+  ds = rasterio.open(raster_files[-1])
+  n_bands, width, height = ds.count, ds.width, ds.height
+  #print(len(raster_files), width, height)
+
+  raster_data = np.empty(shape=(width, height, len(raster_files)), dtype=dtype)
+  #print(raster_data.shape)
+
   args = [ 
-    (raster_idx, raster_files, window, dtype, data_mask, 
+    (raster_idx, raster_files, band, window, dtype, data_mask, 
       expected_shape, try_without_window, overview, verbose) 
     for raster_idx in range(0,len(raster_files)) 
   ]
 
-  for raster_idx, band_data, nodata in parallel.job(_read_raster, args, n_jobs=n_jobs):
-    raster_file = raster_files[raster_idx]
-
-    if (isinstance(band_data, np.ndarray)):
-
-      if nodata is not None:
-        band_data[band_data == nodata] = _nodata_replacement(dtype)
-
-    else:
-      raise Exception(f'The raster {raster_file} not exists')
-    raster_data[raster_idx] = band_data
-
-  raster_data = [raster_data[i] for i in range(0,len(raster_files))]
-  raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
+  for raster_idx, band_data in parallel.job(_read_raster, args, n_jobs=n_jobs):
+    
+    if (not isinstance(band_data, np.ndarray)):
+        raster_file = raster_files[raster_idx]
+        raise Exception(f'The raster {raster_file} not exists')
+    
+    raster_data[:,:,raster_idx] = band_data
+  
+  gc.collect()
+  #raster_data = [raster_data[i] for i in range(0,len(raster_files))]
+  #raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
   return raster_data
 
 def read_auth_rasters(
@@ -556,6 +567,7 @@ class RasterData(SKMapBase):
   GROUP_COL = 'group'
   NAME_COL = 'name'
   PATH_COL = 'input_path'
+  BAND_COL = 'input_band'
   TEMPORAL_COL = 'temporal'
   DT_COL = 'date'
   START_DT_COL = 'start_date'
@@ -588,9 +600,12 @@ class RasterData(SKMapBase):
         rows.append([group,raster_files[group]])
       else:
         for r in raster_files[group]:
-          rows.append([group,r])
+          if isinstance(r, tuple):
+            rows.append([group,r[0],r[1]])
+          else:
+            rows.append([group,r, 1])
 
-    self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL])
+    self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL, RasterData.BAND_COL])
     self.info[RasterData.TEMPORAL_COL] = self.info.apply(lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]), axis=1)
     self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
     self.info.reset_index(drop=True, inplace=True)
@@ -721,20 +736,35 @@ class RasterData(SKMapBase):
       else:
         data_mask = (data_mask != self.raster_mask_val)
 
-    raster_files = [ Path(r) for r in self.info[RasterData.PATH_COL] ]
+    #for band in list(self.info[RasterData.PATH_COL].unique()):
+    if expected_shape is None:
+      base_raster = self._base_raster()
+      ds = rasterio.open(base_raster)
+      width, height = ds.width, ds.height
+    else:
+      width, height = expected_shape[0], expected_shape[1]
     
-    self._verbose(
-        f"RasterData with {len(raster_files)} rasters" 
-      + f" and {len(self.info[RasterData.GROUP_COL].unique())} groups" 
-    )
-    self.array = read_rasters(
-      raster_files,
-      window=self.window, data_mask=data_mask,
-      dtype=dtype, expected_shape=expected_shape,
-      n_jobs=n_jobs, overview=overview, verbose=self.verbose
-    )
+    n_rows = self.info.shape[0]
+    self.array = np.empty((width, height, n_rows), dtype=dtype)
 
-    self._verbose(f"Read array shape: {self.array.shape}")
+    for band, rows in self.info.groupby(RasterData.BAND_COL):
+
+      rows[RasterData.PATH_COL]
+      raster_files = [ Path(r) for r in rows[RasterData.PATH_COL] ]
+      
+      self._verbose(
+          f"RasterData with {len(raster_files)} rasters (band: {band})" 
+        + f" and {len(self.info[RasterData.GROUP_COL].unique())} groups" 
+      )
+
+      self.array[:,:,rows.index] = read_rasters(
+        raster_files, band=band,
+        window=self.window, data_mask=data_mask,
+        dtype=dtype, expected_shape=expected_shape,
+        n_jobs=n_jobs, overview=overview, verbose=self.verbose
+      )
+
+      self._verbose(f"Read array shape: {self.array.shape}")
 
     return self
 
