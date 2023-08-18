@@ -18,6 +18,7 @@ import math
 import re
 import os
 import time
+import gc
 import tempfile
 import matplotlib as mpl
 from matplotlib import pyplot
@@ -38,6 +39,13 @@ from rasterio.windows import Window
 import bottleneck as bn
 
 from IPython.display import HTML
+from joblib import Parallel, delayed
+from tempfile import TemporaryDirectory
+from io import BytesIO
+from base64 import encodebytes, b64decode
+from uuid import uuid4
+from contextlib import ExitStack
+from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -71,7 +79,7 @@ def _fit_in_dtype(data, dtype, nodata):
 
   return data
 
-def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_shape, 
+def _read_raster(raster_idx, raster_files, band, window, dtype, data_mask, expected_shape, 
   try_without_window, overview, verbose):
 
   raster_file = raster_files[raster_idx]
@@ -80,15 +88,18 @@ def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_sh
 
   try:
     ds = rasterio.open(raster_file)
-    overviews = ds.overviews(1)
-
-    if overview is not None and overview in overviews:
-      band_data = ds.read(1, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
+    
+    if overview is not None:
+      overviews = ds.overviews(band)
+      if overview in overviews:
+          band_data = ds.read(band, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
+      else:
+        band_data = ds.read(band, window=window)
     else:
-      band_data = ds.read(1, window=window)
+      band_data = ds.read(band, window=window)
 
     if band_data.size == 0 and try_without_window:
-      band_data = ds.read(1)
+      band_data = ds.read(band)
 
     band_data = band_data.astype(dtype)
     nodata = ds.nodatavals[0]
@@ -114,8 +125,11 @@ def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_sh
       band_data[np.logical_not(data_mask)] = np.nan
     else:
       ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
-
-  return raster_idx, band_data, nodata
+  
+  if nodata is not None:
+    band_data[band_data == nodata] = _nodata_replacement(dtype)
+    
+  return raster_idx, band_data
 
 def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, nodata):
 
@@ -235,6 +249,7 @@ def _save_raster(
 
 def read_rasters(
   raster_files:Union[List,str] = [],
+  band = 1,
   window:Window = None,
   dtype:str = 'float32',
   n_jobs:int = 4,
@@ -315,27 +330,30 @@ def read_rasters(
   if verbose:
     ttprint(f'Reading {len(raster_files)} raster file(s) using {n_jobs} workers')
 
-  raster_data = {}
+  ds = rasterio.open(raster_files[-1])
+  n_bands, width, height = ds.count, ds.width, ds.height
+  #print(len(raster_files), width, height)
+
+  raster_data = np.empty(shape=(width, height, len(raster_files)), dtype=dtype)
+  #print(raster_data.shape)
+
   args = [ 
-    (raster_idx, raster_files, window, dtype, data_mask, 
+    (raster_idx, raster_files, band, window, dtype, data_mask, 
       expected_shape, try_without_window, overview, verbose) 
     for raster_idx in range(0,len(raster_files)) 
   ]
 
-  for raster_idx, band_data, nodata in parallel.job(_read_raster, args, n_jobs=n_jobs):
-    raster_file = raster_files[raster_idx]
-
-    if (isinstance(band_data, np.ndarray)):
-
-      if nodata is not None:
-        band_data[band_data == nodata] = _nodata_replacement(dtype)
-
-    else:
-      raise Exception(f'The raster {raster_file} not exists')
-    raster_data[raster_idx] = band_data
-
-  raster_data = [raster_data[i] for i in range(0,len(raster_files))]
-  raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
+  for raster_idx, band_data in parallel.job(_read_raster, args, n_jobs=n_jobs):
+    
+    if (not isinstance(band_data, np.ndarray)):
+        raster_file = raster_files[raster_idx]
+        raise Exception(f'The raster {raster_file} not exists')
+    
+    raster_data[:,:,raster_idx] = band_data
+  
+  gc.collect()
+  #raster_data = [raster_data[i] for i in range(0,len(raster_files))]
+  #raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
   return raster_data
 
 def read_auth_rasters(
@@ -556,6 +574,7 @@ class RasterData(SKMapBase):
   GROUP_COL = 'group'
   NAME_COL = 'name'
   PATH_COL = 'input_path'
+  BAND_COL = 'input_band'
   TEMPORAL_COL = 'temporal'
   DT_COL = 'date'
   START_DT_COL = 'start_date'
@@ -588,9 +607,12 @@ class RasterData(SKMapBase):
         rows.append([group,raster_files[group]])
       else:
         for r in raster_files[group]:
-          rows.append([group,r])
+          if isinstance(r, tuple):
+            rows.append([group,r[0],r[1]])
+          else:
+            rows.append([group,r, 1])
 
-    self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL])
+    self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL, RasterData.BAND_COL])
     self.info[RasterData.TEMPORAL_COL] = self.info.apply(lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]), axis=1)
     self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
     self.info.reset_index(drop=True, inplace=True)
@@ -721,20 +743,35 @@ class RasterData(SKMapBase):
       else:
         data_mask = (data_mask != self.raster_mask_val)
 
-    raster_files = [ Path(r) for r in self.info[RasterData.PATH_COL] ]
+    #for band in list(self.info[RasterData.PATH_COL].unique()):
+    if expected_shape is None:
+      base_raster = self._base_raster()
+      ds = rasterio.open(base_raster)
+      width, height = ds.width, ds.height
+    else:
+      width, height = expected_shape[0], expected_shape[1]
     
-    self._verbose(
-        f"RasterData with {len(raster_files)} rasters" 
-      + f" and {len(self.info[RasterData.GROUP_COL].unique())} groups" 
-    )
-    self.array = read_rasters(
-      raster_files,
-      window=self.window, data_mask=data_mask,
-      dtype=dtype, expected_shape=expected_shape,
-      n_jobs=n_jobs, overview=overview, verbose=self.verbose
-    )
+    n_rows = self.info.shape[0]
+    self.array = np.empty((width, height, n_rows), dtype=dtype)
 
-    self._verbose(f"Read array shape: {self.array.shape}")
+    for band, rows in self.info.groupby(RasterData.BAND_COL):
+
+      rows[RasterData.PATH_COL]
+      raster_files = [ Path(r) for r in rows[RasterData.PATH_COL] ]
+      
+      self._verbose(
+          f"RasterData with {len(raster_files)} rasters (band: {band})" 
+        + f" and {len(self.info[RasterData.GROUP_COL].unique())} groups" 
+      )
+
+      self.array[:,:,rows.index] = read_rasters(
+        raster_files, band=band,
+        window=self.window, data_mask=data_mask,
+        dtype=dtype, expected_shape=expected_shape,
+        n_jobs=n_jobs, overview=overview, verbose=self.verbose
+      )
+
+      self._verbose(f"Read array shape: {self.array.shape}")
 
     return self
 
@@ -1004,7 +1041,7 @@ class RasterData(SKMapBase):
     legend_title:str = "", 
     img_title:str ="index", 
     interval:int = 250,
-    figsize:tuple = (8,8),
+    figsize:tuple = None,
     v_minmax:tuple = None,
     to_gif:str = None
   ):
@@ -1034,43 +1071,80 @@ class RasterData(SKMapBase):
     """
 
     titles = self._get_titles(img_title)
-    if img_title == 'name':
-      pyplot.rcParams['font.size']=8
-      pyplot.rcParams['axes.titlepad']=0
+    fontsize = 10 if img_title == 'name' else 14
 
-    fig, ax = pyplot.subplots(figsize=figsize)
-    
+    if figsize is None:
+      width, height = self.array.shape[:2]
+      ratio_width = width/height if width>height else height/width
+      ratio_height = 1 if ratio_width < 2 else 2
+      figsize = (6*ratio_width,6*ratio_height)
+
     if v_minmax is None:
-      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+      vmin , vmax = np.nanquantile(self.array.flatten(), [.1, .9])
+      #vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
     else:
       vmin, vmax = v_minmax
     
-    try:
-      mymap = ax.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap)
+    def _populateImages(array, tile):
+      fig, ax = pyplot.subplots(figsize=figsize)
       fig.colorbar(
-        mymap, aspect=15, shrink=0.6, label=legend_title, 
-        location='right', orientation='vertical')
-      
-      def _animate(i):
-        mymap.set_array(self.array[:,:,i])
-        ax.set_title(label=titles[i])
-      
-      animation = FuncAnimation(fig, _animate, interval=interval, frames=self.array.shape[2])
-      pyplot.close(animation._fig)
-      if to_gif is not None:
-        animation.save(to_gif)
-        return to_gif
-      else:
-        return HTML(animation.to_jshtml())
+        ax.imshow(array, vmin=vmin, vmax=vmax, cmap=cmap), 
+        aspect=12, shrink=0.8, 
+        label=legend_title, 
+        orientation='vertical',
+        location='right'
+      )
+      ax.axis('off')
+      pyplot.suptitle(tile, fontsize=fontsize, y=0.9)
+      f = BytesIO()
+      pyplot.tight_layout()
+      fig.savefig(f, format='png')
+      imgdata64 = encodebytes(f.getvalue()).decode('ascii')
+      return imgdata64
     
-    except KeyError:
-      print(f"{cmap} is not valid. Please choose one of the following colormap {mpl.colormaps()}")
+    # find a way to optimize processor count
+    images = Parallel(n_jobs=3)(delayed(_populateImages)(self.array[:,:,i],titles[i]) for i in range(self.array.shape[2]))
+    
+    if to_gif is not None:
+      with ExitStack() as stack:
+        imgs = (
+          stack.enter_context(Image.open(BytesIO(b64decode(f))))
+          for f in images
+        )
+        img = next(imgs)
+        img.save(to_gif, format="GIF", append_images=imgs, save_all=True, duration= interval, loop=0)
+
+    template = '  frames[{0}] = "data:image/{1};base64,{2}"\n'
+
+    embedded_frames = "\n" + "".join(
+      template.format(i, 'png', imgdata.replace("\n","\\\n"))
+      for i, imgdata in enumerate(images)
+    )
+    mode_dict = dict(
+      once_checked="",
+      loop_checked="checked",
+      reflect_checked=""
+    )
+    
+    with TemporaryDirectory() as tmpdir:
+      path = Path(tmpdir, 'temp.html')
+      with open(path, 'w') as of:
+        of.write(JS_INCLUDE + STYLE_INCLUDE)
+        of.write(DISPLAY_TEMPLATE.format(
+          id=uuid4().hex,
+          Nframes=self.array.shape[2],
+          fill_frames = embedded_frames,
+          interval = interval,
+          **mode_dict
+        ))
+      html_rep = path.read_text()
+    return HTML(html_rep)
 
   def plot(self, 
     cmap:str = 'Spectral_r',
     legend_title:str = "", 
     img_title:str = 'index',
-    figsize:tuple = (16,16),
+    figsize:tuple = None,
     v_minmax:tuple = None,
     to_img:str = None,
     dpi:int = 300
@@ -1078,13 +1152,16 @@ class RasterData(SKMapBase):
     """
     Generates a square grid plot to view and save with colorscale.
 
-    :param cmap: colormap name one of the `matplotlib.colormaps()`
-    :param legend_title: title of the colorbar that will be used within the animation
-      default is an empty string
-    :param img_title: this could be `name`,`date`, `index` or None. Default value 
-      is None
-    :param figsize: figure size that will be generated. Default value is `(16,16)`
-    :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
+    :param cmap: Default is Spectral_r
+      colormap name one of the `matplotlib.colormaps()`
+    :param legend_title: Default is an empty string
+      title of the colorbar that will be used within the animation
+    :param img_title: Default value is None
+      this could be `name`,`date`, `index` or None. 
+    :param figsize: Default is None. 
+      Default size for figure will be calculated dynamically respect to the
+      data volume.
+    :param v_minmax: minimum and maximum boundaries of corethe colorscale. Default is None and 
       it will be derived from the dataset if not defined.
     :param to_img:  this should be directory that indicating the location where user want to
       save the image. Default is None
@@ -1097,75 +1174,37 @@ class RasterData(SKMapBase):
     %matplotlib # to stop pouring out when calling the function. 
 
     data = toy.ndvi(gappy=True, verbose=True)
-    gridplot = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
+    figure = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
     
     # to view in jupyter notebook  
-    gridplot.show()   
+    figure.show()   
     """
-    def _get_grid(data_size):
-      if data_size <= 4:
-        row, col = 1, data_size
-      else:
-        row = np.round(np.sqrt(data_size)).astype(int)
-        col = np.floor(data_size/row).astype(int)
-        if row * col != data_size: col += 1
-      return [row, col]
-
-    canvas = []
-    img_count = self.info.shape[0]
-    [nrow, ncol] = _get_grid(img_count)
+    gridsize = math.ceil(math.sqrt(self.array.shape[2]))
     
     if v_minmax is None:
-      vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
+      vmin , vmax = np.nanquantile(self.array.flatten(), [.1, .9])
     else:
       vmin, vmax = v_minmax
-
+    figsize = (5*gridsize, 5*gridsize) if figsize is None else figsize
     titles = self._get_titles(img_title)
-    if img_title == 'name': 
-      pyplot.rcParams['font.size'] = 8
-      pyplot.rcParams['axes.titlepad']=0
-    # this font size seems ok but the bottom ofset of the title has 
-    # more space then th top if the text is in between two subfigures
-    # bottom offset of each title should be decreased
-    fig,axs = pyplot.subplots(
-      nrows=nrow, ncols=ncol, figsize=figsize,
-      sharex=True, sharey=True
-    )
-
-    pyplot.axis('off')
-
-    if cmap is None: cmap='Spectral_r'
-    img_indx = 0
-    if nrow == 1:
-      if ncol == 1:
-        canvas.append(axs[col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
-        axs.set_title(titles[img_indx])
-        axs.axis('off')
-      else:
-        for col in range(ncol):
-          canvas.append(axs[col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
-          axs[col].set_title(titles[img_indx])
-          axs[col].axis('off')
-          img_indx += 1
-    else:
-      for row in range(nrow):
-        for col in range(ncol):
-          if img_indx >= img_count:
-            for ax in axs[row:, col]: ax.set_visible(False)
-
-          else:                    
-            canvas.append(axs[row,col].imshow(self.array[:,:,img_indx], cmap=cmap, vmin=vmin, vmax=vmax))
-            axs[row, col].set_title(titles[img_indx])
-
-          axs[row, col].axis('off')
-          img_indx += 1
+    fig, axs = pyplot.subplots(ncols=gridsize, nrows=gridsize, figsize= figsize)
     
-    pyplot.rcParams['font.size']=10
+    for i, ax in enumerate(axs.flatten()):
+      try:
+        ax.imshow(self.array[:,:,i], vmin=vmin, vmax=vmax, cmap=cmap)
+        ax.set_title(titles[i], fontsize= 3.5 * gridsize)
+        ax.axis('off')
+      except IndexError:
+        ax.axis('off')
 
-    fig.colorbar(
-      canvas[0], ax=axs, orientation="horizontal", shrink=0.3,
-      aspect=10, label=legend_title, location="top"
-    )
+    pyplot.tight_layout()
+    fig.subplots_adjust(bottom=0, top=1, left=0, right=.82)
+    cbar_ax = fig.add_axes([0.83, 0.2, 0.02, 0.6])
+    cbar_ax.tick_params(labelsize=3.5 * gridsize)
+    cbar = fig.colorbar(
+      pyplot.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap),
+      cax=cbar_ax
+    ).set_label(label=legend_title, size = 4 * gridsize, weight = 'bold')
     
     if to_img is not None:
       fig.savefig(to_img, dpi=dpi, bbox_inches='tight')

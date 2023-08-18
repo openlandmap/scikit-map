@@ -657,7 +657,7 @@ try:
 
       return (out_array, ops, tm, dt1, dt2)
 
-    def _args_montly(self, rdata, start_dt, end_dt, date_format, months = 1, daysp = None):
+    def _args_monthly(self, rdata, start_dt, end_dt, date_format, months = 1, daysp = None):
       
       args = []
 
@@ -746,15 +746,15 @@ try:
         elif t == TimeEnum.YEARLY:
           args += self._args_yearly(rdata, start_dt, end_dt, date_format)
         elif t == TimeEnum.MONTHLY:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 1)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 1)
         elif t == TimeEnum.MONTHLY_15P:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 1, 15)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 1, 15)
         elif t == TimeEnum.BIMONTHLY:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 2)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2)
         elif t == TimeEnum.BIMONTHLY_15P:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 2, 15)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2, 15)
         elif t == TimeEnum.QUARTERLY:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 2)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2)
         else:
           raise Exception(f"Aggregation by {t} not implemented")
       
@@ -776,7 +776,7 @@ try:
           new_group = f'{group}.{tm}.{op}'
 
           new_info.append(
-            rdata._new_info_row('', name=name, group=new_group, dates=[start_dt, end_dt])
+            rdata._new_info_row('', name=name, group=new_group, dates=[dt1, dt2])
           )
 
         new_array.append(out_array)

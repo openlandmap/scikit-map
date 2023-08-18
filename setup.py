@@ -45,7 +45,7 @@ setuptools.setup(
             'pqdm>=0.1',
             'pystac>=1.4.0',
             'pyts>=0.11',
-            'pyFFTW>=0.13',
+            'pyfftw>=0.13',
             'scikit_image>=0.17',
             'Shapely>=1.7',
             'sentinelhub==3.4.4',
