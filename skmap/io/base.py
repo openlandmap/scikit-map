@@ -1055,17 +1055,17 @@ class RasterData(SKMapBase):
     else:
       vmin, vmax = v_minmax
     
-    def _populateImages(ind):
+    def _populateImages(array, tile):
       fig, ax = pyplot.subplots(figsize=figsize)
       fig.colorbar(
-        ax.imshow(self.array[:,:,ind], vmin=vmin, vmax=vmax, cmap=cmap), 
+        ax.imshow(array, vmin=vmin, vmax=vmax, cmap=cmap), 
         aspect=12, shrink=0.8, 
         label=legend_title, 
         orientation='vertical',
         location='right'
       )
       ax.axis('off')
-      pyplot.suptitle(titles[ind], fontsize=fontsize, y=0.95)
+      pyplot.suptitle(tile, fontsize=fontsize, y=0.9)
       f = BytesIO()
       pyplot.tight_layout()
       fig.savefig(f, format='png')
@@ -1073,7 +1073,7 @@ class RasterData(SKMapBase):
       return imgdata64
     
     # find a way to optimize processor count
-    images = Parallel(n_jobs=3)(delayed(_populateImages)(i) for i in range(self.array.shape[2]))
+    images = Parallel(n_jobs=3)(delayed(_populateImages)(self.array[:,:,i],titles[i]) for i in range(self.array.shape[2]))
     
     if to_gif is not None:
       with ExitStack() as stack:
