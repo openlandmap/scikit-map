@@ -46,6 +46,7 @@ from base64 import encodebytes, b64decode
 from uuid import uuid4
 from contextlib import ExitStack
 from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
+from PIL import Image
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -331,10 +332,18 @@ def read_rasters(
     ttprint(f'Reading {len(raster_files)} raster file(s) using {n_jobs} workers')
 
   ds = rasterio.open(raster_files[-1])
-  n_bands, width, height = ds.count, ds.width, ds.height
+  if overview is not None:
+    overviews = ds.overviews(band)
+    if overview in overviews:
+        n_bands, height, width  = ds.count, math.ceil(ds.height // overview), math.ceil(ds.width // overview)
+    else:
+      raise Exception(f"Overview {overviews} is invalid for {raster_files[-1]}.\n"
+        f"Use one of overviews: {ds.overviews(band)}")
+  else:
+    n_bands, height, width,  = ds.count, ds.height, ds.width
   #print(len(raster_files), width, height)
 
-  raster_data = np.empty(shape=(width, height, len(raster_files)), dtype=dtype)
+  raster_data = np.empty(shape=(height, width, len(raster_files)), dtype=dtype)
   #print(raster_data.shape)
 
   args = [ 
@@ -604,7 +613,7 @@ class RasterData(SKMapBase):
     rows = []
     for group in raster_files.keys():
       if isinstance(raster_files[group], str):
-        rows.append([group,raster_files[group]])
+        rows.append([group, raster_files[group], 1])
       else:
         for r in raster_files[group]:
           if isinstance(r, tuple):
@@ -744,15 +753,16 @@ class RasterData(SKMapBase):
         data_mask = (data_mask != self.raster_mask_val)
 
     #for band in list(self.info[RasterData.PATH_COL].unique()):
-    if expected_shape is None:
-      base_raster = self._base_raster()
-      ds = rasterio.open(base_raster)
-      width, height = ds.width, ds.height
-    else:
-      width, height = expected_shape[0], expected_shape[1]
+    #if expected_shape is None:
+    #  base_raster = self._base_raster()
+    #  ds = rasterio.open(base_raster)
+    #  width, height = ds.width, ds.height
+    #else:
+    #  width, height = expected_shape[0], expected_shape[1]
     
-    n_rows = self.info.shape[0]
-    self.array = np.empty((width, height, n_rows), dtype=dtype)
+    #n_rows = self.info.shape[0]
+    #self.array = np.empty((width, height, n_rows), dtype=dtype)
+    self.array = []
 
     for band, rows in self.info.groupby(RasterData.BAND_COL):
 
@@ -761,17 +771,20 @@ class RasterData(SKMapBase):
       
       self._verbose(
           f"RasterData with {len(raster_files)} rasters (band: {band})" 
-        + f" and {len(self.info[RasterData.GROUP_COL].unique())} groups" 
+        + f" and {len(self.info[RasterData.GROUP_COL].unique())} group(s)" 
       )
 
-      self.array[:,:,rows.index] = read_rasters(
+      array = read_rasters(
         raster_files, band=band,
         window=self.window, data_mask=data_mask,
         dtype=dtype, expected_shape=expected_shape,
         n_jobs=n_jobs, overview=overview, verbose=self.verbose
       )
+      
+      self.array.append(array)
+      self._verbose(f"Read array shape: {array.shape}")
 
-      self._verbose(f"Read array shape: {self.array.shape}")
+    self.array = np.concatenate(self.array, axis=-1)
 
     return self
 
@@ -1103,7 +1116,8 @@ class RasterData(SKMapBase):
       return imgdata64
     
     # find a way to optimize processor count
-    images = Parallel(n_jobs=3)(delayed(_populateImages)(self.array[:,:,i],titles[i]) for i in range(self.array.shape[2]))
+    args = [ (self.array[:,:,i],titles[i]) for i in range(self.array.shape[2]) ]
+    images = [ img for img in parallel.job(_populateImages, args) ]
     
     if to_gif is not None:
       with ExitStack() as stack:

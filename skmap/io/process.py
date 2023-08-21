@@ -636,24 +636,22 @@ try:
 
     def _aggregate(self, in_array, tm, dt1, dt2):
 
-      out_array = []
+      n_bands = len([ self.bn_ops + self.percs ])
+      out_shape = (in_array.shape[0], in_array.shape[1], n_bands)
+      
+      i = 0
+      out_array = np.empty(out_shape)
       ops = []
 
       for op, method in self.bn_ops:
-        out_array.append(
-          method(in_array, axis=-1)[:, :, np.newaxis]
-        )
+        out_array[:,:,i] = method(in_array, axis=-1)
         ops.append(self._op_name(f'{op}'))
+        i += 1
 
       if len(self.percs) > 0:
-        out_array.append(
-          nan_percentile(in_array.copy().transpose((2,0,1)), q=self.percs).transpose((1,2,0))
-        )
-        
+        out_array[:,:,i:i + len(self.percs)] = nan_percentile(in_array.copy().transpose((2,0,1)), q=self.percs).transpose((1,2,0))
         for p in self.percs:
           ops.append(self._op_name(f'p{p}'))
-
-      out_array = np.concatenate(out_array, axis=-1)
 
       return (out_array, ops, tm, dt1, dt2)
 
@@ -758,14 +756,19 @@ try:
         else:
           raise Exception(f"Aggregation by {t} not implemented")
       
-      new_array = []
+      n_ops = len([ self.bn_ops + self.percs ])
+      n_bands = len(args) * n_ops
+      new_shape = (rdata.array.shape[0], rdata.array.shape[1], n_bands)
+      new_array = np.empty(new_shape)
+      i = 0
+
       new_info = []
 
       self._verbose(f"Computing {len(args)} "
         + f"time aggregates from {start_dt.year} to {end_dt.year}"
       )
 
-      for out_array, ops, tm, dt1, dt2 in parallel.job(self._aggregate, args, joblib_args={'backend': 'threading'}):
+      for out_array, ops, tm, dt1, dt2 in parallel.job(self._aggregate, args):
         for op in ops:
           name = rdata._set_date(outname, 
                 dt1, dt2, 
@@ -779,10 +782,9 @@ try:
             rdata._new_info_row('', name=name, group=new_group, dates=[dt1, dt2])
           )
 
-        new_array.append(out_array)
+        new_array[:,:,i:i+n_ops] = out_array
+        i += 1
         
-      new_array = np.concatenate(new_array, axis=-1)
-
       return new_array, DataFrame(new_info)
 
   class TrendAnalysis(Derivator):
