@@ -7,6 +7,7 @@ from hashlib import sha256
 from pandas import DataFrame, Series, to_datetime
 from types import MappingProxyType
 
+import shutil
 import copy
 import pandas as pd
 import numpy
@@ -80,7 +81,7 @@ def _fit_in_dtype(data, dtype, nodata):
 
   return data
 
-def _read_raster(raster_idx, raster_files, band, window, dtype, data_mask, expected_shape, 
+def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_mask, expected_shape, 
   try_without_window, overview, verbose):
 
   raster_file = raster_files[raster_idx]
@@ -109,28 +110,33 @@ def _read_raster(raster_idx, raster_files, band, window, dtype, data_mask, expec
       if verbose:
         ttprint(f'ERROR: Failed to read {raster_file} window {window}.')
       band_data = np.empty((int(window.height), int(window.width)))
-      band_data[:] = _nodata_replacement(dtype)
+      band_data = _nodata_replacement(dtype)
 
     if expected_shape is not None:
       if verbose:
         ttprint(f'Full nan image for {raster_file}')
       band_data = np.empty(expected_shape)
-      band_data[:] = _nodata_replacement(dtype)
+      band_data = _nodata_replacement(dtype)
 
-  if data_mask is not None:
+  data_exists = (band_data is not None)
 
-    if len(data_mask.shape) == 3:
-      data_mask = data_mask[:,:,0]
+  if data_exists:
+    if data_mask is not None:
 
-    if (data_mask.shape == band_data.shape):
-      band_data[np.logical_not(data_mask)] = np.nan
-    else:
-      ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
-  
-  if nodata is not None:
-    band_data[band_data == nodata] = _nodata_replacement(dtype)
+      if len(data_mask.shape) == 3:
+        data_mask = data_mask[:,:,0]
+
+      if (data_mask.shape == band_data.shape):
+        band_data[np.logical_not(data_mask)] = np.nan
+      else:
+        ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
     
-  return raster_idx, band_data
+    if nodata is not None:
+      band_data[band_data == nodata] = _nodata_replacement(dtype)
+    
+    array_mm[:,:,raster_idx] = band_data
+
+  return raster_idx, data_exists
 
 def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, nodata):
 
@@ -341,26 +347,34 @@ def read_rasters(
         f"Use one of overviews: {ds.overviews(band)}")
   else:
     n_bands, height, width,  = ds.count, ds.height, ds.width
-  #print(len(raster_files), width, height)
 
-  raster_data = np.empty(shape=(height, width, len(raster_files)), dtype=dtype)
-  #print(raster_data.shape)
+  temp_folder = tempfile.mkdtemp()
+  filename = os.path.join(temp_folder, 'joblib_readraster.mmap')
+  array_mm = np.memmap(filename, dtype=dtype, shape=(height, width, len(raster_files)), mode='w+')
 
   args = [ 
-    (raster_idx, raster_files, band, window, dtype, data_mask, 
+    (raster_idx, raster_files, array_mm, band, window, dtype, data_mask, 
       expected_shape, try_without_window, overview, verbose) 
     for raster_idx in range(0,len(raster_files)) 
   ]
 
-  for raster_idx, band_data in parallel.job(_read_raster, args, n_jobs=n_jobs):
+  for raster_idx, data_exists in parallel.job(_read_raster, args, n_jobs=n_jobs):
     
-    if (not isinstance(band_data, np.ndarray)):
-        raster_file = raster_files[raster_idx]
-        raise Exception(f'The raster {raster_file} not exists')
-    
-    raster_data[:,:,raster_idx] = band_data
+    if (not data_exists):
+      raster_file = raster_files[raster_idx]
+      raise Exception(f'The raster {raster_file} not exists')
+  
+  raster_data = np.array(array_mm)
+
+  del array_mm
+
+  try:
+    shutil.rmtree(temp_folder)
+  except:
+    pass
   
   gc.collect()
+
   #raster_data = [raster_data[i] for i in range(0,len(raster_files))]
   #raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
   return raster_data

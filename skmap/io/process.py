@@ -287,8 +287,9 @@ try:
         
       filled[valid_mask] = data[valid_mask]
       filled_qa[valid_mask] = 1.0
+      filled_qa = filled_qa * 100
       filled_qa[filled_qa == 0.0] = np.nan
-      
+
       # Return the reconstructed time series and the quality assesment layer
       if self.return_qa:
         return filled, filled_qa
@@ -768,7 +769,7 @@ try:
         + f"time aggregates from {start_dt.year} to {end_dt.year}"
       )
 
-      for out_array, ops, tm, dt1, dt2 in parallel.job(self._aggregate, args):
+      for out_array, ops, tm, dt1, dt2 in parallel.job(self._aggregate, args, joblib_args={'backend': 'threading'}):
         for op in ops:
           name = rdata._set_date(outname, 
                 dt1, dt2, 
