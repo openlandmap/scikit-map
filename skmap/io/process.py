@@ -177,7 +177,8 @@ try:
     def _gapfill(self, data):
       pass
 
-  class SeasConvCppFill(Filler):
+  
+  class HConv(Filler):
     """
     :param season_size: number of images per year
     :param att_seas: dB of attenuation for images of opposite seasonality
@@ -187,78 +188,84 @@ try:
     
     def __init__(self,
       season_size:int,
-      att_seas:float = 60,
+      att_seas:float = 25,
       att_env:float = 20,
+      N_aggr:int = 1,
+      hconv_ampl:float = 15,
       return_qa:bool = False,
       n_jobs:int = os.cpu_count(),
       d_type = np.float32,
       verbose = False
     ):
 
-      super().__init__(name='seasconv', verbose=verbose, temporal=True)
+      super().__init__(name='hconv', verbose=verbose, temporal=True)
 
       self.season_size = season_size
       self.return_qa = return_qa
       self.att_seas = att_seas
       self.att_env = att_env
+      self.N_aggr = N_aggr
+      self.hconv_ampl = hconv_ampl
       self.n_jobs = n_jobs
       self.d_type = d_type
+      assert (self.att_env/10 + self.att_seas/10 + self.hconv_ampl/10) <= np.finfo(self.d_type).precision, "Reduce the total attenuations to avoid numerical issues"
+
     
-    def _parallel_compute(self, num_threads, ts_array, qa_array, N_years, N_ipy, att_seas, att_env):
-      def compute_slice(ts_array_slice, qa_array_slice, N_years, N_ipy, att_seas, att_env):
-          libfile = glob.glob('build/*/seasconv*.so')[0]
-          seasconv = ctypes.CDLL(libfile)
-          seasconv.runFloat.restype = ctypes.c_int
-          seasconv.runFloat.argtypes = [ctypes.c_uint,
+    def _parallel_compute(self, data, filled, filled_qa, N_years):
+      def compute_slice(data_slice, filled_slice, filled_qa_slice, N_years, N_ipy, att_seas, att_env, N_aggr, hconv_ampl):
+        libfile = glob.glob('build/*/seasconv*.so')[0]
+        seasconv = ctypes.CDLL(libfile)
+        N_pix_tmp = filled_slice.shape[0]
+        if self.d_type == np.float32:
+          seasconv.runHConvFloat.restype = ctypes.c_int
+          seasconv.runHConvFloat.argtypes = [ctypes.c_uint,
           ctypes.c_uint,
           ctypes.c_uint,
           ctypes.c_float,
+          ctypes.c_float,
+          ctypes.c_uint,
           ctypes.c_float,
           np.ctypeslib.ndpointer(dtype=self.d_type),
+          np.ctypeslib.ndpointer(dtype=self.d_type),
           np.ctypeslib.ndpointer(dtype=self.d_type)]
-          N_pix_tmp = ts_array_slice.shape[0]
-          if self.d_type == np.float32:
-            res = seasconv.runFloat(N_years, N_ipy, N_pix_tmp, att_seas, att_env, ts_array_slice, qa_array_slice)
-          elif self.d_type == np.double:
-            res = seasconv.runDobule(N_years, N_ipy, N_pix_tmp, att_seas, att_env, ts_array_slice, qa_array_slice)
-          else:
-            assert False, "Available data formats: np.float32 np.double"
-          pass
+          res = seasconv.runHConvFloat(N_years, N_ipy, N_pix_tmp, att_seas, att_env, N_aggr, hconv_ampl, data_slice, filled_slice, filled_qa_slice)
+        else:
+          assert False, "Available data formats: np.float32 np.double"
+        pass
 
-      num_rows = ts_array.shape[0]
-      rows_per_thread = num_rows // num_threads
-
-        # Create a list to hold thread objects
+      num_rows = filled.shape[0]
+      rows_per_thread = num_rows // self.n_jobs
+      # Create a list to hold thread objects
       threads = []
-
-        # Split the data and create threads
-      for i in range(num_threads):
+      # Split the data and create threads
+      for i in range(self.n_jobs):
         start_row = i * rows_per_thread
-        end_row = start_row + rows_per_thread if i < num_threads - 1 else num_rows
-        ts_slice = ts_array[start_row:end_row]
-        qa_slice = qa_array[start_row:end_row]
+        end_row = start_row + rows_per_thread if i < self.n_jobs - 1 else num_rows
+        data_slice = data[start_row:end_row]
+        filled_slice = filled[start_row:end_row]
+        filled_qa_slice = filled_qa[start_row:end_row]
 
-        thread = threading.Thread(target=compute_slice, args=(ts_slice, qa_slice, N_years, N_ipy, att_seas, att_env))
+        thread = threading.Thread(target=compute_slice, args=(data_slice, filled_slice, filled_qa_slice,
+          N_years, self.season_size, self.att_seas, self.att_env, self.N_aggr, self.hconv_ampl))
         threads.append(thread)
       
-        # Start the threads
+      # Start the threads
       for thread in threads:
         thread.start()
 
-        # Wait for all threads to complete
+      # Wait for all threads to complete
       for thread in threads:
         thread.join()
     
     def _gapfill(self, data):
-      # Convolution and normalization
-      
+      # Convolution and normalization      
       try:
         import mkl
         mkl_threads = mkl.get_num_threads()
         mkl.set_num_threads(self.n_jobs)
       except:
         pass
-      
+
       np.seterr(divide='ignore', invalid='ignore')
 
       # Reshape, format and extend the data structures to give them as input/output to C++
@@ -268,35 +275,24 @@ try:
       N_img = orig_shape[2]
       assert (N_img % self.season_size) == 0, "The number of images in the time series must be a multiple of the season_size"
       N_years = np.floor(N_img / self.season_size).astype(int)
-      N_ext = N_img * 2
-      N_pix = N_row * N_col
-      
-      filled = np.zeros((N_pix,N_ext), dtype=self.d_type)
-      filled[:,0:N_img] = np.reshape(data.astype(self.d_type), (N_pix, N_img)).copy()
-      filled_qa = np.zeros((N_pix,N_ext), dtype=self.d_type)        
-      valid_mask = ~np.isnan(data)
-    
-      if self.season_size*2 > N_img:
-        warnings.warn("Not enough images available")
-      assert (self.att_env/10 + self.att_seas/10) < np.finfo(self.d_type).precision, "Reduce the total attenuations to avoid numerical issues"
+      N_pix = N_row * N_col      
+      N_aipy = len(np.arange(self.season_size)[0::self.N_aggr])
+      N_aimg = N_aipy*N_years
 
-      self._parallel_compute(self.n_jobs, filled, filled_qa, N_years, self.season_size, self.att_seas, self.att_env)
-   
-      filled = np.reshape(filled[:,0:N_img], orig_shape)
-      filled_qa = np.reshape(filled_qa[:,0:N_img], orig_shape)
-        
-      filled[valid_mask] = data[valid_mask]
-      filled_qa[valid_mask] = 1.0
-      filled_qa = filled_qa * 100
-      filled_qa[filled_qa == 0.0] = np.nan
+      filled = np.empty((N_pix,N_aimg), dtype=self.d_type)
+      filled_qa = np.empty((N_pix,N_aimg), dtype=self.d_type)
+
+      # Parallel computation
+      self._parallel_compute(np.reshape(data.astype(self.d_type), (N_pix, N_img)), filled, filled_qa, N_years)
+
+      filled = np.reshape(filled, (N_row, N_col, N_aimg))
+      filled_qa = np.reshape(filled_qa, (N_row, N_col, N_aimg))
 
       # Return the reconstructed time series and the quality assesment layer
       if self.return_qa:
         return filled, filled_qa
       else:
-        return filled
-
-      
+        return filled  
         
   class SeasConvFill(Filler):
     """
