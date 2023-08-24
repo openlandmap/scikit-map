@@ -20,13 +20,13 @@ import re
 import os
 import time
 import gc
-import tempfile
 import matplotlib as mpl
 from matplotlib import pyplot
 from matplotlib.animation import FuncAnimation
+import traceback
 
 from typing import List, Union, Callable
-from skmap.misc import ttprint, _eval, update_by_separator, date_range
+from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap
 from skmap import SKMapRunner, SKMapBase, parallel
 
 from dateutil.relativedelta import relativedelta
@@ -105,10 +105,13 @@ def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_m
 
     band_data = band_data.astype(dtype)
     nodata = ds.nodatavals[0]
-  except:
+  except Exception as ex:
+    ttprint(f"Exception: {ex}")
+    #traceback.iprint_exc()
+    
     if window is not None:
       if verbose:
-        ttprint(f'ERROR: Failed to read {raster_file} window {window}.')
+        ttprint(f'ERROR: Failed to read {raster_file} window {window}')
       band_data = np.empty((int(window.height), int(window.width)))
       band_data = _nodata_replacement(dtype)
 
@@ -222,8 +225,9 @@ def _new_raster(base_raster, raster_file, data, window = None,
 
 def _save_raster(
   fn_base_raster:str,
-  fn_new_raster:str,
+  raster_files:list,
   data:numpy.array,
+  i:int,
   spatial_win:Window = None,
   dtype:str = None,
   nodata = None,
@@ -234,25 +238,23 @@ def _save_raster(
   if len(data.shape) < 3:
     data = np.stack([data], axis=2)
 
-  _, _, nbands = data.shape
+  #_, _, nbands = data.shape
+  
+  with _new_raster(fn_base_raster, raster_files[i], data[:,:,i], spatial_win, dtype, nodata) as new_raster:
 
-  with _new_raster(fn_base_raster, fn_new_raster, data, spatial_win, dtype, nodata) as new_raster:
+    band_data = np.array(data[:,:,i])
+    band_dtype = new_raster.dtypes[0]
 
-    for band in range(0, nbands):
+    if fit_in_dtype:
+      band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
 
-      band_data = data[:,:,band]
-      band_dtype = new_raster.dtypes[band]
-
-      if fit_in_dtype:
-        band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
-
-      band_data[np.isnan(band_data)] = new_raster.nodata
-      new_raster.write(band_data.astype(band_dtype), indexes=(band+1))
+    band_data[np.isnan(band_data)] = new_raster.nodata
+    new_raster.write(band_data.astype(band_dtype), indexes=1)
 
   if on_each_outfile is not None:
-    on_each_outfile(fn_new_raster)
+    on_each_outfile(raster_files[i])
 
-  return fn_new_raster
+  return raster_files[i]
 
 def read_rasters(
   raster_files:Union[List,str] = [],
@@ -264,6 +266,7 @@ def read_rasters(
   expected_shape = None,
   try_without_window = False,
   overview = None,
+  keep_memmap = False,
   verbose = False
 ):
   """
@@ -348,36 +351,27 @@ def read_rasters(
   else:
     n_bands, height, width,  = ds.count, ds.height, ds.width
 
-  temp_folder = tempfile.mkdtemp()
-  filename = os.path.join(temp_folder, 'joblib_readraster.mmap')
-  array_mm = np.memmap(filename, dtype=dtype, shape=(height, width, len(raster_files)), mode='w+')
+  #temp_folder = tempfile.mkdtemp()
+  #filename = os.path.join(temp_folder, 'joblib_readraster.mmap')
+  #array_mm = np.memmap(filename, dtype=dtype, shape=(height, width, len(raster_files)), mode='w+')
+  array_mm = new_memmap(dtype, shape=(height, width, len(raster_files)))
 
   args = [ 
     (raster_idx, raster_files, array_mm, band, window, dtype, data_mask, 
       expected_shape, try_without_window, overview, verbose) 
     for raster_idx in range(0,len(raster_files)) 
   ]
-
-  for raster_idx, data_exists in parallel.job(_read_raster, args, n_jobs=n_jobs):
+  
+  for raster_idx, data_exists in parallel.job(_read_raster, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
     
     if (not data_exists):
       raster_file = raster_files[raster_idx]
       raise Exception(f'The raster {raster_file} not exists')
   
-  raster_data = np.array(array_mm)
-
-  del array_mm
-
-  try:
-    shutil.rmtree(temp_folder)
-  except:
-    pass
-  
-  gc.collect()
-
-  #raster_data = [raster_data[i] for i in range(0,len(raster_files))]
-  #raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
-  return raster_data
+  if not keep_memmap:
+    return del_memmap(array_mm, True)
+  else:
+    return array_mm
 
 def read_auth_rasters(
   raster_files:List,
@@ -577,13 +571,13 @@ def save_rasters(
     ttprint(f'Saving {len(raster_files)} raster files using {n_jobs} workers')
 
   args = [ \
-    (base_raster, raster_files[i], data[:,:,i], window, dtype,
+    (base_raster, raster_files, data, i, window, dtype,
       nodata, fit_in_dtype, on_each_outfile) \
     for i in range(0,len(raster_files))
   ]
 
   out_files = []
-  for out_raster in parallel.job(_save_raster, args, n_jobs=n_jobs):
+  for out_raster in parallel.job(_save_raster, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
     out_files.append(out_raster)
     continue
 

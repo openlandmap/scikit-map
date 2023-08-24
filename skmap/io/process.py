@@ -28,6 +28,7 @@ try:
   import pandas as pd
 
   from dateutil.relativedelta import relativedelta
+  from skmap.misc import new_memmap
 
   import cv2 as cv
   import pyfftw
@@ -279,9 +280,12 @@ try:
       N_aipy = len(np.arange(self.season_size)[0::self.N_aggr])
       N_aimg = N_aipy*N_years
 
-      filled = np.empty((N_pix,N_aimg), dtype=self.d_type)
-      filled_qa = np.empty((N_pix,N_aimg), dtype=self.d_type)
+      #filled = np.empty((N_pix,N_aimg), dtype=self.d_type)
+      #filled_qa = np.empty((N_pix,N_aimg), dtype=self.d_type)
 
+      filled = new_memmap(self.d_type, (N_pix,N_aimg))
+      filled_qa = new_memmap(self.d_type, (N_pix,N_aimg))
+      
       # Parallel computation
       self._parallel_compute(np.reshape(data.astype(self.d_type), (N_pix, N_img)), filled, filled_qa, N_years)
 

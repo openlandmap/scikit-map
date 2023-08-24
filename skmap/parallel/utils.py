@@ -4,7 +4,7 @@ Parallelization helpers based in thread/process pools and joblib
 import numpy
 import multiprocessing
 from typing import Callable, Iterator, List,  Union
-from concurrent.futures import as_completed, wait, FIRST_COMPLETED, ProcessPoolExecutor
+from concurrent.futures import as_completed, wait, FIRST_COMPLETED, ProcessPoolExecutor, ThreadPoolExecutor
 
 import warnings
 from pathlib import Path
@@ -670,7 +670,7 @@ class TaskSequencer():
       self._verbose(f'Starting {pool_size} worker(s) for {task.__name__} (mem_check={mem_check})')
 
       self.tasks.append(task)
-      self.pipeline.append(ProcessPoolExecutor(max_workers = pool_size))
+      self.pipeline.append(ThreadPoolExecutor(max_workers = pool_size))
       self.mem_checks.append(mem_check)
         
     self.n_tasks = len(self.tasks)
