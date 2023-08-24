@@ -48,6 +48,14 @@ def del_memmap(array_mm, return_array=False):
   if return_array:
     return result
 
+def ref_memmap(array):
+  array.flush()
+  return {
+    'filename': array.filename,
+    'dtype': array.dtype,
+    'shape': array.shape
+  }
+
 def ttprint(*args, **kwargs):
   """
   A print function that displays the date and time.

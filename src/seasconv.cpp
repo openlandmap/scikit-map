@@ -127,7 +127,7 @@ int run(const unsigned int N_years,
 
     // Renormalize the result
     ts_ext.block(0, 0, N_pix, N_samp).array() /= mask_ext.block(0, 0, N_pix, N_samp).array();
-    mask_ext.block(0, 0, N_pix, N_samp) = (mask_ext.block(0, 0, N_pix, N_samp).array().rowwise() / norm_qa.segment(0,N_samp).array().transpose()) / N_ext * 10000.;
+    mask_ext.block(0, 0, N_pix, N_samp) = (mask_ext.block(0, 0, N_pix, N_samp).array().rowwise() / norm_qa.segment(0,N_samp).array().transpose()) / N_ext * 100.;
     ts_out.block(0, 0, N_pix, N_aimg) = ts_ext(Eigen::all, samp_pattern);
     mask_out.block(0, 0, N_pix, N_aimg) = mask_ext(Eigen::all, samp_pattern);
 
