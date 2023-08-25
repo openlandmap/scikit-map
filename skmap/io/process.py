@@ -209,8 +209,6 @@ try:
       self.hconv_ampl = hconv_ampl
       self.n_jobs = n_jobs
       self.d_type = d_type
-      assert (self.att_env/10 + self.att_seas/10 + self.hconv_ampl/10) <= np.finfo(self.d_type).precision, "Reduce the total attenuations to avoid numerical issues"
-
     
     def _parallel_compute(self, data, filled, filled_qa, N_years):
       def compute_slice(data_slice, filled_slice, filled_qa_slice, N_years, N_ipy, att_seas, att_env, N_aggr, hconv_ampl):
