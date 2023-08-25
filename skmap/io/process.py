@@ -1,5 +1,6 @@
 import time
 import os
+import warnings
 from enum import Enum
 
 try:
@@ -286,8 +287,7 @@ try:
       n_imag = data.shape[0]
 
       if self.season_size*2 > n_imag:
-        warnings.warn("Not enough images available")
-      assert (self.att_env/10 + self.att_seas/10) < np.finfo(np.double).precision, "Reduce the total attenuations to avoid numerical issues"
+        warnings.warn("Less then two years of images available, the time series reconstruction will not take advantage of seasonality")
 
       filled, filled_qa = self._fftw_toeplitz_matmul(
         data, valid_mask.astype(float), 
