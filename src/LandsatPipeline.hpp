@@ -70,12 +70,12 @@ public:
             }
             // Read the data for one band
             GDALRasterBand *band = readDataset->GetRasterBand(band_id);
-            CPLErr pixelsRead = band->RasterIO(GF_Read, 0, 0, m_N_row, m_N_col,
+            CPLErr outRead = band->RasterIO(GF_Read, 0, 0, m_N_row, m_N_col,
                            readMatrix.data() + (img_offset + i) * m_N_row * m_N_col, m_N_row, m_N_col, readType, 0, 0);
-            if (pixelsRead != CE_None) {
+            if (outRead != CE_None) {
                 // @TODO: Reading was not successful for this file, handle it
                 std::cerr << "Error 2222222222 \n";
-                std::cerr << "pixelsRead " << pixelsRead << "\n";
+                std::cerr << "outRead " << outRead << "\n";
                 GDALClose(readDataset);
                 continue;
             }
@@ -204,6 +204,39 @@ public:
                      ((qualityAssessmentBand.block(pix_offset, 0, N_pix_slice, m_N_img).array() >= 1) && (qualityAssessmentBand.block(pix_offset, 0, N_pix_slice, m_N_img).array() <= 2))
                   || ((qualityAssessmentBand.block(pix_offset, 0, N_pix_slice, m_N_img).array() >= 5) && (qualityAssessmentBand.block(pix_offset, 0, N_pix_slice, m_N_img).array() <= 6))
                   || ((qualityAssessmentBand.block(pix_offset, 0, N_pix_slice, m_N_img).array() >= 11) && (qualityAssessmentBand.block(pix_offset, 0, N_pix_slice, m_N_img).array() <= 17));
+
+    }
+
+    template <class T, class U>
+    void writeOutputFiles(std::string fileName,
+                          T projectionRef,
+                          U noDataValue,
+                          double *geotransform,
+                          MatrixUI8& writeMatrix) {
+        GDALDriver *driver = GetGDALDriverManager()->GetDriverByName("GTiff");
+        GDALDataset *writeDataset = driver->Create(
+            (fileName).c_str(),
+            m_N_row, m_N_col, 1, GDT_Byte, nullptr
+        );        
+        writeDataset->SetProjection(projectionRef);
+        writeDataset->SetGeoTransform(geotransform);
+        GDALRasterBand *writeBand = writeDataset->GetRasterBand(1);
+        writeBand->SetNoDataValue(noDataValue);
+        char **papszOptions = NULL;
+        papszOptions = CSLSetNameValue(papszOptions, "COMPRESS", "LZW");
+        writeDataset->SetMetadata(papszOptions, "IMAGE_STRUCTURE");
+        CSLDestroy(papszOptions);
+        // Write the converted data to the new dataset
+        auto outWrite = writeBand->RasterIO(
+            GF_Write, 0, 0, m_N_row, m_N_col,
+            writeMatrix.data() + m_id * m_N_row * m_N_col,
+            m_N_row, m_N_col, GDT_Byte, 0, 0);
+        if (outWrite != CE_None) {
+            // @TODO: Reading was not successful for this file, handle it
+            std::cerr << "Error 33333333 \n";
+            std::cerr << "outWrite " << outWrite << "\n";
+        }
+        GDALClose(writeDataset);
 
     }
 

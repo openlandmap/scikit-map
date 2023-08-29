@@ -88,7 +88,7 @@ public:
         m_N_fft = N_fft;
         m_N_ext = N_ext;
         m_N_pix = N_pix;
-        auto fftw_flags = FFTW_MEASURE;
+        auto fftw_flags = FFTW_ESTIMATE;
         
         // Save the first row of the inputs since the planning could modify them
         T tmp_ts_ext_data[m_N_ext];
