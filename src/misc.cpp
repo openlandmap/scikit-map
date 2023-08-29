@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
 #include <gdal/gdal.h>
 #include <gdal/gdal_priv.h>
 #include <omp.h>
@@ -22,5 +23,11 @@ std::vector<std::string> outDatesEnd = {
     "1231",
 };
 
-using ReadMatrix = Eigen::Matrix<uint16_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
-using WriteMatrix = Eigen::Matrix<uint8_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+// RowMajor to match the WrapFFT format
+using MatrixFloat = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using MatrixComplexFloat = Eigen::Matrix<std::complex<float>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+// ColMajor to match the GDAL format
+using MatrixUI16 = Eigen::Matrix<unsigned short, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+using MatrixUI8 = Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+using MatrixBool = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+using size_t = std::size_t;
