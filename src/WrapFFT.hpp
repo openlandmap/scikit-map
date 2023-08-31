@@ -43,9 +43,9 @@ private:
     
     using ComplexType = typename TypesFFTW<T>::ComplexType;
     using PlanType = typename TypesFFTW<T>::PlanType;
-    unsigned int m_N_fft;
-    unsigned int m_N_ext;
-    unsigned int m_N_pix;
+    std::size_t m_N_fft;
+    std::size_t m_N_ext;
+    std::size_t m_N_pix;
     T* m_in_forward;
     ComplexType* m_out_forward;
     ComplexType* m_in_backward;
@@ -63,23 +63,29 @@ private:
 
     void computeMultipleFFT(PlanType fftPlan_fw, T* data, std::complex<T>* fft_data) {
         // Compute the forward transforms 
-        for (unsigned int i = 0; i < m_N_pix; ++i) {
+        for (std::size_t i = 0; i < m_N_pix; ++i) {
             TypesFFTW<T>::ExecuteDFT_R2C(fftPlan_fw, data + i * m_N_ext, reinterpret_cast<ComplexType*>(fft_data) + i * m_N_fft);
         }
     }
 
     void computeMultipleIFFT(PlanType fftPlan_bw, std::complex<T>* fft_data, T* data) {
         // Compute the backward transforms 
-        for (unsigned int i = 0; i < m_N_pix; ++i) {
+        for (std::size_t i = 0; i < m_N_pix; ++i) {
             TypesFFTW<T>::ExecuteDFT_C2R(fftPlan_bw, reinterpret_cast<ComplexType*>(fft_data) + i * m_N_fft, data + i * m_N_ext);
         }
     }
 
 public:
     // Constructorfftw_plan_dft_r2c_1dm
-    WrapFFT(unsigned int N_fft,
-            unsigned int N_ext,
-            unsigned int N_pix,
+    WrapFFT(std::size_t N_fft,
+            std::size_t N_ext,
+            std::size_t N_pix,
+            PlanType fftPlan_fw_ts,
+            PlanType fftPlan_fw_mask,
+            PlanType fftPlan_bw_conv_ts,
+            PlanType fftPlan_bw_conv_mask,
+            PlanType plan_forward,
+            PlanType plan_backward,
             T* ts_ext_data,
             T* mask_ext_data, 
             std::complex<T>* ts_ext_fft_data, 
@@ -88,16 +94,7 @@ public:
         m_N_fft = N_fft;
         m_N_ext = N_ext;
         m_N_pix = N_pix;
-        auto fftw_flags = FFTW_ESTIMATE;
         
-        // Save the first row of the inputs since the planning could modify them
-        T tmp_ts_ext_data[m_N_ext];
-        T tmp_mask_ext_data[m_N_ext];
-        for(unsigned int i = 0; i < m_N_ext; ++i) {
-            tmp_ts_ext_data[i] = ts_ext_data[i];
-            tmp_mask_ext_data[i] = mask_ext_data[i];
-        }
-
         // Create input and output arrays
         m_ts_ext_data = ts_ext_data;
         m_mask_ext_data = mask_ext_data;    
@@ -109,39 +106,35 @@ public:
         m_out_backward = (T*)TypesFFTW<T>::Malloc(sizeof(T) * m_N_ext);
 
         // Create plans for forward and backward DFT (Discrete Fourier Transform)
-        m_fftPlan_fw_ts = TypesFFTW<T>::PlanDFT_R2C(m_N_ext, m_ts_ext_data, reinterpret_cast<ComplexType*>(m_ts_ext_fft_data), fftw_flags);
-        m_fftPlan_fw_mask = TypesFFTW<T>::PlanDFT_R2C(m_N_ext, m_mask_ext_data, reinterpret_cast<ComplexType*>(m_mask_ext_fft_data), fftw_flags);
-        m_fftPlan_bw_conv_ts = TypesFFTW<T>::PlanDFT_C2R(m_N_ext, reinterpret_cast<ComplexType*>(m_ts_ext_fft_data), m_ts_ext_data, fftw_flags);
-        m_fftPlan_bw_conv_mask = TypesFFTW<T>::PlanDFT_C2R(m_N_ext, reinterpret_cast<ComplexType*>(m_mask_ext_fft_data), m_mask_ext_data, fftw_flags);
-        m_plan_forward = TypesFFTW<T>::PlanDFT_R2C(N_ext, m_in_forward, m_out_forward, fftw_flags);
-        m_plan_backward = TypesFFTW<T>::PlanDFT_C2R(N_ext, m_in_backward, m_out_backward, fftw_flags);
+        m_fftPlan_fw_ts = fftPlan_fw_ts;
+        m_fftPlan_fw_mask = fftPlan_fw_mask;
+        m_fftPlan_bw_conv_ts = fftPlan_bw_conv_ts;
+        m_fftPlan_bw_conv_mask = fftPlan_bw_conv_mask;
+        m_plan_forward = plan_forward;
+        m_plan_backward = plan_backward;
         
-        for(unsigned int i = 0; i < m_N_ext; ++i) {
-            ts_ext_data[i] = tmp_ts_ext_data[i];
-            mask_ext_data[i] = tmp_mask_ext_data[i];
-        }
     }
 
     void computeFFT(const Eigen::Matrix<T, Eigen::Dynamic, 1>& vec_in, Eigen::Ref<Eigen::Matrix<std::complex<T>, Eigen::Dynamic, 1>> vec_out) {
         // Compute the forward transform
-        for (unsigned int i = 0; i < m_N_ext; ++i) {
+        for (std::size_t i = 0; i < m_N_ext; ++i) {
             m_in_forward[i] = vec_in(i);
         }
         TypesFFTW<T>::Execute(m_plan_forward);
         const std::complex<T> im(0.0, 1.0);
-        for (unsigned int i = 0; i < m_N_fft; ++i) {
+        for (std::size_t i = 0; i < m_N_fft; ++i) {
             vec_out(i) = m_out_forward[i][0] + m_out_forward[i][1]*im;
         }
     }
 
     void computeIFFT(const Eigen::Matrix<std::complex<T>, Eigen::Dynamic, 1>& vec_in, Eigen::Ref<Eigen::Matrix<T, Eigen::Dynamic, 1>> vec_out) {
         // Compute the backward transform
-        for (unsigned int i = 0; i < m_N_fft; ++i) {
+        for (std::size_t i = 0; i < m_N_fft; ++i) {
             m_in_backward[i][0] = vec_in[i].real()/m_N_ext;
             m_in_backward[i][1] = vec_in[i].imag()/m_N_ext;
         }
         TypesFFTW<T>::Execute(m_plan_backward);
-        for (unsigned int i = 0; i < m_N_ext; ++i) {
+        for (std::size_t i = 0; i < m_N_ext; ++i) {
             vec_out(i) = m_out_backward[i];
         }
     }
@@ -168,15 +161,9 @@ public:
 
     void clean() {
          // Clean up
-        TypesFFTW<T>::DestroyPlan(m_plan_forward);
         TypesFFTW<T>::Free(m_in_forward);
         TypesFFTW<T>::Free(m_out_forward);
-        TypesFFTW<T>::DestroyPlan(m_plan_backward);
         TypesFFTW<T>::Free(m_in_backward);
         TypesFFTW<T>::Free(m_out_backward);
-        TypesFFTW<T>::DestroyPlan(m_fftPlan_bw_conv_ts);
-        TypesFFTW<T>::DestroyPlan(m_fftPlan_bw_conv_mask);
-        TypesFFTW<T>::DestroyPlan(m_fftPlan_fw_ts);
-        TypesFFTW<T>::DestroyPlan(m_fftPlan_fw_mask);
     }
 };
