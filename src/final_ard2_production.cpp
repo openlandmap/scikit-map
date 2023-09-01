@@ -14,11 +14,11 @@ int main() {
     auto t_start = std::chrono::high_resolution_clock::now();
 
     // ################################################
-    // #############Input parameters ##################
+    // ############ Input parameters ##################
     // ################################################
     std::string tile = "034E_10N";
     size_t start_year = 1997;
-    size_t end_year = 1998;
+    size_t end_year = 2022;
     size_t N_threads = 96;
     size_t N_bands = 8;
     size_t N_aggr = 4; // Aggregation
@@ -32,7 +32,8 @@ int main() {
                                    savingScaling1,
                                    savingScaling1,
                                    savingScaling1,
-                                   savingScaling2};
+                                   savingScaling2,
+                                   1.};
     std::string out_folder = "/mnt/inca/ard2_production/scikit-map/src/" + tile;
 
     // ################################################
@@ -153,9 +154,7 @@ int main() {
     // ################## Reading, processing and saving data ################
     // #######################################################################
 
-
-    // ################## Stage 1 ################
-
+    MatrixUI8 writeData(N_pix*N_bands, N_aimg);
     { // Use blocks to automatically delate not used Eigen matricies band after extracting the mask
         MatrixFloat aggrData(N_pix*N_bands, N_aimg);
         {
@@ -174,13 +173,14 @@ int main() {
             }
             std::cout << "Done " << toc(t_tmp) << " s \n";
 
-            std::cout << "Creating the clear sky mask" << "\n";
+            std::cout << "Creating the clear-sky mask" << "\n";
             t_tmp = tic();
+            MatrixBool clearSkyMask(N_pix, N_img);
             N_slice = N_threads;
             #pragma omp parallel for
             for (size_t i = 0; i < N_slice; ++i) {        
                 LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-                lsp.processMaskMB<MatrixUI16>(bandsData, offsetQA);
+                lsp.processMaskMB<MatrixUI16>(bandsData, clearSkyMask, offsetQA);
             }
             std::cout << "Done " << toc(t_tmp) << " s \n";
 
@@ -195,79 +195,138 @@ int main() {
             std::cout << "Done " << toc(t_tmp) << " s \n";
 
             std::cout << "Setting to zero the non clear-sky pixels" << "\n";
+            std::cout << "####### TODOOOOOO precompute the boolean mask for all the bands" << "\n";
             t_tmp = tic();
             N_slice = N_threads;
-            for (size_t b = 0; b < N_bands; ++b) {
+            for (size_t b = 0; b < N_bands-1; ++b) {
                 size_t bandOffset = b*N_pix;
-                std::cout << "---- Band " << b << "\n";
+                // std::cout << "---- Band " << b+1 << "\n";
                 #pragma omp parallel for
                 for (size_t i = 0; i < N_slice; ++i) {        
                     LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-                    lsp.maskDataMB(bandOffset, offsetQA, bandsData);
+                    lsp.maskDataMB(bandOffset, clearSkyMask, bandsData);
                 }
             }
-
-
             std::cout << "Done " << toc(t_tmp) << " s \n";            
 
-            std::cout << "Computing wighted summation for the aggregation" << "\n";
-            t_tmp = tic();
-            N_slice = N_threads;
-            #pragma omp parallel for
-            for (size_t i = 0; i < N_slice; ++i) {        
-                LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-                lsp.aggregationSummationMB(bandsData, N_bands, clearSkyFraction, aggrData);
-            }
-            std::cout << "Done " << toc(t_tmp) << " s \n";
-
-            std::cout << "QA band \n";
-            std::cout << bandsData.block(offsetQA,0,2,10) << std::endl;
-            std::cout << "Aggr band QA \n";
-            std::cout << aggrData.block(offsetQA,0,2,10) << std::endl;
-
-            std::cout << "Read band 0 \n";
-            std::cout << bandsData.block(0,0,2,10) << std::endl;
-
-            std::cout << "Aggr band 0 \n";
-            std::cout << aggrData.block(0,0,2,10) << std::endl;
-
-
-
-            std::cout << "Setting to zero the non clear-sky pixels" << "\n";
+            std::cout << "Computing wighted summation for the aggregation" << "\n";            
+            std::cout << "####### TODOOOOOO do not split by band but only by threads" << "\n";
             t_tmp = tic();
             N_slice = N_threads;
             for (size_t b = 0; b < N_bands; ++b) {
                 size_t bandOffset = b*N_pix;
-                std::cout << "---- Band " << b << "\n";
+                // std::cout << "---- Band " << b << "\n";
                 #pragma omp parallel for
                 for (size_t i = 0; i < N_slice; ++i) {        
                     LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-                    lsp.normalizeAggrDataMB(bandOffset, offsetQA, aggrData);
+                    lsp.aggregationSummationMB(bandsData, bandOffset, clearSkyFraction, aggrData, scalings[b]);
                 }
             }
+            std::cout << "Done " << toc(t_tmp) << " s \n";    
+        }
+        
+        std::cout << "Creating gap mask" << "\n";
+        MatrixBool gapMask(N_pix, N_aimg);
+        t_tmp = tic();
+        N_slice = N_aimg;
+        #pragma omp parallel for
+        for (size_t i = 0; i < N_slice; ++i) {        
+            LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
+            lsp.creatingGapMaskMB(offsetQA, aggrData, gapMask);
+        }
+        std::cout << "Done " << toc(t_tmp) << " s \n";
 
-
-
-
-            std::cout << "Creating validity mask" << "\n";
-            t_tmp = tic();
-            N_slice = N_aimg;
+        std::cout << "Normalizing the aggregated values" << "\n";
+        t_tmp = tic();
+        N_slice = N_threads;
+        for (size_t b = 0; b < N_bands; ++b) {
+            size_t bandOffset = b*N_pix;
             #pragma omp parallel for
             for (size_t i = 0; i < N_slice; ++i) {        
                 LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-                lsp.creatingValidityMaskMB(offsetQA, aggrData);
+                lsp.normalizeAggrDataMB(bandOffset, offsetQA, aggrData, gapMask);
             }
-            std::cout << "Done " << toc(t_tmp) << " s \n";
-
         }
-            std::cout << "Remember to put the scaling per band when moving to tensorial representation" << "\n";
-            std::cout << "Remember to put the scaling per band when moving to tensorial representation" << "\n";
-            std::cout << "Remember to put the scaling per band when moving to tensorial representation" << "\n";
-            std::cout << "Remember to put the scaling per band when moving to tensorial representation" << "\n";
-            std::cout << "Remember to put the scaling per band when moving to tensorial representation" << "\n";
-            std::cout << "Remember to put the scaling per band when moving to tensorial representation" << "\n";
+        std::cout << "Done " << toc(t_tmp) << " s \n";
 
+        std::cout << "Computing convolution vector" << "\n";
+        t_tmp = tic();
+        TypesEigen<float>::VectorReal normQa(N_ext);
+        TypesEigen<float>::VectorComplex convExtFFT(N_fft);
+        LandsatPipelineMultiBand lsp(0, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
+        lsp.computeConvolutionVectorMB(normQa, convExtFFT, 
+            fftPlan_fw_ts, fftPlan_fw_mask, fftPlan_bw_conv_ts, fftPlan_bw_conv_mask,
+            plan_forward, plan_backward, attSeas, attEnv);
+        std::cout << "Done " << toc(t_tmp) << " s \n";
+
+        std::cout << "Performing the convolution for SeasConv" << "\n";
+        MatrixFloat convData(N_pix*N_bands, N_aimg);
+        t_tmp = tic();
+        N_slice = N_threads;
+        for (size_t b = 0; b < N_bands; ++b) {
+            size_t bandOffset = b*N_pix;
+            // std::cout << "---- Band " << b << "\n";
+            #pragma omp parallel for
+            for (size_t i = 0; i < N_slice; ++i) {        
+                LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
+                lsp.convolutionSeasConvMB(bandOffset, aggrData, convData, convExtFFT,
+                    fftPlan_fw_ts, fftPlan_fw_mask, fftPlan_bw_conv_ts, fftPlan_bw_conv_mask, plan_forward, plan_backward);
+            }
+        }
+        std::cout << "Done " << toc(t_tmp) << " s \n";
+
+        std::cout << "Renormalizing the gap-filled data" << "\n";
+        t_tmp = tic();
+        N_slice = N_threads;
+        for (size_t b = 0; b < N_bands-1; ++b) {
+            size_t bandOffset = b*N_pix;
+            // std::cout << "---- Band " << b << "\n";
+            #pragma omp parallel for
+            for (size_t i = 0; i < N_slice; ++i) {        
+                LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
+                lsp.renormalizeSeasConvMB(bandOffset, offsetQA, convData, aggrData, gapMask, writeData);
+            }
+        }
+        std::cout << "Done " << toc(t_tmp) << " s \n";
+
+        std::cout << "Extracting the QA band" << "\n";
+        t_tmp = tic();
+        N_slice = N_threads;
+        #pragma omp parallel for
+        for (size_t i = 0; i < N_slice; ++i) {        
+            LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
+            lsp.extractQaMB(normQa, offsetQA, convData, gapMask, writeData);
+        }
+        std::cout << "Done " << toc(t_tmp) << " s \n";
+
+
+        std::cout << "#################################### \n";
+        std::cout << "Aggregated band 0 \n";
+        std::cout << aggrData.block(0+1,0,3,12) << std::endl;
+        std::cout << "Aggregated QA \n";
+        std::cout << aggrData.block(offsetQA+1,0,3,12) << std::endl;
+        std::cout << "Gap-filled band 0  \n";
+        std::cout << convData.block(0+1,0,3,12) << std::endl;
+        std::cout << "Gap-filled QA  \n";
+        std::cout << convData.block(offsetQA+1,0,3,12) << std::endl;
+        std::cout << "Final band 0 \n";
+        std::cout << writeData.block(0+1,0,3,12).cast<int>() << std::endl;
+        std::cout << "Final QA \n";
+        std::cout << writeData.block(offsetQA+1,0,3,12).cast<int>() << std::endl;
     }
+
+    std::cout << "Saving files" << "\n";
+    t_tmp = tic();
+    N_slice = N_aimg;
+    for (size_t b = 0; b < N_bands; ++b) {
+        size_t bandOffset = b*N_pix;
+        #pragma omp parallel for
+        for (size_t i = 0; i < N_slice; ++i) {        
+            LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
+            lsp.writeOutputFilesMB(filePathsWrite[b][i], projectionRef, noDataValue, geotransform, writeData, bandOffset);
+        }
+    }
+    std::cout << "Done " << toc(t_tmp) << " s \n";
 
     std::cout << "Total time " << toc(t_start) << " s \n";
 
