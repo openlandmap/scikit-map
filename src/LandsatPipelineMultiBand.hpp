@@ -48,8 +48,8 @@ public:
         m_slice_read_step = m_N_slice - m_N_slice_read*m_N_slice + N_img;
         m_N_slice_proc = std::ceil((float)m_N_pix/(float)m_N_slice);
         m_slice_proc_step = m_N_slice - m_N_slice_proc*m_N_slice + m_N_pix;
-        m_N_slice_procMB = std::ceil((float)m_N_pix*N_bands/(float)m_N_slice);
-        m_slice_proc_stepMB = m_N_slice - m_N_slice_proc*m_N_slice + m_N_pix*N_bands;
+        m_N_slice_procMB = std::ceil((float)(m_N_pix*N_bands)/(float)m_N_slice);
+        m_slice_proc_stepMB = m_N_slice - m_N_slice_procMB*m_N_slice + m_N_pix*N_bands;
     }
 
 
@@ -61,22 +61,27 @@ public:
                         GDALDataType readType) {
         GDALDataset *readDataset = (GDALDataset *)GDALOpen(fileUrl.c_str(), GA_ReadOnly);
         if (readDataset == nullptr) {
-            // @TODO: Handle error
-            std::cerr << "Error 1111111 \n";
+            bandsData.block(0, m_id, m_N_row * m_N_col * N_bands, 1).setZero();
+            std::cerr << "scikit-map ERROR 1: issues in opening the file with URL " << fileUrl << std::endl;
+            std::cout << "Issues in opening the file with URL " << fileUrl << ", considering as gap." << std::endl;
             GDALClose(readDataset);
-        }
-        // Read the data for one band
-        CPLErr outRead = readDataset->RasterIO(GF_Read, 0, 0, m_N_row, m_N_col, bandsData.data() + m_id * m_N_row * m_N_col * N_bands,
-                           m_N_row, m_N_col, readType, N_bands, bandList, 0, 0, 0);
-        if (outRead != CE_None) {
-            // @TODO: Reading was not successful for this file, handle it
-            std::cerr << "Error 2222222222 \n";
-            std::cerr << "outRead " << outRead << "\n";
+        } else
+        {
+            // Read the data for one band
+            CPLErr outRead = readDataset->RasterIO(GF_Read, 0, 0, m_N_row, m_N_col, bandsData.data() + m_id * m_N_row * m_N_col * N_bands,
+                               m_N_row, m_N_col, readType, N_bands, bandList, 0, 0, 0);
+           
+            if (outRead != CE_None) {
+                bandsData.block(0, m_id, m_N_row * m_N_col * N_bands, 1).setZero();
+                std::cerr << "Error 2: issues in reading the file with URL " << fileUrl << std::endl;
+                std::cout << "Issues in reading the file with URL " << fileUrl << ", considering as gap." << std::endl;
+                GDALClose(readDataset);
+            }
             GDALClose(readDataset);
-        GDALClose(readDataset);
         }
     }
 
+    
     template <class ReadMatrix>
     void processMaskMB(ReadMatrix& bandsData,
                        MatrixBool& clearSkyMask,
@@ -97,7 +102,8 @@ public:
           || ((bandsData.block(band_offset, 0, N_pix_slice, m_N_img).array() >= 11) && (bandsData.block(band_offset, 0, N_pix_slice, m_N_img).array() <= 17));
 
         bandsData.block(band_offset, 0, N_pix_slice, m_N_img).setZero();
-        bandsData.block(band_offset, 0, N_pix_slice, m_N_img) = clearSkyMask.select((unsigned short) 1, bandsData.block(band_offset, 0, N_pix_slice, m_N_img));
+        bandsData.block(band_offset, 0, N_pix_slice, m_N_img) = clearSkyMask.block(band_offset - offset, 0, N_pix_slice, m_N_img).select(
+            (unsigned short) 1, bandsData.block(band_offset, 0, N_pix_slice, m_N_img));
     }
 
     void computeClearSkyFractionMB(TypesEigen<float>::VectorReal& clearSkyFraction,
@@ -124,18 +130,16 @@ public:
     }
 
     void aggregationSummationMB(MatrixUI16& bandsData,
-                                size_t bandOffset,
                                 TypesEigen<float>::VectorReal& clearSkyFraction,
-                                MatrixFloat& aggrData,
-                                float scaling) {
+                                MatrixFloat& aggrData) {
         size_t band_offset;
         size_t N_pix_slice;
-        if (m_id < m_slice_proc_step) {
-            band_offset = bandOffset + m_id * m_N_slice_proc;
-            N_pix_slice = m_N_slice_proc;
+        if (m_id < m_slice_proc_stepMB) {
+            band_offset = m_id * m_N_slice_procMB;
+            N_pix_slice = m_N_slice_procMB;
         } else {
-            band_offset = bandOffset + m_N_slice_proc * m_slice_proc_step + (m_N_slice_proc - 1) * (m_id - m_slice_proc_step);
-            N_pix_slice = m_N_slice_proc - 1;
+            band_offset = m_N_slice_procMB * m_slice_proc_stepMB + (m_N_slice_procMB - 1) * (m_id - m_slice_proc_stepMB);
+            N_pix_slice = m_N_slice_procMB - 1;
         }
 
         Eigen::SparseMatrix<float> aggMatrix(m_N_img, m_N_aimg);
@@ -154,7 +158,7 @@ public:
         }
         aggMatrix.finalize();
 
-        aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg) = bandsData.block(band_offset, 0, N_pix_slice, m_N_img).cast<float>() * (aggMatrix * scaling);
+        aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg) = bandsData.block(band_offset, 0, N_pix_slice, m_N_img).cast<float>() * aggMatrix;
     }
 
 
@@ -164,6 +168,7 @@ public:
 
     void normalizeAggrDataMB(size_t bandOffset,
                              size_t maskOffset,
+                             float scaling,
                              MatrixFloat& aggrData,
                              MatrixBool& gapMask) {
         size_t band_offset;
@@ -179,7 +184,7 @@ public:
             N_pix_slice = m_N_slice_proc - 1;
         }
 
-        aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg).array() /= aggrData.block(mask_offset, 0, N_pix_slice, m_N_aimg).array();
+        aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg).array() /= (aggrData.block(mask_offset, 0, N_pix_slice, m_N_aimg).array() / scaling);
         aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg) = gapMask.block(mask_offset-maskOffset, 0, N_pix_slice, m_N_aimg).select(
             0., aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg));
     }
@@ -187,53 +192,39 @@ public:
 
     void computeConvolutionVectorMB(TypesEigen<float>::VectorReal& normQa,
                                     TypesEigen<float>::VectorComplex& convExtFFT,
-                                    TypesFFTW<float>::PlanType fftPlan_fw_ts,
-                                    TypesFFTW<float>::PlanType fftPlan_fw_mask,
-                                    TypesFFTW<float>::PlanType fftPlan_bw_conv_ts,
-                                    TypesFFTW<float>::PlanType fftPlan_bw_conv_mask,
-                                    TypesFFTW<float>::PlanType plan_forward,
-                                    TypesFFTW<float>::PlanType plan_backward,
                                     float attSeas,
                                     float attEnv) {
 
-        using VectorReal = typename TypesEigen<float>::VectorReal;
-        using VectorComplex = typename TypesEigen<float>::VectorComplex;
         size_t N_ext = m_N_aimg * 2;
         size_t N_fft = m_N_aimg + 1;
-        MatrixFloat tmp1 = MatrixFloat::Zero(1, N_ext);
-        MatrixFloat tmp2 = MatrixFloat::Zero(1, N_ext);
-        MatrixComplexFloat tmp3 = MatrixComplexFloat::Zero(1, N_fft);
-        MatrixComplexFloat tmp4 = MatrixComplexFloat::Zero(1, N_fft);
         // Plan the FFT computation
-        WrapFFT<float> wrapFFT = WrapFFT<float>(N_fft, N_ext, 1,
-                                                fftPlan_fw_ts,
-                                                fftPlan_fw_mask,
-                                                fftPlan_bw_conv_ts,
-                                                fftPlan_bw_conv_mask,
-                                                plan_forward,
-                                                plan_backward,
-                                                tmp1.data(), 
-                                                tmp1.data(),
-                                                tmp3.data(),
-                                                tmp4.data());
 
         TypesEigen<float>::VectorReal conv(m_N_aimg);
-        TypesEigen<float>::VectorReal convExt = VectorReal::Ones(N_ext);
+        TypesEigen<float>::VectorReal convExt(N_ext);
+
+        fftwf_plan plan_forward = 
+            fftwf_plan_dft_r2c_1d(N_ext, convExt.data(), reinterpret_cast<fftwf_complex*>(convExtFFT.data()), FFTW_MEASURE);
+        fftwf_plan plan_backward = 
+            fftwf_plan_dft_c2r_1d(N_ext, reinterpret_cast<fftwf_complex*>(convExtFFT.data()), convExt.data(), FFTW_MEASURE);
+
+        convExt.setOnes();
         TypesEigen<float>::VectorComplex normQaFFT(N_fft);
         compute_conv_vec<float>(conv, m_N_years, m_N_aipy, attSeas, attEnv);
         convExt.segment(0,m_N_aimg) = conv;
         convExt.segment(m_N_aimg+1, m_N_aimg-1) = conv.reverse().segment(0,m_N_aimg-1);
         normQa.setOnes();
-        normQa.segment(m_N_aimg, m_N_aimg) = VectorReal::Zero(m_N_aimg);
+        normQa.segment(m_N_aimg, m_N_aimg).setZero();
         normQa(0) = 0.;
 
-        wrapFFT.computeFFT(convExt, convExtFFT);
-        wrapFFT.computeFFT(normQa, normQaFFT);
-        normQaFFT.array() *= convExtFFT.array();
+        fftwf_execute_dft_r2c(plan_forward, convExt.data(), reinterpret_cast<fftwf_complex*>(convExtFFT.data()));
+        fftwf_execute_dft_r2c(plan_forward, normQa.data(), reinterpret_cast<fftwf_complex*>(normQaFFT.data()));
 
-        // Compute forward transformations
-        wrapFFT.computeIFFT(normQaFFT, normQa);
-        wrapFFT.clean();
+        normQaFFT.array() *= convExtFFT.array()/N_ext;
+
+        fftwf_execute_dft_c2r(plan_backward, reinterpret_cast<fftwf_complex*>(normQaFFT.data()), normQa.data());
+
+        fftwf_destroy_plan(plan_forward);
+        fftwf_destroy_plan(plan_backward);
     }
 
 
@@ -241,12 +232,9 @@ public:
                                MatrixFloat& aggrData,
                                MatrixFloat& convData,
                                TypesEigen<float>::VectorComplex convExtFFT,
-                               TypesFFTW<float>::PlanType fftPlan_fw_ts,
-                               TypesFFTW<float>::PlanType fftPlan_fw_mask,
-                               TypesFFTW<float>::PlanType fftPlan_bw_conv_ts,
-                               TypesFFTW<float>::PlanType fftPlan_bw_conv_mask,
-                               TypesFFTW<float>::PlanType plan_forward,
-                               TypesFFTW<float>::PlanType plan_backward) {
+                               fftwf_plan plan_forward,
+                               fftwf_plan plan_backward) {
+
         size_t band_offset;
         size_t N_pix_slice;
         if (m_id < m_slice_proc_step) {
@@ -261,33 +249,23 @@ public:
         size_t N_fft = m_N_aimg + 1;
 
         MatrixFloat aggrDataExt = MatrixFloat::Zero(N_pix_slice, N_ext);
-        MatrixFloat tmp1(N_pix_slice, N_ext);
         MatrixComplexFloat aggrMatrixFFT = MatrixComplexFloat::Zero(N_pix_slice, N_fft);
-        MatrixComplexFloat tmp2(N_pix_slice, N_fft);
-        // Plan the FFT computation
-        WrapFFT<float> wrapFFT = WrapFFT<float>(N_fft, N_ext, N_pix_slice,
-                                                fftPlan_fw_ts,
-                                                fftPlan_fw_mask,
-                                                fftPlan_bw_conv_ts,
-                                                fftPlan_bw_conv_mask,
-                                                plan_forward,
-                                                plan_backward,
-                                                aggrDataExt.data(), 
-                                                tmp1.data(),
-                                                aggrMatrixFFT.data(),
-                                                tmp2.data());
      
         aggrDataExt.block(0, 0, N_pix_slice, m_N_aimg) = aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg);
 
-        // Compute forward transformations    
-        wrapFFT.computeTimeserisFFT();
+        // Compute the forward transforms 
+        for (std::size_t i = 0; i < N_pix_slice; ++i) {
+            fftwf_execute_dft_r2c(plan_forward, aggrDataExt.data() + i * N_ext, reinterpret_cast<fftwf_complex*>(aggrMatrixFFT.data()) + i * N_fft);
+        }
+        
         // Convolve the vectors
         aggrMatrixFFT.array().rowwise() *= convExtFFT.array().transpose();
 
         // Compute backward transformations
-        wrapFFT.computeTimeserisIFFT();
-        wrapFFT.clean();
-
+        for (std::size_t i = 0; i < N_pix_slice; ++i) {
+            fftwf_execute_dft_c2r(plan_backward, reinterpret_cast<fftwf_complex*>(aggrMatrixFFT.data()) + i * N_fft, aggrDataExt.data() + i * N_ext);
+        }
+        
         convData.block(band_offset, 0, N_pix_slice, m_N_aimg) = aggrDataExt.block(0, 0, N_pix_slice, m_N_aimg);
     }
 
@@ -376,22 +354,24 @@ public:
     }
 
 
+  
     template <class T, class U>
     void writeOutputFilesMB(std::string fileName,
-                          T projectionRef,
-                          U noDataValue,
+                          T projection,
+                          U spatialRef,
                           double *geotransform,
                           MatrixUI8& writeData,
-                          size_t bandOffset) {
+                          size_t dateOffset) {
         GDALDriver *driver = GetGDALDriverManager()->GetDriverByName("GTiff");
         GDALDataset *writeDataset = driver->Create(
             (fileName).c_str(),
             m_N_row, m_N_col, 1, GDT_Byte, nullptr
         );        
-        writeDataset->SetProjection(projectionRef);
         writeDataset->SetGeoTransform(geotransform);
+        writeDataset->SetSpatialRef(spatialRef);
+        writeDataset->SetProjection(projection);
         GDALRasterBand *writeBand = writeDataset->GetRasterBand(1);
-        writeBand->SetNoDataValue(noDataValue);
+        writeBand->SetNoDataValue(255);
         char **papszOptions = NULL;
         papszOptions = CSLSetNameValue(papszOptions, "COMPRESS", "LZW");
         writeDataset->SetMetadata(papszOptions, "IMAGE_STRUCTURE");
@@ -399,15 +379,14 @@ public:
         // Write the converted data to the new dataset
         auto outWrite = writeBand->RasterIO(
             GF_Write, 0, 0, m_N_row, m_N_col,
-            writeData.data() + m_id * m_N_row * m_N_col + bandOffset,
+            writeData.data() + m_id * m_N_row * m_N_col + dateOffset,
             m_N_row, m_N_col, GDT_Byte, 0, 0);
         if (outWrite != CE_None) {
-            // @TODO: Reading was not successful for this file, handle it
-            std::cerr << "Error 33333333 \n";
-            std::cerr << "outWrite " << outWrite << "\n";
+            std::cerr << "scikit-map ERROR 3: issues in writing the file " << fileName << std::endl;
+            std::cout << "scikit-map ERROR 3: issues in writing the file " << fileName << ", blocking the execution." << std::endl;
+            assert(false);
         }
         GDALClose(writeDataset);
-
     }
 
 

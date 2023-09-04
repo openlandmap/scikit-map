@@ -6,6 +6,8 @@
 #include <gdal/gdal_priv.h>
 #include <omp.h>
 #include <chrono>
+#include <cassert>
+#include <iomanip>
 
 std::vector<std::string> outDatesStart = {
     "0101",
