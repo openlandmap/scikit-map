@@ -38,7 +38,7 @@ from rasterio.windows import Window
 import bottleneck as bn
 
 from IPython.display import HTML
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, Memory
 from tempfile import TemporaryDirectory
 from io import BytesIO
 from base64 import encodebytes, b64decode
@@ -1012,7 +1012,6 @@ class RasterData(SKMapBase):
     return titles
 
   def _pop_imgs(self, ind, vmin, vmax, cmap, scale, titles, fontsize, legend_title, cbar=False):
-    from matplotlib.font_manager import FontProperties, findfont, get_font
 
     fig, ax = pyplot.subplots()
     datasize = self.array.shape[:2]
@@ -1020,30 +1019,9 @@ class RasterData(SKMapBase):
     fig.set_size_inches(4*scale, ratio*4*scale)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
     ax.imshow(self.array[:,:,ind], vmin=vmin, vmax=vmax, cmap=cmap)
-    
-    '''
-    if len(titles[ind]) > 25:
-      bbox = ax.get_window_extent()
-      dpi = fig.dpi
-      height = bbox.height/dpi
-      width  = bbox.width /dpi
 
-      props = FontProperties()
-      font = get_font(findfont(props))
-      font.set_size(props.get_size_in_points(), fig.dpi)
-      font.set_text(titles[ind])
-      w, _ = font.get_width_height()
-      subpixles = 64
-      adj_size = props.get_size_in_points() * width  / w * subpixles
-      props.set_size(adj_size)
-
-    ax.annotate(titles[ind], (.5,.5), fontproperties=props)
-    print(titles[ind])
-    '''
-    # somehow need to find right fontsize for different datasizes
     ax.set_title(titles[ind], pad=2, fontsize=fontsize, fontweight='bold')
 
-    buffer = BytesIO()
     if cbar:
       divider = make_axes_locatable(fig.axes[0])
       pyplot.colorbar(
@@ -1060,10 +1038,8 @@ class RasterData(SKMapBase):
     img64 = encodebytes(buffer.getvalue()).decode('ascii')
     buffer.seek(0)
     img = Image.open(buffer)
-    # buffer.close()
     pyplot.close()
-    #return img64
-    return (img, img64) # im = fig.get_images()[0] ax = fig.axes[0]
+    return (img, img64) 
 
   def animate(self, 
     cmap:str = 'Spectral_r', 
@@ -1088,7 +1064,7 @@ class RasterData(SKMapBase):
       it will be derived from the dataset if not defined.
     :param to_gif: this should be directory that indicating the location where user want to
       save the animation. Default is None
-    :param n_jobs: Number of parallel jobs used to read the raster files.
+    :param n_jobs: Number of parallel jobs used to read the raster files. Deafault is 4
     Examples
     ========
     from skmap.data import toy
@@ -1102,7 +1078,7 @@ class RasterData(SKMapBase):
 
     height,width = self.array.shape[:2]
     if width == height:
-      scale = 2
+      scale = 1.5
       fontsize=11
     elif width > height:
       scale = 2.5
@@ -1151,6 +1127,7 @@ class RasterData(SKMapBase):
         ))
       html_rep = path.read_text()
     return HTML(html_rep)
+  
 
   def plot(self, 
     cmap:str = 'Spectral_r',
@@ -1197,7 +1174,7 @@ class RasterData(SKMapBase):
     
     height,width = self.array.shape[:2]
     if width == height:
-      scale = 2
+      scale = 1.5
       fontsize=11
     elif width > height:
       scale = 2.5
@@ -1209,54 +1186,58 @@ class RasterData(SKMapBase):
     sem_img = Parallel(n_jobs=n_jobs)(delayed(self._pop_imgs)(i, vmin, vmax, cmap, scale, titles, fontsize, legend_title, False) for i in range(self.array.shape[2]))
 
     cols, rows = column, math.ceil(len(sem_img)/column)
-    subplot_frame = np.empty((rows,cols), dtype=object)
     width, height = np.array(sem_img[0][0].size)/np.array(sem_img[0][0].info['dpi'])
-    for index, img in enumerate(sem_img):
-      c,r = index % cols, int(index/cols)
-      subplot_frame[r,c] = img[0]
-    
-    grid_fig, grid_axes = pyplot.subplots(nrows=rows, ncols=cols)
     mpl.font_manager._get_font.cache_clear()
-    grid_fig.set_size_inches(width * cols + (cols-1) * 0.1 , height*rows + (rows-1)*0.1)
-    for ax, img in zip(grid_axes.ravel(), subplot_frame.ravel()):
-      try:
-        ax.axis('off')
-        ax.imshow(img)
-      except:
-        pass
-    grid_fig.subplots_adjust(hspace=0, wspace=0)
 
+    grid_fig, grid_axes = pyplot.subplots(nrows=rows, ncols=cols)
+    grid_fig.set_size_inches(width * cols + (cols-1) * 0.1 , height*rows + (rows-1)*0.1)
+
+
+    for ax, img in zip(grid_axes.ravel(), sem_img):
+      ax.axis('off')
+      ax.imshow(img[0])
+    
+    # clean the empty subplot frames
+    diff = len(grid_axes.ravel())-len(sem_img)
+    if diff != 0:
+      for i in range(1, diff+1):
+        grid_axes.ravel()[-i].axis('off')
+
+    grid_fig.subplots_adjust(hspace=0, wspace=0)
     buffer=BytesIO()
     grid_fig.savefig(buffer, format='png', bbox_inches='tight', dpi=100)
     buffer.seek(0)
     grid_image = Image.open(buffer)
     pyplot.close()
     mainplot = np.array(grid_image.size)/np.array(grid_image.info['dpi'])
-
     
     # colorscale
     fig_scale, ax_scale = pyplot.subplots()
     fig_scale.set_size_inches(mainplot[0], 0.4)
     fig_scale.subplots_adjust(bottom=0)
-    cmap_set = mpl.colormaps[cmap]
-    norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+    
     fig_scale.colorbar(
-      mpl.cm.ScalarMappable(norm=norm, cmap=cmap_set),
-      cax = ax_scale, orientation='horizontal', label = legend_title
+      mpl.cm.ScalarMappable(
+        norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax), 
+        cmap=mpl.colormaps[cmap]
+      ),
+      cax = ax_scale, 
+      orientation='horizontal', 
+      label = legend_title
     )
     buffer2=BytesIO()
 
     fig_scale.savefig(buffer2, format='png', bbox_inches='tight', dpi=100)
     pyplot.close()
+
     buffer2.seek(0)
     scale_image = Image.open(buffer2)
     
-    grid_image_size = np.array(grid_image.size)/np.array(grid_image.info['dpi'])
     scale_image_size =  np.array(scale_image.size)/np.array(scale_image.info['dpi'])
 
     final_figure = pyplot.figure()
     final_figure.set_size_inches(mainplot[0], mainplot[1]+1)
-    gs = mpl.gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[2, (grid_image_size/scale_image_size)[1]])
+    gs = mpl.gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[2, (mainplot/scale_image_size)[1]])
     ax0 = pyplot.subplot(gs[0])
     ax1 = pyplot.subplot(gs[1])
     ax0.axis('off')
@@ -1264,6 +1245,7 @@ class RasterData(SKMapBase):
     ax0.imshow(scale_image)
     ax1.imshow(grid_image)
     pyplot.subplots_adjust(hspace=0,wspace=0)
+
     if to_img is not None:
       final_figure.savefig(to_img, dpi=100, bbox_inches='tight')
       return to_img
@@ -1271,14 +1253,16 @@ class RasterData(SKMapBase):
       pyplot.close()
       return final_figure
 
-
-  def point_query(self, x:list, y:list, n_jobs:int=4, x_axis:str='index'):
+  def point_query(self, x:list, y:list, n_jobs:int=4, cols:int=2, x_axis:str='index'):
     """
-    Makes apoint queries on dataset and provide plots and data
+    Makes point queries on dataset and provide plots and data
 
     :param x: longitude value(s) of the given point(s)
     :param y: latitude value(s) of the given point(s)
-    :param x_axis: label if the x axis could ne index or date
+    :param n_jobs: worker count that is going to run in parallel to generate figure.
+      Default is 4.
+    :param cols: column count of the desired layout. Default is 3.
+    :param x_axis: label if the x axis could be `index`, `name`,`date` or None.
     :param n_jobs: processor count that will be used for multiprocessing
     """
     df = pd.DataFrame()
@@ -1296,14 +1280,28 @@ class RasterData(SKMapBase):
       pixel_coords=Parallel(n_jobs=n_jobs, backend='threading')(delayed(pick_pixels)(i) for i in range(len(x)))
     df['data'] = pixel_coords
     titles = self._get_titles(x_axis)
-    gridsize = math.ceil(math.sqrt(df.shape[0]))
-    fig, axs = pyplot.subplots(ncols=gridsize, nrows=gridsize, sharex='col', sharey='row')
+    
+    fig, axs = pyplot.subplots(ncols=cols, nrows=math.ceil(len(x)/cols), figsize=(6 * cols, 2 * math.ceil(len(x)/cols)), sharex=True, sharey=True)
 
-    for i, ax in enumerate(axs.flatten()):
-      try:
-        ax.plot(titles, df.iloc[i]['data'], '-o', color='blue', lw=1)
-        ax.set_title(str(df.iloc[i]['x']) + ',' + str(df.iloc[i]['y']), fontsize=3.5*gridsize)
-      except IndexError:
-        ax.axis('off')
+    try:
+      for i, ax in enumerate(axs.flatten()):
+        try:
+          ax.plot(titles, df.iloc[i]['data'], '-o', markersize=4, color='blue', lw=1)
+          ax.set_title(str(df.iloc[i]['x']) + ',' + str(df.iloc[i]['y']), fontsize=10)
+          ax.tick_params(axis='x',rotation=90)
+        except IndexError:
+          ax.axis('off')
+    except:
+      #pass
+      axs.plot(titles, df.iloc[0]['data'], '-o', markersize=4, color='blue', lw=1)
+      axs.set_title(str(df.iloc[0]['x']) + ',' + str(df.iloc[0]['y']), fontsize=10)
+    pyplot.tight_layout()
     pyplot.close()
     return dict(fig=fig, data=df.data.to_numpy())
+  
+
+
+    
+
+
+
