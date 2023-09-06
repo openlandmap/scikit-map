@@ -1020,7 +1020,7 @@ class RasterData(SKMapBase):
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
     ax.imshow(self.array[:,:,ind], vmin=vmin, vmax=vmax, cmap=cmap)
 
-    ax.set_title(titles[ind], pad=2, fontsize=fontsize, fontweight='bold')
+    ax.set_title(titles[ind], pad=8, fontsize=fontsize, fontweight='bold')
 
     if cbar:
       divider = make_axes_locatable(fig.axes[0])
@@ -1079,7 +1079,7 @@ class RasterData(SKMapBase):
     height,width = self.array.shape[:2]
     if width == height:
       scale = 1.5
-      fontsize=11
+      fontsize=8
     elif width > height:
       scale = 2.5
       fontsize=11
@@ -1092,7 +1092,8 @@ class RasterData(SKMapBase):
     else:
       vmin, vmax = v_minmax
     
-    semi_img = Parallel(n_jobs=n_jobs)(delayed(self._pop_imgs)(i, vmin,vmax,cmap, scale, titles, fontsize, legend_title, True) for i in range(self.array.shape[2]))
+    args = [(i,vmin,vmax,cmap, scale, titles, fontsize, legend_title, True) for i in range(self.array.shape[2])]
+    semi_img = [f for f in parallel.job(self._pop_imgs, args, n_jobs=n_jobs)]
 
     if to_gif is not None: # save as a GIF file
       with ExitStack() as stack:
@@ -1160,7 +1161,7 @@ class RasterData(SKMapBase):
     %matplotlib # to stop pouring out when calling the function. 
 
     data = toy.ndvi(gappy=True, verbose=True)
-    figure = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
+    figure = rdata.plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
     
     # to view in jupyter notebook  
     figure.show()   
@@ -1175,15 +1176,16 @@ class RasterData(SKMapBase):
     height,width = self.array.shape[:2]
     if width == height:
       scale = 1.5
-      fontsize=11
+      fontsize=9
     elif width > height:
       scale = 2.5
       fontsize=12.5
     else:
       scale= 1.5
-      fontsize=10
+      fontsize=9
     
-    sem_img = Parallel(n_jobs=n_jobs)(delayed(self._pop_imgs)(i, vmin, vmax, cmap, scale, titles, fontsize, legend_title, False) for i in range(self.array.shape[2]))
+    args = [(i, vmin, vmax, cmap, scale, titles, fontsize, legend_title, False) for i in range(self.array.shape[2])]
+    sem_img = [m for m in parallel.job(self._pop_imgs, args, n_jobs=n_jobs)]
 
     cols, rows = column, math.ceil(len(sem_img)/column)
     width, height = np.array(sem_img[0][0].size)/np.array(sem_img[0][0].info['dpi'])
@@ -1204,10 +1206,10 @@ class RasterData(SKMapBase):
         grid_axes.ravel()[-i].axis('off')
 
     grid_fig.subplots_adjust(hspace=0, wspace=0)
-    buffer=BytesIO()
-    grid_fig.savefig(buffer, format='png', bbox_inches='tight', dpi=100)
-    buffer.seek(0)
-    grid_image = Image.open(buffer)
+    buf_grid=BytesIO()
+    grid_fig.savefig(buf_grid, format='png', bbox_inches='tight', dpi=100)
+    buf_grid.seek(0)
+    grid_image = Image.open(buf_grid)
     pyplot.close()
     mainplot = np.array(grid_image.size)/np.array(grid_image.info['dpi'])
     
@@ -1225,13 +1227,13 @@ class RasterData(SKMapBase):
       orientation='horizontal', 
       label = legend_title
     )
-    buffer2=BytesIO()
+    buf_scale=BytesIO()
 
-    fig_scale.savefig(buffer2, format='png', bbox_inches='tight', dpi=100)
+    fig_scale.savefig(buf_scale, format='png', bbox_inches='tight', dpi=100)
     pyplot.close()
 
-    buffer2.seek(0)
-    scale_image = Image.open(buffer2)
+    buf_scale.seek(0)
+    scale_image = Image.open(buf_scale)
     
     scale_image_size =  np.array(scale_image.size)/np.array(scale_image.info['dpi'])
 
@@ -1253,55 +1255,60 @@ class RasterData(SKMapBase):
       pyplot.close()
       return final_figure
 
-  def point_query(self, x:list, y:list, n_jobs:int=4, cols:int=2, x_axis:str='index'):
+  def point_query(self, 
+                  x:list, 
+                  y:list, 
+                  cols:int=3,
+                  titles:list = None, 
+                  label_xaxis:str='index', 
+                  return_data:bool=False,
+                  ):
     """
     Makes point queries on dataset and provide plots and data
 
     :param x: longitude value(s) of the given point(s)
     :param y: latitude value(s) of the given point(s)
-    :param n_jobs: worker count that is going to run in parallel to generate figure.
-      Default is 4.
     :param cols: column count of the desired layout. Default is 3.
-    :param x_axis: label if the x axis could be `index`, `name`,`date` or None.
-    :param n_jobs: processor count that will be used for multiprocessing
+    :param titles: list of the titles that will be placed on top of the each graph
+    :param label_xaxis: labels of the x axes. it could be `index`, `name`,`date` or None.
+    :param return_data: If the user wants to access the data sampled from rasters, this
+      needs to be set to True. Default is False 
+
+    Examples
+    ========
+    import geopandas as gpd
+    from skmap.data import toy
+    rasterdata = toy.ndvi_rdata(gappy=False)
+    points = gpd.read_file('./skmap/data/toy/samples/samples.gpkg')
+    # for first 15 points
+    rdata.point_query(x=points.geometry.x.to_list()[:15], y=points.geometry.y.to_list()[:15] , label_xaxis='index', cols=3, titles=points.label[:15])
     """
     df = pd.DataFrame()
-    df['x'], df['y'] = x, y 
+    df['x'], df['y'], df['title'] = x, y, titles
     bbox = rasterio.open(self._base_raster()).bounds
+    # filtering points based on the bounds of the base raster
     df = df[(bbox.left <= df['x']) & (df['x'] <= bbox.right) & (bbox.bottom <= df['y']) & (df['y'] <= bbox.top)]
-    pixel_coords = None
-    with rasterio.open(self._base_raster()) as baseraster:
-      def pick_pixels(indx):
-        pxl1, pxl2 =baseraster.index(x[indx],y[indx])
-        pxl1 = pxl1 - 1 if self.array.shape[0] == pxl1 else pxl1
-        pxl2 = pxl2 - 1 if self.array.shape[0] == pxl2 else pxl2
-        return self.array[pxl1,pxl2,:]
-      
-      pixel_coords=Parallel(n_jobs=n_jobs, backend='threading')(delayed(pick_pixels)(i) for i in range(len(x)))
-    df['data'] = pixel_coords
-    titles = self._get_titles(x_axis)
-    
-    fig, axs = pyplot.subplots(ncols=cols, nrows=math.ceil(len(x)/cols), figsize=(6 * cols, 2 * math.ceil(len(x)/cols)), sharex=True, sharey=True)
 
-    try:
-      for i, ax in enumerate(axs.flatten()):
-        try:
-          ax.plot(titles, df.iloc[i]['data'], '-o', markersize=4, color='blue', lw=1)
-          ax.set_title(str(df.iloc[i]['x']) + ',' + str(df.iloc[i]['y']), fontsize=10)
+    with rasterio.open(self._base_raster()) as src:
+      row_id, col_id = rasterio.transform.rowcol(src.transform, df.x, df.y)
+    df['data']= np.array(self.array[row_id,col_id]).tolist()
+    # if data is required no need to create figures
+    if return_data:
+      return df.data.to_numpy()
+    
+    labels_x = self._get_titles(label_xaxis)
+    fig, axs = pyplot.subplots(ncols=cols, nrows=math.ceil(len(x)/cols), figsize=(6 * cols, 2 * math.ceil(len(x)/cols)), sharex=True, sharey=True)
+    mgc = df.shape[0] # maximum graph count
+    print(mgc)
+    for i, ax in enumerate(axs.flatten()):
+        if i < mgc:
+          ax.plot(labels_x, df.data[i], '-o', markersize=4, color='blue', lw=1)
+          ax.set_title(titles[i], fontsize=10)
           ax.tick_params(axis='x',rotation=90)
-        except IndexError:
+        else:
           ax.axis('off')
-    except:
-      #pass
-      axs.plot(titles, df.iloc[0]['data'], '-o', markersize=4, color='blue', lw=1)
-      axs.set_title(str(df.iloc[0]['x']) + ',' + str(df.iloc[0]['y']), fontsize=10)
     pyplot.tight_layout()
     pyplot.close()
-    return dict(fig=fig, data=df.data.to_numpy())
-  
-
-
     
-
-
-
+    return fig
+    
