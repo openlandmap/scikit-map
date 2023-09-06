@@ -1194,7 +1194,6 @@ class RasterData(SKMapBase):
     grid_fig, grid_axes = pyplot.subplots(nrows=rows, ncols=cols)
     grid_fig.set_size_inches(width * cols + (cols-1) * 0.1 , height*rows + (rows-1)*0.1)
 
-
     for ax, img in zip(grid_axes.ravel(), sem_img):
       ax.axis('off')
       ax.imshow(img[0])
@@ -1280,8 +1279,7 @@ class RasterData(SKMapBase):
     from skmap.data import toy
     rasterdata = toy.ndvi_rdata(gappy=False)
     points = gpd.read_file('./skmap/data/toy/samples/samples.gpkg')
-    # for first 15 points
-    rdata.point_query(x=points.geometry.x.to_list()[:15], y=points.geometry.y.to_list()[:15] , label_xaxis='index', cols=3, titles=points.label[:15])
+    rdata.point_query(x=points.geometry.x.to_list(), y=points.geometry.y.to_list() , label_xaxis='index', cols=3, titles=points.label)
     """
     df = pd.DataFrame()
     df['x'], df['y'], df['title'] = x, y, titles
@@ -1299,7 +1297,6 @@ class RasterData(SKMapBase):
     labels_x = self._get_titles(label_xaxis)
     fig, axs = pyplot.subplots(ncols=cols, nrows=math.ceil(len(x)/cols), figsize=(6 * cols, 2 * math.ceil(len(x)/cols)), sharex=True, sharey=True)
     mgc = df.shape[0] # maximum graph count
-    print(mgc)
     for i, ax in enumerate(axs.flatten()):
         if i < mgc:
           ax.plot(labels_x, df.data[i], '-o', markersize=4, color='blue', lw=1)
@@ -1309,6 +1306,4 @@ class RasterData(SKMapBase):
           ax.axis('off')
     pyplot.tight_layout()
     pyplot.close()
-    
     return fig
-    
