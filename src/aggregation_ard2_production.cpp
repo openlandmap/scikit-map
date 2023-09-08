@@ -17,12 +17,10 @@ int main(int argc, char* argv[]) {
     // ############ Input parameters ##################
     // ################################################
     size_t start_year = 1997;
-    size_t end_year = 2022;
+    size_t end_year = 1998;
     size_t N_threads = omp_get_max_threads();
     size_t N_bands = 8;
     size_t N_aggr = 4; // Aggregation
-    float attSeas = 50.;
-    float attEnvPerYear = 5.;
     float savingScaling = 250./40000.;
     std::vector<float> scalings = {savingScaling,
                                    savingScaling,
@@ -41,6 +39,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << std::setprecision(1);
     std::cout << std::fixed << std::endl;
+    std::cout << "#TODOOOOOOOOOO LZW compression is not working, check chat with Leandro" << std::endl;
 
     for (size_t t = 0; t < argc - 1; ++t)
     {
@@ -54,14 +53,14 @@ int main(int argc, char* argv[]) {
         // ################################################
         // ################### Setup ######################
         // ################################################
-        std::string out_folder = "/mnt/inca/ard2_production/scikit-map/src/" + tile;
+        std::string out_folder = "/mnt/inca/ard2_production/scikit-map/src/" + tile + "_aggr";
+        std::string seaweed_folder = "seaweed/landsat-ard2-prod/" + tile + "/agg";
         size_t N_row = 4004;
         size_t N_col = 4004;
         size_t N_pix = N_row * N_col;
-        size_t N_ipy = 23; // Images per year 
+        size_t N_ipy = 23; // Images per year
         size_t N_aipy = std::ceil((float)N_ipy/(float)N_aggr); // Aggregated images per year
         size_t N_years = end_year-start_year+1;
-        float attEnv = attEnvPerYear*(float)N_years;
         size_t N_img = N_years*N_ipy; // Images
         size_t N_aimg = N_years*N_aipy; // Aggregated images
         size_t N_slice;
@@ -72,6 +71,7 @@ int main(int argc, char* argv[]) {
         omp_set_num_threads(N_threads);
         std::vector<std::string> fileUrlsRead;
         std::vector<std::vector<std::string>> filePathsWrite;
+        std::vector<std::vector<std::string>> seaweedPathsWrite;
         std::vector<std::string> qaPathsWrite;
         CPLSetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif");
         CPLSetConfigOption("GDAL_HTTP_MULTIRANGE", "SINGLE_GET");
@@ -100,13 +100,17 @@ int main(int argc, char* argv[]) {
         std::cout << "Creating the output files paths" << std::endl;
         for (size_t band_id = 1; band_id <= N_bands; ++band_id) {
             std::vector<std::string> tmpVector;
+            std::vector<std::string> tmpVector2;
             for (size_t y = start_year; y <= end_year; ++y) {
                 for (size_t i = 0; i < 6; ++i) {
                     std::string str = out_folder + "/ogh_b" + std::to_string(band_id) + "_" + std::to_string(y) + outDatesStart[i] + "_" + std::to_string(y) + outDatesEnd[i] + ".tif";
+                    std::string str2 = seaweed_folder + "/ogh_b" + std::to_string(band_id) + "_" + std::to_string(y) + outDatesStart[i] + "_" + std::to_string(y) + outDatesEnd[i] + ".tif";
                     tmpVector.push_back(str);
+                    tmpVector2.push_back(str2);
                 }
             }
             filePathsWrite.push_back(tmpVector);
+            seaweedPathsWrite.push_back(tmpVector2);
         }
 
         for (size_t y = start_year; y <= end_year; ++y) {
@@ -242,57 +246,8 @@ int main(int argc, char* argv[]) {
                 #pragma omp parallel for
                 for (size_t i = 0; i < N_slice; ++i) {        
                     LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-                    lsp.normalizeAggrDataMB(bandOffset, offsetQA, scalings[b], aggrData, gapMask);
+                    lsp.normalizeAndConvertAggrDataMB(bandOffset, offsetQA, scalings[b], aggrData, writeData, gapMask);
                 }
-            }
-            std::cout << "Done " << toc(t_tmp) << " s \n";
-
-            
-            std::cout << "Computing convolution vector" << "\n";
-            t_tmp = tic();
-            TypesEigen<float>::VectorReal normQa(N_ext);
-            TypesEigen<float>::VectorComplex convExtFFT(N_fft);
-            LandsatPipelineMultiBand lsp(0, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-            lsp.computeConvolutionVectorMB(normQa, convExtFFT, attSeas, attEnv);
-            std::cout << "Done " << toc(t_tmp) << " s \n";
-
-
-            std::cout << "Performing the convolution for SeasConv" << "\n";
-            MatrixFloat convData(N_pix*N_bands, N_aimg);
-            t_tmp = tic();
-            N_slice = N_threads;
-            for (size_t b = 0; b < N_bands; ++b) {
-                size_t bandOffset = b*N_pix;
-                // std::cout << "---- Band " << b << "\n";
-                #pragma omp parallel for
-                for (size_t i = 0; i < N_slice; ++i) {        
-                    LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-                    lsp.convolutionSeasConvMB(bandOffset, aggrData, convData, convExtFFT, plan_forward, plan_backward);
-                }
-            }
-            std::cout << "Done " << toc(t_tmp) << " s \n";
-
-            std::cout << "Renormalizing the gap-filled data" << "\n";
-            t_tmp = tic();
-            N_slice = N_threads;
-            for (size_t b = 0; b < N_bands-1; ++b) {
-                size_t bandOffset = b*N_pix;
-                // std::cout << "---- Band " << b << "\n";
-                #pragma omp parallel for
-                for (size_t i = 0; i < N_slice; ++i) {        
-                    LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-                    lsp.renormalizeSeasConvMB(bandOffset, offsetQA, convData, aggrData, gapMask, writeData);
-                }
-            }
-            std::cout << "Done " << toc(t_tmp) << " s \n";
-
-            std::cout << "Extracting the QA band" << "\n";
-            t_tmp = tic();
-            N_slice = N_threads;
-            #pragma omp parallel for
-            for (size_t i = 0; i < N_slice; ++i) {        
-                LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-                lsp.extractQaMB(normQa, offsetQA, convData, gapMask, writeData);
             }
             std::cout << "Done " << toc(t_tmp) << " s \n";
 
@@ -302,10 +257,6 @@ int main(int argc, char* argv[]) {
             std::cout << aggrData.block(0+1,0,3,12) << std::endl;
             std::cout << "Aggregated QA \n";
             std::cout << aggrData.block(offsetQA+1,0,3,12) << std::endl;
-            std::cout << "Gap-filled band 0  \n";
-            std::cout << convData.block(0+1,0,3,12) << std::endl;
-            std::cout << "Gap-filled QA  \n";
-            std::cout << convData.block(offsetQA+1,0,3,12) << std::endl;
             std::cout << "Final band 0 \n";
             std::cout << writeData.block(0+1,0,3,12).cast<int>() << std::endl;
             std::cout << "Final QA \n";
@@ -325,7 +276,7 @@ int main(int argc, char* argv[]) {
             size_t dateOffset = i * N_pix * N_bands;    
             for (size_t b = 0; b < N_bands; ++b) {
                 LandsatPipelineMultiBand lsp(b, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_bands, N_bands);
-                lsp.writeOutputFilesMB(filePathsWrite[b][i], projection, spatialRef, geotransform, writeData, dateOffset);
+                lsp.writeOutputFilesMB(filePathsWrite[b][i], seaweedPathsWrite[b][i], projection, spatialRef, geotransform, writeData, dateOffset);
             }
         }
 

@@ -1,5 +1,6 @@
 #include "misc.cpp"
 #include "seasconv.cpp"
+#include <cstdlib>
 
 class LandsatPipelineMultiBand {
 private:    
@@ -189,6 +190,32 @@ public:
             0., aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg));
     }
 
+    void normalizeAndConvertAggrDataMB(size_t bandOffset,
+                             size_t maskOffset,
+                             float scaling,
+                             MatrixFloat& aggrData,
+                             MatrixUI8& writeData,
+                             MatrixBool& gapMask) {
+        size_t band_offset;
+        size_t mask_offset;
+        size_t N_pix_slice;
+        if (m_id < m_slice_proc_step) {
+            band_offset = bandOffset + m_id * m_N_slice_proc;
+            mask_offset = maskOffset + m_id * m_N_slice_proc;
+            N_pix_slice = m_N_slice_proc;
+        } else {
+            band_offset = bandOffset + m_N_slice_proc * m_slice_proc_step + (m_N_slice_proc - 1) * (m_id - m_slice_proc_step);
+            mask_offset = maskOffset + m_N_slice_proc * m_slice_proc_step + (m_N_slice_proc - 1) * (m_id - m_slice_proc_step);
+            N_pix_slice = m_N_slice_proc - 1;
+        }
+
+        aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg).array() /= (aggrData.block(mask_offset, 0, N_pix_slice, m_N_aimg).array() / scaling);
+        aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg) = gapMask.block(mask_offset-maskOffset, 0, N_pix_slice, m_N_aimg).select(
+            255., aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg));
+        writeData.block(band_offset, 0, N_pix_slice, m_N_aimg) = aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg).cast<unsigned char>();
+
+    }
+
 
     void computeConvolutionVectorMB(TypesEigen<float>::VectorReal& normQa,
                                     TypesEigen<float>::VectorComplex& convExtFFT,
@@ -225,6 +252,47 @@ public:
 
         fftwf_destroy_plan(plan_forward);
         fftwf_destroy_plan(plan_backward);
+    }
+
+    float computeConvolutionVectorNoFutureMB(TypesEigen<float>::VectorReal& normQa,
+                                    TypesEigen<float>::VectorComplex& convExtFFT,
+                                    float attSeas,
+                                    float attEnv) {
+
+        size_t N_ext = m_N_aimg * 2;
+        size_t N_fft = m_N_aimg + 1;
+        // Plan the FFT computation
+
+        TypesEigen<float>::VectorReal conv(m_N_aimg);
+        TypesEigen<float>::VectorReal convExt(N_ext);
+
+        fftwf_plan plan_forward = 
+            fftwf_plan_dft_r2c_1d(N_ext, convExt.data(), reinterpret_cast<fftwf_complex*>(convExtFFT.data()), FFTW_MEASURE);
+        fftwf_plan plan_backward = 
+            fftwf_plan_dft_c2r_1d(N_ext, reinterpret_cast<fftwf_complex*>(convExtFFT.data()), convExt.data(), FFTW_MEASURE);
+
+        TypesEigen<float>::VectorComplex normQaFFT(N_fft);
+        compute_conv_vec<float>(conv, m_N_years, m_N_aipy, attSeas, attEnv);
+        convExt.setOnes();
+        convExt.segment(0,m_N_aimg).setZero();
+        convExt.segment(m_N_aimg+1, m_N_aimg-1) = conv.reverse().segment(0,m_N_aimg-1);
+        std::cout << "convExt" << std::endl;
+        std::cout << convExt << std::endl;
+        normQa.setOnes();
+        normQa.segment(m_N_aimg, m_N_aimg).setZero();
+        normQa(0) = 0.;
+
+        fftwf_execute_dft_r2c(plan_forward, convExt.data(), reinterpret_cast<fftwf_complex*>(convExtFFT.data()));
+        fftwf_execute_dft_r2c(plan_forward, normQa.data(), reinterpret_cast<fftwf_complex*>(normQaFFT.data()));
+
+        normQaFFT.array() *= convExtFFT.array()/N_ext;
+
+        fftwf_execute_dft_c2r(plan_backward, reinterpret_cast<fftwf_complex*>(normQaFFT.data()), normQa.data());
+
+        fftwf_destroy_plan(plan_forward);
+        fftwf_destroy_plan(plan_backward);
+        return conv.minCoeff();
+
     }
 
 
@@ -311,6 +379,26 @@ public:
 
     }
 
+    void convertingToUI8MB(size_t bandOffset,
+                                MatrixFloat& aggrData,
+                                MatrixUI8& writeData) {
+        size_t band_offset;
+        size_t N_pix_slice;
+        if (m_id < m_slice_proc_step) {
+            band_offset = bandOffset + m_id * m_N_slice_proc;
+            N_pix_slice = m_N_slice_proc;
+        } else {
+            band_offset = bandOffset + m_N_slice_proc * m_slice_proc_step + (m_N_slice_proc - 1) * (m_id - m_slice_proc_step);
+            N_pix_slice = m_N_slice_proc - 1;
+        }
+
+        
+
+        // Restore the values that were already not gap
+        writeData.block(band_offset, 0, N_pix_slice, m_N_aimg) = aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg).cast<unsigned char>();
+
+    }
+
 
     void extractQaMB(TypesEigen<float>::VectorReal& normQa,
                     size_t maskOffset,
@@ -357,6 +445,7 @@ public:
   
     template <class T, class U>
     void writeOutputFilesMB(std::string fileName,
+                          std::string seaweedPath,
                           T projection,
                           U spatialRef,
                           double *geotransform,
@@ -364,7 +453,7 @@ public:
                           size_t dateOffset) {
         GDALDriver *driver = GetGDALDriverManager()->GetDriverByName("GTiff");
         GDALDataset *writeDataset = driver->Create(
-            (fileName).c_str(),
+            (fileName + "tmp").c_str(),
             m_N_row, m_N_col, 1, GDT_Byte, nullptr
         );        
         writeDataset->SetGeoTransform(geotransform);
@@ -372,10 +461,6 @@ public:
         writeDataset->SetProjection(projection);
         GDALRasterBand *writeBand = writeDataset->GetRasterBand(1);
         writeBand->SetNoDataValue(255);
-        char **papszOptions = NULL;
-        papszOptions = CSLSetNameValue(papszOptions, "COMPRESS", "LZW");
-        writeDataset->SetMetadata(papszOptions, "IMAGE_STRUCTURE");
-        CSLDestroy(papszOptions);
         // Write the converted data to the new dataset
         auto outWrite = writeBand->RasterIO(
             GF_Write, 0, 0, m_N_row, m_N_col,
@@ -387,6 +472,31 @@ public:
             assert(false);
         }
         GDALClose(writeDataset);
+        std::string command = "gdal_translate -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024 " + fileName + "tmp " + fileName;
+        command += " > /dev/null 2>&1";
+        int result = system(command.c_str());
+        if (result != 0) {
+            std::cerr << "scikit-map ERROR 4: issues in comressing the file " << fileName << std::endl;
+        }
+        command = "rm " + fileName + "tmp";
+        command += " > /dev/null 2>&1";
+        result = system(command.c_str());
+        if (result != 0) {
+            std::cerr << "scikit-map ERROR 5: issues in delete the tm file " << fileName << std::endl;
+        }
+        command = "mc cp " + fileName + " " + seaweedPath;
+        command += " > /dev/null 2>&1";
+        result = system(command.c_str());
+        if (result != 0) {
+            std::cerr << "scikit-map ERROR 6: issues in sending to seaweed the file " << fileName << std::endl;
+        }
+        command = "rm " + fileName;
+        command += " > /dev/null 2>&1";
+        result = system(command.c_str());
+        if (result != 0) {
+            std::cerr << "scikit-map ERROR 7: issues in delete the file " << fileName << std::endl;
+        }
+
     }
 
 
