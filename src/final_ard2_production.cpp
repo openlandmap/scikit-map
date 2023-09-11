@@ -41,6 +41,8 @@ int main(int argc, char* argv[]) {
 
     std::cout << std::setprecision(1);
     std::cout << std::fixed << std::endl;
+    std::cout << "#TODOOOOOOOOOO LZW compression is not working, check chat with Leandro" << std::endl;
+    std::cout << "#TODOOOOOOOOOO Norm QA should depend on the date, fix that" << std::endl;
 
     for (size_t t = 0; t < argc - 1; ++t)
     {
@@ -54,7 +56,7 @@ int main(int argc, char* argv[]) {
         // ################################################
         // ################### Setup ######################
         // ################################################
-        std::string out_folder = "/mnt/inca/ard2_production/scikit-map/src/" + tile;
+        std::string out_folder = "/mnt/inca/ard2_production/scikit-map/src/" + tile + "_noFuture";
         size_t N_row = 4004;
         size_t N_col = 4004;
         size_t N_pix = N_row * N_col;
@@ -253,8 +255,9 @@ int main(int argc, char* argv[]) {
             TypesEigen<float>::VectorReal normQa(N_ext);
             TypesEigen<float>::VectorComplex convExtFFT(N_fft);
             LandsatPipelineMultiBand lsp(0, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
-            lsp.computeConvolutionVectorMB(normQa, convExtFFT, attSeas, attEnv);
+            float minConvValue = lsp.computeConvolutionVectorNoFutureMB(normQa, convExtFFT, attSeas, attEnv);
             std::cout << "Done " << toc(t_tmp) << " s \n";
+            std::cout << "minConvValue " << minConvValue << " \n";
 
 
             std::cout << "Performing the convolution for SeasConv" << "\n";
@@ -269,6 +272,17 @@ int main(int argc, char* argv[]) {
                     LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
                     lsp.convolutionSeasConvMB(bandOffset, aggrData, convData, convExtFFT, plan_forward, plan_backward);
                 }
+            }
+            std::cout << "Done " << toc(t_tmp) << " s \n";
+
+            std::cout << "Clipping the convolved clear-sky mask" << "\n";
+            MatrixBool gapMask(N_pix, N_aimg);
+            t_tmp = tic();
+            N_slice = N_aimg;
+            #pragma omp parallel for
+            for (size_t i = 0; i < N_slice; ++i) {        
+                LandsatPipelineMultiBand lsp(i, N_row, N_col, N_img, N_aimg, N_ipy, N_aipy, N_aggr, N_years, N_slice, N_bands);
+                lsp.clipMaskMB(offsetQA, convData, minConvValue);
             }
             std::cout << "Done " << toc(t_tmp) << " s \n";
 

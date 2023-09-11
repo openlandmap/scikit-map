@@ -7,6 +7,7 @@
 #include <fftw3.h>
 #include "LandsatPipelineMultiBand.hpp"
 #include <experimental/filesystem>
+#include <fstream>
 
 namespace fs = std::experimental::filesystem;
 
@@ -17,7 +18,7 @@ int main(int argc, char* argv[]) {
     // ############ Input parameters ##################
     // ################################################
     size_t start_year = 1997;
-    size_t end_year = 1998;
+    size_t end_year = 2022;
     size_t N_threads = omp_get_max_threads();
     size_t N_bands = 8;
     size_t N_aggr = 4; // Aggregation
@@ -30,21 +31,47 @@ int main(int argc, char* argv[]) {
                                    savingScaling,
                                    savingScaling,
                                    1.};
+    std::vector<std::string> bandNames = {"blue_glad",
+                                           "green_glad",
+                                           "red_glad",
+                                           "nir_glad",
+                                           "swir1_glad",
+                                           "swir2_glad",
+                                           "thermal_glad",
+                                           "clear_sky_mask"};
 
     // Check if at least one tile name was provided
-    if (argc < 2) {
-        std::cerr << "Input at least one tile name " << std::endl;
+    if (argc < 3) {
+        std::cerr << "Input the first and the last tile index to process" << std::endl;
         return 1;
     }
 
     std::cout << std::setprecision(1);
     std::cout << std::fixed << std::endl;
-    std::cout << "#TODOOOOOOOOOO LZW compression is not working, check chat with Leandro" << std::endl;
 
-    for (size_t t = 0; t < argc - 1; ++t)
+    // Reading tiles to be processed
+    std::string tilesFilename = "tiles.txt";
+    std::ifstream file(tilesFilename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open the file." << std::endl;
+        return 1;
+    }
+    std::string line;
+    std::vector<std::string> lines;
+    while (std::getline(file, line)) {
+        lines.push_back(line);
+    }
+    
+    // for (size_t t = 0; t < argc - 1; ++t)
+    for (size_t t = std::stoi(argv[1]); t <= std::stoi(argv[2]); ++t)
     {
-        auto t_start = tic();        
-        std::string tile = argv[t + 1]; // This tile is good for debug: 034E_10N
+        std::string tile;
+        if (t >= 0 && t < lines.size()) {
+            tile = lines[t];
+        } else {
+            std::cerr << "Invalid line index." << std::endl;
+        }
+        auto t_start = tic();
 
         std::cout << "####################################################" << std::endl;
         std::cout << "############# Processing tile " << tile << " #############" << std::endl;
@@ -53,8 +80,8 @@ int main(int argc, char* argv[]) {
         // ################################################
         // ################### Setup ######################
         // ################################################
-        std::string out_folder = "/mnt/inca/ard2_production/scikit-map/src/" + tile + "_aggr";
-        std::string seaweed_folder = "seaweed/landsat-ard2-prod/" + tile + "/agg";
+        std::string out_folder = "./" + tile + "_aggr";
+        std::string seaweed_folder = "seaweed/landsat-ard2-prod/" + tile + "/agg/";
         size_t N_row = 4004;
         size_t N_col = 4004;
         size_t N_pix = N_row * N_col;
@@ -104,7 +131,7 @@ int main(int argc, char* argv[]) {
             for (size_t y = start_year; y <= end_year; ++y) {
                 for (size_t i = 0; i < 6; ++i) {
                     std::string str = out_folder + "/ogh_b" + std::to_string(band_id) + "_" + std::to_string(y) + outDatesStart[i] + "_" + std::to_string(y) + outDatesEnd[i] + ".tif";
-                    std::string str2 = seaweed_folder + "/ogh_b" + std::to_string(band_id) + "_" + std::to_string(y) + outDatesStart[i] + "_" + std::to_string(y) + outDatesEnd[i] + ".tif";
+                    std::string str2 = seaweed_folder + bandNames[band_id-1] + ".ard2_m_30m_s_" + std::to_string(y) + outDatesStart[i] + "_" + std::to_string(y) + outDatesEnd[i] + "_go_epsg.4326_v20230908.tif";
                     tmpVector.push_back(str);
                     tmpVector2.push_back(str2);
                 }
@@ -292,6 +319,9 @@ int main(int argc, char* argv[]) {
         TypesFFTW<float>::DestroyPlan(plan_forward);
         TypesFFTW<float>::DestroyPlan(plan_backward);
     }
+
+
+    file.close();
 
     return 0;
 }
