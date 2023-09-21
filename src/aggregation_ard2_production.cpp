@@ -40,9 +40,41 @@ int main(int argc, char* argv[]) {
                                            "thermal_glad",
                                            "clear_sky_mask"};
 
+
+    // ################################################
+    // ################### Setup ######################
+    // ################################################
+    size_t N_row = 4004;
+    size_t N_col = 4004;
+    size_t N_pix = N_row * N_col;
+    size_t N_ipy = 23; // Images per year
+    size_t N_aipy = std::ceil((float)N_ipy/(float)N_aggr); // Aggregated images per year
+    size_t N_years = end_year-start_year+1;
+    size_t N_img = N_years*N_ipy; // Images
+    size_t N_aimg = N_years*N_aipy; // Aggregated images
+    size_t N_slice;
+    size_t offsetQA = (N_bands-1)*N_pix;
+    size_t band_id_read;
+    size_t band_id_proc;
+    size_t band_id_write;
+    omp_set_num_threads(N_threads);
+    std::vector<std::string> fileUrlsRead;
+    std::vector<std::vector<std::string>> filePathsWrite;
+    std::vector<std::vector<std::string>> seaweedPathsWrite;
+    CPLSetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif");
+    CPLSetConfigOption("GDAL_HTTP_MULTIRANGE", "SINGLE_GET");
+    CPLSetConfigOption("GDAL_HTTP_CONNECTTIMEOUT", "320");
+    CPLSetConfigOption("CPL_VSIL_CURL_USE_HEAD", "NO");
+    CPLSetConfigOption("GDAL_HTTP_VERSION", "1.0");
+    CPLSetConfigOption("GDAL_HTTP_TIMEOUT", "320");
+    CPLSetConfigOption("CPL_CURL_GZIP", "NO");
+    GDALAllRegister();  // Initialize GDAL
+    Eigen::initParallel();
+    Eigen::setNbThreads(N_threads);
+
     // Check if at least one tile name was provided
-    if (argc < 3) {
-        std::cerr << "Input the first and the last tile index to process" << std::endl;
+    if (argc < 4) {
+        std::cerr << "Input the first and the last tile index to process, and the tiles filename" << std::endl;
         return 1;
     }
 
@@ -50,10 +82,11 @@ int main(int argc, char* argv[]) {
     std::cout << std::fixed << std::endl;
 
     // Reading tiles to be processed
-    std::string tilesFilename = "tiles.txt";
+    std::string tilesFilename = argv[3];
+    std::string tmpFilename = "tmp.txt";
     std::ifstream file(tilesFilename);
     if (!file.is_open()) {
-        std::cerr << "Failed to open the file." << std::endl;
+        std::cerr << "scikit-map ERROR 15: Failed to open the tile file." << std::endl;
         return 1;
     }
     std::string line;
@@ -65,55 +98,80 @@ int main(int argc, char* argv[]) {
     // for (size_t t = 0; t < argc - 1; ++t)
     for (size_t t = std::stoi(argv[1]); t <= std::stoi(argv[2]); ++t)
     {
+        // ################################################
+        // ######### Check tile files status  #############
+        // ################################################
         std::string tile;
         if (t >= 0 && t < lines.size()) {
             tile = lines[t];
         } else {
-            std::cerr << "Invalid line index." << std::endl;
+            std::cerr << "scikit-map ERROR 9: invalid line index." << std::endl;
         }
+
+
+        std::string out_folder = "./" + tile + "_aggr";
+        std::string seaweed_folder = "seaweed/landsat-ard2-prod/" + tile + "/agg/";
+
+        int N_already_computed_files;
+        std::string command = "mc ls seaweed/landsat-ard2-prod/" + tile + "/agg/ | wc -l > " + tmpFilename;
+        int result = system(command.c_str());
+        if (result != 0) {
+            std::cerr << "scikit-map ERROR 10: issues in checking the number of already processed files" << std::endl;
+            return 1;
+        } else {            
+            std::ifstream fileTmp(tmpFilename);
+            if (!fileTmp.is_open()) {
+                std::cerr << "scikit-map ERROR 11: failed to open the file for tile processing check." << std::endl;
+                return 1;
+            }
+            std::string lineTmp;
+            std::getline(fileTmp, lineTmp);
+            N_already_computed_files = std::stoi(lineTmp);
+            fileTmp.close();
+        }
+        if (N_already_computed_files == N_years*N_aipy*N_bands) {
+            std::cout << "Skipping tile " << tile << ", number of already processed files for this tile = " << N_already_computed_files << std::endl;
+            continue;
+        }
+
+
+        int N_input_files = 0;
+        for (size_t y = start_year; y <= end_year; ++y) {
+            std::string command = "mc ls seaweed/landsat-ard2/" + std::to_string(y) + "/" + tile + "/ | wc -l > " + tmpFilename;
+            int result = system(command.c_str());
+            if (result != 0) {
+                std::cerr << "scikit-map ERROR 12: issues in checking the number of available files" << std::endl;
+                return 1;
+            } else {
+                std::ifstream fileTmp(tmpFilename);
+                if (!fileTmp.is_open()) {
+                    std::cerr << "scikit-map ERROR 13: failed open the file to count the input files." << std::endl;
+                    return 1;
+                }
+                std::string lineTmp;
+                std::getline(fileTmp, lineTmp);
+                N_input_files += std::stoi(lineTmp);
+                fileTmp.close();
+            }
+        }
+        if (N_input_files != N_img) {
+            std::cerr << "scikit-map ERROR 14: only " << N_input_files << " images available for tile " << tile << ", skipping it." << std::endl;
+            continue;
+        }
+
         auto t_start = tic();
 
         std::cout << "####################################################" << std::endl;
         std::cout << "############# Processing tile " << tile << " #############" << std::endl;
         std::cout << "####################################################" << std::endl;
 
-        // ################################################
-        // ################### Setup ######################
-        // ################################################
-        std::string out_folder = "./" + tile + "_aggr";
-        std::string seaweed_folder = "seaweed/landsat-ard2-prod/" + tile + "/agg/";
-        size_t N_row = 4004;
-        size_t N_col = 4004;
-        size_t N_pix = N_row * N_col;
-        size_t N_ipy = 23; // Images per year
-        size_t N_aipy = std::ceil((float)N_ipy/(float)N_aggr); // Aggregated images per year
-        size_t N_years = end_year-start_year+1;
-        size_t N_img = N_years*N_ipy; // Images
-        size_t N_aimg = N_years*N_aipy; // Aggregated images
-        size_t N_slice;
-        size_t offsetQA = (N_bands-1)*N_pix;
-        size_t band_id_read;
-        size_t band_id_proc;
-        size_t band_id_write;
-        omp_set_num_threads(N_threads);
-        std::vector<std::string> fileUrlsRead;
-        std::vector<std::vector<std::string>> filePathsWrite;
-        std::vector<std::vector<std::string>> seaweedPathsWrite;
-        std::vector<std::string> qaPathsWrite;
-        CPLSetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif");
-        CPLSetConfigOption("GDAL_HTTP_MULTIRANGE", "SINGLE_GET");
-        CPLSetConfigOption("GDAL_HTTP_CONNECTTIMEOUT", "320");
-        CPLSetConfigOption("CPL_VSIL_CURL_USE_HEAD", "NO");
-        CPLSetConfigOption("GDAL_HTTP_VERSION", "1.0");
-        CPLSetConfigOption("GDAL_HTTP_TIMEOUT", "320");
-        CPLSetConfigOption("CPL_CURL_GZIP", "NO");
-        GDALAllRegister();  // Initialize GDAL
-        Eigen::initParallel();
-        Eigen::setNbThreads(N_threads);
+        std::cout << "Number of previously computed images " << N_already_computed_files << std::endl;
+        std::cout << "Number of input files " << N_input_files << std::endl;
 
         // ################################################
         // ######### Input/output files ###################
         // ################################################
+
 
         std::cout << "Creating the URLs" << std::endl;
         // Creating reading and writng urls/paths
@@ -140,15 +198,6 @@ int main(int argc, char* argv[]) {
             seaweedPathsWrite.push_back(tmpVector2);
         }
 
-        for (size_t y = start_year; y <= end_year; ++y) {
-            for (size_t i = 0; i < 6; ++i) {
-                std::string str = out_folder + "/ogh_qa_" + std::to_string(y) + outDatesStart[i] + "_" + std::to_string(y) + outDatesEnd[i] + ".tif";
-                qaPathsWrite.push_back(str);
-            }
-        }
-
-        
-
         // ###################################################################
         // ######### Creating data structures and saving folder ##############
         // ###################################################################
@@ -164,23 +213,23 @@ int main(int argc, char* argv[]) {
         // Create the output folder
         if (!fs::exists(out_folder)) {
             if (!fs::create_directory(out_folder)) {
-                std::cerr << "Failed to create the output folder." << std::endl;
+                std::cerr << "scikit-map ERROR 17: Failed to create the output folder." << std::endl;
                 return 1;
             }
         }
 
-        // The planning can not be constructed in parallel, so it is shared between the threads
-        auto fftw_flags = FFTW_MEASURE;
-        size_t N_fft = N_aimg + 1;
-        size_t N_ext = N_aimg * 2;
-        TypesEigen<float>::VectorReal tmpRealVector(N_ext);
-        TypesEigen<float>::VectorComplex tmpComplexVector(N_fft);
-        // Create plans for forward and backward DFT (Discrete Fourier Transform)
-        fftwf_plan plan_forward = 
-                fftwf_plan_dft_r2c_1d(N_ext, tmpRealVector.data(), reinterpret_cast<fftwf_complex*>(tmpComplexVector.data()), FFTW_MEASURE);
-            fftwf_plan plan_backward = 
-                fftwf_plan_dft_c2r_1d(N_ext, reinterpret_cast<fftwf_complex*>(tmpComplexVector.data()), tmpRealVector.data(), FFTW_MEASURE);
-        std::cout << "Done in " << toc(t_tmp) << " s \n";
+        // // The planning can not be constructed in parallel, so it is shared between the threads
+        // auto fftw_flags = FFTW_MEASURE;
+        // size_t N_fft = N_aimg + 1;
+        // size_t N_ext = N_aimg * 2;
+        // TypesEigen<float>::VectorReal tmpRealVector(N_ext);
+        // TypesEigen<float>::VectorComplex tmpComplexVector(N_fft);
+        // // Create plans for forward and backward DFT (Discrete Fourier Transform)
+        // fftwf_plan plan_forward = 
+        //         fftwf_plan_dft_r2c_1d(N_ext, tmpRealVector.data(), reinterpret_cast<fftwf_complex*>(tmpComplexVector.data()), FFTW_MEASURE);
+        //     fftwf_plan plan_backward = 
+        //         fftwf_plan_dft_c2r_1d(N_ext, reinterpret_cast<fftwf_complex*>(tmpComplexVector.data()), tmpRealVector.data(), FFTW_MEASURE);
+        // std::cout << "Done in " << toc(t_tmp) << " s \n";
         
 
         // #######################################################################
@@ -316,10 +365,10 @@ int main(int argc, char* argv[]) {
         // ################## Cleaning up ################
         // #######################################################################
 
-        TypesFFTW<float>::DestroyPlan(plan_forward);
-        TypesFFTW<float>::DestroyPlan(plan_backward);
+        // TypesFFTW<float>::DestroyPlan(plan_forward);
+        // TypesFFTW<float>::DestroyPlan(plan_backward);
+        
     }
-
 
     file.close();
 

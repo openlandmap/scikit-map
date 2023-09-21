@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cassert>
 #include <iomanip>
+#include <cstdlib>
 
 std::vector<std::string> outDatesStart = {
     "0101",

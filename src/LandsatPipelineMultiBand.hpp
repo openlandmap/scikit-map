@@ -1,6 +1,5 @@
 #include "misc.cpp"
 #include "seasconv.cpp"
-#include <cstdlib>
 
 class LandsatPipelineMultiBand {
 private:    
@@ -482,7 +481,7 @@ public:
         command += " > /dev/null 2>&1";
         result = system(command.c_str());
         if (result != 0) {
-            std::cerr << "scikit-map ERROR 5: issues in delete the tm file " << fileName << std::endl;
+            std::cerr << "scikit-map ERROR 5: issues in delete the tmp file " << fileName << std::endl;
         }
         command = "mc cp " + fileName + " " + seaweedPath;
         command += " > /dev/null 2>&1";
@@ -499,6 +498,4 @@ public:
 
     }
 
-
-    
 };
