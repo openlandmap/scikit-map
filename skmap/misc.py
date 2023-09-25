@@ -6,6 +6,9 @@ from typing import List, Dict, Union, Iterable
 from datetime import datetime, timedelta
 from functools import reduce
 
+import os
+import gc
+import tempfile
 import rasterio
 import geopandas as gp
 import pandas as pd
@@ -20,6 +23,38 @@ def _warn_deps(e, module_name):
         f'Encountered because {module_name} has additional dependencies, please try:\n\n' \
         '\tpip install skmap[full]\n'
     )
+
+def new_memmap(dtype, shape): 
+  filename = tempfile.NamedTemporaryFile(prefix='skmap_memmap_', suffix='.npy').name
+  return np.memmap(filename, dtype=dtype, shape=shape, mode='w+')
+
+def load_memmap(filename, dtype, shape):
+  return np.memmap(filename, dtype=dtype, mode='r+', shape=shape)
+  #return np.lib.format.open_memmap(filename, dtype=dtype, mode='w+', shape=shape)
+
+def del_memmap(array_mm, return_array=False):
+  
+  result = None
+  if return_array:
+    result = np.array(array_mm) # test np.ascontiguousarray
+  
+  os.remove(array_mm.filename)
+  #temp_folder = Path(array_mm.filename).parent
+  #try:
+  #  shutil.rmtree(temp_folder)
+  #except:
+  #  pass
+  
+  if return_array:
+    return result
+
+def ref_memmap(array):
+  array.flush()
+  return {
+    'filename': array.filename,
+    'dtype': array.dtype,
+    'shape': array.shape
+  }
 
 def ttprint(*args, **kwargs):
   """

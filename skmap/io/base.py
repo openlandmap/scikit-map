@@ -7,6 +7,7 @@ from hashlib import sha256
 from pandas import DataFrame, Series, to_datetime
 from types import MappingProxyType
 
+import shutil
 import copy
 import pandas as pd
 import numpy
@@ -18,13 +19,14 @@ import math
 import re
 import os
 import time
-import tempfile
+import gc
 import matplotlib as mpl
 from matplotlib import pyplot
 from matplotlib.animation import FuncAnimation
+import traceback
 
 from typing import List, Union, Callable
-from skmap.misc import ttprint, _eval, update_by_separator, date_range
+from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap
 from skmap import SKMapRunner, SKMapBase, parallel
 
 from dateutil.relativedelta import relativedelta
@@ -45,6 +47,7 @@ from base64 import encodebytes, b64decode
 from uuid import uuid4
 from contextlib import ExitStack
 from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
+from PIL import Image
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -78,7 +81,7 @@ def _fit_in_dtype(data, dtype, nodata):
 
   return data
 
-def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_shape, 
+def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_mask, expected_shape, 
   try_without_window, overview, verbose):
 
   raster_file = raster_files[raster_idx]
@@ -87,42 +90,56 @@ def _read_raster(raster_idx, raster_files, window, dtype, data_mask, expected_sh
 
   try:
     ds = rasterio.open(raster_file)
-    overviews = ds.overviews(1)
-
-    if overview is not None and overview in overviews:
-      band_data = ds.read(1, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
+    
+    if overview is not None:
+      overviews = ds.overviews(band)
+      if overview in overviews:
+          band_data = ds.read(band, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
+      else:
+        band_data = ds.read(band, window=window)
     else:
-      band_data = ds.read(1, window=window)
+      band_data = ds.read(band, window=window)
 
     if band_data.size == 0 and try_without_window:
-      band_data = ds.read(1)
+      band_data = ds.read(band)
 
     band_data = band_data.astype(dtype)
     nodata = ds.nodatavals[0]
-  except:
+  except Exception as ex:
+    ttprint(f"Exception: {ex}")
+    #traceback.iprint_exc()
+    
     if window is not None:
       if verbose:
-        ttprint(f'ERROR: Failed to read {raster_file} window {window}.')
+        ttprint(f'ERROR: Failed to read {raster_file} window {window}')
       band_data = np.empty((int(window.height), int(window.width)))
-      band_data[:] = _nodata_replacement(dtype)
+      band_data = _nodata_replacement(dtype)
 
     if expected_shape is not None:
       if verbose:
         ttprint(f'Full nan image for {raster_file}')
       band_data = np.empty(expected_shape)
-      band_data[:] = _nodata_replacement(dtype)
+      band_data = _nodata_replacement(dtype)
 
-  if data_mask is not None:
+  data_exists = (band_data is not None)
 
-    if len(data_mask.shape) == 3:
-      data_mask = data_mask[:,:,0]
+  if data_exists:
+    if data_mask is not None:
 
-    if (data_mask.shape == band_data.shape):
-      band_data[np.logical_not(data_mask)] = np.nan
-    else:
-      ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
+      if len(data_mask.shape) == 3:
+        data_mask = data_mask[:,:,0]
 
-  return raster_idx, band_data, nodata
+      if (data_mask.shape == band_data.shape):
+        band_data[np.logical_not(data_mask)] = np.nan
+      else:
+        ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
+    
+    if nodata is not None:
+      band_data[band_data == nodata] = _nodata_replacement(dtype)
+    
+    array_mm[:,:,raster_idx] = band_data
+
+  return raster_idx, data_exists
 
 def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, nodata):
 
@@ -208,8 +225,9 @@ def _new_raster(base_raster, raster_file, data, window = None,
 
 def _save_raster(
   fn_base_raster:str,
-  fn_new_raster:str,
+  raster_files:list,
   data:numpy.array,
+  i:int,
   spatial_win:Window = None,
   dtype:str = None,
   nodata = None,
@@ -220,28 +238,27 @@ def _save_raster(
   if len(data.shape) < 3:
     data = np.stack([data], axis=2)
 
-  _, _, nbands = data.shape
+  #_, _, nbands = data.shape
+  
+  with _new_raster(fn_base_raster, raster_files[i], data[:,:,i], spatial_win, dtype, nodata) as new_raster:
 
-  with _new_raster(fn_base_raster, fn_new_raster, data, spatial_win, dtype, nodata) as new_raster:
+    band_data = np.array(data[:,:,i])
+    band_dtype = new_raster.dtypes[0]
 
-    for band in range(0, nbands):
+    if fit_in_dtype:
+      band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
 
-      band_data = data[:,:,band]
-      band_dtype = new_raster.dtypes[band]
-
-      if fit_in_dtype:
-        band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
-
-      band_data[np.isnan(band_data)] = new_raster.nodata
-      new_raster.write(band_data.astype(band_dtype), indexes=(band+1))
+    band_data[np.isnan(band_data)] = new_raster.nodata
+    new_raster.write(band_data.astype(band_dtype), indexes=1)
 
   if on_each_outfile is not None:
-    on_each_outfile(fn_new_raster)
+    on_each_outfile(raster_files[i])
 
-  return fn_new_raster
+  return raster_files[i]
 
 def read_rasters(
   raster_files:Union[List,str] = [],
+  band = 1,
   window:Window = None,
   dtype:str = 'float32',
   n_jobs:int = 4,
@@ -249,6 +266,7 @@ def read_rasters(
   expected_shape = None,
   try_without_window = False,
   overview = None,
+  keep_memmap = False,
   verbose = False
 ):
   """
@@ -322,28 +340,38 @@ def read_rasters(
   if verbose:
     ttprint(f'Reading {len(raster_files)} raster file(s) using {n_jobs} workers')
 
-  raster_data = {}
+  ds = rasterio.open(raster_files[-1])
+  if overview is not None:
+    overviews = ds.overviews(band)
+    if overview in overviews:
+        n_bands, height, width  = ds.count, math.ceil(ds.height // overview), math.ceil(ds.width // overview)
+    else:
+      raise Exception(f"Overview {overviews} is invalid for {raster_files[-1]}.\n"
+        f"Use one of overviews: {ds.overviews(band)}")
+  else:
+    n_bands, height, width,  = ds.count, ds.height, ds.width
+
+  #temp_folder = tempfile.mkdtemp()
+  #filename = os.path.join(temp_folder, 'joblib_readraster.mmap')
+  #array_mm = np.memmap(filename, dtype=dtype, shape=(height, width, len(raster_files)), mode='w+')
+  array_mm = new_memmap(dtype, shape=(height, width, len(raster_files)))
+
   args = [ 
-    (raster_idx, raster_files, window, dtype, data_mask, 
+    (raster_idx, raster_files, array_mm, band, window, dtype, data_mask, 
       expected_shape, try_without_window, overview, verbose) 
     for raster_idx in range(0,len(raster_files)) 
   ]
-
-  for raster_idx, band_data, nodata in parallel.job(_read_raster, args, n_jobs=n_jobs):
-    raster_file = raster_files[raster_idx]
-
-    if (isinstance(band_data, np.ndarray)):
-
-      if nodata is not None:
-        band_data[band_data == nodata] = _nodata_replacement(dtype)
-
-    else:
+  
+  for raster_idx, data_exists in parallel.job(_read_raster, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
+    
+    if (not data_exists):
+      raster_file = raster_files[raster_idx]
       raise Exception(f'The raster {raster_file} not exists')
-    raster_data[raster_idx] = band_data
-
-  raster_data = [raster_data[i] for i in range(0,len(raster_files))]
-  raster_data = np.ascontiguousarray(np.stack(raster_data, axis=2))
-  return raster_data
+  
+  if not keep_memmap:
+    return del_memmap(array_mm, True)
+  else:
+    return array_mm
 
 def read_auth_rasters(
   raster_files:List,
@@ -543,13 +571,13 @@ def save_rasters(
     ttprint(f'Saving {len(raster_files)} raster files using {n_jobs} workers')
 
   args = [ \
-    (base_raster, raster_files[i], data[:,:,i], window, dtype,
+    (base_raster, raster_files, data, i, window, dtype,
       nodata, fit_in_dtype, on_each_outfile) \
     for i in range(0,len(raster_files))
   ]
 
   out_files = []
-  for out_raster in parallel.job(_save_raster, args, n_jobs=n_jobs):
+  for out_raster in parallel.job(_save_raster, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
     out_files.append(out_raster)
     continue
 
@@ -563,6 +591,7 @@ class RasterData(SKMapBase):
   GROUP_COL = 'group'
   NAME_COL = 'name'
   PATH_COL = 'input_path'
+  BAND_COL = 'input_band'
   TEMPORAL_COL = 'temporal'
   DT_COL = 'date'
   START_DT_COL = 'start_date'
@@ -592,12 +621,15 @@ class RasterData(SKMapBase):
     rows = []
     for group in raster_files.keys():
       if isinstance(raster_files[group], str):
-        rows.append([group,raster_files[group]])
+        rows.append([group, raster_files[group], 1])
       else:
         for r in raster_files[group]:
-          rows.append([group,r])
+          if isinstance(r, tuple):
+            rows.append([group,r[0],r[1]])
+          else:
+            rows.append([group,r, 1])
 
-    self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL])
+    self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL, RasterData.BAND_COL])
     self.info[RasterData.TEMPORAL_COL] = self.info.apply(lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]), axis=1)
     self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
     self.info.reset_index(drop=True, inplace=True)
@@ -728,20 +760,39 @@ class RasterData(SKMapBase):
       else:
         data_mask = (data_mask != self.raster_mask_val)
 
-    raster_files = [ Path(r) for r in self.info[RasterData.PATH_COL] ]
+    #for band in list(self.info[RasterData.PATH_COL].unique()):
+    #if expected_shape is None:
+    #  base_raster = self._base_raster()
+    #  ds = rasterio.open(base_raster)
+    #  width, height = ds.width, ds.height
+    #else:
+    #  width, height = expected_shape[0], expected_shape[1]
     
-    self._verbose(
-        f"RasterData with {len(raster_files)} rasters" 
-      + f" and {len(self.info[RasterData.GROUP_COL].unique())} groups" 
-    )
-    self.array = read_rasters(
-      raster_files,
-      window=self.window, data_mask=data_mask,
-      dtype=dtype, expected_shape=expected_shape,
-      n_jobs=n_jobs, overview=overview, verbose=self.verbose
-    )
+    #n_rows = self.info.shape[0]
+    #self.array = np.empty((width, height, n_rows), dtype=dtype)
+    self.array = []
 
-    self._verbose(f"Read array shape: {self.array.shape}")
+    for band, rows in self.info.groupby(RasterData.BAND_COL):
+
+      rows[RasterData.PATH_COL]
+      raster_files = [ Path(r) for r in rows[RasterData.PATH_COL] ]
+      
+      self._verbose(
+          f"RasterData with {len(raster_files)} rasters (band: {band})" 
+        + f" and {len(self.info[RasterData.GROUP_COL].unique())} group(s)" 
+      )
+
+      array = read_rasters(
+        raster_files, band=band,
+        window=self.window, data_mask=data_mask,
+        dtype=dtype, expected_shape=expected_shape,
+        n_jobs=n_jobs, overview=overview, verbose=self.verbose
+      )
+      
+      self.array.append(array)
+      self._verbose(f"Read array shape: {array.shape}")
+
+    self.array = np.concatenate(self.array, axis=-1)
 
     return self
 
@@ -1073,7 +1124,8 @@ class RasterData(SKMapBase):
       return imgdata64
     
     # find a way to optimize processor count
-    images = Parallel(n_jobs=3)(delayed(_populateImages)(self.array[:,:,i],titles[i]) for i in range(self.array.shape[2]))
+    args = [ (self.array[:,:,i],titles[i]) for i in range(self.array.shape[2]) ]
+    images = [ img for img in parallel.job(_populateImages, args) ]
     
     if to_gif is not None:
       with ExitStack() as stack:
