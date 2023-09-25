@@ -646,7 +646,6 @@ try:
         for op in ops:
           name = rdata._set_date(outname, 
                 dt1, dt2, 
-                rdata.date_format, rdata.date_style, 
                 op=op, tm=tm, gr=group
               )
           

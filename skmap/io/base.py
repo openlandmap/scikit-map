@@ -625,9 +625,9 @@ class RasterData(SKMapBase):
       else:
         for r in raster_files[group]:
           if isinstance(r, tuple):
-            rows.append([group,r[0],r[1]])
+            rows.append([group, r[0], r[1]])
           else:
-            rows.append([group,r, 1])
+            rows.append([group, r, 1])
 
     self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL, RasterData.BAND_COL])
     self.info[RasterData.TEMPORAL_COL] = self.info.apply(lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]), axis=1)
@@ -635,6 +635,7 @@ class RasterData(SKMapBase):
     self.info.reset_index(drop=True, inplace=True)
 
     self._active_group = None
+    self.date_args = {}
 
   def _new_info_row(self, 
     raster_file:str,
@@ -652,15 +653,19 @@ class RasterData(SKMapBase):
     row[RasterData.NAME_COL] = name
     row[RasterData.GROUP_COL] = group
 
-    if len(dates) > 0 and self.date_style is not None:
+    date_style = self.date_args[self._active_group]['date_style']
+    date_format = self.date_args[self._active_group]['date_format']
+    self.date_args[group] = self.date_args[self._active_group]
+
+    if len(dates) > 0 and date_style is not None:
       row[RasterData.TEMPORAL_COL] = True
 
       dt1, dt2 = (dates[0], dates[1] )
       
       if isinstance(dt1, str):
-        dt1 = datetime.strptime(dt1, self.date_format)
+        dt1 = datetime.strptime(dt1, date_format)
       if isinstance(dt2, str):
-        dt2 = datetime.strptime(dt2, self.date_format)
+        dt2 = datetime.strptime(dt2, date_format)
       row[RasterData.START_DT_COL] = dt1
       row[RasterData.END_DT_COL] = dt2
 
@@ -676,6 +681,7 @@ class RasterData(SKMapBase):
     dt2,
     date_format = None,
     date_style = None,
+    ignore_29feb = None,
     **kwargs
   ):
     
@@ -683,12 +689,12 @@ class RasterData(SKMapBase):
       gr = ''
 
     if date_format is None:
-      date_format = self.date_format
+      date_format = self.date_args[self._active_group]['date_format']
 
     if date_style is None:
-      date_style = self.date_style
+      date_style = self.date_args[self._active_group]['date_style']
 
-    if self.ignore_29feb and '%j' in date_format:
+    if ignore_29feb and '%j' in date_format:
       dt1 = dt1 + relativedelta(leapdays=-1)
       dt2 = dt2 + relativedelta(leapdays=-1)
 
@@ -710,34 +716,50 @@ class RasterData(SKMapBase):
     date_step,
     date_style:str = 'interval',
     date_format:str = '%Y%m%d',
-    ignore_29feb = True
+    ignore_29feb = True,
+    group:[list,str] = []
   ):
     
-    self.date_style = date_style
-    self.date_format = date_format
-    self.ignore_29feb = ignore_29feb
+    if isinstance(group, str):
+      group = [ group ]
 
-    dates = date_range(start_date, end_date, 
-      date_unit=date_unit, date_step=date_step, 
-      date_format=date_format, ignore_29feb=ignore_29feb)
+    new_info = [] 
+
+    for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
+
+      self.date_args[_group] = {
+        'date_style': date_style,
+        'date_format': date_format,
+        'ignore_29feb': ignore_29feb
+      }
+
+      dates = date_range(start_date, end_date, 
+        date_unit=date_unit, date_step=date_step, 
+        date_format=date_format, ignore_29feb=ignore_29feb)
     
-    def fun(r):
-      if r[RasterData.TEMPORAL_COL]:
-        names, start, end = [], [], []
-        for dt1, dt2 in dates:
-          names.append(self._set_date(r[RasterData.PATH_COL], dt1, dt2, date_format, date_style))
-          start.append(dt1)
-          end.append(dt2)
-        return Series([names, start, end])
-      else:
-        return Series([[r[RasterData.PATH_COL]],[None],[None]])
+      def fun(r):
+        if r[RasterData.TEMPORAL_COL]:
+          names, start, end = [], [], []
+          for dt1, dt2 in dates:
+            names.append(self._set_date(
+              r[RasterData.PATH_COL], dt1, dt2, 
+              date_format=date_format, date_style=date_style, ignore_29feb=ignore_29feb)
+            )
+            start.append(dt1)
+            end.append(dt2)
+          return Series([names, start, end])
+        else:
+          return Series([[r[RasterData.PATH_COL]],[None],[None]])
 
-    temporal_cols = [RasterData.PATH_COL, RasterData.START_DT_COL, RasterData.END_DT_COL]
+      temporal_cols = [RasterData.PATH_COL, RasterData.START_DT_COL, RasterData.END_DT_COL]
 
-    self.info[temporal_cols] = self.info.apply(fun, axis=1)
-    self.info = self.info.explode(temporal_cols)
-    self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL]).stem, axis=1)
-    self.info.reset_index(drop=True, inplace=True)
+      ginfo[temporal_cols] = ginfo.apply(fun, axis=1)
+      ginfo = ginfo.explode(temporal_cols)
+      ginfo[RasterData.NAME_COL] = ginfo.apply(lambda r: Path(r[RasterData.PATH_COL]).stem, axis=1)
+      print(ginfo.shape)
+      new_info.append(ginfo)
+
+    self.info = pd.concat(new_info).reset_index(drop=True)
 
     return self
 
@@ -848,6 +870,10 @@ class RasterData(SKMapBase):
   def rename(self, groups:dict):
     self.info[RasterData.GROUP_COL] = self.info[RasterData.GROUP_COL].replace(groups)
     self.info[RasterData.NAME_COL] = self.info[RasterData.NAME_COL].replace(groups)
+    for old_group in groups.keys():
+      new_group = groups[old_group]
+      self.date_args[new_group] = self.date_args[old_group]
+      del self.date_args[old_group]
     return self
 
   def filter_date(self, 
