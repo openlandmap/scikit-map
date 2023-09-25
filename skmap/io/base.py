@@ -652,6 +652,7 @@ class RasterData(SKMapBase):
     row[RasterData.PATH_COL] = raster_file
     row[RasterData.NAME_COL] = name
     row[RasterData.GROUP_COL] = group
+    row[RasterData.BAND_COL] = 1
 
     date_style = self.date_args[self._active_group]['date_style']
     date_format = self.date_args[self._active_group]['date_format']
