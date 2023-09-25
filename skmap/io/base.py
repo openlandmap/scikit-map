@@ -350,7 +350,7 @@ def read_rasters(
         f"Use one of overviews: {ds.overviews(band)}")
   elif window is not None:
     n_bands, height, width,  = ds.count, window.height, window.width
-  else
+  else:
     n_bands, height, width,  = ds.count, ds.height, ds.width
 
   #temp_folder = tempfile.mkdtemp()
