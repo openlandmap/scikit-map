@@ -348,7 +348,9 @@ def read_rasters(
     else:
       raise Exception(f"Overview {overviews} is invalid for {raster_files[-1]}.\n"
         f"Use one of overviews: {ds.overviews(band)}")
-  else:
+  elif window is not None:
+    n_bands, height, width,  = ds.count, window.height, window.width
+  else
     n_bands, height, width,  = ds.count, ds.height, ds.width
 
   #temp_folder = tempfile.mkdtemp()
