@@ -652,7 +652,7 @@ try:
           new_group = f'{group}.{tm}.{op}'
 
           new_info.append(
-            rdata._new_info_row('', name=name, group=new_group, dates=[start_dt, end_dt])
+            rdata._new_info_row(rdata.base_raster, name=name, group=new_group, dates=[start_dt, end_dt])
           )
 
         new_array.append(out_array)
@@ -776,7 +776,7 @@ try:
         new_group = f'{group}.{nm}.{pr}'
 
         new_info.append(
-          rdata._new_info_row('', group=new_group, name=name, dates=[start_dt, end_dt])
+          rdata._new_info_row(rdata.base_raster, group=new_group, name=name, dates=[start_dt, end_dt])
         )
 
       ts_size = array.shape[2]
@@ -791,7 +791,7 @@ try:
         new_group = f'{group}.{nm}.{pr}'
 
         new_info.append(
-          rdata._new_info_row('', group=new_group, name=name, dates=[start_dt_min, end_dt_max])
+          rdata._new_info_row(rdata.base_raster, group=new_group, name=name, dates=[start_dt_min, end_dt_max])
         )
 
       return new_array, DataFrame(new_info)

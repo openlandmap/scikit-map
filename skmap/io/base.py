@@ -766,6 +766,17 @@ class RasterData(SKMapBase):
 
     return self
 
+  def _base_raster(self):
+
+    for filepath in list(self.info[RasterData.PATH_COL]):
+      if 'http' in filepath:
+        res = requests.head(filepath)
+        if (res.status_code == 200):
+          return True
+      else:
+        if Path(filepath).exists():
+          return True
+        
   def read(self,
     window:Window = None,
     dtype:str = 'float32',
@@ -795,6 +806,8 @@ class RasterData(SKMapBase):
     
     #n_rows = self.info.shape[0]
     #self.array = np.empty((width, height, n_rows), dtype=dtype)
+    self.base_raster = self._base_raster()
+    
     self.array = []
 
     for band, rows in self.info.groupby(RasterData.BAND_COL):
