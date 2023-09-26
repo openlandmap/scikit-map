@@ -113,13 +113,13 @@ def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_m
       if verbose:
         ttprint(f'ERROR: Failed to read {raster_file} window {window}')
       band_data = np.empty((int(window.height), int(window.width)))
-      band_data = _nodata_replacement(dtype)
+      band_data[:,:] = _nodata_replacement(dtype)
 
     if expected_shape is not None:
       if verbose:
         ttprint(f'Full nan image for {raster_file}')
       band_data = np.empty(expected_shape)
-      band_data = _nodata_replacement(dtype)
+      band_data[expected_shape] = _nodata_replacement(dtype)
 
   data_exists = (band_data is not None)
 
