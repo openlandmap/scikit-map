@@ -38,6 +38,7 @@ from minio import Minio
 from pathlib import Path
 import rasterio
 from rasterio.windows import Window, from_bounds
+from pystac.item import Item
 
 import bottleneck as bn
 
@@ -695,6 +696,40 @@ class RasterData(SKMapBase):
       row[RasterData.NAME_COL] = name
 
     return row
+
+  def from_stac_tems(
+    stac_items:List[Item], 
+    bands:List[str] = None,
+    verbose = False
+  ):
+
+    rdata_input = {}
+
+    for i in stac_items:
+        
+      kbbox = str(i.bbox)
+      if kbbox not in rdata_input:
+        rdata_input[kbbox] = { 'groups': {}, 'dates': [] }
+      
+      rdata_input[kbbox]['dates'].append(i.datetime.replace(tzinfo=None))
+      
+      for kband in  i.assets.keys():
+        if kband in bands:
+          if kband not in rdata_input[kbbox]['groups']:
+            rdata_input[kbbox]['groups'][kband] = []
+          rdata_input[kbbox]['groups'][kband].append(i.assets[kband].href)
+
+    result = []
+        
+    for kbbox in rdata_input.keys():
+      if verbose: 
+        ttprint(f'Creating RasterData for extent {kbbox}')
+      kbbox_in = rdata_input[kbbox]
+      result.append(
+        RasterData(kbbox_in['groups'], verbose=verbose).set_dates(kbbox_in['dates'], kbbox_in['dates'])
+      )
+
+    return result
 
   def _set_date(self, 
     text, 
