@@ -25,6 +25,8 @@ from matplotlib import pyplot
 from matplotlib.animation import FuncAnimation
 import traceback
 
+from shapely.geometry import box,shape
+
 from typing import List, Union, Callable
 from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap
 from skmap import SKMapRunner, SKMapBase, parallel
@@ -35,7 +37,7 @@ from minio import Minio
 
 from pathlib import Path
 import rasterio
-from rasterio.windows import Window
+from rasterio.windows import Window, from_bounds
 
 import bottleneck as bn
 
@@ -82,7 +84,10 @@ def _fit_in_dtype(data, dtype, nodata):
   return data
 
 def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_mask, expected_shape, 
-  try_without_window, overview, verbose):
+  try_without_window, gdal_opts, overview, verbose):
+
+  for key in gdal_opts.keys():
+    gdal.SetConfigOption(key,gdal_opts[key])
 
   raster_file = raster_files[raster_idx]
   ds, band_data = None, None
@@ -260,11 +265,13 @@ def read_rasters(
   raster_files:Union[List,str] = [],
   band = 1,
   window:Window = None,
+  bounds:[] = None,
   dtype:str = 'float32',
   n_jobs:int = 4,
   data_mask:numpy.array = None,
   expected_shape = None,
   try_without_window = False,
+  gdal_opts:dict = {},
   overview = None,
   keep_memmap = False,
   verbose = False
@@ -341,6 +348,17 @@ def read_rasters(
     ttprint(f'Reading {len(raster_files)} raster file(s) using {n_jobs} workers')
 
   ds = rasterio.open(raster_files[-1])
+  if bounds is not None and len(bounds) == 4:
+    bounds = shape(rasterio.warp.transform_geom(
+        src_crs='EPSG:4326',
+        dst_crs=ds.crs,
+        geom=box(*bounds),
+    )).bounds
+    window = from_bounds(*bounds, ds.transform).round_shape()
+    if verbose:
+      ttprint(f'Transform {bounds} into {window}')
+
+
   if overview is not None:
     overviews = ds.overviews(band)
     if overview in overviews:
@@ -360,7 +378,7 @@ def read_rasters(
 
   args = [ 
     (raster_idx, raster_files, array_mm, band, window, dtype, data_mask, 
-      expected_shape, try_without_window, overview, verbose) 
+      expected_shape, try_without_window, gdal_opts, overview, verbose) 
     for raster_idx in range(0,len(raster_files)) 
   ]
   
@@ -712,6 +730,40 @@ class RasterData(SKMapBase):
 
     return _eval(str(text), {**kwargs,**locals()})
 
+  def set_dates(self,
+    start_dates:list,
+    end_dates:list,
+    date_style:str = 'interval',
+    date_format:str = '%Y%m%d',
+    ignore_29feb = True,
+    group:[list,str] = []
+  ):
+
+    if isinstance(group, str):
+      group = [ group ]
+
+    self.info[RasterData.START_DT_COL] = None
+    self.info[RasterData.END_DT_COL] = None
+
+    for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
+
+      if len(group) > 0 and _group not in group:
+        continue
+
+      self.date_args[_group] = {
+        'date_style': date_style,
+        'date_format': date_format,
+        'ignore_29feb': ignore_29feb
+      }
+
+      ginfo[RasterData.START_DT_COL] = start_dates
+      ginfo[RasterData.END_DT_COL] = end_dates
+      ginfo[RasterData.TEMPORAL_COL] = True
+
+      self.info.iloc[ginfo.index] = ginfo
+
+    return self
+
   def timespan(self,
     start_date,
     end_date,
@@ -726,9 +778,10 @@ class RasterData(SKMapBase):
     if isinstance(group, str):
       group = [ group ]
 
-    new_info = [] 
-
     for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
+
+      if len(group) > 0 and _group not in group:
+        continue
 
       self.date_args[_group] = {
         'date_style': date_style,
@@ -759,10 +812,9 @@ class RasterData(SKMapBase):
       ginfo[temporal_cols] = ginfo.apply(fun, axis=1)
       ginfo = ginfo.explode(temporal_cols)
       ginfo[RasterData.NAME_COL] = ginfo.apply(lambda r: Path(r[RasterData.PATH_COL]).stem, axis=1)
-      print(ginfo.shape)
-      new_info.append(ginfo)
-
-    self.info = pd.concat(new_info).reset_index(drop=True)
+      
+      self.info = self.info.drop(index=ginfo.index)
+      self.info = pd.concat([self.info, ginfo]).reset_index(drop=True)
 
     return self
 
@@ -779,10 +831,12 @@ class RasterData(SKMapBase):
         
   def read(self,
     window:Window = None,
+    bounds:list = None,
     dtype:str = 'float32',
     expected_shape = None,
     overview:int = None,
     n_jobs:int = 4,
+    gdal_opts:dict = {}
   ):
 
     self.window = window
@@ -790,7 +844,7 @@ class RasterData(SKMapBase):
     data_mask = None
     if self.raster_mask is not None:
       self._verbose(f"Masking {self.raster_mask_val} values considering {Path(self.raster_mask).name}")
-      data_mask = read_rasters([self.raster_mask], window=window, overview=overview)
+      data_mask = read_rasters([self.raster_mask], window=window, overview=overview, gdal_opts=gdal_opts)
       if self.raster_mask_val is np.nan:
         data_mask = np.logical_not(np.isnan(data_mask))
       else:
@@ -821,10 +875,11 @@ class RasterData(SKMapBase):
       )
 
       array = read_rasters(
-        raster_files, band=band,
-        window=self.window, data_mask=data_mask,
+        raster_files, band=band,window=self.window, 
+        bounds=bounds, data_mask=data_mask,
         dtype=dtype, expected_shape=expected_shape,
-        n_jobs=n_jobs, overview=overview, verbose=self.verbose
+        n_jobs=n_jobs, overview=overview, gdal_opts=gdal_opts,
+        verbose=self.verbose
       )
       
       self.array.append(array)
@@ -986,7 +1041,7 @@ class RasterData(SKMapBase):
   def _base_raster(self):
     for _, row  in self.info.iterrows():
       path = row[RasterData.PATH_COL]
-      if 'http:' in str(path):
+      if 'http' in str(path):
         res = requests.head(path)
         if (res.status_code == 200):
           return path
