@@ -38,17 +38,15 @@ from rasterio.windows import Window
 import bottleneck as bn
 
 from IPython.display import HTML
-from joblib import Parallel, delayed, Memory
 from tempfile import TemporaryDirectory
 from io import BytesIO
 from base64 import encodebytes, b64decode
 from uuid import uuid4
 from PIL import Image
 from contextlib import ExitStack
-from mpl_toolkits.axes_grid1 import ImageGrid
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
-
+from copy import deepcopy
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -1128,131 +1126,6 @@ class RasterData(SKMapBase):
         ))
       html_rep = path.read_text()
     return HTML(html_rep)
-  
-
-  def plot(self, 
-    cmap:str = 'Spectral_r',
-    legend_title:str = "", 
-    img_title:str = 'index',
-    v_minmax:tuple = None,
-    to_img:str = None,
-    n_jobs:int = 4,
-    column:int = 3,
-  ):
-    """
-    Generates a square grid plot to view and save with colorscale with a given column count.
-
-    :param cmap: Default is Spectral_r
-      colormap name one of the `matplotlib.colormaps()`
-    :param legend_title: Default is an empty string
-      title of the colorbar that will be used within the animation
-    :param img_title: Default value is None
-      this could be `name`,`date`, `index` or None. 
-    :param v_minmax: minimum and maximum boundaries of corethe colorscale. Default is None and 
-      it will be derived from the dataset if not defined.
-    :param to_img:  this should be directory that indicating the location where user want to
-      save the image. Default is None
-    :param n_jobs: worker count that is going to run in parallel to generate figure. Default is 4. 
-    :param column: column count of the desired plot. Default is 3.
-
-    Examples
-    ========
-    from skmap.data import toy
-    %matplotlib # to stop pouring out when calling the function. 
-
-    data = toy.ndvi(gappy=True, verbose=True)
-    figure = rdata.plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
-    
-    # to view in jupyter notebook  
-    figure.show()   
-    """
-
-    if v_minmax is None:
-      vmin , vmax = np.nanquantile(self.array.flatten(), [.1, .9])
-    else:
-      vmin, vmax = v_minmax
-    titles = self._get_titles(img_title)
-    
-    height,width = self.array.shape[:2]
-    if width == height:
-      scale = 1.5
-      fontsize=9
-    elif width > height:
-      scale = 2.5
-      fontsize=12.5
-    else:
-      scale= 1.5
-      fontsize=9
-    
-    args = [(i, vmin, vmax, cmap, scale, titles, fontsize, legend_title, False) for i in range(self.array.shape[2])]
-    sem_img = [m for m in parallel.job(self._pop_imgs, args, n_jobs=n_jobs)]
-
-    cols, rows = column, math.ceil(len(sem_img)/column)
-    width, height = np.array(sem_img[0][0].size)/np.array(sem_img[0][0].info['dpi'])
-    mpl.font_manager._get_font.cache_clear()
-
-    grid_fig, grid_axes = pyplot.subplots(nrows=rows, ncols=cols)
-    grid_fig.set_size_inches(width * cols + (cols-1) * 0.1 , height*rows + (rows-1)*0.1)
-
-    for ax, img in zip(grid_axes.ravel(), sem_img):
-      ax.axis('off')
-      ax.imshow(img[0])
-    
-    # clean the empty subplot frames
-    diff = len(grid_axes.ravel())-len(sem_img)
-    if diff != 0:
-      for i in range(1, diff+1):
-        grid_axes.ravel()[-i].axis('off')
-
-    grid_fig.subplots_adjust(hspace=0, wspace=0)
-    buf_grid=BytesIO()
-    grid_fig.savefig(buf_grid, format='png', bbox_inches='tight', dpi=100)
-    buf_grid.seek(0)
-    grid_image = Image.open(buf_grid)
-    pyplot.close()
-    mainplot = np.array(grid_image.size)/np.array(grid_image.info['dpi'])
-    
-    # colorscale
-    fig_scale, ax_scale = pyplot.subplots()
-    fig_scale.set_size_inches(mainplot[0], 0.4)
-    fig_scale.subplots_adjust(bottom=0)
-    
-    fig_scale.colorbar(
-      mpl.cm.ScalarMappable(
-        norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax), 
-        cmap=mpl.colormaps[cmap]
-      ),
-      cax = ax_scale, 
-      orientation='horizontal', 
-      label = legend_title
-    )
-    buf_scale=BytesIO()
-
-    fig_scale.savefig(buf_scale, format='png', bbox_inches='tight', dpi=100)
-    pyplot.close()
-
-    buf_scale.seek(0)
-    scale_image = Image.open(buf_scale)
-    
-    scale_image_size =  np.array(scale_image.size)/np.array(scale_image.info['dpi'])
-
-    final_figure = pyplot.figure()
-    final_figure.set_size_inches(mainplot[0], mainplot[1]+1)
-    gs = mpl.gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[2, (mainplot/scale_image_size)[1]])
-    ax0 = pyplot.subplot(gs[0])
-    ax1 = pyplot.subplot(gs[1])
-    ax0.axis('off')
-    ax1.axis('off')
-    ax0.imshow(scale_image)
-    ax1.imshow(grid_image)
-    pyplot.subplots_adjust(hspace=0,wspace=0)
-
-    if to_img is not None:
-      final_figure.savefig(to_img, dpi=100, bbox_inches='tight')
-      return to_img
-    else:
-      pyplot.close()
-      return final_figure
 
   def point_query(self, 
                   x:list, 
@@ -1307,3 +1180,191 @@ class RasterData(SKMapBase):
     pyplot.tight_layout()
     pyplot.close()
     return fig
+  
+### More roboust implementation
+  def _vminmax(self, vmm, arr):
+      if vmm:
+        return vmm
+      return np.nanquantile(arr.flatten(), [.1, .9])
+  
+  def _op_io(self, figure, to64=False):
+    buffer = BytesIO()
+    figure.savefig(buffer, format='png', bbox_inches='tight')
+    buffer.seek(0)
+    img = Image.open(buffer)
+    pyplot.close()
+    if to64:
+      img64 = encodebytes(buffer.getvalue()).decode('ascii')
+      return (img, img64)
+    return img
+
+  def _percent_clip(self, arr):
+    return (arr - np.percentile(arr, 1)) / (np.percentile(arr,99)-np.percentile(arr,1))
+  
+  def _mutate_baseshot(self, img, arr, title_params:dict=None):
+    
+    c_img = deepcopy(img)
+    c_img.set_data(arr)
+    if title_params:
+      c_img._axes.set_title(**title_params)
+    return c_img.get_figure()
+   
+  def _gen_baseshot(self, arr, img_style:dict=None, cbar_props:dict=None, composite=False):
+    #base figure with predefined style
+    
+    # no axis labels
+    tick_params=dict(left=False, labelleft=False, labelbottom=False, bottom=False)
+    pyplot.tick_params(**tick_params)
+    
+    # scaling the figsize based on the passed array shape
+    # the base figsize is 3.15 inc = 8cm almost half short side of a A4 page 
+
+    fig, ax = pyplot.subplots()
+
+    rc,cc = arr.shape[:2]
+    fig.set_size_inches(3.15, 3.15*rc/cc)
+    
+    # generation of basedata based on the array shape
+    basedata = np.zeros(rc*cc).reshape(rc,cc)
+    if composite:
+      basedata = np.zeros(rc*cc*3).reshape(rc,cc,3)
+
+    # crafting the base image
+    ax.margins(x=0)
+    
+    if img_style:
+      baseimg = ax.imshow(basedata, **img_style) # img_style = dict(vmin=, vmax=, cmap=)
+    else:
+      baseimg = ax.imshow(basedata)
+    # if there will be a colorbar there will be a colorbar
+    if cbar_props: # cbar_props is dict(label='text')
+      div = make_axes_locatable(ax)
+      pyplot.colorbar(
+        baseimg, 
+        orientation='horizontal', label=cbar_props['label'],
+        cax = div.append_axes('bottom', size='3%', pad = 0.05)
+      )
+    pyplot.close()
+    return baseimg
+  
+  def _band_manage(self, bands):
+
+    if len(bands) == 1: # single band raster
+      arr = self.filter(f"group=={bands}").array
+    elif len(bands) == 3: # composite
+      arr = []
+      band1 = self.filter(f"group=={bands}[0]")
+      band2 = self.filter(f"group=={bands}[1]")
+      band3 = self.filter(f"group=={bands}[2]")
+      for i in range(band1.array.shape[2]):
+        arr.append(
+          np.stack([
+            np.clip(self._percent_clip(band1.array[:,:,i]),0,1),
+            np.clip(self._percent_clip(band2.array[:,:,i]),0,1),
+            np.clip(self._percent_clip(band3.array[:,:,i]),0,1),
+          ], axis=2)
+        )
+    else:
+      raise Exception("""The band count should either be one or three. 
+                      Current plotting capabilites are limited to single 
+                      or composite image generation.""")
+    return arr
+      
+  def plot(
+      self,
+      cmap:str = 'Spectral_r',
+      cbar_title:str = None, 
+      img_title_text:str or list = "index",
+      img_title_fontsize:int = 10,
+      vminmax:tuple = (None,None),
+      bands:list = ['default'],
+      to_img:str = None,
+      dpi:int = 100,
+      layout_col: int = 4
+  ):
+    """
+      Generates a grid plot to view and save with a colorscale with a desired layout.
+      :param cmap                 : This sets the colorscale with given matplotlib.colormap. Default is Spectral_r
+      :param cbar_title           : This sets the colorbar title if the cbar exists in the plot. Default is None.
+      :param img_title_text       : This sets the image titles that will be display on top of the each image. Default is `index``.
+      :param img_ltitle_fontsize  : This sets the fontsize of the image label which will be on top of the image. Default is 10.
+      :param v_minmax             : This sets the loower and upper limits of the data that will be plot and the colorbar. Default is None and will be calculated on he fly.
+      :param bands                : This used for to generate composite plot. Pass one or tree group names (bands) which will be used to generate. Default is ['default'] 
+      :param to_img               : This sets the directory adn the format of the file where the generated image will be saved. Default is None.
+      :param dpi                  : dot per inch value to save the figure. If the `to_img` param provided
+      :param layout_col           : This controls the column count that will be used in the grid plot. Default is 3.
+    """
+
+    if isinstance(img_title_text, str):
+      img_title_text = self._get_titles(img_title_text)
+
+    arr = self._band_manage(bands=bands)
+    
+    if len(bands) == 3:
+      img_cnt = len(arr)
+      composite=True
+      baseimg = self._gen_baseshot(arr[0][:,:,0])
+    elif len(bands) == 1:
+      img_cnt = arr.shape[2]
+      composite=False
+      vminmax = self._vminmax(vminmax, arr)
+      baseimg = self._gen_baseshot(arr[:,:,0])
+
+    if img_cnt < layout_col:
+      layout_col = img_cnt
+
+    layout_row = math.ceil(img_cnt/layout_col)
+
+    set_h = baseimg.get_size()[0] / baseimg.get_figure()._dpi
+    set_w = baseimg.get_size()[1] / baseimg.get_figure()._dpi
+    if set_w > set_h:
+      set_w = set_w *3.15 / set_h
+      set_h = 3.15
+    else:
+      set_h = set_h *3.15 / set_w
+      set_w = 3.15
+    grd_fig, grd_axs = pyplot.subplots(
+      nrows=layout_row, ncols=layout_col,
+      gridspec_kw=dict(wspace=0.1, hspace=0.1),
+      figsize=(
+        set_w * layout_col + (layout_col-1) * 0.1,
+        set_h * layout_row + (layout_row-1) * 0.1 + 1
+      ),
+    )
+    pyplot.close()
+    def getMatrix(arr_, ind, composite):
+      if composite:
+        return np.flipud(arr_[ind])
+      else:
+        return np.flipud(arr_[:,:,ind])
+      
+    matrix_params = dict(vmin=vminmax[0], vmax=vminmax[1], cmap=cmap)
+
+    def gen_pane(ind, arr, ax, composite, matrix_params, img_title_text, img_title_fontsize):
+      try:
+        ax.pcolorfast(getMatrix(arr, ind, composite=composite), **matrix_params)
+        ax.set_title(img_title_text[ind], fontsize=img_title_fontsize, pad=1)
+        ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+      except IndexError:
+        ax.axis('off')
+
+    for i, ax in enumerate(grd_axs.flatten()):
+      gen_pane(i, arr, ax, composite, matrix_params, img_title_text, img_title_fontsize)
+    pyplot.close()
+
+    if not composite:
+      grd_fig.subplots_adjust(
+        left=0, right=1,
+        bottom=0,top=.92
+      )
+      cbar_ax= grd_fig.add_axes([0.2,.97,0.6,0.02])
+      cbar_ax = grd_fig.colorbar(
+        pyplot.imshow(arr[:,:,0], vmin= vminmax[0], vmax=vminmax[1], cmap=cmap),
+        orientation = 'horizontal',
+        cax = cbar_ax
+      ).set_label(label = cbar_title)
+      pyplot.close()
+
+    if to_img:
+      grd_fig.savefig(to_img, format=f"{to_img.split('.')[-1]}", dpi=dpi)
+    return grd_fig
