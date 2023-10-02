@@ -29,6 +29,7 @@ from shapely.geometry import box,shape
 
 from typing import List, Union, Callable
 from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap
+from skmap.misc import vrt_warp
 from skmap import SKMapRunner, SKMapBase, parallel
 
 from dateutil.relativedelta import relativedelta
@@ -696,18 +697,12 @@ class RasterData(SKMapBase):
 
     return row
 
-  def _map_stac_items(band, href, dates):
-    with rasterio.open(href) as ds:
-      bounds = str(
-        shape(rasterio.warp.transform_geom(
-          dst_crs='EPSG:4326', src_crs=ds.crs, geom=box(*ds.bounds))
-        ).bounds
-      )
-      return bounds, band, href, dates 
-
-  def from_stac_tems(
+  def from_stac_items(
     stac_items:List[Item], 
     bands:List[str] = None,
+    to_crs = rasterio.crs.CRS.from_epsg(4326),
+    spatial_res = None,
+    resamp_method = 'near',
     n_jobs:int = 10,
     verbose = False
   ):
@@ -715,40 +710,36 @@ class RasterData(SKMapBase):
     all_bands = list(stac_items[0].assets.keys())
     if bands is None:
       if verbose: 
-        ttprint(f'Reading only first band, {all_bands[0]}')
+        ttprint(f'Reading band {all_bands[0]} from {all_bands}')
       bands = [ all_bands[0] ]
 
-    rdata_input = {}
+    rdata_input = { 'groups': {}, 'dates': [] }
 
-    args = []
     for i in stac_items:
       for band in  i.assets.keys():
         if band in bands:
-          args.append((band, i.assets[band].href, i.datetime.replace(tzinfo=None),))
+          if band not in rdata_input['groups']:
+            rdata_input['groups'][band] = []
 
-    for bounds, band, href, dates  in parallel.job(RasterData._map_stac_items, args, n_jobs=n_jobs):
-      if bounds not in rdata_input:
-        rdata_input[bounds] = { 'groups': {}, 'dates': [] }
+          href = i.assets[band].href
+          dates = i.datetime.replace(tzinfo=None)
 
-      if band not in rdata_input[bounds]['groups']:
-        rdata_input[bounds]['groups'][band] = []
-
-      if band == bands[0]: # Adding date only one time
-        rdata_input[bounds]['dates'].append(dates)
-      
-      rdata_input[bounds]['groups'][band].append(href)
-
+          rdata_input['groups'][band].append(href)
+          if band == bands[0]: # Adding date only one time
+            rdata_input['dates'].append(dates)
+    
     result = []
         
-    for bounds in rdata_input.keys():
-      if verbose: 
-        ttprint(f'Creating RasterData for extent {bounds}')
-      bounds_in = rdata_input[bounds]
-      result.append(
-        RasterData(bounds_in['groups'], verbose=verbose).set_dates(bounds_in['dates'], bounds_in['dates'])
+    for group in rdata_input['groups'].keys():
+      raster_files = rdata_input['groups'][group]
+      rdata_input['groups'][group] = vrt_warp(raster_files,
+        dst_crs=to_crs.to_wkt(), tr=spatial_res, r_method=resamp_method
       )
 
-    return result
+    rdata = RasterData(rdata_input['groups'], verbose=verbose
+          ).set_dates(rdata_input['dates'], rdata_input['dates'])
+
+    return rdata
 
   def _set_date(self, 
     text, 
