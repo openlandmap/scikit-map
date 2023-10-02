@@ -13,8 +13,13 @@ import rasterio
 import geopandas as gp
 import pandas as pd
 import numpy as np
+
 from pathlib import Path
+from osgeo.gdal import BuildVRT, Warp
+from shapely.geometry import box,shape
 from dateutil.relativedelta import relativedelta
+
+TMP_DIR = tempfile.gettempdir()
 
 def _warn_deps(e, module_name):
     import warnings
@@ -55,6 +60,64 @@ def ref_memmap(array):
     'dtype': array.dtype,
     'shape': array.shape
   }
+
+def make_tempdir(basedir='skmap'):
+  name = Path(tempfile.NamedTemporaryFile().name).name
+  tempdir = Path(TMP_DIR).joinpath('skmap').joinpath(name)
+  tempdir.mkdir(parents=True, exist_ok=True)
+  return tempdir
+
+def _bounds_crs(raster_file, dst_crs):
+  with rasterio.open(raster_file) as ds:
+    bounds = shape(rasterio.warp.transform_geom(
+      dst_crs=dst_crs, src_crs=ds.crs, geom=box(*ds.bounds))).bounds
+    crs = ds.crs
+    return raster_file, bounds, crs 
+
+def _build_vrt(raster_file, band, tr, dst_crs, r_method, outdir, te):
+  outfile_1 = str(Path(outdir).joinpath(str(Path(raster_file.split('?')[0]).stem + f'_b{band}.vrt')))
+  ds_1 = BuildVRT(outfile_1, f'/vsicurl/{raster_file}', bandList = [band])
+  ds_1.FlushCache()
+  del(ds_1)
+
+  outfile_2 = str(Path(outdir).joinpath(str(Path(raster_file.split('?')[0]).stem + f'_b{band}_wrapped.vrt')))
+  Warp(outfile_2, outfile_1, xRes = tr, yRes = tr, resampleAlg=r_method, dstSRS=dst_crs, outputBounds=te)
+  
+  return outfile_2
+
+def vrt_warp(raster_files, 
+  dst_crs='EPSG:4326',
+  band = 1, 
+  tr = None,
+  r_method = 'near', 
+  outdir=None, 
+  n_jobs=-1
+):
+  
+  from skmap import parallel
+
+  if outdir is None:
+      outdir = make_tempdir()
+  else:
+      Path(outdir).mkdir(parents=True, exist_ok=True)
+  
+  args = [ (r, dst_crs) for r in raster_files ] 
+  
+  total_bounds = []
+  args_vrt = []
+  
+  for raster_file, bounds, crs in parallel.job(_bounds_crs, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
+    total_bounds.append(box(*bounds))
+    args_vrt.append( (raster_file, band, tr, dst_crs, r_method, outdir) )
+  
+  te = gp.GeoSeries(total_bounds).unary_union.bounds
+  args_vrt = [ a + (te,) for a in args_vrt ]
+  
+  vrtfiles = []
+  for vrtfile in parallel.job(_build_vrt, args_vrt, n_jobs=-1, joblib_args={'backend': 'multiprocessing'}):
+      vrtfiles.append(vrtfile)
+  
+  return vrtfiles
 
 def ttprint(*args, **kwargs):
   """
