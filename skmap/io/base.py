@@ -355,10 +355,9 @@ def read_rasters(
         dst_crs=ds.crs,
         geom=box(*bounds),
     )).bounds
-    window = from_bounds(*bounds, ds.transform).round_shape()
+    window = from_bounds(*bounds, ds.transform).round_lengths()
     if verbose:
       ttprint(f'Transform {bounds} into {window}')
-
 
   if overview is not None:
     overviews = ds.overviews(band)
@@ -652,7 +651,7 @@ class RasterData(SKMapBase):
 
     self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL, RasterData.BAND_COL])
     self.info[RasterData.TEMPORAL_COL] = self.info.apply(lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]), axis=1)
-    self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
+    self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL].split('?')[0]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
     self.info.reset_index(drop=True, inplace=True)
 
     self._active_group = None
@@ -697,36 +696,56 @@ class RasterData(SKMapBase):
 
     return row
 
+  def _map_stac_items(band, href, dates):
+    with rasterio.open(href) as ds:
+      bounds = str(
+        shape(rasterio.warp.transform_geom(
+          dst_crs='EPSG:4326', src_crs=ds.crs, geom=box(*ds.bounds))
+        ).bounds
+      )
+      return bounds, band, href, dates 
+
   def from_stac_tems(
     stac_items:List[Item], 
     bands:List[str] = None,
+    n_jobs:int = 10,
     verbose = False
   ):
 
+    all_bands = list(stac_items[0].assets.keys())
+    if bands is None:
+      if verbose: 
+        ttprint(f'Reading only first band, {all_bands[0]}')
+      bands = [ all_bands[0] ]
+
     rdata_input = {}
 
+    args = []
     for i in stac_items:
-        
-      kbbox = str(i.bbox)
-      if kbbox not in rdata_input:
-        rdata_input[kbbox] = { 'groups': {}, 'dates': [] }
+      for band in  i.assets.keys():
+        if band in bands:
+          args.append((band, i.assets[band].href, i.datetime.replace(tzinfo=None),))
+
+    for bounds, band, href, dates  in parallel.job(RasterData._map_stac_items, args, n_jobs=n_jobs):
+      if bounds not in rdata_input:
+        rdata_input[bounds] = { 'groups': {}, 'dates': [] }
+
+      if band not in rdata_input[bounds]['groups']:
+        rdata_input[bounds]['groups'][band] = []
+
+      if band == bands[0]: # Adding date only one time
+        rdata_input[bounds]['dates'].append(dates)
       
-      rdata_input[kbbox]['dates'].append(i.datetime.replace(tzinfo=None))
-      
-      for kband in  i.assets.keys():
-        if kband in bands:
-          if kband not in rdata_input[kbbox]['groups']:
-            rdata_input[kbbox]['groups'][kband] = []
-          rdata_input[kbbox]['groups'][kband].append(i.assets[kband].href)
+      rdata_input[bounds]['groups'][band].append(href)
 
     result = []
         
-    for kbbox in rdata_input.keys():
+    for bounds in rdata_input.keys():
       if verbose: 
-        ttprint(f'Creating RasterData for extent {kbbox}')
-      kbbox_in = rdata_input[kbbox]
+        ttprint(f'Creating RasterData for extent {bounds}')
+      bounds_in = rdata_input[bounds]
       result.append(
-        RasterData(kbbox_in['groups'], verbose=verbose).set_dates(kbbox_in['dates'], kbbox_in['dates'])
+        RasterData(bounds_in['groups'], verbose=verbose).set_dates(bounds_in['dates'], bounds_in['dates'])
       )
 
     return result
