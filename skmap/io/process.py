@@ -30,6 +30,7 @@ try:
   from dateutil.relativedelta import relativedelta
 
   import pyfftw
+  import numexpr as ne
 
   class Transformer(SKMapGroupRunner, ABC):
     
@@ -67,9 +68,6 @@ try:
       group:str,
       outname:str = 'skmap_{nm}_{gr}_{dt}'
     ):
-      """
-      Execute the gapfilling approach.
-      """
 
       if outname is None:
         outname = 'skmap_{nm}_{gr}_{dt}'
@@ -436,7 +434,7 @@ try:
 
       return (out_array, ops, tm, dt1, dt2)
 
-    def _args_montly(self, rdata, start_dt, end_dt, date_format, months = 1, daysp = None):
+    def _args_monthly(self, rdata, start_dt, end_dt, date_format, months = 1, daysp = None):
       
       args = []
 
@@ -509,7 +507,7 @@ try:
     def _run(self, 
       rdata:RasterData,
       group:str,
-      outname:str = 'skmap_aggregate.{gr}.{tm}_{op}_{dt}'
+      outname:str = 'skmap_aggregate.{gr}_{op}_{dt}'
     ):
 
       date_format = '%Y%m%d'
@@ -525,15 +523,15 @@ try:
         elif t == TimeEnum.YEARLY:
           args += self._args_yearly(rdata, start_dt, end_dt, date_format)
         elif t == TimeEnum.MONTHLY:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 1)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 1)
         elif t == TimeEnum.MONTHLY_15P:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 1, 15)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 1, 15)
         elif t == TimeEnum.BIMONTHLY:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 2)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2)
         elif t == TimeEnum.BIMONTHLY_15P:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 2, 15)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2, 15)
         elif t == TimeEnum.QUARTERLY:
-          args += self._args_montly(rdata, start_dt, end_dt, date_format, 2)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2)
         else:
           raise Exception(f"Aggregation by {t} not implemented")
       
@@ -546,12 +544,17 @@ try:
 
       for out_array, ops, tm, dt1, dt2 in parallel.job(self._aggregate, args, joblib_args={'backend': 'threading'}):
         for op in ops:
+          
+          _group = group
+          if tm != '':
+            _group = f'{group}.{tm}'
+
           name = rdata._set_date(outname, 
                 dt1, dt2, 
-                op=op, tm=tm, gr=group
+                op=op, gr=_group
               )
           
-          new_group = f'{group}.{tm}.{op}'
+          new_group = f'{_group}.{op}'
 
           new_info.append(
             rdata._new_info_row(rdata.base_raster, name=name, group=new_group, dates=[start_dt, end_dt])
@@ -706,12 +709,12 @@ try:
       verbose = False
     ):
 
-      super().__init__(verbose=verbose, temporal=True)
+      super().__init__(verbose=verbose)
       
       self.n_jobs = n_jobs
       self.fn = fn
 
-    def _calc(self, gmap):
+    def _map(self, gmap):
       
       array_dict, group_idx = {}, {}
       
@@ -755,7 +758,6 @@ try:
           garray_i[:] = garray[:,:,i]
 
           garray_i_ref = ref_memmap(garray_i)
-          #memmap_list.append(garray_i)
 
           gmap[ggroup[i]] = (garray_i_ref, gidx[i])
         
@@ -766,10 +768,7 @@ try:
       new_array = []
       new_info = []
 
-      for exi_array_dict, new_array_dict in parallel.job(self._calc, args, n_jobs=self.n_jobs):
-
-        print('exi_array_dict', exi_array_dict.keys())
-        print('new_array_dict', new_array_dict.keys())
+      for exi_array_dict, new_array_dict in parallel.job(self._map, args, n_jobs=self.n_jobs):
 
         row = None
         for array, idx in exi_array_dict.values():
@@ -791,7 +790,6 @@ try:
           
           name = rdata._set_date(outname, start_dt, end_dt, 
             date_format=date_format, date_style=date_style,  gr=new_group)
-          print(outname, name)
           
           new_info.append(
             rdata._new_info_row(rdata.base_raster, 
@@ -807,6 +805,38 @@ try:
         del_memmap(rm)
 
       return new_array, DataFrame(new_info)
+
+  class Calc(Map):
+
+    def __init__(self,
+      expressions:dict,
+      mask_group:str = None,
+      mask_values:list = [],
+      n_jobs:int = os.cpu_count(),
+      verbose = False
+    ):
+
+      super().__init__(fn=self._calc, n_jobs=n_jobs, verbose=verbose)
+
+      self.expressions = expressions
+      self.mask_group = mask_group
+      self.mask_values = mask_values
+
+    def _calc(self, array_dict):
+
+      if self.mask_group is not None and len(self.mask_values) > 1:
+        array_mask = array_dict[self.mask_group]
+        array_mask = np.isin(array_mask, self.mask_values)
+      
+        for g in array_dict.keys():
+          if g != self.mask_group:
+            array_dict[g][array_mask] = np.nan
+      
+      for group in self.expressions.keys():
+        expression = self.expressions[group]
+        array_dict[group] = ne.evaluate(expression, local_dict=array_dict)
+    
+      return array_dict
 
 except ImportError as e:
   from skmap.misc import _warn_deps
