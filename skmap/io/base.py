@@ -44,14 +44,15 @@ from pystac.item import Item
 import bottleneck as bn
 
 from IPython.display import HTML
-from joblib import Parallel, delayed
 from tempfile import TemporaryDirectory
 from io import BytesIO
 from base64 import encodebytes, b64decode
 from uuid import uuid4
-from contextlib import ExitStack
-from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
 from PIL import Image
+from contextlib import ExitStack
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
+from copy import deepcopy
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -646,17 +647,35 @@ class RasterData(SKMapBase):
       else:
         for r in raster_files[group]:
           if isinstance(r, tuple):
-            rows.append([group, r[0], r[1]])
+            if (len(r) == 2):
+              rows.append([group, r[0], r[1], None, None])
+            elif (len(r) == 4):
+              rows.append([group, r[0], r[1], r[2], r[3]])
+            else:
+              raise Exception(f'Wrong tuple size {len(r)}. Please provide 2 or 4 size tuple.')
           else:
-            rows.append([group, r, 1])
+            rows.append([group, r, 1, None, None])
 
-    self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL, RasterData.BAND_COL])
+    self.info = DataFrame(rows, columns=[RasterData.GROUP_COL, RasterData.PATH_COL, RasterData.BAND_COL, 
+      RasterData.START_DT_COL, RasterData.END_DT_COL])
+
     self.info[RasterData.TEMPORAL_COL] = self.info.apply(lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]), axis=1)
     self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL].split('?')[0]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
-    self.info.reset_index(drop=True, inplace=True)
-
-    self._active_group = None
+    
     self.date_args = {}
+    self._active_group = None
+
+    has_date = ~self.info[RasterData.START_DT_COL].isnull().any()
+    if has_date:
+      self.info[RasterData.TEMPORAL_COL] = True
+      for g in self.info[RasterData.GROUP_COL].unique():
+        self.date_args[g] = {
+          'date_style': 'interval',
+          'date_format': '%Y%m%d',
+          'ignore_29feb': True
+        }
+
+    self.info.reset_index(drop=True, inplace=True)
 
   def _new_info_row(self, 
     raster_file:str,
@@ -745,19 +764,14 @@ class RasterData(SKMapBase):
     vrt_info = pd.DataFrame({ 'href':raster_file, 'vrt':vrt_files })
     stac_info = stac_info.merge(vrt_info, on='href', how='inner')
 
-    dates = sorted(stac_info['date'].unique())
-
     groups = {}
     for g, row in stac_info.groupby('band'):
       if g not in groups:
         groups[g] = []
-      groups[g] += set(row['vrt'])
 
-    for g in groups:
-      groups[g] = sorted(groups[g])
+      groups[g] += [ (v, 1, d, d) for v, d in zip(row['vrt'], row['date']) ]
 
-    rdata = RasterData(groups, verbose=verbose).set_dates(dates, dates)
-    return rdata
+    return RasterData(groups, verbose=verbose)
 
   def _set_date(self, 
     text, 
@@ -792,40 +806,6 @@ class RasterData(SKMapBase):
       dt += f'{dt2.strftime(date_format)}'
 
     return _eval(str(text), {**kwargs,**locals()})
-
-  def set_dates(self,
-    start_dates:list,
-    end_dates:list,
-    date_style:str = 'interval',
-    date_format:str = '%Y%m%d',
-    ignore_29feb = True,
-    group:[list,str] = []
-  ):
-
-    if isinstance(group, str):
-      group = [ group ]
-
-    self.info[RasterData.START_DT_COL] = None
-    self.info[RasterData.END_DT_COL] = None
-
-    for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
-
-      if len(group) > 0 and _group not in group:
-        continue
-
-      self.date_args[_group] = {
-        'date_style': date_style,
-        'date_format': date_format,
-        'ignore_29feb': ignore_29feb
-      }
-
-      ginfo[RasterData.START_DT_COL] = start_dates
-      ginfo[RasterData.END_DT_COL] = end_dates
-      ginfo[RasterData.TEMPORAL_COL] = True
-
-      self.info.iloc[ginfo.index] = ginfo
-
-    return self
 
   def timespan(self,
     start_date,
@@ -1263,14 +1243,44 @@ class RasterData(SKMapBase):
       titles = [''] * self.info.shape[0]
     return titles
 
+  def _pop_imgs(self, ind, vmin, vmax, cmap, scale, titles, fontsize, legend_title, cbar=False):
+
+    fig, ax = pyplot.subplots()
+    datasize = self.array.shape[:2]
+    ratio = datasize[0]/datasize[1]
+    fig.set_size_inches(4*scale, ratio*4*scale)
+    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    ax.imshow(self.array[:,:,ind], vmin=vmin, vmax=vmax, cmap=cmap)
+
+    ax.set_title(titles[ind], pad=8, fontsize=fontsize, fontweight='bold')
+
+    if cbar:
+      divider = make_axes_locatable(fig.axes[0])
+      pyplot.colorbar(
+        fig.axes[0].get_images()[0],
+        divider.append_axes('bottom', size='5%', pad=0.1),
+        orientation='horizontal',
+        label=legend_title
+      )
+    
+    pyplot.tight_layout()
+  
+    buffer = BytesIO()
+    fig.savefig(buffer, format='png', bbox_inches='tight')
+    img64 = encodebytes(buffer.getvalue()).decode('ascii')
+    buffer.seek(0)
+    img = Image.open(buffer)
+    pyplot.close()
+    return (img, img64) 
+
   def animate(self, 
     cmap:str = 'Spectral_r', 
     legend_title:str = "", 
     img_title:str ="index", 
     interval:int = 250,
-    figsize:tuple = None,
     v_minmax:tuple = None,
-    to_gif:str = None
+    to_gif:str = None,
+    n_jobs:int = 4,
   ):
 
     """
@@ -1282,12 +1292,11 @@ class RasterData(SKMapBase):
     :param img_title: this could be `name`,`date`, `index` or None. Default value 
       is `index`
     :param interval: delay-time in between two images in miliseconds. Default is 250 ms
-    :param figsize: figure size that will be generated. Default value is `(8,8)`
     :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
       it will be derived from the dataset if not defined.
     :param to_gif: this should be directory that indicating the location where user want to
       save the animation. Default is None
-    
+    :param n_jobs: Number of parallel jobs used to read the raster files. Deafault is 4
     Examples
     ========
     from skmap.data import toy
@@ -1298,55 +1307,39 @@ class RasterData(SKMapBase):
     """
 
     titles = self._get_titles(img_title)
-    fontsize = 10 if img_title == 'name' else 14
 
-    if figsize is None:
-      width, height = self.array.shape[:2]
-      ratio_width = width/height if width>height else height/width
-      ratio_height = 1 if ratio_width < 2 else 2
-      figsize = (6*ratio_width,6*ratio_height)
+    height,width = self.array.shape[:2]
+    if width == height:
+      scale = 1.5
+      fontsize=8
+    elif width > height:
+      scale = 2.5
+      fontsize=11
+    else:
+      scale= 1.5
+      fontsize=10
 
     if v_minmax is None:
       vmin , vmax = np.nanquantile(self.array.flatten(), [.1, .9])
-      #vmin, vmax = (bn.nanmin(self.array), bn.nanmax(self.array))
     else:
       vmin, vmax = v_minmax
     
-    def _populateImages(array, tile):
-      fig, ax = pyplot.subplots(figsize=figsize)
-      fig.colorbar(
-        ax.imshow(array, vmin=vmin, vmax=vmax, cmap=cmap), 
-        aspect=12, shrink=0.8, 
-        label=legend_title, 
-        orientation='vertical',
-        location='right'
-      )
-      ax.axis('off')
-      pyplot.suptitle(tile, fontsize=fontsize, y=0.9)
-      f = BytesIO()
-      pyplot.tight_layout()
-      fig.savefig(f, format='png')
-      imgdata64 = encodebytes(f.getvalue()).decode('ascii')
-      return imgdata64
-    
-    # find a way to optimize processor count
-    args = [ (self.array[:,:,i],titles[i]) for i in range(self.array.shape[2]) ]
-    images = [ img for img in parallel.job(_populateImages, args) ]
-    
-    if to_gif is not None:
+    args = [(i,vmin,vmax,cmap, scale, titles, fontsize, legend_title, True) for i in range(self.array.shape[2])]
+    semi_img = [f for f in parallel.job(self._pop_imgs, args, n_jobs=n_jobs)]
+
+    if to_gif is not None: # save as a GIF file
       with ExitStack() as stack:
         imgs = (
-          stack.enter_context(Image.open(BytesIO(b64decode(f))))
-          for f in images
+          stack.enter_context(Image.open(BytesIO(b64decode(f[1]))))
+          for f in semi_img
         )
         img = next(imgs)
         img.save(to_gif, format="GIF", append_images=imgs, save_all=True, duration= interval, loop=0)
 
     template = '  frames[{0}] = "data:image/{1};base64,{2}"\n'
-
     embedded_frames = "\n" + "".join(
-      template.format(i, 'png', imgdata.replace("\n","\\\n"))
-      for i, imgdata in enumerate(images)
+      template.format(i, 'png', imgdata[1].replace("\n","\\\n"))
+      for i, imgdata in enumerate(semi_img)
     )
     mode_dict = dict(
       once_checked="",
@@ -1368,75 +1361,244 @@ class RasterData(SKMapBase):
       html_rep = path.read_text()
     return HTML(html_rep)
 
-  def plot(self, 
-    cmap:str = 'Spectral_r',
-    legend_title:str = "", 
-    img_title:str = 'index',
-    figsize:tuple = None,
-    v_minmax:tuple = None,
-    to_img:str = None,
-    dpi:int = 300
-  ):
+  def point_query(self, 
+                  x:list, 
+                  y:list, 
+                  cols:int=3,
+                  titles:list = None, 
+                  label_xaxis:str='index', 
+                  return_data:bool=False,
+                  ):
     """
-    Generates a square grid plot to view and save with colorscale.
+    Makes point queries on dataset and provide plots and data
 
-    :param cmap: Default is Spectral_r
-      colormap name one of the `matplotlib.colormaps()`
-    :param legend_title: Default is an empty string
-      title of the colorbar that will be used within the animation
-    :param img_title: Default value is None
-      this could be `name`,`date`, `index` or None. 
-    :param figsize: Default is None. 
-      Default size for figure will be calculated dynamically respect to the
-      data volume.
-    :param v_minmax: minimum and maximum boundaries of corethe colorscale. Default is None and 
-      it will be derived from the dataset if not defined.
-    :param to_img:  this should be directory that indicating the location where user want to
-      save the image. Default is None
-    :param dpi: Dot per inch. This params used for to save the image with a required DPI.
-      Default is 300. 
+    :param x: longitude value(s) of the given point(s)
+    :param y: latitude value(s) of the given point(s)
+    :param cols: column count of the desired layout. Default is 3.
+    :param titles: list of the titles that will be placed on top of the each graph
+    :param label_xaxis: labels of the x axes. it could be `index`, `name`,`date` or None.
+    :param return_data: If the user wants to access the data sampled from rasters, this
+      needs to be set to True. Default is False 
 
     Examples
     ========
+    import geopandas as gpd
     from skmap.data import toy
-    %matplotlib # to stop pouring out when calling the function. 
-
-    data = toy.ndvi(gappy=True, verbose=True)
-    figure = rdata.grid_plot(cmap='Spectral_r', legend_title="NDVI", img_title='date', save=True)
-    
-    # to view in jupyter notebook  
-    figure.show()   
+    rasterdata = toy.ndvi_rdata(gappy=False)
+    points = gpd.read_file('./skmap/data/toy/samples/samples.gpkg')
+    rdata.point_query(x=points.geometry.x.to_list(), y=points.geometry.y.to_list() , label_xaxis='index', cols=3, titles=points.label)
     """
-    gridsize = math.ceil(math.sqrt(self.array.shape[2]))
+    df = pd.DataFrame()
+    df['x'], df['y'], df['title'] = x, y, titles
+    bbox = rasterio.open(self._base_raster()).bounds
+    # filtering points based on the bounds of the base raster
+    df = df[(bbox.left <= df['x']) & (df['x'] <= bbox.right) & (bbox.bottom <= df['y']) & (df['y'] <= bbox.top)]
+
+    with rasterio.open(self._base_raster()) as src:
+      row_id, col_id = rasterio.transform.rowcol(src.transform, df.x, df.y)
+    df['data']= np.array(self.array[row_id,col_id]).tolist()
+    # if data is required no need to create figures
+    if return_data:
+      return df.data.to_numpy()
     
-    if v_minmax is None:
-      vmin , vmax = np.nanquantile(self.array.flatten(), [.1, .9])
-    else:
-      vmin, vmax = v_minmax
-    figsize = (5*gridsize, 5*gridsize) if figsize is None else figsize
-    titles = self._get_titles(img_title)
-    fig, axs = pyplot.subplots(ncols=gridsize, nrows=gridsize, figsize= figsize)
-    
+    labels_x = self._get_titles(label_xaxis)
+    fig, axs = pyplot.subplots(ncols=cols, nrows=math.ceil(len(x)/cols), figsize=(6 * cols, 2 * math.ceil(len(x)/cols)), sharex=True, sharey=True)
+    mgc = df.shape[0] # maximum graph count
     for i, ax in enumerate(axs.flatten()):
+        if i < mgc:
+          ax.plot(labels_x, df.data[i], '-o', markersize=4, color='blue', lw=1)
+          ax.set_title(titles[i], fontsize=10)
+          ax.tick_params(axis='x',rotation=90)
+        else:
+          ax.axis('off')
+    pyplot.tight_layout()
+    pyplot.close()
+    return fig
+  
+### More roboust implementation
+  def _vminmax(self, vmm, arr):
+      if vmm:
+        return vmm
+      return np.nanquantile(arr.flatten(), [.1, .9])
+  
+  def _op_io(self, figure, to64=False):
+    buffer = BytesIO()
+    figure.savefig(buffer, format='png', bbox_inches='tight')
+    buffer.seek(0)
+    img = Image.open(buffer)
+    pyplot.close()
+    if to64:
+      img64 = encodebytes(buffer.getvalue()).decode('ascii')
+      return (img, img64)
+    return img
+
+  def _percent_clip(self, arr):
+    return (arr - np.percentile(arr, 1)) / (np.percentile(arr,99)-np.percentile(arr,1))
+  
+  def _mutate_baseshot(self, img, arr, title_params:dict=None):
+    
+    c_img = deepcopy(img)
+    c_img.set_data(arr)
+    if title_params:
+      c_img._axes.set_title(**title_params)
+    return c_img.get_figure()
+   
+  def _gen_baseshot(self, arr, img_style:dict=None, cbar_props:dict=None, composite=False):
+    #base figure with predefined style
+    
+    # no axis labels
+    tick_params=dict(left=False, labelleft=False, labelbottom=False, bottom=False)
+    pyplot.tick_params(**tick_params)
+    
+    # scaling the figsize based on the passed array shape
+    # the base figsize is 3.15 inc = 8cm almost half short side of a A4 page 
+
+    fig, ax = pyplot.subplots()
+
+    rc,cc = arr.shape[:2]
+    fig.set_size_inches(3.15, 3.15*rc/cc)
+    
+    # generation of basedata based on the array shape
+    basedata = np.zeros(rc*cc).reshape(rc,cc)
+    if composite:
+      basedata = np.zeros(rc*cc*3).reshape(rc,cc,3)
+
+    # crafting the base image
+    ax.margins(x=0)
+    
+    if img_style:
+      baseimg = ax.imshow(basedata, **img_style) # img_style = dict(vmin=, vmax=, cmap=)
+    else:
+      baseimg = ax.imshow(basedata)
+    # if there will be a colorbar there will be a colorbar
+    if cbar_props: # cbar_props is dict(label='text')
+      div = make_axes_locatable(ax)
+      pyplot.colorbar(
+        baseimg, 
+        orientation='horizontal', label=cbar_props['label'],
+        cax = div.append_axes('bottom', size='3%', pad = 0.05)
+      )
+    pyplot.close()
+    return baseimg
+  
+  def _band_manage(self, bands):
+
+    if len(bands) == 1: # single band raster
+      arr = self.filter(f"group=={bands}").array
+    elif len(bands) == 3: # composite
+      arr = []
+      band1 = self.filter(f"group=={bands}[0]")
+      band2 = self.filter(f"group=={bands}[1]")
+      band3 = self.filter(f"group=={bands}[2]")
+      for i in range(band1.array.shape[2]):
+        arr.append(
+          np.stack([
+            np.clip(self._percent_clip(band1.array[:,:,i]),0,1),
+            np.clip(self._percent_clip(band2.array[:,:,i]),0,1),
+            np.clip(self._percent_clip(band3.array[:,:,i]),0,1),
+          ], axis=2)
+        )
+    else:
+      raise Exception("""The band count should either be one or three. 
+                      Current plotting capabilites are limited to single 
+                      or composite image generation.""")
+    return arr
+      
+  def plot(
+      self,
+      cmap:str = 'Spectral_r',
+      cbar_title:str = None, 
+      img_title_text:str or list = "index",
+      img_title_fontsize:int = 10,
+      vminmax:tuple = (None,None),
+      bands:list = [],
+      to_img:str = None,
+      dpi:int = 100,
+      layout_col: int = 4
+  ):
+    """
+      Generates a grid plot to view and save with a colorscale with a desired layout.
+      :param cmap                 : This sets the colorscale with given matplotlib.colormap. Default is Spectral_r
+      :param cbar_title           : This sets the colorbar title if the cbar exists in the plot. Default is None.
+      :param img_title_text       : This sets the image titles that will be display on top of the each image. Default is `index``.
+      :param img_ltitle_fontsize  : This sets the fontsize of the image label which will be on top of the image. Default is 10.
+      :param v_minmax             : This sets the loower and upper limits of the data that will be plot and the colorbar. Default is None and will be calculated on he fly.
+      :param bands                : This used for to generate composite plot. Pass one or tree group names (bands) which will be used to generate. Default is ['default'] 
+      :param to_img               : This sets the directory adn the format of the file where the generated image will be saved. Default is None.
+      :param dpi                  : dot per inch value to save the figure. If the `to_img` param provided
+      :param layout_col           : This controls the column count that will be used in the grid plot. Default is 3.
+    """
+
+    if isinstance(img_title_text, str):
+      img_title_text = self._get_titles(img_title_text)
+
+    arr = self._band_manage(bands=bands)
+    
+    if len(bands) == 3:
+      img_cnt = len(arr)
+      composite=True
+      baseimg = self._gen_baseshot(arr[0][:,:,0])
+    elif len(bands) == 1:
+      img_cnt = arr.shape[2]
+      composite=False
+      vminmax = self._vminmax(vminmax, arr)
+      baseimg = self._gen_baseshot(arr[:,:,0])
+
+    if img_cnt < layout_col:
+      layout_col = img_cnt
+
+    layout_row = math.ceil(img_cnt/layout_col)
+
+    set_h = baseimg.get_size()[0] / baseimg.get_figure()._dpi
+    set_w = baseimg.get_size()[1] / baseimg.get_figure()._dpi
+    if set_w > set_h:
+      set_w = set_w *3.15 / set_h
+      set_h = 3.15
+    else:
+      set_h = set_h *3.15 / set_w
+      set_w = 3.15
+    grd_fig, grd_axs = pyplot.subplots(
+      nrows=layout_row, ncols=layout_col,
+      gridspec_kw=dict(wspace=0.1, hspace=0.1),
+      figsize=(
+        set_w * layout_col + (layout_col-1) * 0.1,
+        set_h * layout_row + (layout_row-1) * 0.1 + 1
+      ),
+    )
+    pyplot.close()
+    def getMatrix(arr_, ind, composite):
+      if composite:
+        return np.flipud(arr_[ind])
+      else:
+        return np.flipud(arr_[:,:,ind])
+      
+    matrix_params = dict(vmin=vminmax[0], vmax=vminmax[1], cmap=cmap)
+
+    def gen_pane(ind, arr, ax, composite, matrix_params, img_title_text, img_title_fontsize):
       try:
-        ax.imshow(self.array[:,:,i], vmin=vmin, vmax=vmax, cmap=cmap)
-        ax.set_title(titles[i], fontsize= 3.5 * gridsize)
-        ax.axis('off')
+        ax.pcolorfast(getMatrix(arr, ind, composite=composite), **matrix_params)
+        ax.set_title(img_title_text[ind], fontsize=img_title_fontsize, pad=1)
+        ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
       except IndexError:
         ax.axis('off')
 
-    pyplot.tight_layout()
-    fig.subplots_adjust(bottom=0, top=1, left=0, right=.82)
-    cbar_ax = fig.add_axes([0.83, 0.2, 0.02, 0.6])
-    cbar_ax.tick_params(labelsize=3.5 * gridsize)
-    cbar = fig.colorbar(
-      pyplot.imshow(self.array[:,:,0], vmin=vmin, vmax=vmax, cmap=cmap),
-      cax=cbar_ax
-    ).set_label(label=legend_title, size = 4 * gridsize, weight = 'bold')
-    
-    if to_img is not None:
-      fig.savefig(to_img, dpi=dpi, bbox_inches='tight')
-      return to_img
-    else:
+    for i, ax in enumerate(grd_axs.flatten()):
+      gen_pane(i, arr, ax, composite, matrix_params, img_title_text, img_title_fontsize)
+    pyplot.close()
+
+    if not composite:
+      grd_fig.subplots_adjust(
+        left=0, right=1,
+        bottom=0,top=.92
+      )
+      cbar_ax= grd_fig.add_axes([0.2,.97,0.6,0.02])
+      cbar_ax = grd_fig.colorbar(
+        pyplot.imshow(arr[:,:,0], vmin= vminmax[0], vmax=vminmax[1], cmap=cmap),
+        orientation = 'horizontal',
+        cax = cbar_ax
+      ).set_label(label = cbar_title)
       pyplot.close()
-      return fig
+
+    if to_img:
+      grd_fig.savefig(to_img, format=f"{to_img.split('.')[-1]}", dpi=dpi)
+    return grd_fig
