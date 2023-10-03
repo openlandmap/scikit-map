@@ -35,7 +35,6 @@ setuptools.setup(
             'gspread>=5.3.2',
             'matplotlib>=3.3',
             'minio>=7.1.0',
-            'opencv-python>=4.5',
             'pqdm>=0.1',
             'pystac>=1.4.0',
             'pyts>=0.11',

@@ -29,8 +29,6 @@ try:
 
   from dateutil.relativedelta import relativedelta
 
-
-  import cv2 as cv
   import pyfftw
 
   class Transformer(SKMapGroupRunner, ABC):
@@ -307,105 +305,6 @@ try:
         return np.reshape(filled.T, orig_shape), np.reshape(filled_qa.T, orig_shape) 
       else:
         return np.reshape(filled.T, orig_shape)
-
-  class InPaintingFill(Filler):
-    """
-    Approach that uses a inpating technique [1] to gapfill raster data
-    using neighborhood values.
-
-    :param fn_files: Raster file paths to be read and gapfilled.
-    :param data: 3D array where the last dimension is the time.
-    :param space_win: Radius of a circular neighborhood of each point inpainted that is considered by the algorithm.
-    :param data_mask: 2D array indicating a valid areas, equal 1, where in case of gaps should be filled.
-    :param mode:  Inpainting method that could be cv::INPAINT_NS or cv::INPAINT_TELEA [1]
-    :param outlier_remover: Strategy to remove outliers.
-    :param std_win: Temporal window size used to calculate a local median and std.
-    :param std_env: Number of std used to define a local envelope around the median.
-      Values outside of this envelope are removed.
-    :param perc_env: A list containing the lower and upper percentiles used to defined a global
-      envelope for the time series. Values outside of this envelope are removed.
-    :param n_jobs_io: Number of parallel jobs to read/write raster files.
-    :param verbose: Use ``True`` to print the progress of the gapfilled.
-
-    Examples
-    ========
-
-    >>> from skmap import gapfiller
-    >>>
-    >>> # Considerer land_mask as 2D numpy array where 1 indicates land
-    >>> inPainting = gapfiller.InPainting(fn_files=fn_rasters, space_win = 10, data_mask=land_mask)
-    >>> data_inp = inPainting.run()
-    >>>
-    >>> fn_rasters_inp = inPainting.save_rasters('./gapfilled_inp')
-
-    References
-    ==========
-
-    [1] `OpenCV Tutorial - Image Inpainting <https://docs.opencv.org/4.5.2/df/d3d/tutorial_py_inpainting.html>`_
-
-    """
-
-    def __init__(self,
-      space_win = 10,
-      data_mask = None,
-      mode = cv.INPAINT_TELEA,
-      verbose = True
-    ):
-      super().__init__(verbose=verbose, temporal=False)
-
-      self.data_mask = data_mask
-      self.space_win = space_win
-      self.mode = mode
-
-    def _inpaint(self, data, i=0):
-
-      # necessary for a proper inpaint execution
-      data_copy = np.copy(data)
-      
-      with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
-        initial_value = np.nanmedian(data_copy)
-
-      na_data_mask = np.isnan(data_copy)
-      data_copy[na_data_mask] = initial_value
-      data_gapfilled = cv.inpaint(data_copy.astype('float32'), na_data_mask.astype('uint8'), self.space_win, self.mode)
-
-      return (data_gapfilled, i)
-
-    def _gapfill(self):
-
-      data = np.copy(self.data)
-      data_flag = np.zeros(data.shape)
-
-      if self.data_mask is None:
-        self.data_mask = np.ones(data.shape[0:2])
-
-      max_workers = multiprocessing.cpu_count()
-      n_times = data.shape[2]
-
-      args = []
-
-      for i in range(0, n_times):
-        if self._n_gaps(data[:,:,i]) > 0:
-          args.append((data[:,:,i], i))
-
-      result_set = {}
-      for band_data, i in parallel.job(self._inpaint, args, n_jobs=max_workers):
-          result_set[f'{i}'] = band_data
-
-      for i in range(0, n_times):
-        key = f'{i}'
-
-        if (key in result_set):
-          band_data_gapfilled = result_set[key]
-
-          gapfill_mask = np.logical_and(~np.isnan(band_data_gapfilled), np.isnan(data[:,:,i]))
-          gapfill_mask = np.logical_and(gapfill_mask, (self.data_mask == 1))
-
-          data[:,:,i][gapfill_mask] = band_data_gapfilled[gapfill_mask]
-          data_flag[:,:,i][gapfill_mask] = 1
-
-      return data, data_flag
 
   class WhittakerSmooth(Transformer):    
     """
@@ -911,4 +810,4 @@ try:
 
 except ImportError as e:
   from skmap.misc import _warn_deps
-  _warn_deps(e, 'skmap.io.derive')
+  _warn_deps(e, 'skmap.io')

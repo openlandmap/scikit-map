@@ -10,7 +10,6 @@ dependencies:
   - jupytext=1.11.4
   - numba=0.53
   - numpy=1.19
-  - opencv=4.5
   - pygeos=0.10
   - pyproj=3.1
   - rasterio=1.1
