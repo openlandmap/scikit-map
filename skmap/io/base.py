@@ -994,19 +994,21 @@ class RasterData(SKMapBase):
 
     return self
 
-  def _get_titles(self, img_title):
+  def _get_titles(self, img_title, bands):
+    f_arr = self.filter(f"group=={bands}")
+    
     if img_title == 'date':
-      titles = list(self.info['start_date'].astype(str) + ' - ' + self.info['end_date'].astype(str))
+      titles = list(f_arr.info['start_date'].astype(str) + ' - ' + f_arr.info['end_date'].astype(str))
     elif img_title == 'index':
-      titles = [i for i in range(self.info.shape[0])]
+      titles = [str(i) for i in range(f_arr.info.shape[0])]
     elif img_title == 'name':
-      titles = self.info['name'].to_list()
+      titles = f_arr.info['name'].to_list()
       #titles = []
       # n = 20
-      # for name in list(self.info['name']):
+      # for name in list(f_arr.info['name']):
       #   titles.append('\n'.join(name[i:i+n] for i in range(0, len(name), n)))
     else:
-      titles = [''] * self.info.shape[0]
+      titles = [''] * f_arr.info.shape[0]
     return titles
 
   def point_query(self, 
