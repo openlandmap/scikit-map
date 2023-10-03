@@ -1039,13 +1039,11 @@ class RasterData(SKMapBase):
     if isinstance(group, str):
       group = [ group ]
 
-    for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
-      if len(group) > 0 and _group not in group:
-        continue
-
-      self._verbose(f"Dropping data and info for {_group} group")
-      self.array = np.delete(self.array, ginfo.index, axis=-1) 
-      self.info = self.info.drop(ginfo.index)
+    self._verbose(f"Dropping data and info for groups: {group}")
+    idx = self.info[self.info[RasterData.GROUP_COL].isin(group)].index
+    self.array = np.delete(self.array, idx, axis=-1) 
+    self.info = self.info.drop(idx)
+    self.info.reset_index(drop=True, inplace=True)
 
     return self
 
