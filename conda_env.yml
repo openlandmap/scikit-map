@@ -11,7 +11,6 @@ dependencies:
   - numba=0.53
   - numpy=1.19
   - opencv=4.5
-  - owslib=0.22
   - pygeos=0.10
   - pyproj=3.1
   - rasterio=1.1
@@ -31,9 +30,8 @@ dependencies:
     - pystac==1.4.0
     - pyts==0.11
     - requests==2.24
-    - scikit-image==0.17.1
+    - scikit-image==0.20
     - scikit-learn==0.24
-    - sentinelhub==3.4.4
     - sphinx-autodoc-typehints==1.12.0
     - sphinx-copybutton==0.4.0
     - sphinx==4.1.2

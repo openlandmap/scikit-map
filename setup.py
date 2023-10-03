@@ -26,7 +26,7 @@ setuptools.setup(
         'pyproj>=3.1',
         'pandas>=2.0',
         'requests>=2.24',
-        'scikit-learn>=1.0',
+        'scikit-learn>=1.3',
         'rasterio>=1.1'
     ],
     extras_require={
@@ -40,9 +40,8 @@ setuptools.setup(
             'pystac>=1.4.0',
             'pyts>=0.11',
             'pyfftw>=0.13',
-            'scikit_image>=0.17',
+            'scikit_image>=0.20',
             'Shapely>=1.7',
-            'sentinelhub==3.4.4',
             'whoosh>=2.7.4'
         ],
     },
