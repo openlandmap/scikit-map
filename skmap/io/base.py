@@ -114,7 +114,7 @@ def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_m
     nodata = ds.nodatavals[0]
   except Exception as ex:
     ttprint(f"Exception: {ex}")
-    #traceback.iprint_exc()
+    #traceback.i(print)_exc()
     
     if window is not None:
       if verbose:
@@ -969,8 +969,11 @@ class RasterData(SKMapBase):
       self._verbose(f"Running {process_name}"
         + f" on {self.array.shape}")
 
-      new_array, new_info = process.run(self, outname)
-      print(new_info.shape)
+      kwargs = {'rdata': self}
+      if outname is not None:
+        kwargs['outname'] = outname
+      
+      new_array, new_info = process.run(**kwargs)
 
       if new_info.shape[0] > 0:
         self.array = np.concatenate([self.array, new_array], axis=-1)

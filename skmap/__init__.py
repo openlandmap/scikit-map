@@ -13,18 +13,17 @@ class SKMapRunner(SKMapBase, ABC):
 
   def __init__(self,
     verbose:bool = True,
-    temporal:bool = False
   ):
     self.verbose = verbose
 
   @abstractmethod
   def run(self, 
-    data, 
+    data,
     outname:str
   ):
     pass
 
-class SKMapGroupRunner(SKMapRunner, ABC):
+class SKMapGroupRunner(SKMapBase, ABC):
 
   def __init__(self,
     verbose:bool = True,
@@ -32,3 +31,13 @@ class SKMapGroupRunner(SKMapRunner, ABC):
   ):
     self.verbose = verbose
     self.temporal = temporal
+
+    temporal:bool = False
+
+  @abstractmethod
+  def run(self, 
+    data,
+    group:str,
+    outname:str
+  ):
+    pass
