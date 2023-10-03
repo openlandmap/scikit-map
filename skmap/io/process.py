@@ -2,14 +2,16 @@ import time
 import os
 import warnings
 from enum import Enum
+from typing import Callable
 
 try:
 
   from abc import ABC, abstractmethod
   from skmap import parallel
 
-  from skmap import SKMapRunner, parallel
+  from skmap import SKMapGroupRunner, SKMapRunner, parallel
   from skmap.misc import date_range, nan_percentile
+  from skmap.misc import new_memmap, del_memmap, ref_memmap, load_memmap
   from skmap.io import RasterData
 
   from scipy.special import log1p
@@ -27,10 +29,11 @@ try:
 
   from dateutil.relativedelta import relativedelta
 
+
   import cv2 as cv
   import pyfftw
 
-  class Transformer(SKMapRunner, ABC):
+  class Transformer(SKMapGroupRunner, ABC):
     
     def __init__(self,
       name:str,
@@ -94,7 +97,7 @@ try:
     def _run(self, data):
       pass
 
-  class Derivator(SKMapRunner, ABC):
+  class Derivator(SKMapGroupRunner, ABC):
     
     def __init__(self,
       verbose:bool = True,
@@ -793,6 +796,116 @@ try:
         new_info.append(
           rdata._new_info_row(rdata.base_raster, group=new_group, name=name, dates=[start_dt_min, end_dt_max])
         )
+
+      return new_array, DataFrame(new_info)
+
+  class Map(SKMapRunner):
+    
+    def __init__(self,
+      fn:Callable,
+      n_jobs:int = os.cpu_count(),
+      verbose = False
+    ):
+
+      super().__init__(verbose=verbose, temporal=True)
+      
+      self.n_jobs = n_jobs
+      self.fn = fn
+
+    def _calc(self, gmap):
+      
+      array_dict, group_idx = {}, {}
+      
+      for key in gmap.keys():
+        array_dict[key] = load_memmap(**gmap[key][0])
+        group_idx[key] = gmap[key][1]
+
+      result_fn = self.fn(array_dict)
+      new_array_dict, exi_array_dict = {}, {}
+
+      for key in result_fn.keys():
+        if key in group_idx:
+          exi_array_dict[key] = (ref_memmap(result_fn[key]), group_idx[key])
+        else:
+          data = result_fn[key]
+          data_mem = new_memmap(data.dtype, data.shape)
+          data_mem[:] = data
+          new_array_dict[key] = ref_memmap(data_mem)
+
+      return(exi_array_dict, new_array_dict)
+
+    def run(self, 
+      rdata:RasterData,
+      outname:str = 'skmap_{gr}_{dt}'
+    ):
+
+      gmap_list = []
+
+      group_cols = [RasterData.START_DT_COL, RasterData.END_DT_COL]
+      memmap_list = []
+
+      for _, rows in rdata.info.groupby(group_cols):
+        gidx = rows.index
+        garray = rdata.array[:,:,gidx]
+        ggroup = list(rdata.info.iloc[gidx]['group'])
+        
+        gmap = {}
+        
+        for i in range(0, len(gidx)):
+          garray_i = new_memmap(rdata.array.dtype, (rdata.array.shape[0], rdata.array.shape[1]))
+          garray_i[:] = garray[:,:,i]
+
+          garray_i_ref = ref_memmap(garray_i)
+          #memmap_list.append(garray_i)
+
+          gmap[ggroup[i]] = (garray_i_ref, gidx[i])
+        
+        gmap_list.append(gmap)
+
+      args = [ (gmap,) for gmap in gmap_list ]
+      
+      new_array = []
+      new_info = []
+
+      for exi_array_dict, new_array_dict in parallel.job(self._calc, args, n_jobs=self.n_jobs):
+
+        print('exi_array_dict', exi_array_dict.keys())
+        print('new_array_dict', new_array_dict.keys())
+
+        row = None
+        for array, idx in exi_array_dict.values():
+          array = load_memmap(**array)
+          rdata.array[:,:,idx] = array
+          memmap_list.append(array)
+          row = rdata.info.iloc[idx]
+
+        start_dt, end_dt = row[RasterData.START_DT_COL], row[RasterData.END_DT_COL]
+        group = row[RasterData.GROUP_COL]
+
+        date_format = rdata.date_args[group]['date_format']
+        date_style = rdata.date_args[group]['date_style']
+
+        for new_group in new_array_dict.keys():
+          array = load_memmap(**new_array_dict[new_group])
+          new_array.append(array)
+          memmap_list.append(array)
+          
+          name = rdata._set_date(outname, start_dt, end_dt, 
+            date_format=date_format, date_style=date_style,  gr=new_group)
+          print(outname, name)
+          
+          new_info.append(
+            rdata._new_info_row(rdata.base_raster, 
+              date_format=date_format, date_style=date_style,
+              group=new_group, name=name, dates=[start_dt, end_dt]
+            )
+          )
+
+      if len(new_array) > 0:
+        new_array = np.stack(new_array, axis=-1)
+
+      for rm in memmap_list:
+        del_memmap(rm)
 
       return new_array, DataFrame(new_info)
 

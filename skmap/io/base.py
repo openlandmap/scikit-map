@@ -30,7 +30,7 @@ from shapely.geometry import box,shape
 from typing import List, Union, Callable
 from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap
 from skmap.misc import vrt_warp
-from skmap import SKMapRunner, SKMapBase, parallel
+from skmap import SKMapGroupRunner, SKMapRunner, SKMapBase, parallel
 
 from dateutil.relativedelta import relativedelta
 from datetime import datetime
@@ -663,6 +663,9 @@ class RasterData(SKMapBase):
     name:str,
     group:str = None,
     dates:list = [],
+    date_format = None,
+    date_style = None,
+    ignore_29feb = True
   ):
 
     row = {}
@@ -675,9 +678,19 @@ class RasterData(SKMapBase):
     row[RasterData.GROUP_COL] = group
     row[RasterData.BAND_COL] = 1
 
-    date_style = self.date_args[self._active_group]['date_style']
-    date_format = self.date_args[self._active_group]['date_format']
-    self.date_args[group] = self.date_args[self._active_group]
+    if self._active_group is not None:
+      if date_style is None:
+        date_style = self.date_args[self._active_group]['date_style']
+      if date_format is None:
+        date_format = self.date_args[self._active_group]['date_format']
+
+      self.date_args[group] = self.date_args[self._active_group]
+    else:
+      self.date_args[group] = {
+        'date_style': date_style,
+        'date_format': date_format,
+        'ignore_29feb': ignore_29feb
+      }
 
     if len(dates) > 0 and date_style is not None:
       row[RasterData.TEMPORAL_COL] = True
@@ -713,32 +726,37 @@ class RasterData(SKMapBase):
         ttprint(f'Reading band {all_bands[0]} from {all_bands}')
       bands = [ all_bands[0] ]
 
-    rdata_input = { 'groups': {}, 'dates': [] }
+    stac_info = []
 
     for i in stac_items:
       for band in  i.assets.keys():
         if band in bands:
-          if band not in rdata_input['groups']:
-            rdata_input['groups'][band] = []
+          stac_info.append({
+            'href': i.assets[band].href,
+            'band': band,
+            'date': i.datetime.replace(tzinfo=None)
+          })
 
-          href = i.assets[band].href
-          dates = i.datetime.replace(tzinfo=None)
+    stac_info = pd.DataFrame(stac_info)
 
-          rdata_input['groups'][band].append(href)
-          if band == bands[0]: # Adding date only one time
-            rdata_input['dates'].append(dates)
-    
-    result = []
-        
-    for group in rdata_input['groups'].keys():
-      raster_files = rdata_input['groups'][group]
-      rdata_input['groups'][group] = vrt_warp(raster_files,
-        dst_crs=to_crs.to_wkt(), tr=spatial_res, r_method=resamp_method
-      )
+    raster_file, vrt_files = vrt_warp(stac_info['href'], dst_crs=to_crs.to_wkt(), 
+      tr=spatial_res, r_method=resamp_method, return_input_files=True
+    )
+    vrt_info = pd.DataFrame({ 'href':raster_file, 'vrt':vrt_files })
+    stac_info = stac_info.merge(vrt_info, on='href', how='inner')
 
-    rdata = RasterData(rdata_input['groups'], verbose=verbose
-          ).set_dates(rdata_input['dates'], rdata_input['dates'])
+    dates = sorted(stac_info['date'].unique())
 
+    groups = {}
+    for g, row in stac_info.groupby('band'):
+      if g not in groups:
+        groups[g] = []
+      groups[g] += set(row['vrt'])
+
+    for g in groups:
+      groups[g] = sorted(groups[g])
+
+    rdata = RasterData(groups, verbose=verbose).set_dates(dates, dates)
     return rdata
 
   def _set_date(self, 
@@ -940,6 +958,36 @@ class RasterData(SKMapBase):
     outname:str = None,
     drop_input:bool = False
   ):
+
+    if isinstance(process, SKMapGroupRunner):
+      return self._group_run(process, group, outname, drop_input)
+    else:
+      
+      process_name = process.__class__.__name__
+      
+      start = time.time()
+      self._verbose(f"Running {process_name}"
+        + f" on {self.array.shape}")
+
+      new_array, new_info = process.run(self, outname)
+      print(new_info.shape)
+
+      if new_info.shape[0] > 0:
+        self.array = np.concatenate([self.array, new_array], axis=-1)
+        self.info = pd.concat([self.info, new_info])
+        self.info.reset_index(drop=True, inplace=True)
+      
+      self._verbose(f"Execution"
+        + f" time for {process_name}: {(time.time() - start):.2f} segs")
+
+      return self
+
+  def _group_run(self, 
+    process:SKMapGroupRunner,
+    group:[list,str] = [],
+    outname:str = None,
+    drop_input:bool = False
+  ):
     
     if isinstance(group, str):
       group = [ group ]
@@ -980,6 +1028,21 @@ class RasterData(SKMapBase):
         + f" time for {process_name}: {(time.time() - start):.2f} segs")
 
       self._active_group = None
+
+    return self
+
+  def drop(self, group):
+
+    if isinstance(group, str):
+      group = [ group ]
+
+    for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
+      if len(group) > 0 and _group not in group:
+        continue
+
+      self._verbose(f"Dropping data and info for {_group} group")
+      self.array = np.delete(self.array, ginfo.index, axis=-1) 
+      self.info = self.info.drop(ginfo.index)
 
     return self
 

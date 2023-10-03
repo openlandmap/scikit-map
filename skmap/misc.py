@@ -14,6 +14,7 @@ import geopandas as gp
 import pandas as pd
 import numpy as np
 
+import time
 from pathlib import Path
 from osgeo.gdal import BuildVRT, Warp
 from shapely.geometry import box,shape
@@ -30,7 +31,7 @@ def _warn_deps(e, module_name):
     )
 
 def new_memmap(dtype, shape): 
-  filename = tempfile.NamedTemporaryFile(prefix='skmap_memmap_', suffix='.npy').name
+  filename = str(make_tempfile(prefix='memmap', suffix='npy', make_subdir=False))
   return np.memmap(filename, dtype=dtype, shape=shape, mode='w+')
 
 def load_memmap(filename, dtype, shape):
@@ -61,29 +62,38 @@ def ref_memmap(array):
     'shape': array.shape
   }
 
-def make_tempdir(basedir='skmap'):
-  name = Path(tempfile.NamedTemporaryFile().name).name
-  tempdir = Path(TMP_DIR).joinpath('skmap').joinpath(name)
+def make_tempdir(basedir='skmap', make_subdir = True):
+  tempdir = Path(TMP_DIR).joinpath(basedir)
+  if make_subdir: 
+    name = Path(tempfile.NamedTemporaryFile().name).name
+    tempdir = tempdir.joinpath(name)
   tempdir.mkdir(parents=True, exist_ok=True)
   return tempdir
+
+def make_tempfile(basedir='skmap', prefix='', suffix='', make_subdir = False):
+  tempdir = make_tempdir(basedir, make_subdir=make_subdir)
+  return tempdir.joinpath(
+    Path(tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix).name).name
+  )
 
 def _bounds_crs(raster_file, dst_crs):
   with rasterio.open(raster_file) as ds:
     bounds = shape(rasterio.warp.transform_geom(
       dst_crs=dst_crs, src_crs=ds.crs, geom=box(*ds.bounds))).bounds
     crs = ds.crs
-    return raster_file, bounds, crs 
+    tr = ds.transform[0]
+    return raster_file, bounds, crs, tr
 
-def _build_vrt(raster_file, band, tr, dst_crs, r_method, outdir, te):
+def _build_vrt(raster_file, band, tr, dst_crs, r_method, outdir, te, tr_min):
   outfile_1 = str(Path(outdir).joinpath(str(Path(raster_file.split('?')[0]).stem + f'_b{band}.vrt')))
-  ds_1 = BuildVRT(outfile_1, f'/vsicurl/{raster_file}', bandList = [band])
+  ds_1 = BuildVRT(outfile_1, f'/vsicurl/{raster_file}', bandList = [band], xRes = tr_min, yRes = tr_min)
   ds_1.FlushCache()
-  del(ds_1)
 
   outfile_2 = str(Path(outdir).joinpath(str(Path(raster_file.split('?')[0]).stem + f'_b{band}_wrapped.vrt')))
-  Warp(outfile_2, outfile_1, xRes = tr, yRes = tr, resampleAlg=r_method, dstSRS=dst_crs, outputBounds=te)
-  
-  return outfile_2
+  ds_2 = Warp(outfile_2, ds_1, xRes = tr, yRes = tr, resampleAlg=r_method, dstSRS=dst_crs, outputBounds=te)
+  ds_2.FlushCache()
+
+  return raster_file, outfile_2
 
 def vrt_warp(raster_files, 
   dst_crs='EPSG:4326',
@@ -91,7 +101,8 @@ def vrt_warp(raster_files,
   tr = None,
   r_method = 'near', 
   outdir=None, 
-  n_jobs=-1
+  n_jobs=-1,
+  return_input_files = False,
 ):
   
   from skmap import parallel
@@ -101,23 +112,32 @@ def vrt_warp(raster_files,
   else:
       Path(outdir).mkdir(parents=True, exist_ok=True)
   
-  args = [ (r, dst_crs) for r in raster_files ] 
+  args = sorted(set( r for r in raster_files ))
+  args = [ (r, dst_crs) for r in raster_files ]
   
   total_bounds = []
   args_vrt = []
-  
-  for raster_file, bounds, crs in parallel.job(_bounds_crs, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
+  tr_arr = []
+  for raster_file, bounds, crs, tr1 in parallel.job(_bounds_crs, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
+
     total_bounds.append(box(*bounds))
+    tr_arr.append(tr1)
     args_vrt.append( (raster_file, band, tr, dst_crs, r_method, outdir) )
   
+  tr_min = np.min(tr_arr)
   te = gp.GeoSeries(total_bounds).unary_union.bounds
-  args_vrt = [ a + (te,) for a in args_vrt ]
+  args_vrt = [ a + (te, tr_min) for a in args_vrt ]
   
-  vrtfiles = []
-  for vrtfile in parallel.job(_build_vrt, args_vrt, n_jobs=-1, joblib_args={'backend': 'multiprocessing'}):
-      vrtfiles.append(vrtfile)
+  vrt_files = []
+  input_files = []
+  for input_file, vrt_file in parallel.job(_build_vrt, args_vrt, n_jobs=-1, joblib_args={'backend': 'multiprocessing'}):
+    input_files.append(input_file)
+    vrt_files.append(vrt_file)
   
-  return vrtfiles
+  if return_input_files:
+    return input_files, vrt_files    
+  else:
+    return vrt_files
 
 def ttprint(*args, **kwargs):
   """
