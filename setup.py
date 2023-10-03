@@ -33,7 +33,7 @@ setuptools.setup(
         'full': [
             'Bottleneck>=1.3',
             'gspread>=5.3.2',
-            'matplotlib>=3.3',
+            'matplotlib>=3.7.3',
             'minio>=7.1.0',
             'pqdm>=0.1',
             'pystac>=1.4.0',
