@@ -1009,124 +1009,6 @@ class RasterData(SKMapBase):
       titles = [''] * self.info.shape[0]
     return titles
 
-  def _pop_imgs(self, ind, vmin, vmax, cmap, scale, titles, fontsize, legend_title, cbar=False):
-
-    fig, ax = pyplot.subplots()
-    datasize = self.array.shape[:2]
-    ratio = datasize[0]/datasize[1]
-    fig.set_size_inches(4*scale, ratio*4*scale)
-    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
-    ax.imshow(self.array[:,:,ind], vmin=vmin, vmax=vmax, cmap=cmap)
-
-    ax.set_title(titles[ind], pad=8, fontsize=fontsize, fontweight='bold')
-
-    if cbar:
-      divider = make_axes_locatable(fig.axes[0])
-      pyplot.colorbar(
-        fig.axes[0].get_images()[0],
-        divider.append_axes('bottom', size='5%', pad=0.1),
-        orientation='horizontal',
-        label=legend_title
-      )
-    
-    pyplot.tight_layout()
-  
-    buffer = BytesIO()
-    fig.savefig(buffer, format='png', bbox_inches='tight')
-    img64 = encodebytes(buffer.getvalue()).decode('ascii')
-    buffer.seek(0)
-    img = Image.open(buffer)
-    pyplot.close()
-    return (img, img64) 
-
-  def animate(self, 
-    cmap:str = 'Spectral_r', 
-    legend_title:str = "", 
-    img_title:str ="index", 
-    interval:int = 250,
-    v_minmax:tuple = None,
-    to_gif:str = None,
-    n_jobs:int = 4,
-  ):
-
-    """
-    Generates an animation to view and save.
-
-    :param cmap: colormap name one of the `matplotlib.colormaps()`
-    :param legend_title: title of the colorbar that will be used within the animation
-      default is an empty string
-    :param img_title: this could be `name`,`date`, `index` or None. Default value 
-      is `index`
-    :param interval: delay-time in between two images in miliseconds. Default is 250 ms
-    :param v_minmax: minimum and maximum boundaries of the colorscale. Default is None and 
-      it will be derived from the dataset if not defined.
-    :param to_gif: this should be directory that indicating the location where user want to
-      save the animation. Default is None
-    :param n_jobs: Number of parallel jobs used to read the raster files. Deafault is 4
-    Examples
-    ========
-    from skmap.data import toy
-
-    data = toy.ndvi_data(gappy=True, verbose=True)
-    data.animate(cmap='Spectral_r', legend_title="NDVI", img_title='date')
-
-    """
-
-    titles = self._get_titles(img_title)
-
-    height,width = self.array.shape[:2]
-    if width == height:
-      scale = 1.5
-      fontsize=8
-    elif width > height:
-      scale = 2.5
-      fontsize=11
-    else:
-      scale= 1.5
-      fontsize=10
-
-    if v_minmax is None:
-      vmin , vmax = np.nanquantile(self.array.flatten(), [.1, .9])
-    else:
-      vmin, vmax = v_minmax
-    
-    args = [(i,vmin,vmax,cmap, scale, titles, fontsize, legend_title, True) for i in range(self.array.shape[2])]
-    semi_img = [f for f in parallel.job(self._pop_imgs, args, n_jobs=n_jobs)]
-
-    if to_gif is not None: # save as a GIF file
-      with ExitStack() as stack:
-        imgs = (
-          stack.enter_context(Image.open(BytesIO(b64decode(f[1]))))
-          for f in semi_img
-        )
-        img = next(imgs)
-        img.save(to_gif, format="GIF", append_images=imgs, save_all=True, duration= interval, loop=0)
-
-    template = '  frames[{0}] = "data:image/{1};base64,{2}"\n'
-    embedded_frames = "\n" + "".join(
-      template.format(i, 'png', imgdata[1].replace("\n","\\\n"))
-      for i, imgdata in enumerate(semi_img)
-    )
-    mode_dict = dict(
-      once_checked="",
-      loop_checked="checked",
-      reflect_checked=""
-    )
-    
-    with TemporaryDirectory() as tmpdir:
-      path = Path(tmpdir, 'temp.html')
-      with open(path, 'w') as of:
-        of.write(JS_INCLUDE + STYLE_INCLUDE)
-        of.write(DISPLAY_TEMPLATE.format(
-          id=uuid4().hex,
-          Nframes=self.array.shape[2],
-          fill_frames = embedded_frames,
-          interval = interval,
-          **mode_dict
-        ))
-      html_rep = path.read_text()
-    return HTML(html_rep)
-
   def point_query(self, 
                   x:list, 
                   y:list, 
@@ -1180,49 +1062,62 @@ class RasterData(SKMapBase):
     pyplot.tight_layout()
     pyplot.close()
     return fig
-  
+ 
 ### More roboust implementation
   def _vminmax(self, vmm, arr):
-      if vmm:
-        return vmm
-      return np.nanquantile(arr.flatten(), [.1, .9])
+    """
+    To check and calculate the boundaries of the data. If the bounds are supplied
+    it will return it, If not function will return the 1 and 99% of the data as bounds.
+    :param vmm: supplied min/max bounds of data
+    :param arr: the data will be used to generate a image  
+    """
+    if vmm[0]:
+      return vmm
+    return np.nanquantile(arr.flatten(), [.1, .9])
   
-  def _op_io(self, figure, to64=False):
+  def _op_io(self, figure):
+    """
+    converts figure to image and ascii representation of it to use with
+    HTML embeded animation.
+    :param figure: matplotlib figure object
+    """
     buffer = BytesIO()
     figure.savefig(buffer, format='png', bbox_inches='tight')
-    buffer.seek(0)
-    img = Image.open(buffer)
-    pyplot.close()
-    if to64:
-      img64 = encodebytes(buffer.getvalue()).decode('ascii')
-      return (img, img64)
-    return img
+    img64 = encodebytes(buffer.getvalue()).decode('ascii')
+    return img64
 
   def _percent_clip(self, arr):
+    """
+    To calculate and scale the band upper and lower limits to generate a composite
+    image from 3 bands. returns the scaled data
+    :param arr: the data usually single band data in np.array format.
+    """
     return (arr - np.percentile(arr, 1)) / (np.percentile(arr,99)-np.percentile(arr,1))
   
-  def _mutate_baseshot(self, img, arr, title_params:dict=None):
-    
+  def _mutate_baseshot(self, img, arr, titletext, textfontsize):
+    """
+    takes imshow generated mock image copies it and replaces the nested image data.
+    :param img: the mock image, generated with pyplot.imshow
+    :param arr: the scaled data for the frame
+    :param title_params: it is a dict. It will be used for the title generation on the frame.
+    """
     c_img = deepcopy(img)
     c_img.set_data(arr)
-    if title_params:
-      c_img._axes.set_title(**title_params)
+    if titletext:
+      c_img._axes.set_title(label=titletext,fontdict=dict(fontsize=textfontsize), pad=1)
     return c_img.get_figure()
    
-  def _gen_baseshot(self, arr, img_style:dict=None, cbar_props:dict=None, composite=False):
+  def _gen_baseshot(self, arr, scaling:int=1, img_style:dict=None, cbar_props:dict=None, composite=False):
     #base figure with predefined style
     
     # no axis labels
     tick_params=dict(left=False, labelleft=False, labelbottom=False, bottom=False)
-    pyplot.tick_params(**tick_params)
     
     # scaling the figsize based on the passed array shape
     # the base figsize is 3.15 inc = 8cm almost half short side of a A4 page 
-
     fig, ax = pyplot.subplots()
-
     rc,cc = arr.shape[:2]
-    fig.set_size_inches(3.15, 3.15*rc/cc)
+    fig.set_size_inches(scaling * 3.15, scaling * 3.15*rc/cc)
     
     # generation of basedata based on the array shape
     basedata = np.zeros(rc*cc).reshape(rc,cc)
@@ -1230,13 +1125,14 @@ class RasterData(SKMapBase):
       basedata = np.zeros(rc*cc*3).reshape(rc,cc,3)
 
     # crafting the base image
+    ax.tick_params(**tick_params)
     ax.margins(x=0)
     
     if img_style:
       baseimg = ax.imshow(basedata, **img_style) # img_style = dict(vmin=, vmax=, cmap=)
     else:
       baseimg = ax.imshow(basedata)
-    # if there will be a colorbar there will be a colorbar
+    #if there will be a colorbar there will be a colorbar
     if cbar_props: # cbar_props is dict(label='text')
       div = make_axes_locatable(ax)
       pyplot.colorbar(
@@ -1248,6 +1144,11 @@ class RasterData(SKMapBase):
     return baseimg
   
   def _band_manage(self, bands):
+    """
+    to structure the band(s) data based on the provided band information.
+    either single or multiple band data.
+    :params bands: list of band names.
+    """
 
     if len(bands) == 1: # single band raster
       arr = self.filter(f"group=={bands}").array
@@ -1277,7 +1178,7 @@ class RasterData(SKMapBase):
       img_title_text:str or list = "index",
       img_title_fontsize:int = 10,
       vminmax:tuple = (None,None),
-      bands:list = ['default'],
+      bands:list = None,
       to_img:str = None,
       dpi:int = 100,
       layout_col: int = 4
@@ -1286,19 +1187,22 @@ class RasterData(SKMapBase):
       Generates a grid plot to view and save with a colorscale with a desired layout.
       :param cmap                 : This sets the colorscale with given matplotlib.colormap. Default is Spectral_r
       :param cbar_title           : This sets the colorbar title if the cbar exists in the plot. Default is None.
-      :param img_title_text       : This sets the image titles that will be display on top of the each image. Default is `index``.
+      :param img_title_text       : This sets the image titles that will be display on top of the each image. Default is `index`.
       :param img_ltitle_fontsize  : This sets the fontsize of the image label which will be on top of the image. Default is 10.
       :param v_minmax             : This sets the loower and upper limits of the data that will be plot and the colorbar. Default is None and will be calculated on he fly.
-      :param bands                : This used for to generate composite plot. Pass one or tree group names (bands) which will be used to generate. Default is ['default'] 
+      :param bands                : This used for to generate composite plot. Pass one or tree group names (bands) which will be used to generate. Default is None.
       :param to_img               : This sets the directory adn the format of the file where the generated image will be saved. Default is None.
       :param dpi                  : dot per inch value to save the figure. If the `to_img` param provided
       :param layout_col           : This controls the column count that will be used in the grid plot. Default is 3.
     """
 
-    if isinstance(img_title_text, str):
-      img_title_text = self._get_titles(img_title_text)
-
+    
+    if not bands:
+      bands = [self.info.group.to_list()[0]]
     arr = self._band_manage(bands=bands)
+
+    if isinstance(img_title_text, str):
+      img_title_text = self._get_titles(img_title_text, bands)
     
     if len(bands) == 3:
       img_cnt = len(arr)
@@ -1328,11 +1232,11 @@ class RasterData(SKMapBase):
       gridspec_kw=dict(wspace=0.1, hspace=0.1),
       figsize=(
         set_w * layout_col + (layout_col-1) * 0.1,
-        set_h * layout_row + (layout_row-1) * 0.1 + 1
+        set_h * layout_row + (layout_row-1) * 0.1 #+ 1
       ),
     )
-    pyplot.close()
-    def getMatrix(arr_, ind, composite):
+    
+    def _preprocess(arr_, ind, composite):
       if composite:
         return np.flipud(arr_[ind])
       else:
@@ -1342,29 +1246,117 @@ class RasterData(SKMapBase):
 
     def gen_pane(ind, arr, ax, composite, matrix_params, img_title_text, img_title_fontsize):
       try:
-        ax.pcolorfast(getMatrix(arr, ind, composite=composite), **matrix_params)
+        ax.pcolorfast(_preprocess(arr, ind, composite=composite), **matrix_params)
         ax.set_title(img_title_text[ind], fontsize=img_title_fontsize, pad=1)
         ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
       except IndexError:
         ax.axis('off')
-
-    for i, ax in enumerate(grd_axs.flatten()):
-      gen_pane(i, arr, ax, composite, matrix_params, img_title_text, img_title_fontsize)
+    try:
+      for i, ax in enumerate(grd_axs.flatten()):
+        gen_pane(i, arr, ax, composite, matrix_params, img_title_text, img_title_fontsize)
+      
+    except AttributeError:
+      gen_pane(0, arr, grd_axs, composite, matrix_params, img_title_text, img_title_fontsize)
     pyplot.close()
 
     if not composite:
       grd_fig.subplots_adjust(
         left=0, right=1,
-        bottom=0,top=.92
+        bottom=0,top=1
       )
-      cbar_ax= grd_fig.add_axes([0.2,.97,0.6,0.02])
+      w,h = grd_fig.get_size_inches()
+      cbar_ax= grd_fig.add_axes([0.1, 1+(3.15/h) * 0.1, 0.8, 0.16/h])
       cbar_ax = grd_fig.colorbar(
         pyplot.imshow(arr[:,:,0], vmin= vminmax[0], vmax=vminmax[1], cmap=cmap),
         orientation = 'horizontal',
-        cax = cbar_ax
+        cax = cbar_ax,
+        ticklocation='top'
       ).set_label(label = cbar_title)
+      pyplot.tight_layout()
       pyplot.close()
 
     if to_img:
-      grd_fig.savefig(to_img, format=f"{to_img.split('.')[-1]}", dpi=dpi)
+      grd_fig.savefig(to_img, format=f"{to_img.split('.')[-1]}", dpi=dpi, bbox_inches='tight')
     return grd_fig
+  
+  def animate(
+      self,
+      cmap:str = 'Spectral_r',
+      bands:list = None,
+      scaling:float = 2,
+      cbar_title:str = None,
+      img_title_text:str or list = 'index',
+      img_title_fontsize:int = 10,
+      vminmax:tuple = (None, None),
+      interval:int = 250,
+      to_gif:str = None,
+      n_jobs:int = 4
+  ):
+    """
+    Generates an animation with the given band(s) and saves it.
+    :param cmap: colormap name that will derived from `matplotlib.colormaps()`
+    :param bands: this is used for to select the band(s) or to generate a composite images, 
+      that will be used as animation frame. Default is None but it will select the first band on RasterData.
+    :param scaling: scaling can be used to increase/decrease the frame size. Default is 2.
+    :param cbar_title: 
+    """
+    
+    if not bands:
+      bands = [self.info.group.to_list()[0]]
+    arr = self._band_manage(bands=bands)
+    
+    if isinstance(img_title_text, str):
+      img_title_text = self._get_titles(img_title_text, bands)
+    
+    if len(bands) == 3:
+      img_cnt = len(arr)
+      baseimg = self._gen_baseshot(arr=arr[0][:,:,0], scaling=scaling, composite=True)
+      args = [(baseimg,arr[i], img_title_text[i], img_title_fontsize) for i in range(img_cnt)]
+    elif len(bands) == 1:
+      img_cnt = arr.shape[2]
+      vminmax = self._vminmax(vminmax, arr)
+      baseimg = self._gen_baseshot(arr=arr[:,:,0],
+                                   scaling=scaling,
+                                   img_style=dict(vmin=vminmax[0], vmax=vminmax[1], cmap=cmap),
+                                   cbar_props=dict(label=cbar_title),
+                                   composite=False
+                                   )
+      args = [(baseimg, arr[:,:,i], img_title_text[i], img_title_fontsize) for i in range(img_cnt)]
+
+    int_fig = [f for f in parallel.job(self._mutate_baseshot, args, n_jobs=n_jobs)]
+    int_img = [j for j in parallel.job(self._op_io, [(fig,) for fig in int_fig], n_jobs=n_jobs)]
+    
+    
+    if to_gif is not None:
+      with ExitStack() as stack:
+        imgs = (
+          stack.enter_context(Image.open(BytesIO(b64decode(img))))
+          for img in int_img
+        )
+        img = next(imgs)
+        img.save(to_gif, format='GIF', append_images=imgs, save_all=True, duration=interval, loop=0)
+    
+    template = '  frames[{0}] = "data:image/{1};base64,{2}"\n'
+    embedded_frames = "\n" + "".join(
+      template.format(i, 'png', imgdata.replace("\n","\\\n"))
+      for i, imgdata in enumerate(int_img)
+    )
+    mode_dict = dict(
+      once_checked="",
+      loop_checked="checked",
+      reflect_checked=""
+    )
+
+    with TemporaryDirectory() as tmpdir:
+      path = Path(tmpdir, 'temp.html')
+      with open(path, 'w') as of:
+        of.write(JS_INCLUDE + STYLE_INCLUDE)
+        of.write(DISPLAY_TEMPLATE.format(
+          id=uuid4().hex,
+          Nframes=img_cnt,
+          fill_frames = embedded_frames,
+          interval = interval,
+          **mode_dict
+        ))
+      html_rep = path.read_text()
+    return HTML(html_rep)
