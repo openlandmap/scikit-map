@@ -3,6 +3,7 @@ import os
 import warnings
 from enum import Enum
 from typing import Callable
+from scipy.linalg import matmul_toeplitz
 
 try:
 
@@ -186,89 +187,55 @@ try:
       season_size:int,
       att_seas:float = 60,
       att_env:float = 20,
+      conv_vect_future = [],
+      conv_vect_past = [],
       return_qa:bool = False,
       n_jobs:int = os.cpu_count(),
       verbose = False
     ):
-
       super().__init__(name='seasconv', verbose=verbose, temporal=True)
-
       self.season_size = season_size
       self.return_qa = return_qa
       self.att_seas = att_seas
       self.att_env = att_env
+      self.conv_vect_future = conv_vect_future
+      self.conv_vect_past = conv_vect_past
       self.n_jobs = n_jobs
         
-    def _compute_conv_mat_row(self, n_imag):            
-        
+    def _compute_conv_mat_row(self, n_imag):
       # Compute a triangular basis function with yaerly periodicity
       conv_mat_row = np.zeros((n_imag))
-      
       base_func = np.zeros((self.season_size,))
       period_y = self.season_size/2.0
       slope_y = self.att_seas/10/period_y
-      
       for i in np.arange(self.season_size):
         if i <= period_y:
           base_func[i] = -slope_y*i
         else:
-          base_func[i] = slope_y*(i-period_y)-self.att_seas/10            
-      
+          base_func[i] = slope_y*(i-period_y)-self.att_seas/10
       # Compute the envelop to attenuate temporarly far images
       env_func = np.zeros((n_imag,))
       delta_e = n_imag
       slope_e = self.att_env/10/delta_e
-      
       for i in np.arange(delta_e):
         env_func[i] = -slope_e*i
       conv_mat_row = 10.0**(np.resize(base_func,n_imag) + env_func)
-      
       return conv_mat_row
         
-    def _fftw_toeplitz_matmul(self, data, valid_mask, conv_vec):
-      plan = 'FFTW_EXHAUSTIVE'
-      N_samp = conv_vec.shape[0]
-      N_ext = N_samp*2
-      N_fft = (np.floor(N_ext/2)+1).astype(int)
-      N_imag = data.shape[1]
-      in_ts_forward = pyfftw.empty_aligned((N_ext,N_imag), dtype='float32')
-      out_ts_forward = pyfftw.empty_aligned((N_fft,N_imag), dtype='complex64')
-      in_conv_forward = pyfftw.empty_aligned(N_ext, dtype='float32')
-      out_conv_forward = pyfftw.empty_aligned(N_fft, dtype='complex64')
-      out_conv_backward = pyfftw.empty_aligned(N_ext, dtype='float32')
-      in_ts_backward = pyfftw.empty_aligned((N_fft,N_imag), dtype='complex64')
-      out_ts_backward = pyfftw.empty_aligned((N_ext,N_imag), dtype='float32')
-      plan_conv_forward = pyfftw.FFTW(in_conv_forward, out_conv_forward, axes=(0,), flags=(plan,), direction='FFTW_FORWARD',threads=self.n_jobs)
-      plan_conv_backward = pyfftw.FFTW(out_conv_forward, out_conv_backward, axes=(0,), flags=(plan,), direction='FFTW_BACKWARD',threads=self.n_jobs)
-      plan_ts_forward = pyfftw.FFTW(in_ts_forward, out_ts_forward, axes=(0,), flags=(plan,), direction='FFTW_FORWARD',threads=self.n_jobs)
-      plan_ts_backward = pyfftw.FFTW(in_ts_backward, out_ts_backward, axes=(0,), flags=(plan,), direction='FFTW_BACKWARD',threads=self.n_jobs)
-      in_conv_forward = np.zeros(N_ext)
-      in_conv_forward[0:N_samp] = conv_vec
-      in_conv_forward[N_samp:] = np.roll(conv_vec[::-1],1)
-      plan_conv_forward(in_conv_forward)
-      conv_fft = out_conv_forward.copy()
-      in_conv_forward = np.zeros(N_ext)
-      in_conv_forward[0:N_samp] = 1
-      plan_conv_forward(in_conv_forward)
-      out_conv_forward = conv_fft * out_conv_forward
-      plan_conv_backward(out_conv_forward)
-      in_ts_forward = np.concatenate((data,np.zeros((N_samp,N_imag))))
-      plan_ts_forward(in_ts_forward)
-      in_ts_backward = conv_fft.reshape(-1,1) * out_ts_forward
-      plan_ts_backward(in_ts_backward)
-      conv = out_ts_backward[0:N_samp,:].copy()
-      in_ts_forward = np.concatenate((valid_mask,np.zeros((N_samp,N_imag))))
-      plan_ts_forward(in_ts_forward)
-      in_ts_backward = conv_fft.reshape(-1,1) * out_ts_forward
-      plan_ts_backward(in_ts_backward)
-      filled_qa = out_ts_backward[0:N_samp,:]
-      filled = conv/filled_qa
-      filled_qa /= out_conv_backward.reshape(-1,1)[0:N_samp] # Renormalization of the quality assesmtent vector
+    def _fftw_toeplitz_matmul(self, data, valid_mask):
+      norm_vec = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), np.ones((data.shape[0], 1)), check_finite=False, workers=None)
+      filled = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), data, check_finite=False, workers=None)
+      filled_qa = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), valid_mask, check_finite=False, workers=None)
+      min_conv_val = np.min([np.min(self.conv_vect_past), np.min(self.conv_vect_past)])
+      filled = filled/filled_qa
+      no_fill_mask = filled_qa < min_conv_val
+      filled_qa /= norm_vec
+      filled[no_fill_mask] = np.nan
+      filled_qa[no_fill_mask] = 0
       return filled, filled_qa
     
     def _gapfill(self, data):
       # Convolution and normalization
-      
       try:
         import mkl
         mkl_threads = mkl.get_num_threads()
@@ -277,27 +244,25 @@ try:
         pass
       
       np.seterr(divide='ignore', invalid='ignore')
-
       orig_shape = data.shape
       data = np.reshape(data,(data.shape[0]*data.shape[1],data.shape[2])).T.copy()
-
       valid_mask = ~np.isnan(data)
       data[~valid_mask] = 0.0
       n_imag = data.shape[0]
-
       if self.season_size*2 > n_imag:
         warnings.warn("Less then two years of images available, the time series reconstruction will not take advantage of seasonality")
+      half_conv_vect = self._compute_conv_mat_row(n_imag)
+      if self.conv_vect_future == []:
+        self.conv_vect_future = half_conv_vect
+      if self.conv_vect_past == []:
+        self.conv_vect_past = half_conv_vect
 
       filled, filled_qa = self._fftw_toeplitz_matmul(
-        data, valid_mask.astype(float), 
-        self._compute_conv_mat_row(n_imag)
-      )
-      
+        data, valid_mask.astype(float))
       filled[valid_mask] = data[valid_mask]
       filled_qa[valid_mask] = 1.0
       filled_qa = filled_qa * 100
-      filled_qa[filled_qa == 0.0] = np.nan
-      
+      filled_qa[filled_qa == 0.0] = np.nan      
       # Return the reconstructed time series and the quality assesment layer
       if self.return_qa:
         return np.reshape(filled.T, orig_shape), np.reshape(filled_qa.T, orig_shape) 
