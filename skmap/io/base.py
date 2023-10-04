@@ -643,7 +643,7 @@ class RasterData(SKMapBase):
     rows = []
     for group in raster_files.keys():
       if isinstance(raster_files[group], str):
-        rows.append([group, raster_files[group], 1])
+        rows.append([group, raster_files[group], 1, None, None])
       else:
         for r in raster_files[group]:
           if isinstance(r, tuple):
@@ -660,12 +660,13 @@ class RasterData(SKMapBase):
       RasterData.START_DT_COL, RasterData.END_DT_COL])
 
     self.info[RasterData.TEMPORAL_COL] = self.info.apply(lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]), axis=1)
-    self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(r[RasterData.PATH_COL].split('?')[0]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
+    self.info[RasterData.NAME_COL] = self.info.apply(lambda r: Path(str(r[RasterData.PATH_COL]).split('?')[0]).stem if not r[RasterData.TEMPORAL_COL] else None, axis=1)
     
     self.date_args = {}
     self._active_group = None
 
     has_date = ~self.info[RasterData.START_DT_COL].isnull().any()
+    print(has_date)
     if has_date:
       self.info[RasterData.TEMPORAL_COL] = True
       for g in self.info[RasterData.GROUP_COL].unique():
@@ -821,6 +822,9 @@ class RasterData(SKMapBase):
     if isinstance(group, str):
       group = [ group ]
 
+    to_drop = []
+    to_add = []
+
     for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
 
       if len(group) > 0 and _group not in group:
@@ -856,8 +860,13 @@ class RasterData(SKMapBase):
       ginfo = ginfo.explode(temporal_cols)
       ginfo[RasterData.NAME_COL] = ginfo.apply(lambda r: Path(r[RasterData.PATH_COL]).stem, axis=1)
       
-      self.info = self.info.drop(index=ginfo.index)
-      self.info = pd.concat([self.info, ginfo]).reset_index(drop=True)
+      to_drop.append(ginfo.index)
+      to_add.append(ginfo)
+
+    for idx in to_drop:
+      self.info = self.info.drop(index=idx)
+    
+    self.info = pd.concat([ self.info ] + to_add).reset_index(drop=True)
 
     return self
 
@@ -975,6 +984,10 @@ class RasterData(SKMapBase):
     if isinstance(group, str):
       group = [ group ]
 
+    to_drop = []
+    to_add_arr = []
+    to_add_info = []
+
     for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
 
       if ginfo[RasterData.TEMPORAL_COL].iloc[0] != process.temporal:
@@ -1000,17 +1013,26 @@ class RasterData(SKMapBase):
       
       if drop_input:
         self._verbose(f"Dropping data and info for {_group} group")
-        self.array = np.delete(self.array, ginfo.index, axis=-1) 
-        self.info = self.info.drop(ginfo.index)
-
-      self.array = np.concatenate([self.array, new_array], axis=-1)
-      self.info = pd.concat([self.info, new_info])
-      self.info.reset_index(drop=True, inplace=True)
+        to_drop.append(ginfo.index)
+        
+      to_add_arr.append(new_array)
+      to_add_info.append(new_info)
       
       self._verbose(f"Execution"
         + f" time for {process_name}: {(time.time() - start):.2f} segs")
 
       self._active_group = None
+
+    idx_list = []
+    for idx in to_drop:
+      self.info = self.info.drop(idx)
+      idx_list += list(idx)
+    
+    self.array = np.delete(self.array, idx_list, axis=-1) 
+
+    self.array = np.concatenate( [self.array] + to_add_arr, axis=-1)
+    self.info = pd.concat( [self.info] + to_add_info)
+    self.info.reset_index(drop=True, inplace=True)
 
     return self
 
@@ -1309,7 +1331,7 @@ class RasterData(SKMapBase):
     """
     if vmm[0]:
       return vmm
-    return np.nanquantile(arr.flatten(), [.1, .9])
+    return np.nanquantile(arr.flatten(), [.02, .98])
   
   def _op_io(self, figure):
     """
@@ -1379,20 +1401,20 @@ class RasterData(SKMapBase):
     pyplot.close()
     return baseimg
   
-  def _band_manage(self, bands):
+  def _band_manage(self, groups):
     """
     to structure the band(s) data based on the provided band information.
     either single or multiple band data.
-    :params bands: list of band names.
+    :params groups: list of band names.
     """
 
-    if len(bands) == 1: # single band raster
-      arr = self.filter(f"group=={bands}").array
-    elif len(bands) == 3: # composite
+    if len(groups) == 1: # single band raster
+      arr = self.filter(f"group=={groups}").array
+    elif len(groups) == 3: # composite
       arr = []
-      band1 = self.filter(f"group=={bands}[0]")
-      band2 = self.filter(f"group=={bands}[1]")
-      band3 = self.filter(f"group=={bands}[2]")
+      band1 = self.filter(f"group=={groups}[0]")
+      band2 = self.filter(f"group=={groups}[1]")
+      band3 = self.filter(f"group=={groups}[2]")
       for i in range(band1.array.shape[2]):
         arr.append(
           np.stack([
@@ -1409,12 +1431,12 @@ class RasterData(SKMapBase):
       
   def plot(
       self,
+      groups:list = None,
       cmap:str = 'Spectral_r',
       cbar_title:str = None, 
       img_title_text:str or list = "index",
       img_title_fontsize:int = 10,
       vminmax:tuple = (None,None),
-      bands:list = None,
       to_img:str = None,
       dpi:int = 100,
       layout_col: int = 4
@@ -1426,24 +1448,24 @@ class RasterData(SKMapBase):
       :param img_title_text       : This sets the image titles that will be display on top of the each image. Default is `index`.
       :param img_ltitle_fontsize  : This sets the fontsize of the image label which will be on top of the image. Default is 10.
       :param v_minmax             : This sets the loower and upper limits of the data that will be plot and the colorbar. Default is None and will be calculated on he fly.
-      :param bands                : This used for to generate composite plot. Pass one or tree group names (bands) which will be used to generate. Default is None.
+      :param groups                : This used for to generate composite plot. Pass one or tree group names (groups) which will be used to generate. Default is None.
       :param to_img               : This sets the directory adn the format of the file where the generated image will be saved. Default is None.
       :param dpi                  : dot per inch value to save the figure. If the `to_img` param provided
       :param layout_col           : This controls the column count that will be used in the grid plot. Default is 3.
     """
-    if not bands:
-      bands = [self.info.group.to_list()[0]]
-      
-    arr = self._band_manage(bands=bands)
+    if not groups:
+      groups = [self.info.group.to_list()[0]]
+
+    arr = self._band_manage(groups=groups)
 
     if isinstance(img_title_text, str):
-      img_title_text = self._get_titles(img_title_text, bands)
+      img_title_text = self._get_titles(img_title_text, groups)
     
-    if len(bands) == 3:
+    if len(groups) == 3:
       img_cnt = len(arr)
       composite=True
       baseimg = self._gen_baseshot(arr[0][:,:,0])
-    elif len(bands) == 1:
+    elif len(groups) == 1:
       img_cnt = arr.shape[2]
       composite=False
       vminmax = self._vminmax(vminmax, arr)
@@ -1517,7 +1539,7 @@ class RasterData(SKMapBase):
   def animate(
       self,
       cmap:str = 'Spectral_r',
-      bands:list = None,
+      groups:list = None,
       scaling:float = 2,
       cbar_title:str = None,
       img_title_text:str or list = 'index',
@@ -1530,24 +1552,24 @@ class RasterData(SKMapBase):
     """
     Generates an animation with the given band(s) and saves it.
     :param cmap: colormap name that will derived from `matplotlib.colormaps()`
-    :param bands: this is used for to select the band(s) or to generate a composite images, 
+    :param groups: this is used for to select the band(s) or to generate a composite images, 
       that will be used as animation frame. Default is None but it will select the first band on RasterData.
     :param scaling: scaling can be used to increase/decrease the frame size. Default is 2.
     :param cbar_title: 
     """
     
-    if not bands:
-      bands = [self.info.group.to_list()[0]]
-    arr = self._band_manage(bands=bands)
+    if not groups:
+      groups = [self.info.group.to_list()[0]]
+    arr = self._band_manage(groups=groups)
     
     if isinstance(img_title_text, str):
-      img_title_text = self._get_titles(img_title_text, bands)
+      img_title_text = self._get_titles(img_title_text, groups)
     
-    if len(bands) == 3:
+    if len(groups) == 3:
       img_cnt = len(arr)
       baseimg = self._gen_baseshot(arr=arr[0][:,:,0], scaling=scaling, composite=True)
       args = [(baseimg,arr[i], img_title_text[i], img_title_fontsize) for i in range(img_cnt)]
-    elif len(bands) == 1:
+    elif len(groups) == 1:
       img_cnt = arr.shape[2]
       vminmax = self._vminmax(vminmax, arr)
       baseimg = self._gen_baseshot(arr=arr[:,:,0],

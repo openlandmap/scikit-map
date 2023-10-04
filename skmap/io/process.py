@@ -454,7 +454,6 @@ try:
         in_array = rdata.filter_date(dt1a, dt2a, return_array=True, 
           date_format=date_format, date_overlap=self.date_overlap)
         
-        
         if in_array.size > 0:  
           args += [ (in_array, tm, datetime.strptime(dt1, date_format), datetime.strptime(dt2, date_format)) ]
 
@@ -510,9 +509,11 @@ try:
       outname:str = 'skmap_aggregate.{gr}_{op}_{dt}'
     ):
 
+      info = rdata._info()
+
       date_format = '%Y%m%d'
-      start_dt = rdata.info[RasterData.START_DT_COL].min()
-      end_dt = rdata.info[RasterData.END_DT_COL].max()
+      start_dt = info[RasterData.START_DT_COL].min()
+      end_dt = info[RasterData.END_DT_COL].max()
 
       args = []
 
@@ -531,7 +532,7 @@ try:
         elif t == TimeEnum.BIMONTHLY_15P:
           args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2, 15)
         elif t == TimeEnum.QUARTERLY:
-          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2)
+          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 3)
         else:
           raise Exception(f"Aggregation by {t} not implemented")
       
@@ -557,7 +558,8 @@ try:
           new_group = f'{_group}.{op}'
 
           new_info.append(
-            rdata._new_info_row(rdata.base_raster, name=name, group=new_group, dates=[start_dt, end_dt])
+            rdata._new_info_row(rdata.base_raster, name=name, group=new_group, 
+              dates=[dt1, dt2])
           )
 
         new_array.append(out_array)
