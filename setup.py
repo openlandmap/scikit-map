@@ -3,7 +3,7 @@ from pathlib import Path
 
 setuptools.setup(
     name='scikit-map',
-    version='0.7.0',
+    version='0.7.3',
     description='scikit-learn applied to mapping and spatial prediction',
     long_description="Python module to produce maps using machine learning, reference samples and raster data.",
     long_description_content_type='text/markdown',
