@@ -717,7 +717,7 @@ try:
         gidx = rows.index
         garray = rdata.array[:,:,gidx]
         ggroup = list(rdata.info.iloc[gidx]['group'])
-        
+
         gmap = {}
         
         for i in range(0, len(gidx)):
@@ -791,14 +791,13 @@ try:
 
     def _calc(self, array_dict):
 
-      if self.mask_group is not None and len(self.mask_values) > 1:
-        array_mask = array_dict[self.mask_group]
-        array_mask = np.isin(array_mask, self.mask_values)
-      
+      if self.mask_group is not None and len(self.mask_values) >= 1:
+        array_mask = np.isin(array_dict[self.mask_group], self.mask_values)
+
         for g in array_dict.keys():
           if g != self.mask_group:
             array_dict[g][array_mask] = np.nan
-      
+
       for group in self.expressions.keys():
         expression = self.expressions[group]
         array_dict[group] = ne.evaluate(expression, local_dict=array_dict)

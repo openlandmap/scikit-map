@@ -508,6 +508,7 @@ def save_rasters(
   raster_files:List,
   data:numpy.array,
   window:Window = None,
+  bounds:[] = None,
   dtype:str = None,
   nodata = None,
   fit_in_dtype:bool = False,
@@ -588,6 +589,17 @@ def save_rasters(
   n_files = data.shape[-1]
   if n_files != len(raster_files):
     raise Exception(f'The data shape {data.shape} is incompatible with the raster_files size {len(raster_files)}.')
+
+  ds = rasterio.open(base_raster)
+  if bounds is not None and len(bounds) == 4:
+    bounds = shape(rasterio.warp.transform_geom(
+        src_crs='EPSG:4326',
+        dst_crs=ds.crs,
+        geom=box(*bounds),
+    )).bounds
+    window = from_bounds(*bounds, ds.transform).round_lengths()
+    if verbose:
+      ttprint(f'Transform {bounds} into {window}')
 
   if verbose:
     ttprint(f'Saving {len(raster_files)} raster files using {n_jobs} workers')
@@ -896,6 +908,7 @@ class RasterData(SKMapBase):
   ):
 
     self.window = window
+    self.bounds = bounds
     
     data_mask = None
     if self.raster_mask is not None:
@@ -1197,7 +1210,8 @@ class RasterData(SKMapBase):
 
     save_rasters(
       base_raster, outfiles,
-      self.array[:,:,info.index], self.window,
+      self.array[:,:,info.index], 
+      window=self.window, bounds=self.bounds,
       dtype=dtype, nodata=nodata,
       fit_in_dtype=fit_in_dtype, n_jobs=n_jobs,
       on_each_outfile = on_each_outfile, verbose = self.verbose
