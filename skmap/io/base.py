@@ -666,7 +666,7 @@ class RasterData(SKMapBase):
     self._active_group = None
 
     has_date = ~self.info[RasterData.START_DT_COL].isnull().any()
-    print(has_date)
+
     if has_date:
       self.info[RasterData.TEMPORAL_COL] = True
       for g in self.info[RasterData.GROUP_COL].unique():
@@ -747,15 +747,19 @@ class RasterData(SKMapBase):
       bands = [ all_bands[0] ]
 
     stac_info = []
+    stac_href = {}
 
     for i in stac_items:
       for band in  i.assets.keys():
         if band in bands:
-          stac_info.append({
-            'href': i.assets[band].href,
-            'band': band,
-            'date': i.datetime.replace(tzinfo=None)
-          })
+          href = i.assets[band].href
+          if href not in stac_href:
+            stac_href[href] = False
+            stac_info.append({
+              'href': i.assets[band].href,
+              'band': band,
+              'date': i.datetime.replace(tzinfo=None)
+            })
 
     stac_info = pd.DataFrame(stac_info)
 
@@ -1350,7 +1354,7 @@ class RasterData(SKMapBase):
     image from 3 bands. returns the scaled data
     :param arr: the data usually single band data in np.array format.
     """
-    return (arr - np.percentile(arr, 1)) / (np.percentile(arr,99)-np.percentile(arr,1))
+    return (arr - np.nanpercentile(arr, 1)) / (np.nanpercentile(arr,99)-np.nanpercentile(arr,1))
   
   def _mutate_baseshot(self, img, arr, titletext, textfontsize):
     """
@@ -1412,15 +1416,21 @@ class RasterData(SKMapBase):
       arr = self.filter(f"group=={groups}").array
     elif len(groups) == 3: # composite
       arr = []
-      band1 = self.filter(f"group=={groups}[0]")
-      band2 = self.filter(f"group=={groups}[1]")
-      band3 = self.filter(f"group=={groups}[2]")
-      for i in range(band1.array.shape[2]):
+      band1 = self.filter(f"group=={groups}[0]", return_array=True)
+      band2 = self.filter(f"group=={groups}[1]", return_array=True)
+      band3 = self.filter(f"group=={groups}[2]", return_array=True)
+
+      alpha = np.ones(band3.shape)
+      mask = np.any(np.isnan(np.stack([band1, band2, band3], axis=-1)), axis=-1)
+      alpha[mask] = 0
+
+      for i in range(band1.shape[2]):
         arr.append(
           np.stack([
-            np.clip(self._percent_clip(band1.array[:,:,i]),0,1),
-            np.clip(self._percent_clip(band2.array[:,:,i]),0,1),
-            np.clip(self._percent_clip(band3.array[:,:,i]),0,1),
+            np.clip(self._percent_clip(band1[:,:,i]),0,1),
+            np.clip(self._percent_clip(band2[:,:,i]),0,1),
+            np.clip(self._percent_clip(band3[:,:,i]),0,1),
+            alpha[:,:,i],
           ], axis=2)
         )
     else:
