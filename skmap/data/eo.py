@@ -11,7 +11,8 @@ import os
 
 import warnings
 from skmap import parallel
-from skmap.raster import read_auth_rasters, save_rasters
+from skmap.misc import date_range
+from skmap.io import read_auth_rasters, save_rasters
 from skmap.misc import _warn_deps, _eval, nan_percentile, ttprint, find_files, GoogleSheet
 
 class GLADLandsat():
@@ -360,13 +361,16 @@ try:
   
   import pystac
   import rasterio
+  import requests
   import mimetypes
   import pandas as pd
   import matplotlib.pyplot as plt
+
   from minio import Minio
   from PIL import Image
   from itertools import chain
   from datetime import datetime
+  from bs4 import BeautifulSoup 
   from pyproj import Transformer
   from matplotlib.colors import ListedColormap
   from shapely.geometry import Polygon, mapping, shape
@@ -409,11 +413,11 @@ try:
   """
     def __init__(self,
       gsheet:GoogleSheet,
-      url_date_format = '%Y.%m.%d',
+      url_date_format = '%Y%m%d',
       cog_level = 7,
       thumb_overwrite = False,
       asset_id_delim = '_',
-      asset_id_fields = [1,3,5],
+      asset_id_fields = [0,2,4],
       catalogs = None,
       verbose = False
     ):
@@ -479,30 +483,57 @@ try:
     def _fetch_collection(self, key, i, row, bbox_footprint_results):
 
       items = []
-      for start_date, end_date in self._gen_dates(**row):
-        main_url = self._parse_url(row['main_url'], start_date, end_date, row['date_unit'], row['date_style'])
-        additional_urls = []
-        for ac_url in self.additional_url_cols:
-          if row[ac_url]:
-            additional_urls.append(self._parse_url(row[ac_url], start_date, end_date, row['date_unit'], row['date_style']))
-        
-        bbox, footprint = bbox_footprint_results[main_url]
+      dt_fmt = self.url_date_format
+      for dp in row['depth']:
+            
+        date_unit = row['date_unit']
+        date_step = row['date_step']
+        ignore_29feb = row['ignore_29feb']
+        if date_unit == 'static':
+          date_step = int((row['end_date'] - row['start_date']).days) + 1
+          date_unit, ignore_29feb = 'days', False
 
-        items.append(self._new_item(row, start_date, end_date, main_url, bbox, footprint, additional_urls))
+        for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
+            date_step=date_step, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
+          
+          main_url = _eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp})
+          additional_urls = []
+          for ac_url in self.additional_url_cols:
+            if row[ac_url]:
+              additional_urls.append(_eval(row[ac_url],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
+        
+          if main_url in bbox_footprint_results:
+              bbox, footprint = bbox_footprint_results[main_url]
+
+              items.append(self._new_item(row, dt1, dt2, main_url, bbox, footprint, additional_urls))
+          else:
+            self._verbose(f"The url {main_url} is invalid.")
 
       return (key, row, items)
 
     def _populate(self):
 
       self.new_collections = {}
+      dt_fmt = self.url_date_format
       groups = self.gsheet.collections.groupby('catalog')
       
       args = []
       for key in groups.groups.keys():
         for i, row in groups.get_group(key).iterrows():
-          for start_date, end_date in self._gen_dates(**row):
-            main_url = self._parse_url(row['main_url'], start_date, end_date, row['date_unit'], row['date_style'])
-            args.append((main_url,))
+          for dp in row['depth']:
+            
+            date_unit = row['date_unit']
+            date_step = row['date_step']
+            ignore_29feb = row['ignore_29feb']
+            if date_unit == 'static':
+              date_step = int((row['end_date'] - row['start_date']).days) + 1
+              date_unit, ignore_29feb = 'days', False
+            
+            for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
+                date_step=date_step, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
+              #main_url = self._parse_url(row['main_url'], start_date, end_date, row['date_unit'], row['date_style'])
+              main_url = _eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp})
+              args.append((main_url,))
 
       bbox_footprint_results = {}
       for url, bbox, footprint in parallel.job(self._bbox_and_footprint, args, n_jobs=-1, joblib_args={'backend': 'multiprocessing'}):
@@ -639,18 +670,39 @@ try:
         except:
           return(None, item_id, is_thumb_url)
 
+    def sld2cmap(self, sld_url):
+    
+      r = requests.get(sld_url, allow_redirects=True)
+    
+      bs_data = BeautifulSoup(r.content, 'xml') 
+      colors, values = [], []
+
+      for cmp in bs_data.find_all('ColorMapEntry'):
+        colors.append(cmp.get('color'))
+        values.append(float(cmp.get('quantity')))
+
+      values = np.array(values)
+      np.min(values), np.max(values)
+
+      thumb_vmin, thumb_vmax = np.min(values), np.max(values)
+      thumb_cmap = ','.join(colors)
+    
+      return thumb_cmap, thumb_vmin, thumb_vmax
+    
     def _new_collection(self, row, items):  
       
       if len(items) > 0:
         unioned_footprint = shape(items[0].geometry)
         collection_bbox = list(unioned_footprint.bounds)
+
+        row['thumb_cmap'], row['thumb_vmin'], row['thumb_vmax'] = self.sld2cmap(row['sld_url'])
         
         start_date = items[0].properties['start_datetime']
         end_date = items[-1].properties['end_datetime']
 
         collection_interval = sorted([
-          datetime.strptime(start_date,"%Y-%m-%d"), 
-          datetime.strptime(end_date,"%Y-%m-%d")
+          datetime.strptime(start_date, '%Y-%m-%d'), 
+          datetime.strptime(end_date, '%Y-%m-%d')
         ])
 
         collection = pystac.Collection(
@@ -687,19 +739,16 @@ try:
 
     def _new_item(self, row, start_date, end_date, main_url, bbox, footprint, additional_urls = []):
       
-      start_date_str = start_date.strftime("%Y-%m-%d")
-      end_date_str = end_date.strftime("%Y-%m-%d")
+      start_date_item = datetime.strptime(start_date, self.url_date_format).strftime('%Y-%m-%d')
+      end_date_item = datetime.strptime(end_date, self.url_date_format).strftime('%Y-%m-%d')
 
-      start_date_url_str = start_date.strftime(self.url_date_format)
-      end_date_url_str = end_date.strftime(self.url_date_format)
-
-      item_id = f'{row["id"]}_{start_date_url_str}..{end_date_url_str}'
+      item_id = f'{row["id"]}_{start_date}_{end_date}'
 
       item = pystac.Item(id=item_id,
                       geometry=footprint,
                       bbox=bbox,
-                      datetime=start_date,
-                      properties={'start_datetime': start_date_str, 'end_datetime': end_date_str},
+                      datetime=datetime.strptime(start_date, self.url_date_format),
+                      properties={'start_datetime': start_date_item, 'end_datetime': end_date_item},
                       stac_extensions=["https://stac-extensions.github.io/eo/v1.0.0/schema.json"])
 
       item.common_metadata.gsd = row['gsd']
@@ -723,88 +772,6 @@ try:
 
       return item
 
-    def _gen_dates(self, start_date, end_date, date_unit, date_step, ignore_29feb, **kwargs):
-
-      result = []
-      
-      if date_unit == 'static': 
-        result.append((
-          start_date, 
-          end_date
-        ))
-      elif date_unit == 'custom_multiannual': 
-      ## Irregular/custom date iteration
-        
-        for year_range in date_step.split(','):
-          year_range_arr = year_range.split('..')
-          start_year = year_range_arr[0]
-          end_year = year_range_arr[1]
-
-          result.append((
-            datetime.strptime(f'{start_year}.01.01', self.url_date_format),
-            datetime.strptime(f'{end_year}.12.31', self.url_date_format)
-          ))
-
-      elif date_unit == 'custom_predefined': 
-      ## Irregular/custom date iteration
-        
-        for dt_range in date_step.split(','):
-          dt_range_arr = dt_range.split('..')
-          start_year = dt_range_arr[0]
-          end_year = dt_range_arr[1]
-          result.append((
-            datetime.strptime(f'{start_year}', self.url_date_format),
-            datetime.strptime(f'{end_year}', self.url_date_format)
-          ))
-
-      else:
-
-        dt1 = start_date
-        while(dt1 <= end_date):
-        ## Regular date iteration
-          
-          if date_unit == 'custom_intraannual': 
-          ## Regular yearly iteration and irregular/custom intraannual date iteration
-
-            for date_range in date_step.split(','):
-              date_step_arr = date_range.split('..')
-              start_dt = date_step_arr[0]
-              end_dt = date_step_arr[1]
-
-              year = int(dt1.strftime('%Y'))
-              y, y_m1, y_p1 = str(year), str((year - 1)), str((year + 1))
-
-              start_dt = start_dt.replace('{year}', y) \
-                                 .replace('{year_minus_1}', y_m1) \
-                                 .replace('{year_plus_1}', y_p1)
-
-              end_dt = end_dt.replace('{year}', y) \
-                             .replace('{year_minus_1}', y_m1) \
-                             .replace('{year_plus_1}', y_p1)
-
-              result.append((
-                datetime.strptime(start_dt, self.url_date_format),
-                datetime.strptime(end_dt, self.url_date_format)
-              ))
-
-            dt1 = dt1 + relativedelta(years=+1)
-
-          else:
-            ## Regular date iteration (yearly, monthly, daily, etc)
-            delta_args = {}
-            delta_args[date_unit] = int(date_step) # TODO: Threat the value "month"
-            
-            dt1n = dt1 + relativedelta(**delta_args)
-            dt2 = dt1n + relativedelta(days=-1)
-          
-            if (ignore_29feb.lower() == 'true' and dt2.strftime("%m") == '02' and dt2.strftime("%d") == '29'):
-              dt2 = dt2 + relativedelta(days=-1)
-                
-            result.append((dt1, dt2))       
-            dt1 = dt1n
-      
-      return result
-
     def _kargs(self, row, key, add_extra_fields=False):
       _args = {}
       for f in self.fields[key]:
@@ -818,25 +785,6 @@ try:
             _args['extra_fields'][ef] = row[ef]
 
       return _args
-
-    def _parse_url(self, url, dt1, dt2, date_unit = 'months', date_style = 'interval'):
-      
-      date_format = self.url_date_format
-      if (date_unit == 'years' or date_unit == 'custom_multiannual'):
-        date_format = '%Y'
-
-      if (date_style == 'start_date'):
-        dt = f'{dt1.strftime(date_format)}'
-      elif (date_style == 'end_date'):
-        dt = f'{dt2.strftime(date_format)}'
-      else:
-        dt = f'{dt1.strftime(date_format)}..{dt2.strftime(date_format)}'
-
-      item_id = str(Path(url).name) \
-                  .replace('{dt}','') \
-                  .replace('__', '_')
-
-      return _eval(url, locals())
 
     def _bbox_and_footprint(self, raster_fn):
 
