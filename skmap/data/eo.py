@@ -432,10 +432,28 @@ try:
 
       coll_columns = gsheet.collections.columns
       self.additional_url_cols = list(coll_columns[pd.Series(coll_columns).str.startswith('url')])
-
+      
       self.gdal_env = {
         "GDAL_CACHEMAX": 1024_000_000,  # 1 Gb in bytes
         "GDAL_DISABLE_READDIR_ON_OPEN": False,
+        "VSI_CACHE": True,
+        "VSI_CACHE_SIZE": 1024_000_000,
+        "GDAL_HTTP_MAX_RETRY": 3,
+        "GDAL_HTTP_RETRY_DELAY": 60
+      }
+
+
+      self.gdal_env_2 = {
+        "GDAL_CACHEMAX": 1024_000_000,  # 1 Gb in bytes
+        "GDAL_DISABLE_READDIR_ON_OPEN": False,
+        'GDAL_HTTP_MULTIRANGE': 'YES',
+        'GDAL_HTTP_MERGE_CONSECUTIVE_RANGES': 'YES',
+        'GDAL_DISABLE_READDIR_ON_OPEN': 'EMPTY_DIR',
+        'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif',
+        'GDAL_HTTP_CONNECTTIMEOUT': '320',
+        'CPL_VSIL_CURL_USE_HEAD': 'NO',
+        'GDAL_HTTP_TIMEOUT': '320',
+        'CPL_CURL_GZIP': 'NO',
         "VSI_CACHE": True,
         "VSI_CACHE_SIZE": 1024_000_000,
         "GDAL_HTTP_MAX_RETRY": 3,
@@ -447,7 +465,7 @@ try:
         'provider': ['name', 'description', 'roles', 'url'],
         'catalog': ['id', 'title', 'description'],
         'common_metadata': ['constellation', 'platform', 'instruments', 'gsd'],
-        'internal': ['start_date', 'end_date', 'date_step', 'date_unit', 'date_style','catalog', 'providers', 'main_url']
+        'internal': ['start_date', 'end_date', 'date_step', 'date_unit', 'date_style','catalog', 'providers', 'main_url', 'ignore_29feb', 'depth']
       }
 
       self.fields['internal'] += self.additional_url_cols
@@ -456,6 +474,10 @@ try:
         set(chain(*[self.fields[key] for key in self.fields.keys()]))
         , True
       )
+
+      self.THUMB_CMAP = 'thumb_cmap'
+      self.THUMB_VMIN = 'thumb_vmin'
+      self.THUMB_VMAX = 'thumb_vmax'
 
       self.providers = self._providers()
       if catalogs is None:
@@ -483,31 +505,39 @@ try:
     def _fetch_collection(self, key, i, row, bbox_footprint_results):
 
       items = []
-      dt_fmt = self.url_date_format
-      for dp in row['depth']:
-            
-        date_unit = row['date_unit']
-        date_step = row['date_step']
-        ignore_29feb = row['ignore_29feb']
-        if date_unit == 'static':
-          date_step = int((row['end_date'] - row['start_date']).days) + 1
-          date_unit, ignore_29feb = 'days', False
 
-        for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
-            date_step=date_step, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
-          
-          main_url = _eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp})
-          additional_urls = []
+      depth, dp = [""], ""
+      if 'depth' in row and len(list(row['depth'])) > 0:
+        depth, dp = list(row['depth']), row['depth'][0]
+
+      dt_fmt = self.url_date_format
+      
+      date_unit = row['date_unit']
+      date_step = row['date_step']
+      ignore_29feb = row['ignore_29feb']
+      
+      if date_unit == 'static':
+        date_step = int((row['end_date'] - row['start_date']).days) + 1
+        date_unit, ignore_29feb = 'days', False
+
+      for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
+          date_step=date_step, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
+        
+        item_urls = []        
+        for dp in depth:
+          item_urls.append(_eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
           for ac_url in self.additional_url_cols:
             if row[ac_url]:
-              additional_urls.append(_eval(row[ac_url],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
-        
-          if main_url in bbox_footprint_results:
-              bbox, footprint = bbox_footprint_results[main_url]
+              item_urls.append(_eval(row[ac_url],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
+          
+        main_url = item_urls[0]
 
-              items.append(self._new_item(row, dt1, dt2, main_url, bbox, footprint, additional_urls))
-          else:
-            self._verbose(f"The url {main_url} is invalid.")
+        if main_url in bbox_footprint_results:
+            bbox, footprint = bbox_footprint_results[main_url]
+
+            items.append(self._new_item(row, dt1, dt2, bbox, footprint, item_urls))
+        else:
+          self._verbose(f"The url {main_url} is invalid.")
 
       return (key, row, items)
 
@@ -520,20 +550,22 @@ try:
       args = []
       for key in groups.groups.keys():
         for i, row in groups.get_group(key).iterrows():
-          for dp in row['depth']:
+
+          dp = ""
+          if 'depth' in row:
+            dp = row['depth'][0]
             
-            date_unit = row['date_unit']
-            date_step = row['date_step']
-            ignore_29feb = row['ignore_29feb']
-            if date_unit == 'static':
-              date_step = int((row['end_date'] - row['start_date']).days) + 1
-              date_unit, ignore_29feb = 'days', False
-            
-            for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
-                date_step=date_step, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
-              #main_url = self._parse_url(row['main_url'], start_date, end_date, row['date_unit'], row['date_style'])
-              main_url = _eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp})
-              args.append((main_url,))
+          date_unit = row['date_unit']
+          date_step = row['date_step']
+          ignore_29feb = row['ignore_29feb']
+          if date_unit == 'static':
+            date_step = int((row['end_date'] - row['start_date']).days) + 1
+            date_unit, ignore_29feb = 'days', False
+          
+          for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
+              date_step=date_step, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
+            main_url = _eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp})
+            args.append((main_url,))
 
       bbox_footprint_results = {}
       for url, bbox, footprint in parallel.job(self._bbox_and_footprint, args, n_jobs=-1, joblib_args={'backend': 'multiprocessing'}):
@@ -585,14 +617,13 @@ try:
             
             assets = [ a for a in item.assets.items() ]
             collection = item.get_collection()
-            cmap = self._get_val(collection.extra_fields, 'thumb_cmap')
-            vmin = self._get_val(collection.extra_fields, 'thumb_vmin')
-            vmax = self._get_val(collection.extra_fields, 'thumb_vmax')
+            cmap = self._get_val(collection.extra_fields, self.THUMB_CMAP)
+            vmin = self._get_val(collection.extra_fields, self.THUMB_VMIN)
+            vmax = self._get_val(collection.extra_fields, self.THUMB_VMAX)
             
             if ',' in cmap:
               colors = cmap.split(',')
               cmap = ListedColormap(colors)
-
 
             for key, asset in assets:
               if self._is_data(asset):
@@ -612,7 +643,12 @@ try:
 
         for thumb_fn, item_id, is_thumb_url in parallel.job(self._thumbnail, args, n_jobs=-1):
           item = catalog.get_item(item_id, True)
+          collection = item.get_collection()
           
+          for f in [self.THUMB_CMAP, self.THUMB_VMIN, self.THUMB_VMAX]:
+            if f in collection.extra_fields:
+              del collection.extra_fields[f]
+
           if thumb_fn is not None:
             thumd_id = self._asset_id(thumb_fn, self.asset_id_delim, self.asset_id_fields) + '_preview'
             roles = []
@@ -674,20 +710,23 @@ try:
     
       r = requests.get(sld_url, allow_redirects=True)
     
-      bs_data = BeautifulSoup(r.content, 'xml') 
-      colors, values = [], []
+      if (r.status_code == 200):
+        bs_data = BeautifulSoup(r.content, 'xml') 
+        colors, values = [], []
 
-      for cmp in bs_data.find_all('ColorMapEntry'):
-        colors.append(cmp.get('color'))
-        values.append(float(cmp.get('quantity')))
+        for cmp in bs_data.find_all('ColorMapEntry'):
+          colors.append(cmp.get('color'))
+          values.append(float(cmp.get('quantity')))
 
-      values = np.array(values)
-      np.min(values), np.max(values)
+        values = np.array(values)
+        np.min(values), np.max(values)
 
-      thumb_vmin, thumb_vmax = np.min(values), np.max(values)
-      thumb_cmap = ','.join(colors)
-    
-      return thumb_cmap, thumb_vmin, thumb_vmax
+        thumb_vmin, thumb_vmax = np.nanmin(values), np.nanmax(values)
+        thumb_cmap = ','.join(colors)
+      
+        return thumb_cmap, thumb_vmin, thumb_vmax
+      else:
+        return 'binary', None, None
     
     def _new_collection(self, row, items):  
       
@@ -695,7 +734,7 @@ try:
         unioned_footprint = shape(items[0].geometry)
         collection_bbox = list(unioned_footprint.bounds)
 
-        row['thumb_cmap'], row['thumb_vmin'], row['thumb_vmax'] = self.sld2cmap(row['sld_url'])
+        row[self.THUMB_CMAP], row[self.THUMB_VMIN], row[self.THUMB_VMAX] = self.sld2cmap(row['sld_url'])
         
         start_date = items[0].properties['start_datetime']
         end_date = items[-1].properties['end_datetime']
@@ -737,8 +776,11 @@ try:
 
       return delim.join(result)
 
-    def _new_item(self, row, start_date, end_date, main_url, bbox, footprint, additional_urls = []):
+    def _new_item(self, row, start_date, end_date, bbox, footprint, item_urls = []):
       
+      main_url = item_urls[0]
+      additional_urls = item_urls[1:]
+
       start_date_item = datetime.strptime(start_date, self.url_date_format).strftime('%Y-%m-%d')
       end_date_item = datetime.strptime(end_date, self.url_date_format).strftime('%Y-%m-%d')
 
