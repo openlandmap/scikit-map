@@ -226,7 +226,9 @@ try:
       norm_vec = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), np.ones((data.shape[0], 1)), check_finite=False, workers=None)
       filled = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), data, check_finite=False, workers=None)
       filled_qa = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), valid_mask, check_finite=False, workers=None)
-      min_conv_val = np.min([np.min(self.conv_vect_past), np.min(self.conv_vect_past)])
+      conv_vec = np.concatenate((self.conv_vect_past, self.conv_vect_future[-1:0:-1]))
+      nz_conv_vec = conv_vec[conv_vec>0]
+      min_conv_val = np.min(nz_conv_vec)
       filled = filled/filled_qa
       no_fill_mask = filled_qa < min_conv_val
       filled_qa /= norm_vec
