@@ -223,7 +223,9 @@ try:
       return conv_mat_row
         
     def _fftw_toeplitz_matmul(self, data, valid_mask):
-      norm_vec = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), np.ones((data.shape[0], 1)), check_finite=False, workers=None)
+      tmp_norm_vec = np.ones((data.shape[0], 1));
+      tmp_norm_vec[0] = 0.
+      norm_vec = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), tmp_norm_vec, check_finite=False, workers=None)
       filled = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), data, check_finite=False, workers=None)
       filled_qa = matmul_toeplitz((self.conv_vect_past, self.conv_vect_future), valid_mask, check_finite=False, workers=None)
       conv_vec = np.concatenate((self.conv_vect_past, self.conv_vect_future[-1:0:-1]))
@@ -231,7 +233,7 @@ try:
       min_conv_val = np.min(nz_conv_vec)
       filled = filled/filled_qa
       no_fill_mask = filled_qa < min_conv_val
-      filled_qa /= norm_vec
+      filled_qa /= np.max(norm_vec)
       filled[no_fill_mask] = np.nan
       filled_qa[no_fill_mask] = 0
       return filled, filled_qa
