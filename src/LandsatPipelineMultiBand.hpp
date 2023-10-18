@@ -54,7 +54,7 @@ public:
 
 
     template <class ReadMatrix>
-    void readInputFilesMB(std::string fileUrl,
+    unsigned char readInputFilesMB(std::string fileUrl,
                         int* bandList,
                         size_t N_bands,
                         ReadMatrix& bandsData,
@@ -65,6 +65,7 @@ public:
             std::cerr << "scikit-map ERROR 1: issues in opening the file with URL " << fileUrl << std::endl;
             std::cout << "Issues in opening the file with URL " << fileUrl << ", considering as gap." << std::endl;
             GDALClose(readDataset);
+            return 1;
         } else
         {
             // Read the data for one band
@@ -79,6 +80,7 @@ public:
             }
             GDALClose(readDataset);
         }
+        return 0;
     }
 
     
