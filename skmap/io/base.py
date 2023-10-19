@@ -1285,60 +1285,6 @@ class RasterData(SKMapBase):
     else:
       titles = [''] * f_arr.info.shape[0]
     return titles
-
-  def point_query(self, 
-                  x:list, 
-                  y:list, 
-                  cols:int=3,
-                  titles:list = None, 
-                  label_xaxis:str='index', 
-                  return_data:bool=False,
-                  ):
-    """
-    Makes point queries on dataset and provide plots and data
-
-    :param x: longitude value(s) of the given point(s)
-    :param y: latitude value(s) of the given point(s)
-    :param cols: column count of the desired layout. Default is 3.
-    :param titles: list of the titles that will be placed on top of the each graph
-    :param label_xaxis: labels of the x axes. it could be `index`, `name`,`date` or None.
-    :param return_data: If the user wants to access the data sampled from rasters, this
-      needs to be set to True. Default is False 
-
-    Examples
-    ========
-    import geopandas as gpd
-    from skmap.data import toy
-    rasterdata = toy.ndvi_rdata(gappy=False)
-    points = gpd.read_file('./skmap/data/toy/samples/samples.gpkg')
-    rdata.point_query(x=points.geometry.x.to_list(), y=points.geometry.y.to_list() , label_xaxis='index', cols=3, titles=points.label)
-    """
-    df = pd.DataFrame()
-    df['x'], df['y'], df['title'] = x, y, titles
-    bbox = rasterio.open(self._base_raster()).bounds
-    # filtering points based on the bounds of the base raster
-    df = df[(bbox.left <= df['x']) & (df['x'] <= bbox.right) & (bbox.bottom <= df['y']) & (df['y'] <= bbox.top)]
-
-    with rasterio.open(self._base_raster()) as src:
-      row_id, col_id = rasterio.transform.rowcol(src.transform, df.x, df.y)
-    df['data']= np.array(self.array[row_id,col_id]).tolist()
-    # if data is required no need to create figures
-    if return_data:
-      return df.data.to_numpy()
-    
-    labels_x = self._get_titles(label_xaxis)
-    fig, axs = pyplot.subplots(ncols=cols, nrows=math.ceil(len(x)/cols), figsize=(6 * cols, 2 * math.ceil(len(x)/cols)), sharex=True, sharey=True)
-    mgc = df.shape[0] # maximum graph count
-    for i, ax in enumerate(axs.flatten()):
-        if i < mgc:
-          ax.plot(labels_x, df.data[i], '-o', markersize=4, color='blue', lw=1)
-          ax.set_title(titles[i], fontsize=10)
-          ax.tick_params(axis='x',rotation=90)
-        else:
-          ax.axis('off')
-    pyplot.tight_layout()
-    pyplot.close()
-    return fig
   
   def _vminmax(self, vmm, arr):
     """
@@ -1467,15 +1413,15 @@ class RasterData(SKMapBase):
   ):
     """
       Generates a grid plot to view and save with a colorscale with a desired layout.
-      :param cmap                 : This sets the colorscale with given matplotlib.colormap. Default is Spectral_r
-      :param cbar_title           : This sets the colorbar title if the cbar exists in the plot. Default is None.
-      :param img_title_text       : This sets the image titles that will be display on top of the each image. Default is `index`.
-      :param img_ltitle_fontsize  : This sets the fontsize of the image label which will be on top of the image. Default is 10.
-      :param v_minmax             : This sets the loower and upper limits of the data that will be plot and the colorbar. Default is None and will be calculated on he fly.
-      :param groups                : This used for to generate composite plot. Pass one or tree group names (groups) which will be used to generate. Default is None.
-      :param to_img               : This sets the directory adn the format of the file where the generated image will be saved. Default is None.
-      :param dpi                  : dot per inch value to save the figure. If the `to_img` param provided
-      :param layout_col           : This controls the column count that will be used in the grid plot. Default is 3.
+      :param groups: This used for to generate composite plot. Pass one or tree group names (groups) which will be used to generate. Default is None.
+      :param cmap: This sets the colorscale with given matplotlib.colormap. Default is Spectral_r
+      :param cbar_title: This sets the colorbar title if the cbar exists in the plot. Default is None.
+      :param img_title_text: This sets the image titles that will be display on top of the each image. Default is `index`.
+      :param img_title_fontsize: This sets the fontsize of the image label which will be on top of the image. Default is 10.
+      :param vminmax: This sets the loower and upper limits of the data that will be plot and the colorbar. Default is None and will be calculated on he fly.
+      :param to_img: This sets the directory adn the format of the file where the generated image will be saved. Default is None.
+      :param dpi: dot per inch value to save the figure. If the `to_img` param provided
+      :param layout_col: This controls the column count that will be used in the grid plot. Default is 3.
     """
     if not groups:
       groups = [self.info.group.to_list()[0]]
@@ -1513,7 +1459,7 @@ class RasterData(SKMapBase):
       gridspec_kw=dict(wspace=0.1, hspace=0.1),
       figsize=(
         set_w * layout_col + (layout_col-1) * 0.1,
-        set_h * layout_row + (layout_row-1) * 0.1 #+ 1
+        set_h * layout_row + (layout_row-1) * 0.1
       ),
     )
     
@@ -1579,7 +1525,15 @@ class RasterData(SKMapBase):
     :param groups: this is used for to select the band(s) or to generate a composite images, 
       that will be used as animation frame. Default is None but it will select the first band on RasterData.
     :param scaling: scaling can be used to increase/decrease the frame size. Default is 2.
-    :param cbar_title: 
+    :param cbar_title: This sets the colorbar title. Default is None.
+    :param img_title_text: This sets titles of the each snapshot. Default is `index`. User can pass a list of
+      strings.  
+    :param img_title_fontsize: This sets the font size of tthe image title. Default is 10.
+    :param vminmax: The minimum and maximum bounds of the colorscale. This option can be used for the color 
+      saturation. Default is None and it will be calculated on the fly.
+    :param interval: This is the interval value for the animation. Default is 250 ms.
+    :param to_gif: This is an option to save the animation. Default is None.
+    :param n_jobs: Number of parallel jobs used to read the raster files.
     """
     
     if not groups:
@@ -1641,3 +1595,117 @@ class RasterData(SKMapBase):
         ))
       html_rep = path.read_text()
     return HTML(html_rep)
+
+  def point_query(
+    self,
+    x:list,
+    y:list,
+    groups:list = None,
+    pane_size:tuple = (6*1.5,1.5),
+    layout_col:int = 2,
+    label_xaxis:str = 'index',
+    label_xaxis_rotation:float = 0,
+    img_title_text: list = None,
+    img_title_fontsize: int = 10,
+    return_data: bool = False,
+    shared_x:bool = False,
+    shared_y:bool = False,
+  ):
+    """
+    makes point queries on the supplied groups (bands) and returns either time series
+    plot or the data of query results.
+    :param x: longitude of the given point(s)
+    :param y: latitude of the given point(s)
+    :param groups: This is used for to select the band(s) that will be used to make query. 
+      Default is None but it will select the first band on RasterData.
+    :param pane_size: This sets the size of the each pane. The figure size will be determined
+      based on the combination of this value, layout column and row counts. Default is (9, 1.5)
+    :param layout_col: column count of the desired layout. Default is 2.
+    :param label_xaxis: This sets the labels on the x-axis. Default in 'index'
+    :param label_xaxis_rotation: This changes the label orienetation on the x-axis. Default 0.
+    :param img_title_text: This sets the image titles that will be display on top of the each image. Default is `index`.                                   
+    :param img_title_fontsize: This sets the fontsize of the image label which will be on top of the image. Default is 10.
+    :param return_data: This is an option to get the query data. If this set to True, mehtod will returns the underlying
+      data of timeseries and not going to generate plots. Default is False.
+    :param shared_x: This sets the shared x axis or not for multiple subplots. Default is False.
+    :param shared_x: This sets the shared y axis or not for multiple subplots. Default is False.
+    """
+    
+    if not groups:
+      groups = [self.info.group.to_list()[0]]
+    
+    if img_title_text is None:
+      img_title_text = self._get_titles(img_title_text, groups)
+    temp_df = pd.DataFrame(data=list(zip(x,y,img_title_text)), columns=['x','y','title'])
+
+    # filtering the points
+    with rasterio.open(self._base_raster()) as src:
+      if self.bounds:
+        bounds = self.bounds
+        _, _transform = rasterio.mask.mask(src, [box(*self.bounds)], crop=True)
+      else:
+        bounds = src.bounds
+        _transform = src.transform
+      
+      temp_df = temp_df[(bounds[0] <= temp_df['x']) & (temp_df['x'] <= bounds[2]) & (bounds[1] <= temp_df['y']) & (temp_df['y'] <= bounds[3])]
+      r_pos, c_pos = rasterio.transform.rowcol(_transform, temp_df.x, temp_df.y)
+      for band in groups:
+        temp_arr = self._band_manage([band])
+        temp_df[band] = np.array(temp_arr[r_pos, c_pos]).tolist()
+    
+    if return_data:
+      rdata = dict()
+      for band in groups:
+        rdata[band] = temp_df[band].tolist()
+      return rdata
+    
+    labels_x = self._get_titles(label_xaxis, [groups[0]])
+    graph_count = temp_df.shape[0] 
+
+    if graph_count < layout_col:
+      layout_col = graph_count
+    layout_row = math.ceil(graph_count/layout_col)
+    
+    graph_fig, graph_axs = pyplot.subplots(
+      nrows=layout_row,
+      ncols=layout_col,
+      gridspec_kw=dict(wspace=0.05, hspace=0.5),
+      figsize=(
+        pane_size[0] * layout_col + (layout_col - 1) * 0.05,
+        pane_size[1] * layout_row + (layout_row - 1) * 0.5
+      ),
+      sharex=shared_x, sharey=shared_y
+    )
+    
+    try:
+      for i, ax in enumerate(graph_axs.flatten()):
+        try:
+          for band in groups:
+            ax.plot(labels_x, temp_df[band].tolist()[i],'-o', markersize=4, lw=1, label=band)
+            ax.set_title(img_title_text[i], fontsize=img_title_fontsize)
+            ax.tick_params(axis='x', labelrotation = label_xaxis_rotation)
+            ax.margins(y=0.1)
+          lines_labels = [ax.get_legend_handles_labels()]
+          lines, labels = [sum(ll, []) for ll in zip(*lines_labels)]
+        except IndexError:
+          ax.axis('off')
+    # single graph plot
+    except AttributeError:
+      graph_axs.plot(labels_x, temp_df[groups], '-o', markersize=4, lw=1, label=groups[0])
+      graph_axs.tick_params(axis='x', labelrotation = label_xaxis_rotation)
+      graph_axs.margins(y=0.1)
+      lines_labels = [graph_axs.get_legend_handles_labels()]
+      lines, labels = [sum(ll, []) for ll in zip(*lines_labels)]
+    
+    # setting up the legend
+    graph_fig.subplots_adjust(
+      left=0, right=1, bottom=0, top=0.99
+    )
+    graph_fig.legend(
+      lines, labels, loc='upper center', 
+      ncol=len(groups), fontsize=img_title_fontsize,
+      
+      bbox_to_anchor=(0.5, 1 + 0.005*layout_col)
+      )
+    pyplot.close()  
+    return graph_fig
