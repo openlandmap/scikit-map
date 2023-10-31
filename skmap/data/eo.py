@@ -433,6 +433,20 @@ try:
       coll_columns = gsheet.collections.columns
       self.additional_url_cols = list(coll_columns[pd.Series(coll_columns).str.startswith('url')])
       
+      self.stac_extensions = {
+        'cole': [
+          'https://stac-extensions.github.io/item-assets/v1.0.0/schema.json',
+          "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+          "https://stac-extensions.github.io/scientific/v1.0.0/schema.json",
+          "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+        ],
+        'item': [
+          "https://stac-extensions.github.io/eo/v1.0.0/schema.json",
+          "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+          "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+        ]
+      }
+
       self.gdal_env = {
         "GDAL_CACHEMAX": 1024_000_000,  # 1 Gb in bytes
         "GDAL_DISABLE_READDIR_ON_OPEN": False,
@@ -465,7 +479,7 @@ try:
         'provider': ['name', 'description', 'roles', 'url'],
         'catalog': ['id', 'title', 'description'],
         'common_metadata': ['constellation', 'platform', 'instruments', 'gsd'],
-        'internal': ['start_date', 'end_date', 'date_step', 'date_unit', 'date_style','catalog', 'providers', 'main_url', 'ignore_29feb', 'depth']
+        'internal': ['start_date', 'end_date', 'date_step', 'date_unit', 'date_style','catalog', 'providers', 'main_url', 'ignore_29feb', 'depth','ignore']
       }
 
       self.fields['internal'] += self.additional_url_cols
@@ -514,14 +528,15 @@ try:
       
       date_unit = row['date_unit']
       date_step = row['date_step']
-      ignore_29feb = row['ignore_29feb']
+      date_offset = row['date_offset']
+      ignore_29feb = bool(int(row['ignore_29feb']))
       
       if date_unit == 'static':
         date_step = int((row['end_date'] - row['start_date']).days) + 1
         date_unit, ignore_29feb = 'days', False
 
       for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
-          date_step=date_step, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
+          date_step=date_step, date_offset=date_offset, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
         
         item_urls = []        
         for dp in depth:
@@ -557,13 +572,16 @@ try:
             
           date_unit = row['date_unit']
           date_step = row['date_step']
-          ignore_29feb = row['ignore_29feb']
+          date_offset = row['date_offset']
+          ignore_29feb = bool(int(row['ignore_29feb']))
+
           if date_unit == 'static':
             date_step = int((row['end_date'] - row['start_date']).days) + 1
             date_unit, ignore_29feb = 'days', False
           
+          ttprint(f"Generating dates for {row['id']} ({row['start_date']} => {row['end_date']})")
           for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
-              date_step=date_step, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
+              date_step=date_step, date_offset=date_offset, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
             main_url = _eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp})
             args.append((main_url,))
 
@@ -750,7 +768,7 @@ try:
             temporal=pystac.TemporalExtent(intervals=[collection_interval])
           ),
           providers=[ self.providers[p] for p in row['providers'] ],
-          stac_extensions=['https://stac-extensions.github.io/item-assets/v1.0.0/schema.json'],
+          stac_extensions=self.stac_extensions['cole'],
           **self._kargs(row, 'collection', True)
         )
 
@@ -791,7 +809,7 @@ try:
                       bbox=bbox,
                       datetime=datetime.strptime(start_date, self.url_date_format),
                       properties={'start_datetime': start_date_item, 'end_datetime': end_date_item},
-                      stac_extensions=["https://stac-extensions.github.io/eo/v1.0.0/schema.json"])
+                      stac_extensions=stac_extensions=self.stac_extensions['item'])
 
       item.common_metadata.gsd = row['gsd']
       item.common_metadata.instruments = row['instruments']
@@ -830,7 +848,7 @@ try:
 
     def _bbox_and_footprint(self, raster_fn):
 
-      self._verbose(f'Accesing COG bounds ({raster_fn})')
+      self._verbose(f'Accessing COG bounds ({raster_fn})')
 
       r = requests.head(raster_fn)
       if not (r.status_code == 200):

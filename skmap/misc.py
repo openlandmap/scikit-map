@@ -422,10 +422,13 @@ def sample_groups(
 def _eval(str_val, args):
   return eval("f'"+str_val+"'", args)
 
-def _date_step( 
+def _date_step_off( 
   date_step, 
   i = 0
 ):
+  if isinstance(date_step, str) and ',' in date_step:
+    date_step = date_step.split(',')
+
   if isinstance(date_step, list):
     if i >= len(date_step):
       i = 0
@@ -452,14 +455,14 @@ def date_range(
   result = []
 
   dt1 = start_date
-  date_step_i = 0
+  date_step_i, date_off_i = 0, 0
 
   watchdog = 0
   add_leapday = True
 
   while(dt1 <= end_date):
     delta_args = {}
-    date_step_i, date_step_cur = _date_step(date_step, date_step_i)
+    date_step_i, date_step_cur = _date_step_off(date_step, date_step_i)
     delta_args[date_unit] = date_step_cur
 
     if ignore_29feb and 'months' == date_unit and dt1.month == 2 and dt1.day == 29:
@@ -493,9 +496,10 @@ def date_range(
     else:
       result.append((dt1, dt2))
     
-    if date_offset > 0:
+    if   date_offset is not None and date_offset != '':
       delta_args = {}
-      delta_args[date_unit] = date_offset
+      date_off_i, date_offset_cur = _date_step_off(date_offset, date_off_i)
+      delta_args[date_unit] = date_offset_cur
       dt1n = dt1n + relativedelta(**delta_args)
 
     dt1 = dt1n
@@ -620,6 +624,8 @@ try:
         if column.endswith(self.col_date_suffix):
           df[column] = pd.to_datetime(df[column], 
             format=self.col_date_format, errors='coerce')
+          #print(f'{column}')
+          #df[column] = np.datetime64(list(df[column])) # FIXME: support col_date_format
 
       return df.drop(columns=to_drop)
 
