@@ -12,7 +12,7 @@
 [Release Notes](NEWS.md)
 -->
 
-`scikit-map` is a Python module to produce maps using machine learning, reference samples and raster data. It is fully compatible with [scikit-learn](https://github.com/scikit-learn/scikit-learn) and distributed under the MIT license. 
+`scikit-map` is a Python module to produce maps using machine learning, reference samples and raster data. It is fully compatible with [scikit-learn](https://github.com/openlandmap/scikit-learn) and distributed under the MIT license. 
 
 The project was started in 2020 by [GeoHarmonizer](https://opendatascience.eu/geoharmonizer-project/) and originally called [`eumap`](https://gitlab.com/geoharmonizer_inea/eumap). In 2023, `eumap` was archived and the codebase moved to this repository.
 
@@ -89,7 +89,7 @@ Installation
 If you already have a working installation of `gdal`, `scikit-learn` and `numpy`, you can install `scikit-map` is using pip:
 
 ```bash
-pip install -e 'git+https://github.com/scikit-map/scikit-map#egg=scikit-map[full]'
+pip install -e 'git+https://github.com/openlandmap/scikit-map#egg=scikit-map[full]'
 ```
 
 License
