@@ -38,7 +38,7 @@ You can also run the Docker container directly using Docker commands. Follow the
 
 1. **Clone the repository**
     ```
-    git clone https://github.com/scikit-map/scikit-map.git
+    git clone https://github.com/openlandmap/scikit-map.git
     cd scikit-map/docker
     ```
 

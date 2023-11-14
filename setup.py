@@ -7,7 +7,7 @@ setuptools.setup(
     description='scikit-learn applied to mapping and spatial prediction',
     long_description="Python module to produce maps using machine learning, reference samples and raster data.",
     long_description_content_type='text/markdown',
-    url='https://github.com/scikit-map/scikit-map',
+    url='https://github.com/openlandmap/scikit-map',
     packages=setuptools.find_packages(),
     package_data={},
     scripts=[],
