@@ -28,7 +28,7 @@ import traceback
 from shapely.geometry import box,shape
 
 from typing import List, Union, Callable
-from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap
+from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap, concat_memmap
 from skmap.misc import vrt_warp
 from skmap import SKMapGroupRunner, SKMapRunner, SKMapBase, parallel
 
@@ -86,13 +86,14 @@ def _fit_in_dtype(data, dtype, nodata):
 
   return data
 
-def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_mask, expected_shape, 
+def _read_raster(raster_idx, raster_files, array_mm, band_list, window, dtype, data_mask, expected_shape, 
   try_without_window, gdal_opts, overview, verbose):
 
   for key in gdal_opts.keys():
     gdal.SetConfigOption(key,gdal_opts[key])
 
   raster_file = raster_files[raster_idx]
+  band = band_list[raster_idx]
   ds, band_data = None, None
   nodata = None
 
@@ -266,7 +267,7 @@ def _save_raster(
 
 def read_rasters(
   raster_files:Union[List,str] = [],
-  band = 1,
+  band:Union[int,List] = 1,
   window:Window = None,
   bounds:[] = None,
   dtype:str = 'float32',
@@ -347,6 +348,16 @@ def read_rasters(
   if len(raster_files) < n_jobs:
     n_jobs = len(raster_files)
 
+  if len(band) == 1:
+    band = band[0]
+  elif isinstance(band, list) and len(raster_files) != len(band):
+    ttprint(f'Band list and raster_files with different lengths ({len(band)} != {len(raster_files)})')
+    ttprint(f'Seting band={band[0]}.')
+
+  if isinstance(band, int):
+    band_list = [ band for i in range(0, len(raster_files)) ]
+    band = band_list
+
   if verbose:
     ttprint(f'Reading {len(raster_files)} raster file(s) using {n_jobs} workers')
 
@@ -362,12 +373,12 @@ def read_rasters(
       ttprint(f'Transform {bounds} into {window}')
 
   if overview is not None:
-    overviews = ds.overviews(band)
+    overviews = ds.overviews(0)
     if overview in overviews:
         n_bands, height, width  = ds.count, math.ceil(ds.height // overview), math.ceil(ds.width // overview)
     else:
       raise Exception(f"Overview {overviews} is invalid for {raster_files[-1]}.\n"
-        f"Use one of overviews: {ds.overviews(band)}")
+        f"Use one of overviews: {ds.overviews(0)}")
   elif window is not None:
     n_bands, height, width,  = ds.count, window.height, window.width
   else:
@@ -932,29 +943,28 @@ class RasterData(SKMapBase):
     self.base_raster = self._base_raster()
     
     self.array = []
+    
+    raster_files = []
+    band_list = []
 
     for band, rows in self.info.groupby(RasterData.BAND_COL):
-
-      rows[RasterData.PATH_COL]
-      raster_files = [ Path(r) for r in rows[RasterData.PATH_COL] ]
+      raster_files += [ Path(r) for r in rows[RasterData.PATH_COL] ]
+      band_list.append(band)
       
-      self._verbose(
-          f"RasterData with {len(raster_files)} rasters (band: {band})" 
-        + f" and {len(self.info[RasterData.GROUP_COL].unique())} group(s)" 
-      )
+    self._verbose(
+        f"RasterData with {len(raster_files)} rasters" 
+      + f" and {len(self.info[RasterData.GROUP_COL].unique())} group(s)" 
+    )
 
-      array = read_rasters(
-        raster_files, band=band,window=self.window, 
-        bounds=bounds, data_mask=data_mask,
-        dtype=dtype, expected_shape=expected_shape,
-        n_jobs=n_jobs, overview=overview, gdal_opts=gdal_opts,
-        verbose=self.verbose
-      )
-      
-      self.array.append(array)
-      self._verbose(f"Read array shape: {array.shape}")
-
-    self.array = np.concatenate(self.array, axis=-1)
+    self.array = read_rasters(
+      raster_files, band=band_list, window=self.window, 
+      bounds=bounds, data_mask=data_mask,
+      dtype=dtype, expected_shape=expected_shape,
+      n_jobs=n_jobs, overview=overview, gdal_opts=gdal_opts,
+      keep_memmap=True, verbose=self.verbose
+    )
+    
+    self._verbose(f"Read array shape: {self.array.shape}")
 
     return self
 
@@ -981,8 +991,14 @@ class RasterData(SKMapBase):
       
       new_array, new_info = process.run(**kwargs)
 
+      if isinstance(new_array, list):
+        new_array.insert(0, self.array)
+      else:
+        new_array = [self.array, new_array]
+
       if new_info.shape[0] > 0:
-        self.array = np.concatenate([self.array, new_array], axis=-1)
+        #self.array = np.concatenate([self.array, new_array], axis=-1)
+        self.array = concat_memmap(new_array, axis=2)
         self.info = pd.concat([self.info, new_info])
         self.info.reset_index(drop=True, inplace=True)
       
@@ -1268,6 +1284,12 @@ class RasterData(SKMapBase):
     self._verbose(f"Last raster in s3: {last_url}")
 
     return self
+
+  def close(self):
+    del_memmap(self.array)
+
+  def __del__(self):
+    self.close()
 
   def _get_titles(self, img_title, bands):
     f_arr = self.filter(f"group=={bands}")

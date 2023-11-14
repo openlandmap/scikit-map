@@ -38,21 +38,28 @@ def load_memmap(filename, dtype, shape):
   return np.memmap(filename, dtype=dtype, mode='r+', shape=shape)
   #return np.lib.format.open_memmap(filename, dtype=dtype, mode='w+', shape=shape)
 
+def is_memmap(array_mm):
+  return hasattr(array_mm, 'filename')
+
 def del_memmap(array_mm, return_array=False):
   
   result = None
-  if return_array:
-    result = np.array(array_mm) # test np.ascontiguousarray
-  
-  os.remove(array_mm.filename)
-  #temp_folder = Path(array_mm.filename).parent
-  #try:
-  #  shutil.rmtree(temp_folder)
-  #except:
-  #  pass
-  
-  if return_array:
-    return result
+
+  if is_memmap(array_mm):
+    if return_array:
+      result = np.array(array_mm) # test np.ascontiguousarray
+    
+    os.remove(array_mm.filename)
+    #temp_folder = Path(array_mm.filename).parent
+    #try:
+    #  shutil.rmtree(temp_folder)
+    #except:
+    #  pass
+    
+    if return_array:
+      return result
+  else:
+    del array_mm
 
 def ref_memmap(array):
   array.flush()
@@ -61,6 +68,27 @@ def ref_memmap(array):
     'dtype': array.dtype,
     'shape': array.shape
   }
+
+def concat_memmap(arrs, axis = 0): 
+  
+  shapes = np.stack([ a.shape for a in arrs ], axis=0)
+  noaxis = [ i for i in range(0, len(shapes[0])) if i != axis ]
+  all_noaxis = np.all(np.all(shapes == shapes[0], axis=0)[noaxis])
+  
+  if not all_noaxis:
+    raise Exception(f"All arrays must have same shape in all dimensions excepet in {axis}")
+  
+  newshape = list(shapes[0])
+  newshape[axis] = np.sum(shapes[:,axis])
+  newshape = tuple(newshape)
+  out_memmap = new_memmap(arrs[0].dtype, newshape)
+    
+  inds = [0] + list(np.cumsum(shapes[:,axis]))
+  for arr, i1, i2 in zip(arrs, inds[:-1], np.roll(inds, -1)[:-1]):
+    out_memmap[:,:,i1:i2] = arr
+    del_memmap(arr)
+
+  return out_memmap
 
 def make_tempdir(basedir='skmap', make_subdir = True):
   tempdir = Path(TMP_DIR).joinpath(basedir)

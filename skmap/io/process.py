@@ -685,68 +685,67 @@ try:
       self.n_jobs = n_jobs
       self.fn = fn
 
-    def _map(self, gmap):
+    def _map(self, ref_array, gmap):
       
-      array_dict, group_idx = {}, {}
-      
-      for key in gmap.keys():
-        array_dict[key] = load_memmap(**gmap[key][0])
-        group_idx[key] = gmap[key][1]
+      array_dict, idx_dict = {}, {}
+      array = load_memmap(**ref_array)
+
+      for group in gmap.keys():
+        idx = gmap[group]
+        array_dict[group] = array[:,:,idx]
+        idx_dict[group] = idx
 
       result_fn = self.fn(array_dict)
-      new_array_dict, exi_array_dict = {}, {}
+      new_groups = []
 
-      for key in result_fn.keys():
-        if key in group_idx:
-          exi_array_dict[key] = (ref_memmap(result_fn[key]), group_idx[key])
+      for group in result_fn.keys():
+        if group in idx_dict:
+          idx = idx_dict[group]
+          array[:,:,idx] = result_fn[group]
         else:
-          data = result_fn[key]
-          data_mem = new_memmap(data.dtype, data.shape)
-          data_mem[:] = data
-          new_array_dict[key] = ref_memmap(data_mem)
+          new_groups.append(group)
 
-      return(exi_array_dict, new_array_dict)
+      new_shape = list(array.shape)
+      new_shape[2] = len(new_groups)
+      new_shape = tuple(new_shape)
+      new_array = new_memmap(array.dtype, new_shape)
+
+      for i in range(0, len(new_groups)):
+        new_array[:,:,i] = result_fn[new_groups[i]]
+      
+      ref_new_array = ref_memmap(new_array)
+      fidx = list(idx_dict.values())[0]
+
+      return(fidx, new_groups, ref_new_array)
 
     def run(self, 
       rdata:RasterData,
       outname:str = 'skmap_{gr}_{dt}'
     ):
 
-      gmap_list = []
+      args = []
 
       group_cols = [RasterData.START_DT_COL, RasterData.END_DT_COL]
-      memmap_list = []
+      ref_array = ref_memmap(rdata.array)
 
       for _, rows in rdata.info.groupby(group_cols):
         gidx = rows.index
-        garray = rdata.array[:,:,gidx]
         ggroup = list(rdata.info.iloc[gidx]['group'])
 
         gmap = {}
         
-        for i in range(0, len(gidx)):
-          garray_i = new_memmap(rdata.array.dtype, (rdata.array.shape[0], rdata.array.shape[1]))
-          garray_i[:] = garray[:,:,i]
-
-          garray_i_ref = ref_memmap(garray_i)
-
-          gmap[ggroup[i]] = (garray_i_ref, gidx[i])
+        for idx, group in zip(gidx, ggroup):
+          gmap[group] = idx
         
-        gmap_list.append(gmap)
-
-      args = [ (gmap,) for gmap in gmap_list ]
+        args.append((ref_array, gmap))
       
       new_array = []
       new_info = []
 
-      for exi_array_dict, new_array_dict in parallel.job(self._map, args, n_jobs=self.n_jobs):
-
-        row = None
-        for array, idx in exi_array_dict.values():
-          array = load_memmap(**array)
-          rdata.array[:,:,idx] = array
-          memmap_list.append(array)
-          row = rdata.info.iloc[idx]
+      for fidx, new_groups, ref_new_array in parallel.job(self._map, args, n_jobs=self.n_jobs, joblib_args={'backend': 'multiprocessing'}):
+        
+        new_array.append(load_memmap(**ref_new_array))
+        row = rdata.info.iloc[fidx]
 
         start_dt, end_dt = row[RasterData.START_DT_COL], row[RasterData.END_DT_COL]
         group = row[RasterData.GROUP_COL]
@@ -754,26 +753,15 @@ try:
         date_format = rdata.date_args[group]['date_format']
         date_style = rdata.date_args[group]['date_style']
 
-        for new_group in new_array_dict.keys():
-          array = load_memmap(**new_array_dict[new_group])
-          new_array.append(array)
-          memmap_list.append(array)
-          
+        for new_group in new_groups:
           name = rdata._set_date(outname, start_dt, end_dt, 
             date_format=date_format, date_style=date_style,  gr=new_group)
-          
           new_info.append(
             rdata._new_info_row(rdata.base_raster, 
               date_format=date_format, date_style=date_style,
               group=new_group, name=name, dates=[start_dt, end_dt]
             )
           )
-
-      if len(new_array) > 0:
-        new_array = np.stack(new_array, axis=-1)
-
-      for rm in memmap_list:
-        del_memmap(rm)
 
       return new_array, DataFrame(new_info)
 
