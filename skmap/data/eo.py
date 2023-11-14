@@ -538,19 +538,20 @@ try:
       for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
           date_step=date_step, date_offset=date_offset, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
         
-        item_urls = []        
+        asset_urls = []        
         for dp in depth:
-          item_urls.append(_eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
+          asset_urls.append(_eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
           for ac_url in self.additional_url_cols:
             if row[ac_url]:
-              item_urls.append(_eval(row[ac_url],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
+              asset_urls.append(_eval(row[ac_url],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
           
-        main_url = item_urls[0]
+        main_url = asset_urls[0]
+        style_urls = [ row['sld_url'], row['qml_url'] ]
 
         if main_url in bbox_footprint_results:
             bbox, footprint = bbox_footprint_results[main_url]
 
-            items.append(self._new_item(row, dt1, dt2, bbox, footprint, item_urls))
+            items.append(self._new_item(row, dt1, dt2, bbox, footprint, asset_urls, style_urls))
         else:
           self._verbose(f"The url {main_url} is invalid.")
 
@@ -794,10 +795,10 @@ try:
 
       return delim.join(result)
 
-    def _new_item(self, row, start_date, end_date, bbox, footprint, item_urls = []):
+    def _new_item(self, row, start_date, end_date, bbox, footprint, asset_urls = [], style_urls = []):
       
-      main_url = item_urls[0]
-      additional_urls = item_urls[1:]
+      main_url = asset_urls[0]
+      additional_urls = asset_urls[1:]
 
       start_date_item = datetime.strptime(start_date, self.url_date_format).strftime('%Y-%m-%d')
       end_date_item = datetime.strptime(end_date, self.url_date_format).strftime('%Y-%m-%d')
@@ -809,7 +810,7 @@ try:
                       bbox=bbox,
                       datetime=datetime.strptime(start_date, self.url_date_format),
                       properties={'start_datetime': start_date_item, 'end_datetime': end_date_item},
-                      stac_extensions=stac_extensions=self.stac_extensions['item'])
+                      stac_extensions=self.stac_extensions['item'])
 
       item.common_metadata.gsd = row['gsd']
       item.common_metadata.instruments = row['instruments']
@@ -825,10 +826,24 @@ try:
       #])
 
       item.add_asset(self._asset_id(main_url, self.asset_id_delim, self.asset_id_fields), \
-        pystac.Asset(href=main_url, media_type=pystac.MediaType.GEOTIFF, roles=['data'], extra_fields={'main': True}))
+        pystac.Asset(href=main_url, media_type=pystac.MediaType.COG, roles=['data'], extra_fields={'main': True}))
       for aurl in additional_urls:
         item.add_asset(self._asset_id(aurl, self.asset_id_delim, self.asset_id_fields), \
-          pystac.Asset(href=aurl, media_type=pystac.MediaType.GEOTIFF, roles=['data']))
+          pystac.Asset(href=aurl, media_type=pystac.MediaType.COG, roles=['data']))
+
+      for surl in style_urls:
+        suffixes = Path(surl).suffixes
+        if len(suffixes) > 0:
+          sid = suffixes[-1]
+          title = None
+          
+          if sid == 'style_sld':
+            title = 'Style Layer Descriptor (SLD)'
+          elif if sid == 'style_qml':
+            title = 'QGIS Layer Style (QML)'
+
+          item.add_asset(sid, \
+            pystac.Asset(title=title, href=aurl, media_type=pystac.MediaType.XML, roles=['style']))
 
       return item
 
