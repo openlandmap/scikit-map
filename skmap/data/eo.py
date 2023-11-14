@@ -6,10 +6,12 @@ import numpy as np
 import bottleneck as bc
 import joblib
 from pathlib import Path
+from pystac.extensions.file import FileExtension
 import gc
 import os
 
 import warnings
+import hashlib, json
 from skmap import parallel
 from skmap.misc import date_range
 from skmap.io import read_auth_rasters, save_rasters
@@ -443,7 +445,7 @@ try:
         'item': [
           "https://stac-extensions.github.io/eo/v1.0.0/schema.json",
           "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
-          "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+          "https://stac-extensions.github.io/file/v2.0.0/schema.json"
         ]
       }
 
@@ -795,6 +797,22 @@ try:
 
       return delim.join(result)
 
+    def _ext_file_asset(self, asset):
+      if asset.href:
+        r = requests.head(asset.href)
+        
+        keys = [ 'Content-Length', 'Content-Type', 'Last-Modified']
+        headers = { k: r.headers[k] for k in keys }
+        checksum = hashlib.md5(
+          json.dumps(headers, sort_keys=True, ensure_ascii=True).encode('utf-8')
+        ).hexdigest()
+        
+        asset = FileExtension.ext(asset).apply(
+          checksum=checksum, size=headers['Content-Length']
+        )
+
+      return asset
+
     def _new_item(self, row, start_date, end_date, bbox, footprint, asset_urls = [], style_urls = []):
       
       main_url = asset_urls[0]
@@ -834,16 +852,19 @@ try:
       for surl in style_urls:
         suffixes = Path(surl).suffixes
         if len(suffixes) > 0:
-          sid = suffixes[-1]
+          sid = suffixes[-1].split('.')[1]
           title = None
           
-          if sid == 'style_sld':
+          if sid == 'sld':
             title = 'Style Layer Descriptor (SLD)'
-          elif if sid == 'style_qml':
+          elif sid == 'qml':
             title = 'QGIS Layer Style (QML)'
 
           item.add_asset(sid, \
-            pystac.Asset(title=title, href=aurl, media_type=pystac.MediaType.XML, roles=['style']))
+            pystac.Asset(title=title, href=surl, media_type=pystac.MediaType.XML, roles=['style']))
+
+      for _, asset in item.assets.items():
+        asset = self._ext_file_asset(asset)
 
       return item
 
