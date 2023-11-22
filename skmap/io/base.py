@@ -28,7 +28,7 @@ import traceback
 from shapely.geometry import box,shape
 
 from typing import List, Union, Callable
-from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap
+from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap, ref_memmap, load_memmap, concat_memmap
 from skmap.misc import vrt_warp
 from skmap import SKMapGroupRunner, SKMapRunner, SKMapBase, parallel
 
@@ -87,7 +87,7 @@ def _fit_in_dtype(data, dtype, nodata):
   return data
 
 def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_mask, expected_shape, 
-  try_without_window, gdal_opts, overview, verbose):
+  try_without_window, scale, gdal_opts, overview, verbose):
 
   for key in gdal_opts.keys():
     gdal.SetConfigOption(key,gdal_opts[key])
@@ -102,17 +102,19 @@ def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_m
     if overview is not None:
       overviews = ds.overviews(band)
       if overview in overviews:
-          band_data = ds.read(band, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
+          ds.read(band, out=array_mm[:,:,raster_idx], out_dtype=dtype, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
       else:
-        band_data = ds.read(band, window=window)
+        ds.read(band, out=array_mm[:,:,raster_idx],  out_dtype=dtype, window=window)
     else:
-      band_data = ds.read(band, window=window)
+      ds.read(band, out=array_mm[:,:,raster_idx],  out_dtype=dtype, window=window)
 
-    if band_data.size == 0 and try_without_window:
-      band_data = ds.read(band)
+    #if band_data.size == 0 and try_without_window:
+    #  band_data = ds.read(band, out=array_mm[:,:,raster_idx])
 
-    band_data = band_data.astype(dtype)
+    #band_data = band_data.astype(dtype)
     nodata = ds.nodatavals[0]
+    data_exists = True
+    #print(f"Data was read: {raster_file}")
   except Exception as ex:
     ttprint(f"Exception: {ex}")
     #traceback.i(print)_exc()
@@ -120,16 +122,14 @@ def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_m
     if window is not None:
       if verbose:
         ttprint(f'ERROR: Failed to read {raster_file} window {window}')
-      band_data = np.empty((int(window.height), int(window.width)))
-      band_data[:,:] = _nodata_replacement(dtype)
+      array_mm[:,:,raster_idx] = np.empty((int(window.height), int(window.width)))
+      array_mm[:,:,raster_idx] = _nodata_replacement(dtype)
 
     if expected_shape is not None:
       if verbose:
         ttprint(f'Full nan image for {raster_file}')
-      band_data = np.empty(expected_shape)
-      band_data[expected_shape] = _nodata_replacement(dtype)
-
-  data_exists = (band_data is not None)
+      array_mm[:,:,raster_idx] = np.empty(expected_shape)
+      array_mm[:,:,raster_idx] = _nodata_replacement(dtype)
 
   if data_exists:
     if data_mask is not None:
@@ -138,14 +138,15 @@ def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_m
         data_mask = data_mask[:,:,0]
 
       if (data_mask.shape == band_data.shape):
-        band_data[np.logical_not(data_mask)] = np.nan
+        array_mm[:,:,raster_idx][np.logical_not(data_mask)] = np.nan
       else:
         ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
     
     if nodata is not None:
-      band_data[band_data == nodata] = _nodata_replacement(dtype)
-    
-    array_mm[:,:,raster_idx] = band_data
+      array_mm[:,:,raster_idx][array_mm[:,:,raster_idx] == nodata] = _nodata_replacement(dtype)
+
+  if scale != 1.0:
+    array_mm[:,:,raster_idx] = array_mm[:,:,raster_idx] * scale
 
   return raster_idx, data_exists
 
@@ -233,8 +234,8 @@ def _new_raster(base_raster, raster_file, data, window = None,
 
 def _save_raster(
   fn_base_raster:str,
-  raster_files:list,
-  data:numpy.array,
+  raster_file:str,
+  ref_array,
   i:int,
   spatial_win:Window = None,
   dtype:str = None,
@@ -243,26 +244,27 @@ def _save_raster(
   on_each_outfile:Callable = None
 ):
 
-  if len(data.shape) < 3:
-    data = np.stack([data], axis=2)
+  #if len(data.shape) < 3:
+  #  data = np.stack([data], axis=2)
 
   #_, _, nbands = data.shape
-  
-  with _new_raster(fn_base_raster, raster_files[i], data[:,:,i], spatial_win, dtype, nodata) as new_raster:
 
-    band_data = np.array(data[:,:,i])
+  array = load_memmap(**ref_array)
+
+  with _new_raster(fn_base_raster, raster_file, array[:,:,i], spatial_win, dtype, nodata) as new_raster:
+
     band_dtype = new_raster.dtypes[0]
 
     if fit_in_dtype:
-      band_data = _fit_in_dtype(band_data, band_dtype, new_raster.nodata)
+      array[:,:,i] = _fit_in_dtype(array[:,:,i], band_dtype, new_raster.nodata)
 
-    band_data[np.isnan(band_data)] = new_raster.nodata
-    new_raster.write(band_data.astype(band_dtype), indexes=1)
+    array[:,:,i][np.isnan(array[:,:,i])] = new_raster.nodata
+    new_raster.write(array[:,:,i].astype(band_dtype), indexes=1)
 
   if on_each_outfile is not None:
-    on_each_outfile(raster_files[i])
+    on_each_outfile(raster_file)
 
-  return raster_files[i]
+  return raster_file
 
 def read_rasters(
   raster_files:Union[List,str] = [],
@@ -270,13 +272,13 @@ def read_rasters(
   window:Window = None,
   bounds:[] = None,
   dtype:str = 'float32',
-  n_jobs:int = 4,
+  n_jobs:int = 8,
   data_mask:numpy.array = None,
+  scale:float = 1.0,
   expected_shape = None,
   try_without_window = False,
   gdal_opts:dict = {},
   overview = None,
-  keep_memmap = False,
   verbose = False
 ):
   """
@@ -373,27 +375,32 @@ def read_rasters(
   else:
     n_bands, height, width,  = ds.count, ds.height, ds.width
 
-  #temp_folder = tempfile.mkdtemp()
-  #filename = os.path.join(temp_folder, 'joblib_readraster.mmap')
-  #array_mm = np.memmap(filename, dtype=dtype, shape=(height, width, len(raster_files)), mode='w+')
   array_mm = new_memmap(dtype, shape=(height, width, len(raster_files)))
 
   args = [ 
     (raster_idx, raster_files, array_mm, band, window, dtype, data_mask, 
-      expected_shape, try_without_window, gdal_opts, overview, verbose) 
+      expected_shape, try_without_window, scale, gdal_opts, overview, verbose) 
     for raster_idx in range(0,len(raster_files)) 
   ]
   
-  for raster_idx, data_exists in parallel.job(_read_raster, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
+  for raster_idx, data_exists in parallel.job(_read_raster, args, n_jobs=n_jobs, 
+    joblib_args={
+      'backend': 'threading', 
+      'pre_dispatch': math.ceil(n_jobs / 3), 
+      'batch_size': math.floor(len(args) / n_jobs),
+      'return_as': 'generator'
+    }):
     
-    if (not data_exists):
-      raster_file = raster_files[raster_idx]
-      raise Exception(f'The raster {raster_file} not exists')
+      if (not data_exists):
+        raster_file = raster_files[raster_idx]
+        raise Exception(f'The raster {raster_file} not exists')
   
-  if not keep_memmap:
-    return del_memmap(array_mm, True)
-  else:
-    return array_mm
+  return array_mm
+
+  #if not keep_memmap:
+  #  return del_memmap(array_mm, True)
+  #else:
+  #  return array_mm
 
 def read_auth_rasters(
   raster_files:List,
@@ -506,19 +513,20 @@ def read_auth_rasters(
 def save_rasters(
   base_raster:str,
   raster_files:List,
-  data:numpy.array,
+  array,
   window:Window = None,
   bounds:[] = None,
   dtype:str = None,
   nodata = None,
+  array_idx:List = [],
   fit_in_dtype:bool = False,
-  n_jobs:int = 4,
+  n_jobs:int = 8,
   on_each_outfile:Callable = None,
   verbose:bool = False
 ):
   """
   Save a 3D array in multiple raster files using as reference one base raster.
-  The last dimension is used to split the data in different rasters. GeoTIFF is
+  The last dimension is used to split the array in different rasters. GeoTIFF is
   the only output format supported. It always replaces the ``np.nan`` value
   by the specified ``nodata``.
 
@@ -527,7 +535,7 @@ def save_rasters(
     new rasters.
   :param raster_files: A list containing the paths for the new raster. It creates
     the folder hierarchy if not exists.
-  :param data: 3D data array.
+  :param array: 3D data array.
   :param window: Save the data considering a spatial window, even if the ``base_rasters``
     refers to a bigger area. For example, it's possible to have a base raster covering the whole
     Europe and save the data using a window that cover just part of Wageningen. By default is
@@ -583,12 +591,14 @@ def save_rasters(
   if type(raster_files) == str: 
     raster_files = [ raster_files ]
 
-  if len(data.shape) < 3:
-    data = np.stack([data], axis=2)
+  #if len(data.shape) < 3:
+  #  data = np.stack([data], axis=2)
   
-  n_files = data.shape[-1]
-  if n_files != len(raster_files):
-    raise Exception(f'The data shape {data.shape} is incompatible with the raster_files size {len(raster_files)}.')
+  if (len(array_idx) == 0):
+    array_idx = list(range(0, array.shape[-1]))
+
+  if len(array_idx) != len(raster_files):
+    raise Exception(f'The array shape {array.shape} is incompatible with the raster_files size {len(raster_files)}.')
 
   ds = rasterio.open(base_raster)
   if bounds is not None and len(bounds) == 4:
@@ -604,16 +614,26 @@ def save_rasters(
   if verbose:
     ttprint(f'Saving {len(raster_files)} raster files using {n_jobs} workers')
 
+  ref_array = ref_memmap(array)
+
   args = [ \
-    (base_raster, raster_files, data, i, window, dtype,
+    (base_raster, raster_file, ref_array, i, window, dtype,
       nodata, fit_in_dtype, on_each_outfile) \
-    for i in range(0,len(raster_files))
+    for raster_file, i in zip(raster_files, array_idx)
   ]
 
+  batch_size = math.floor(len(args) / n_jobs)
+  if batch_size <= 0:
+    batch_size = 'auto'
+
   out_files = []
-  for out_raster in parallel.job(_save_raster, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
-    out_files.append(out_raster)
-    continue
+  for out_raster in parallel.job(_save_raster, args, n_jobs=n_jobs, 
+    joblib_args={
+      'pre_dispatch': n_jobs, 
+      'batch_size': batch_size
+    }):
+      out_files.append(out_raster)
+      continue
 
   return out_files
 
@@ -904,6 +924,7 @@ class RasterData(SKMapBase):
     expected_shape = None,
     overview:int = None,
     n_jobs:int = 4,
+    scale:float = 1,
     gdal_opts:dict = {}
   ):
 
@@ -930,31 +951,24 @@ class RasterData(SKMapBase):
     #n_rows = self.info.shape[0]
     #self.array = np.empty((width, height, n_rows), dtype=dtype)
     self.base_raster = self._base_raster()
-    
-    self.array = []
+    raster_files = []
 
     for band, rows in self.info.groupby(RasterData.BAND_COL):
-
-      rows[RasterData.PATH_COL]
-      raster_files = [ Path(r) for r in rows[RasterData.PATH_COL] ]
+      raster_files += [ Path(r) for r in rows[RasterData.PATH_COL] ]
       
-      self._verbose(
-          f"RasterData with {len(raster_files)} rasters (band: {band})" 
-        + f" and {len(self.info[RasterData.GROUP_COL].unique())} group(s)" 
-      )
+    self._verbose(
+        f"RasterData with {len(raster_files)} rasters" 
+      + f" and {len(self.info[RasterData.GROUP_COL].unique())} group(s)" 
+    )
 
-      array = read_rasters(
-        raster_files, band=band,window=self.window, 
-        bounds=bounds, data_mask=data_mask,
-        dtype=dtype, expected_shape=expected_shape,
-        n_jobs=n_jobs, overview=overview, gdal_opts=gdal_opts,
-        verbose=self.verbose
-      )
-      
-      self.array.append(array)
-      self._verbose(f"Read array shape: {array.shape}")
-
-    self.array = np.concatenate(self.array, axis=-1)
+    self.array = read_rasters(
+      raster_files, band=band, window=self.window, 
+      bounds=bounds, data_mask=data_mask,
+      dtype=dtype, expected_shape=expected_shape,
+      n_jobs=n_jobs, overview=overview, scale=scale,
+      gdal_opts=gdal_opts, verbose=self.verbose
+    )
+    self._verbose(f"Read array shape: {self.array.shape}")
 
     return self
 
@@ -982,7 +996,8 @@ class RasterData(SKMapBase):
       new_array, new_info = process.run(**kwargs)
 
       if new_info.shape[0] > 0:
-        self.array = np.concatenate([self.array, new_array], axis=-1)
+        new_array.insert(0, self.array)
+        self.array = concat_memmap(new_array, axis=2)
         self.info = pd.concat([self.info, new_info])
         self.info.reset_index(drop=True, inplace=True)
       
@@ -1210,7 +1225,7 @@ class RasterData(SKMapBase):
 
     save_rasters(
       base_raster, outfiles,
-      self.array[:,:,info.index], 
+      self.array, array_idx = info.index,
       window=self.window, bounds=self.bounds,
       dtype=dtype, nodata=nodata,
       fit_in_dtype=fit_in_dtype, n_jobs=n_jobs,
@@ -1269,6 +1284,13 @@ class RasterData(SKMapBase):
 
     return self
 
+  def __del__(self):
+    print("Deleting")
+    del_memmap(self.array)
+  
+  def __exit__(self):
+    self.__del__()
+  
   def _get_titles(self, img_title, bands):
     f_arr = self.filter(f"group=={bands}")
     

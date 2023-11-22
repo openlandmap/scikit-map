@@ -27,10 +27,15 @@ try:
   from datetime import datetime
   from pandas import DataFrame
   import pandas as pd
+  import math
+  import gc
 
   from dateutil.relativedelta import relativedelta
 
   import pyfftw
+  
+  #os.environ['NUMEXPR_MAX_THREADS'] = '1'
+  #os.environ['NUMEXPR_NUM_THREADS'] = '1'
   import numexpr as ne
 
   class Transformer(SKMapGroupRunner, ABC):
@@ -685,68 +690,67 @@ try:
       self.n_jobs = n_jobs
       self.fn = fn
 
-    def _map(self, gmap):
+    def _map(self, ref_array, gmap):
       
-      array_dict, group_idx = {}, {}
-      
-      for key in gmap.keys():
-        array_dict[key] = load_memmap(**gmap[key][0])
-        group_idx[key] = gmap[key][1]
+      array_dict, idx_dict = {}, {}
+      array = load_memmap(**ref_array)
+
+      for group in gmap.keys():
+        idx = gmap[group]
+        array_dict[group] = array[:,:,idx]
+        idx_dict[group] = idx
 
       result_fn = self.fn(array_dict)
-      new_array_dict, exi_array_dict = {}, {}
+      new_groups = []
 
-      for key in result_fn.keys():
-        if key in group_idx:
-          exi_array_dict[key] = (ref_memmap(result_fn[key]), group_idx[key])
+      for group in result_fn.keys():
+        if group in idx_dict:
+          idx = idx_dict[group]
+          array[:,:,idx] = result_fn[group]
         else:
-          data = result_fn[key]
-          data_mem = new_memmap(data.dtype, data.shape)
-          data_mem[:] = data
-          new_array_dict[key] = ref_memmap(data_mem)
+          new_groups.append(group)
 
-      return(exi_array_dict, new_array_dict)
+      new_shape = list(array.shape)
+      new_shape[2] = len(new_groups)
+      new_shape = tuple(new_shape)
+      new_array = new_memmap(array.dtype, new_shape)
+
+      for i in range(0, len(new_groups)):
+        new_array[:,:,i] = result_fn[new_groups[i]]
+      
+      ref_new_array = ref_memmap(new_array)
+      fidx = list(idx_dict.values())[0]
+
+      return(fidx, new_groups, ref_new_array)
 
     def run(self, 
       rdata:RasterData,
       outname:str = 'skmap_{gr}_{dt}'
     ):
 
-      gmap_list = []
+      args = []
 
       group_cols = [RasterData.START_DT_COL, RasterData.END_DT_COL]
-      memmap_list = []
+      ref_array = ref_memmap(rdata.array)
 
       for _, rows in rdata.info.groupby(group_cols):
         gidx = rows.index
-        garray = rdata.array[:,:,gidx]
         ggroup = list(rdata.info.iloc[gidx]['group'])
 
         gmap = {}
         
-        for i in range(0, len(gidx)):
-          garray_i = new_memmap(rdata.array.dtype, (rdata.array.shape[0], rdata.array.shape[1]))
-          garray_i[:] = garray[:,:,i]
-
-          garray_i_ref = ref_memmap(garray_i)
-
-          gmap[ggroup[i]] = (garray_i_ref, gidx[i])
+        for idx, group in zip(gidx, ggroup):
+          gmap[group] = idx
         
-        gmap_list.append(gmap)
-
-      args = [ (gmap,) for gmap in gmap_list ]
+        args.append((ref_array, gmap))
       
       new_array = []
       new_info = []
 
-      for exi_array_dict, new_array_dict in parallel.job(self._map, args, n_jobs=self.n_jobs):
-
-        row = None
-        for array, idx in exi_array_dict.values():
-          array = load_memmap(**array)
-          rdata.array[:,:,idx] = array
-          memmap_list.append(array)
-          row = rdata.info.iloc[idx]
+      for fidx, new_groups, ref_new_array in parallel.job(self._map, args, n_jobs=self.n_jobs, joblib_args={'backend': 'multiprocessing'}):
+        
+        new_array.append(load_memmap(**ref_new_array))
+        row = rdata.info.iloc[fidx]
 
         start_dt, end_dt = row[RasterData.START_DT_COL], row[RasterData.END_DT_COL]
         group = row[RasterData.GROUP_COL]
@@ -754,26 +758,15 @@ try:
         date_format = rdata.date_args[group]['date_format']
         date_style = rdata.date_args[group]['date_style']
 
-        for new_group in new_array_dict.keys():
-          array = load_memmap(**new_array_dict[new_group])
-          new_array.append(array)
-          memmap_list.append(array)
-          
+        for new_group in new_groups:
           name = rdata._set_date(outname, start_dt, end_dt, 
             date_format=date_format, date_style=date_style,  gr=new_group)
-          
           new_info.append(
             rdata._new_info_row(rdata.base_raster, 
               date_format=date_format, date_style=date_style,
               group=new_group, name=name, dates=[start_dt, end_dt]
             )
           )
-
-      if len(new_array) > 0:
-        new_array = np.stack(new_array, axis=-1)
-
-      for rm in memmap_list:
-        del_memmap(rm)
 
       return new_array, DataFrame(new_info)
 
@@ -792,6 +785,146 @@ try:
       self.expressions = expressions
       self.mask_group = mask_group
       self.mask_values = mask_values
+
+    def _calc(self, array_dict):
+
+      if self.mask_group is not None and len(self.mask_values) >= 1:
+        array_mask = np.isin(array_dict[self.mask_group], self.mask_values)
+
+        for g in array_dict.keys():
+          if g != self.mask_group:
+            array_dict[g][array_mask] = np.nan
+
+      for group in self.expressions.keys():
+        expression = self.expressions[group]
+        array_dict[group] = ne.evaluate(expression, local_dict=array_dict)
+    
+      return array_dict
+    
+  class Calc2(SKMapRunner):
+
+    def __init__(self,
+      expressions:dict,
+      mask_group:str = None,
+      mask_values:list = [],
+      n_jobs:int = os.cpu_count(),
+      verbose = False
+    ):
+
+      self.n_jobs = n_jobs
+
+      self.expressions = expressions
+      self.mask_group = mask_group
+      self.mask_values = mask_values
+      self.date_cols = [RasterData.START_DT_COL, RasterData.END_DT_COL]
+
+    def _map(self, ref_array, ref_new_array, gmap, new_gmap):
+      
+      array_dict, idx_dict = {}, {}
+      array = load_memmap(**ref_array)
+      new_array = load_memmap(**ref_new_array)
+      #print(array.shape, new_array.shape)
+  
+      array_mask = None
+      if self.mask_group is not None and len(self.mask_values) >= 1:
+        idx = gmap[self.mask_group]
+        array_mask = np.isin(array[:,:,idx], self.mask_values)
+      
+      for group in gmap.keys():
+        idx = gmap[group]
+        array_dict[group] = array[:,:,idx]
+        if array_mask is not None and group != self.mask_group:
+          array_dict[group][array_mask] = np.nan
+          
+      for group in self.expressions.keys():
+        expression = self.expressions[group]
+        if group in gmap:
+          print(f'{group} in array')
+          idx = gmap[group]
+          array[:,:,idx]  = ne.evaluate(expression, local_dict=array_dict)
+        else:
+          
+          idx = new_gmap[group]
+          print(f'{group} in new_array {idx}')
+          new_array[:,:,idx] = ne.evaluate(expression, local_dict=array_dict)
+      
+      #del array_dict
+      #gc.collect()
+      
+      fidx = list(gmap.values())[0]
+
+      return(fidx)
+
+    def run(self, 
+      rdata:RasterData,
+      outname:str = 'skmap_{gr}_{dt}'
+    ):
+
+      self.groups = list(rdata.info[RasterData.GROUP_COL].unique())
+      n_dates = rdata.info[self.date_cols].value_counts().shape[0]
+
+      self.new_groups = []
+      for key in self.expressions.keys():
+        if key not in self.groups:
+          self.new_groups.append(key)
+
+      print(self.new_groups)
+      
+      args = []
+
+      n_new_groups = len(self.new_groups)
+      new_shape = list(rdata.array.shape)
+      new_shape[2] = n_dates * n_new_groups
+      new_shape = tuple(new_shape)
+      new_array = new_memmap(rdata.array.dtype, new_shape)
+      print(new_array.shape)
+      
+      ref_array = ref_memmap(rdata.array)
+      ref_new_array = ref_memmap(new_array)
+
+      idx_counter = 0
+      for _, rows in rdata.info.groupby(self.date_cols):
+        gidx = rows.index
+        ggroup = list(rdata.info.iloc[gidx]['group'])
+
+        gmap = {}
+        new_gmap = {}
+        
+        for idx, group in zip(gidx, ggroup):
+          gmap[group] = idx
+
+        new_group_offset = (idx_counter * n_new_groups)
+        for idx, new_group in zip(range(0, n_new_groups), self.new_groups):
+          new_gmap[new_group] = (new_group_offset + idx)
+          #print(new_group, (new_group_offset + idx))
+        
+        args.append((ref_array, ref_new_array, gmap, new_gmap))
+        idx_counter += 1
+      
+      new_array = [ new_array ]
+      new_info = []
+
+      for fidx in parallel.job(self._map, args, n_jobs=self.n_jobs, joblib_args={'backend': 'multiprocessing'}):
+        
+          row = rdata.info.iloc[fidx]
+
+          start_dt, end_dt = row[RasterData.START_DT_COL], row[RasterData.END_DT_COL]
+          group = row[RasterData.GROUP_COL]
+
+          date_format = rdata.date_args[group]['date_format']
+          date_style = rdata.date_args[group]['date_style']
+
+          for new_group in self.new_groups:
+            name = rdata._set_date(outname, start_dt, end_dt, 
+              date_format=date_format, date_style=date_style,  gr=new_group)
+            new_info.append(
+              rdata._new_info_row(rdata.base_raster, 
+                date_format=date_format, date_style=date_style,
+                group=new_group, name=name, dates=[start_dt, end_dt]
+              )
+            )
+
+      return new_array, DataFrame(new_info)
 
     def _calc(self, array_dict):
 
