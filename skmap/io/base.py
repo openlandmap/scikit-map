@@ -27,8 +27,8 @@ import traceback
 
 from shapely.geometry import box,shape
 
-from typing import List, Union, Callable
-from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap, ref_memmap, load_memmap, concat_memmap
+from typing import List, Union, TypedDict, Callable
+from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, shrink_memmap, del_memmap, ref_memmap, load_memmap, concat_memmap
 from skmap.misc import vrt_warp
 from skmap import SKMapGroupRunner, SKMapRunner, SKMapBase, parallel
 
@@ -279,6 +279,7 @@ def read_rasters(
   try_without_window = False,
   gdal_opts:dict = {},
   overview = None,
+  max_rasters = None,
   verbose = False
 ):
   """
@@ -375,7 +376,11 @@ def read_rasters(
   else:
     n_bands, height, width,  = ds.count, ds.height, ds.width
 
-  array_mm = new_memmap(dtype, shape=(height, width, len(raster_files)))
+  if max_rasters is not None:
+    array_mm = new_memmap(dtype, shape=(height, width, max_rasters))
+  else:
+    array_mm = new_memmap(dtype, shape=(height, width, len(raster_files) * 10))
+
 
   args = [ 
     (raster_idx, raster_files, array_mm, band, window, dtype, data_mask, 
@@ -618,20 +623,22 @@ def save_rasters(
 
   args = [ \
     (base_raster, raster_file, ref_array, i, window, dtype,
-      nodata, fit_in_dtype, on_each_outfile) \
+      nodata, fit_in_dtype) \
     for raster_file, i in zip(raster_files, array_idx)
   ]
 
-  batch_size = math.floor(len(args) / n_jobs)
-  if batch_size <= 0:
-    batch_size = 'auto'
+  #batch_size = math.floor(len(args) / n_jobs)
+  #if batch_size <= 0:
+  #  batch_size = 'auto'
 
   out_files = []
   for out_raster in parallel.job(_save_raster, args, n_jobs=n_jobs, 
     joblib_args={
-      'pre_dispatch': n_jobs, 
-      'batch_size': batch_size
+      'backend': 'loky', 
+      'return_as': 'generator'
     }):
+      if on_each_outfile is not None:
+        on_each_outfile(out_raster)
       out_files.append(out_raster)
       continue
 
@@ -657,6 +664,7 @@ class RasterData(SKMapBase):
     raster_files:Union[List,str,dict],
     raster_mask:str = None,
     raster_mask_val = np.nan,
+    max_rasters:int = None,
     verbose = False
   ):
 
@@ -709,6 +717,8 @@ class RasterData(SKMapBase):
         }
 
     self.info.reset_index(drop=True, inplace=True)
+    self.max_rasters = max_rasters
+    
 
   def _new_info_row(self, 
     raster_file:str,
@@ -966,8 +976,10 @@ class RasterData(SKMapBase):
       bounds=bounds, data_mask=data_mask,
       dtype=dtype, expected_shape=expected_shape,
       n_jobs=n_jobs, overview=overview, scale=scale,
-      gdal_opts=gdal_opts, verbose=self.verbose
+      gdal_opts=gdal_opts, verbose=self.verbose,
+      max_rasters = self.max_rasters
     )
+
     self._verbose(f"Read array shape: {self.array.shape}")
 
     return self
@@ -993,13 +1005,15 @@ class RasterData(SKMapBase):
       if outname is not None:
         kwargs['outname'] = outname
       
-      new_array, new_info = process.run(**kwargs)
+      _, new_info = process.run(**kwargs)
 
       if new_info.shape[0] > 0:
-        new_array.insert(0, self.array)
-        self.array = concat_memmap(new_array, axis=2)
+      #  new_array.insert(0, self.array)
+      #  self.array = concat_memmap(new_array, axis=2)
+        idx_offset = self.info.index.max()
+        new_info.index = list(range(idx_offset, idx_offset + new_info.shape[0]))
         self.info = pd.concat([self.info, new_info])
-        self.info.reset_index(drop=True, inplace=True)
+        #self.info.reset_index(drop=True, inplace=True)
       
       self._verbose(f"Execution"
         + f" time for {process_name}: {(time.time() - start):.2f} segs")
@@ -1017,8 +1031,10 @@ class RasterData(SKMapBase):
       group = [ group ]
 
     to_drop = []
-    to_add_arr = []
     to_add_info = []
+
+    group_list = []
+    ginfo_list = []
 
     for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
 
@@ -1029,42 +1045,76 @@ class RasterData(SKMapBase):
       if len(group) > 0 and _group not in group:
         continue
 
-      self._active_group = _group
-
-      expr_group = f'{RasterData.GROUP_COL} == "{self._active_group}"'
+      expr_group = f'{RasterData.GROUP_COL} == "{_group}"'
       ginfo = self.info.query(expr_group)
 
-      process_name = process.__class__.__name__
-      
-      start = time.time()
-      self._verbose(f"Running {process_name}"
-        + f" on {self.array[:,:,ginfo.index].shape}"
-        + f" for {_group} group")
+      group_list.append(_group)
+      ginfo_list.append(ginfo)
 
-      new_array, new_info = process.run(self, _group, outname)
+    process_name = process.__class__.__name__
       
-      if drop_input:
-        self._verbose(f"Dropping data and info for {_group} group")
-        to_drop.append(ginfo.index)
+    start = time.time()
+    self._verbose(f"Running {process_name}"
+        + f" {len(group_list)} groups")
+
+    _, new_info = process.run(self, group_list, ginfo_list, outname)
+      
+    if drop_input:
+      self._verbose(f"Dropping info for {group_list}")
+      for group, ginfo in zip(group_list, ginfo_list):
+        to_drop += list(ginfo.index)
+      self.info = self.info.drop(to_drop)
         
-      to_add_arr.append(new_array)
-      to_add_info.append(new_info)
+    to_add_info.append(new_info)
       
-      self._verbose(f"Execution"
-        + f" time for {process_name}: {(time.time() - start):.2f} segs")
+    self._verbose(f"Execution"
+      + f" time for {process_name}: {(time.time() - start):.2f} segs")
 
-      self._active_group = None
+    self._active_group = None
 
-    idx_list = []
-    for idx in to_drop:
-      self.info = self.info.drop(idx)
-      idx_list += list(idx)
+    #to_del_idx = []
+    #for idx in to_drop:
+    #  to_del_idx += list(idx)
     
-    self.array = np.delete(self.array, idx_list, axis=-1) 
+    #self.info = self.info.drop(to_del_idx)
+    #keep_idx = []
+    #for idx in range(0, self.array.shape[2]):
+    #  if idx not in to_del_idx:
+    #    keep_idx.append(idx)
 
-    self.array = np.concatenate( [self.array] + to_add_arr, axis=-1)
-    self.info = pd.concat( [self.info] + to_add_info)
-    self.info.reset_index(drop=True, inplace=True)
+    #
+    #self.array = np.delete(self.array, to_del_idx, axis=-1) 
+    
+    #if len(to_del_idx):
+      #new_shape = list(self.array.shape)
+      #new_shape[2] -= len(to_del_idx)
+      #new_shape = tuple(new_shape)
+      #new_array = new_memmap(self.array.dtype, new_shape)
+      #print("Begin reducing")
+      #new_array[:,:,:] = self.array[:,:,keep_idx]
+      #print("End reducing")
+      #del_memmap(self.array)
+      #self.array = new_array
+      #self.array = shrink_memmap(self.array, keep_idx, 2)
+
+    if len(to_add_info) > 0: #new_array.shape[0] > 0:
+      #to_add_arr.insert(0, self.array)
+      #print("Begin concat")
+      #self.array = concat_memmap(to_add_arr, axis=2)
+      #print("End concat")
+      
+      new_info = pd.concat(to_add_info)
+      idx_offset = self.info.index.max()
+      new_info.index = list(range(idx_offset, idx_offset + new_info.shape[0]))
+      print('####', idx_offset)
+
+      #to_add_info.insert(0, self.info)
+      self.info = pd.concat([self.info, new_info])
+      #self.info.reset_index(drop=True, inplace=True)
+
+      #self.array = np.concatenate( [self.array] + to_add_arr, axis=-1)
+      #self.info = pd.concat( [self.info] + to_add_info)
+      #self.info.reset_index(drop=True, inplace=True)
 
     return self
 
@@ -1075,9 +1125,9 @@ class RasterData(SKMapBase):
 
     self._verbose(f"Dropping data and info for groups: {group}")
     idx = self.info[self.info[RasterData.GROUP_COL].isin(group)].index
-    self.array = np.delete(self.array, idx, axis=-1) 
+    #self.array = np.delete(self.array, idx, axis=-1) 
     self.info = self.info.drop(idx)
-    self.info.reset_index(drop=True, inplace=True)
+    #self.info.reset_index(drop=True, inplace=True)
 
     return self
 
@@ -1096,7 +1146,8 @@ class RasterData(SKMapBase):
     date_format = '%Y-%m-%d',
     date_overlap = False,
     return_array=False, 
-    return_copy=True
+    return_copy=True,
+    return_idx=False
   ):
 
     start_dt_col, end_dt_col = (RasterData.START_DT_COL, RasterData.END_DT_COL)
@@ -1129,39 +1180,44 @@ class RasterData(SKMapBase):
       )  
 
     return self._filter(info_main[dt_mask],
-      return_array=return_array, return_copy=return_copy
+      return_array=return_array, return_copy=return_copy, return_idx=return_idx
     )
 
   def filter_contains(self, 
     text, 
     return_array=False, 
-    return_copy=True
+    return_copy=True,
+    return_idx=False
   ):
     return self.filter(f'{self.NAME_COL}.str.contains("{text}")', 
-       return_array=return_array, return_copy=return_copy
+       return_array=return_array, return_copy=return_copy, return_idx=return_idx
     )
 
   def filter(self, 
     expr, 
     return_array=False, 
-    return_copy=True
+    return_copy=True,
+    return_idx=False
   ):
     return self._filter(self.info.query(expr),
-      return_array=return_array, return_copy=return_copy
+      return_array=return_array, return_copy=return_copy, return_idx=return_idx
     )
 
   def _filter(self, 
     info, 
     return_info=False,
     return_array=False, 
-    return_copy=True
+    return_copy=True,
+    return_idx=False
   ):
 
     # Active filters 
     if self._active_group is not None:
       info = info.query(f'{RasterData.GROUP_COL} == "{self._active_group}"')
 
-    if return_array:
+    if return_idx:
+      return list(info.index)
+    elif return_array:
       return self.array[:,:,info.index]
     elif return_info:
       return info

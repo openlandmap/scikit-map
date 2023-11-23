@@ -2,7 +2,7 @@ import time
 import os
 import warnings
 from enum import Enum
-from typing import Callable
+from typing import List, Union, TypedDict, Callable
 from scipy.linalg import matmul_toeplitz
 
 try:
@@ -15,6 +15,7 @@ try:
   from skmap.misc import new_memmap, del_memmap, ref_memmap, load_memmap
   from skmap.io import RasterData
 
+  from scipy.signal import find_peaks
   from scipy.special import log1p
   from statsmodels.tsa.seasonal import STL
   import statsmodels.api as sm
@@ -109,14 +110,19 @@ try:
 
     def run(self, 
       rdata:RasterData,
-      group:str,
+      group_list:str,
+      ginfo_list:str,
       outname:str = None
     ):
       """
       Execute the gapfilling approach.
       """
 
-      kwargs = {'rdata': rdata, 'group': group}
+      kwargs = {
+        'rdata': rdata, 
+        'group_list': group_list, 
+        'ginfo_list': ginfo_list
+      }
       if outname is not None:
         kwargs['outname'] = outname
 
@@ -128,7 +134,8 @@ try:
     @abstractmethod
     def _run(self, 
       rdata:RasterData, 
-      group:str,
+      group_list:str,
+      ginfo_list:str,
       outname:str
     ):
       pass
@@ -352,8 +359,9 @@ try:
     
     def __init__(self,
       time:list = [ TimeEnum.YEARLY, TimeEnum.MONTHLY_LONGTERM ],
-      operations = ['p25', 'p50', 'p75', 'std'],
+      operations:List = ['p25', 'p50', 'p75', 'std'],
       rename_operations:dict = {},
+      post_expression:str = None,
       date_overlap:bool = False,
       n_jobs:int = os.cpu_count(),
       verbose = False
@@ -366,6 +374,8 @@ try:
       self.rename_operations = rename_operations
       self.date_overlap = date_overlap
       self.n_jobs = n_jobs
+
+      self.post_expression = post_expression
 
       self.percs = []
       self.bn_ops = []
@@ -385,32 +395,40 @@ try:
       else:
         return op
 
-    def _aggregate(self, in_array, tm, dt1, dt2):
+    def _aggregate(self, new_idx, ref_array, array_idx, group, tm, dt1, dt2):
 
-      out_array = []
+      array = load_memmap(**ref_array)
+
       ops = []
+      _idxs = []
 
       for op, method in self.bn_ops:
-        out_array.append(
-          method(in_array, axis=-1)[:, :, np.newaxis]
-        )
+        array[:,:,new_idx:new_idx+1] = method(array[:,:,array_idx], axis=-1)[:, :, np.newaxis]
+        _idxs.append(new_idx)
+        new_idx += 1
+
         ops.append(self._op_name(f'{op}'))
 
       if len(self.percs) > 0:
-        out_array.append(
-          nan_percentile(in_array.copy().transpose((2,0,1)), q=self.percs).transpose((1,2,0))
-        )
+        perc_idx = list(range(new_idx, new_idx + len(self.percs)))
+        in_array = array[:,:,array_idx] #array[:,:,array_idx].copy()
+        array[:,:,perc_idx] = nan_percentile(in_array.transpose((2,0,1)), q=self.percs).transpose((1,2,0))
+        new_idx += len(self.percs)
+        _idxs += perc_idx
         
         for p in self.percs:
           ops.append(self._op_name(f'p{p}'))
 
-      out_array = np.concatenate(out_array, axis=-1)
+      if self.post_expression is not None and len(_idxs) > 0:
+        for idx in _idxs:
+          array[:,:,idx] = ne.evaluate(self.post_expression, local_dict = { 'new_array': array[:,:,idx] })
 
-      return (out_array, ops, tm, dt1, dt2)
+      return (group, ops, tm, dt1, dt2)
 
-    def _args_monthly(self, rdata, start_dt, end_dt, date_format, months = 1, daysp = None):
+    def _args_monthly(self, rdata, group, start_dt, end_dt, date_format, months = 1, daysp = None):
       
       args = []
+      ref_array = ref_memmap(rdata.array)
 
       for dt1, dt2 in date_range(
         f'{start_dt.year}0101',f'{end_dt.year}1201', 
@@ -425,17 +443,18 @@ try:
           dt2a = (dt2a + relativedelta(days=daysp)).strftime(date_format)
 
         tm = ''
-        in_array = rdata.filter_date(dt1a, dt2a, return_array=True, 
+        array_idx = rdata.filter_date(dt1a, dt2a, return_idx=True, 
           date_format=date_format, date_overlap=self.date_overlap)
         
-        if in_array.size > 0:  
-          args += [ (in_array, tm, datetime.strptime(dt1, date_format), datetime.strptime(dt2, date_format)) ]
+        if len(array_idx) > 0:  
+          args += [ (ref_array, array_idx, group, tm, datetime.strptime(dt1, date_format), datetime.strptime(dt2, date_format)) ]
 
       return args
 
-    def _args_yearly(self, rdata, start_dt, end_dt, date_format):
+    def _args_yearly(self, rdata, group, start_dt, end_dt, date_format):
       
       args = []
+      ref_array = ref_memmap(rdata.array)
 
       for dt1, dt2 in date_range(
         f'{start_dt.year}0101',f'{end_dt.year}1201', 
@@ -443,21 +462,22 @@ try:
         date_format=date_format):
 
         tm = 'yearly'
-        in_array = rdata.filter_date(dt1, dt2, return_array=True, 
+        array_idx = rdata.filter_date(dt1, dt2, return_idx=True, 
           date_format=date_format, date_overlap=self.date_overlap)
         
-        if in_array.size > 0:  
-          args += [ (in_array, tm, datetime.strptime(dt1, date_format), datetime.strptime(dt2, date_format)) ]
+        if len(array_idx):  
+          args += [ (ref_array, array_idx, group, tm, datetime.strptime(dt1, date_format), datetime.strptime(dt2, date_format)) ]
 
       return args
 
-    def _args_monthly_longterm(self, rdata, start_dt, end_dt, date_format):
+    def _args_monthly_longterm(self, rdata, group, start_dt, end_dt, date_format):
 
       args = []
+      ref_array = ref_memmap(rdata.array)
 
       for month in range(1,13):
         
-        in_array = []
+        array_idx_list = []
         month = str(month).zfill(2)
 
         for dt1, dt2 in date_range(
@@ -465,65 +485,82 @@ try:
           'months', 1, date_offset=11, return_str=True, 
           ignore_29feb=False, date_format=date_format):
           
-          array = rdata.filter_date(dt1, dt2, return_array=True, 
+          array_idx = rdata.filter_date(dt1, dt2, return_idx=True, 
               date_format=date_format, date_overlap=self.date_overlap)
           
-          if array.size > 0:
-            in_array.append(array)
+          if len(array_idx):
+            array_idx_list += array_idx
 
         tm = f'm{month}'
-        if len(in_array) > 0:
-          args += [ (np.concatenate(in_array, axis=-1), tm, start_dt, end_dt) ]
+        if len(array_idx_list) > 0:
+          #args += [ (np.concatenate(in_array, axis=-1), tm, start_dt, end_dt) ]
+          args += [ (ref_array, array_idx_list, group, tm, start_dt, end_dt) ]
 
       return args
 
     def _run(self, 
       rdata:RasterData,
-      group:str,
+      group_list:list,
+      ginfo_list:list,
       outname:str = 'skmap_aggregate.{gr}_{op}_{dt}'
     ):
 
-      info = rdata._info()
-
-      date_format = '%Y%m%d'
-      start_dt = info[RasterData.START_DT_COL].min()
-      end_dt = info[RasterData.END_DT_COL].max()
-
       args = []
 
-      for t in self.time:
+      for group, ginfo in zip(group_list, ginfo_list):
 
-        if t == TimeEnum.MONTHLY_LONGTERM:
-          args += self._args_monthly_longterm(rdata, start_dt, end_dt, date_format)
-        elif t == TimeEnum.YEARLY:
-          args += self._args_yearly(rdata, start_dt, end_dt, date_format)
-        elif t == TimeEnum.MONTHLY:
-          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 1)
-        elif t == TimeEnum.MONTHLY_15P:
-          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 1, 15)
-        elif t == TimeEnum.BIMONTHLY:
-          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2)
-        elif t == TimeEnum.BIMONTHLY_15P:
-          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 2, 15)
-        elif t == TimeEnum.QUARTERLY:
-          args += self._args_monthly(rdata, start_dt, end_dt, date_format, 3)
-        else:
-          raise Exception(f"Aggregation by {t} not implemented")
+        date_format = '%Y%m%d'
+        start_dt = ginfo[RasterData.START_DT_COL].min()
+        end_dt = ginfo[RasterData.END_DT_COL].max()
+
+        rdata._active_group = group
       
-      new_array = []
+        for t in self.time:
+
+          if t == TimeEnum.MONTHLY_LONGTERM:
+            args += self._args_monthly_longterm(rdata, group, start_dt, end_dt, date_format)
+          elif t == TimeEnum.YEARLY:
+            args += self._args_yearly(rdata, group, start_dt, end_dt, date_format)
+          elif t == TimeEnum.MONTHLY:
+            args += self._args_monthly(rdata, group, start_dt, end_dt, date_format, 1)
+          elif t == TimeEnum.MONTHLY_15P:
+            args += self._args_monthly(rdata, group, start_dt, end_dt, date_format, 1, 15)
+          elif t == TimeEnum.BIMONTHLY:
+            args += self._args_monthly(rdata, group, start_dt, end_dt, date_format, 2)
+          elif t == TimeEnum.BIMONTHLY_15P:
+            args += self._args_monthly(rdata, group, start_dt, end_dt, date_format, 2, 15)
+          elif t == TimeEnum.QUARTERLY:
+            args += self._args_monthly(rdata, group, start_dt, end_dt, date_format, 3)
+          else:
+            raise Exception(f"Aggregation by {t} not implemented")
+        
+      n_new_rasters = len(args) * len(self.operations)
+      idx_offset = rdata.info.index.max()
+
+      _args = []
+      for idx, arg in zip(range(0, n_new_rasters, len(self.operations)), args):
+        _arg = list(arg)
+        _arg.insert(0, idx_offset + idx)
+        _args.append(tuple(_arg))
+        #print(idx, idx_offset + idx)
+
+      args = _args
+
+      #new_array = []
       new_info = []
 
       self._verbose(f"Computing {len(args)} "
         + f"time aggregates from {start_dt.year} to {end_dt.year}"
       )
 
-      for out_array, ops, tm, dt1, dt2 in parallel.job(self._aggregate, args, joblib_args={'backend': 'threading'}):
+      for group, ops, tm, dt1, dt2 in parallel.job(self._aggregate, args, joblib_args={'backend': 'multiprocessing'}):
         for op in ops:
           
           _group = group
           if tm != '':
             _group = f'{group}.{tm}'
 
+          rdata._active_group = group
           name = rdata._set_date(outname, 
                 dt1, dt2, 
                 op=op, gr=_group
@@ -536,11 +573,176 @@ try:
               dates=[dt1, dt2])
           )
 
-        new_array.append(out_array)
+        #new_array.append(out_array)
         
-      new_array = np.concatenate(new_array, axis=-1)
+      #new_array = np.concatenate(new_array, axis=-1)
+      rdata._active_group = None
+      
+      return None, DataFrame(new_info)
 
-      return new_array, DataFrame(new_info)
+  class PeakAnalysis(Derivator):
+    
+    def __init__(self,
+      season_size:int,
+      min_height:float = 0.5,
+      min_prominence:float = 0.2,
+      min_distance:float = 1.0,
+      n_jobs:int = os.cpu_count(),
+      verbose = False
+    ):
+
+      super().__init__(verbose=verbose, temporal=True)
+      
+      self.season_size = season_size
+      self.min_height = min_height
+      self.min_prominence = min_prominence
+      self.min_distance = min_distance
+      self.n_jobs = n_jobs
+
+      self.name_misc = [
+        ('peaks', 'm', 100), ('peaks', 'n', 1), 
+      ]
+
+      self.scale_arr = np.array([ scale for _, _, scale in self.name_misc ])
+      #print(self.scale_arr.shape)
+
+    def _find_peaks(self, data):
+
+      has_nan = np.sum(np.isnan(data).astype('int'))
+      
+      ts_size = data.shape[0]
+      idxs = [ (i, i + self.season_size) for i in range(0, ts_size, self.season_size) ]
+
+      #print(f'{len(idxs)}')
+
+      n_bands = self.scale_arr.shape
+      result = np.empty((len(idxs) * 2))
+      
+      if has_nan == 0:
+        o2 = 0
+        for i0, i1 in idxs:
+          #i0, i1 = idxs[i]
+          
+          peaks, _ = find_peaks(data[i0:i1], height=self.min_height, prominence=self.min_prominence, distance=self.min_distance)
+          nos = len(peaks)
+          
+          #print(f"nos = {nos}")
+          mean, los = np.nan, 0
+          if nos > 0:
+            mean = np.mean(data[peaks])
+            los = np.sum(data > mean * self.min_height) / ts_size
+            #print(f"los = {los}")
+
+          #print(f"mean = {mean}")
+          result[o2] = mean
+          result[o2 + 1] = los
+          o2 += 2
+
+      return result #* self.scale_arr
+
+    def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset):
+      
+      array = load_memmap(**ref_array)
+      #print("###", i0_0, i0_1)
+      #print("#####", array[i0_0:i0_1, :, i2].shape)
+      result = np.apply_along_axis(self._find_peaks, 2, array[i0_0:i0_1, :, i2])
+      #print(result.shape)
+      o2 = list(range(idx_offset, idx_offset + result.shape[2]))
+      #print("###", i0_0, i0_1, o2)
+      #print(i0_0, i0_1, np.nanmean(result))
+      array[i0_0:i0_1, :, o2] = result
+
+
+      #for i0 in range(i0_0, i0_1):
+      #  print('#', i0_0, i0_1)
+      #  for i1 in range(0, array.shape[1]):
+      #    print('#', i0, i1)
+          #print(array[i0, i1, i2])
+      #    result = self._find_peaks(array[i0, i1, i2])
+      #    o2 = list(range(idx_offset, idx_offset + len(result)))
+      #    array[i0, i1, o2] = result * self.scale_arr
+          
+      return True
+
+    def _args(self, rdata, ginfo):
+
+      ref_array = ref_memmap(rdata.array)
+      max_i0 = rdata.array.shape[0]
+      rows_per_job = math.ceil(max_i0 / self.n_jobs)
+
+      idx_offset = rdata.info.index.max()
+
+      args = []
+      for i in range(0, max_i0, rows_per_job):
+        i0_0, i0_1 = i, (i + rows_per_job)
+        if i0_1 > max_i0:
+          i0_1 = max_i0
+
+        i2 = ginfo.index
+        args.append((i0_0, i0_1, i2, ref_array, idx_offset))
+        #print((i0_0, i0_1, i2, ref_array, idx_offset))
+
+      return args
+
+    def _run(self, 
+      rdata:RasterData,
+      group_list:list,
+      ginfo_list:list,
+      outname:str = 'skmap_{gr}.{nm}_{pr}_{dt}'
+    ):
+
+      new_info = []
+
+      for group, ginfo in zip(group_list, ginfo_list):
+
+        rdata._active_group = group
+        array = rdata._array()
+
+        start_dt_min = ginfo[RasterData.START_DT_COL].min()
+        end_dt_max = ginfo[RasterData.END_DT_COL].max()
+
+        ts_size = ginfo.shape[0]
+        
+        args = self._args(rdata, ginfo)
+        #print(len(args))
+        for r in parallel.job(self._unpack, args, n_jobs=self.n_jobs, joblib_args={'backend': 'multiprocessing'}):
+          continue
+
+        #new_array = parallel.apply_along_axis(self._find_peaks, 
+        #  axis=2, arr=array, n_jobs=self.n_jobs)
+
+        for i in range(0, ts_size, self.season_size):
+          
+          _i = int(i /  self.season_size)
+          i0, i1 = (i, i + self.season_size - 1)
+          #print('###', i0, i1, ginfo.shape)
+          
+          start_dt_min = ginfo.iloc[i0][RasterData.START_DT_COL]
+          end_dt_max = ginfo.iloc[i1][RasterData.END_DT_COL]
+          
+          #print(_i, new_array.shape)
+          for j, (nm, pr, _) in zip(range(_i, _i + len(self.name_misc)), self.name_misc):
+            
+            #new_array[:,:,j] *= scale
+
+            name = rdata._set_date(outname, start_dt_min, 
+              end_dt_max, nm=nm, pr=pr, gr=group)
+
+            new_group = f'{group}.{nm}.{pr}'
+
+            new_info.append(
+              rdata._new_info_row(rdata.base_raster, group=new_group, name=name, dates=[start_dt_min, end_dt_max])
+            )
+          
+      #idx_offset = rdata.info.shape[0]
+      #i0, i1 = idx_offset, (idx_offset + new_array.shape[2])
+      #print(i0, i1)
+      #rdata.array[:,:,i0:i1] = new_array
+      #_new_array = new_memmap(array.dtype, new_array.shape)
+      #_new_array[:] = new_array[:]
+      #del new_array
+
+      return None, DataFrame(new_info)
 
   class TrendAnalysis(Derivator):
     
@@ -770,7 +972,7 @@ try:
 
       return new_array, DataFrame(new_info)
 
-  class Calc(Map):
+  class Calc2(Map):
 
     def __init__(self,
       expressions:dict,
@@ -801,7 +1003,7 @@ try:
     
       return array_dict
     
-  class Calc2(SKMapRunner):
+  class Calc(SKMapRunner):
 
     def __init__(self,
       expressions:dict,
@@ -818,12 +1020,10 @@ try:
       self.mask_values = mask_values
       self.date_cols = [RasterData.START_DT_COL, RasterData.END_DT_COL]
 
-    def _map(self, ref_array, ref_new_array, gmap, new_gmap):
+    def _map(self, ref_array, gmap, new_gmap):
       
-      array_dict, idx_dict = {}, {}
+      array_dict = {}
       array = load_memmap(**ref_array)
-      new_array = load_memmap(**ref_new_array)
-      #print(array.shape, new_array.shape)
   
       array_mask = None
       if self.mask_group is not None and len(self.mask_values) >= 1:
@@ -839,14 +1039,10 @@ try:
       for group in self.expressions.keys():
         expression = self.expressions[group]
         if group in gmap:
-          print(f'{group} in array')
           idx = gmap[group]
-          array[:,:,idx]  = ne.evaluate(expression, local_dict=array_dict)
         else:
-          
           idx = new_gmap[group]
-          print(f'{group} in new_array {idx}')
-          new_array[:,:,idx] = ne.evaluate(expression, local_dict=array_dict)
+        array[:,:,idx] = ne.evaluate(expression, local_dict=array_dict)
       
       #del array_dict
       #gc.collect()
@@ -872,17 +1068,11 @@ try:
       
       args = []
 
-      n_new_groups = len(self.new_groups)
-      new_shape = list(rdata.array.shape)
-      new_shape[2] = n_dates * n_new_groups
-      new_shape = tuple(new_shape)
-      new_array = new_memmap(rdata.array.dtype, new_shape)
-      print(new_array.shape)
-      
       ref_array = ref_memmap(rdata.array)
-      ref_new_array = ref_memmap(new_array)
 
+      idx_offset = rdata.info.index.max()
       idx_counter = 0
+      n_new_groups = len(self.new_groups)
       for _, rows in rdata.info.groupby(self.date_cols):
         gidx = rows.index
         ggroup = list(rdata.info.iloc[gidx]['group'])
@@ -893,15 +1083,15 @@ try:
         for idx, group in zip(gidx, ggroup):
           gmap[group] = idx
 
-        new_group_offset = (idx_counter * n_new_groups)
+        new_group_offset = idx_offset + (idx_counter * n_new_groups)
         for idx, new_group in zip(range(0, n_new_groups), self.new_groups):
           new_gmap[new_group] = (new_group_offset + idx)
           #print(new_group, (new_group_offset + idx))
         
-        args.append((ref_array, ref_new_array, gmap, new_gmap))
+        args.append((ref_array, gmap, new_gmap))
         idx_counter += 1
       
-      new_array = [ new_array ]
+      #new_array = [ new_array ]
       new_info = []
 
       for fidx in parallel.job(self._map, args, n_jobs=self.n_jobs, joblib_args={'backend': 'multiprocessing'}):
@@ -924,7 +1114,7 @@ try:
               )
             )
 
-      return new_array, DataFrame(new_info)
+      return None, DataFrame(new_info)
 
     def _calc(self, array_dict):
 
