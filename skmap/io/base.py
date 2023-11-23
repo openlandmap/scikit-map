@@ -992,7 +992,7 @@ class RasterData(SKMapBase):
   ):
 
     if isinstance(process, SKMapGroupRunner):
-      return self._group_run(process, group, outname, drop_input)
+      self._group_run(process, group, outname)
     else:
       
       process_name = process.__class__.__name__
@@ -1010,7 +1010,7 @@ class RasterData(SKMapBase):
       if new_info.shape[0] > 0:
       #  new_array.insert(0, self.array)
       #  self.array = concat_memmap(new_array, axis=2)
-        idx_offset = self.info.index.max()
+        idx_offset = self._idx_offset()
         new_info.index = list(range(idx_offset, idx_offset + new_info.shape[0]))
         self.info = pd.concat([self.info, new_info])
         #self.info.reset_index(drop=True, inplace=True)
@@ -1018,19 +1018,20 @@ class RasterData(SKMapBase):
       self._verbose(f"Execution"
         + f" time for {process_name}: {(time.time() - start):.2f} segs")
 
-      return self
+      if drop_input:
+        self.drop(group)
+
+    return self
 
   def _group_run(self, 
     process:SKMapGroupRunner,
     group:[list,str] = [],
     outname:str = None,
-    drop_input:bool = False
   ):
     
     if isinstance(group, str):
       group = [ group ]
 
-    to_drop = []
     to_add_info = []
 
     group_list = []
@@ -1059,11 +1060,11 @@ class RasterData(SKMapBase):
 
     _, new_info = process.run(self, group_list, ginfo_list, outname)
       
-    if drop_input:
-      self._verbose(f"Dropping info for {group_list}")
-      for group, ginfo in zip(group_list, ginfo_list):
-        to_drop += list(ginfo.index)
-      self.info = self.info.drop(to_drop)
+    #if drop_input:
+    #  self._verbose(f"Dropping info for {group_list}")
+    #  for group, ginfo in zip(group_list, ginfo_list):
+    #    to_drop += list(ginfo.index)
+    #  self.info = self.info.drop(to_drop)
         
     to_add_info.append(new_info)
       
@@ -1104,7 +1105,7 @@ class RasterData(SKMapBase):
       #print("End concat")
       
       new_info = pd.concat(to_add_info)
-      idx_offset = self.info.index.max()
+      idx_offset = self._idx_offset()
       new_info.index = list(range(idx_offset, idx_offset + new_info.shape[0]))
       print('####', idx_offset)
 
@@ -1125,8 +1126,10 @@ class RasterData(SKMapBase):
 
     self._verbose(f"Dropping data and info for groups: {group}")
     idx = self.info[self.info[RasterData.GROUP_COL].isin(group)].index
+    #print(idx)
     #self.array = np.delete(self.array, idx, axis=-1) 
     self.info = self.info.drop(idx)
+    #print(self._idx_offset())
     #self.info.reset_index(drop=True, inplace=True)
 
     return self
@@ -1638,6 +1641,9 @@ class RasterData(SKMapBase):
       grd_fig.savefig(to_img, format=f"{to_img.split('.')[-1]}", dpi=dpi, bbox_inches='tight')
     return grd_fig
   
+  def _idx_offset(self):
+    return self.info.index.max() + 1
+
   def animate(
       self,
       cmap:str = 'Spectral_r',

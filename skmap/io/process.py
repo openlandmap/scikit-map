@@ -535,7 +535,7 @@ try:
             raise Exception(f"Aggregation by {t} not implemented")
         
       n_new_rasters = len(args) * len(self.operations)
-      idx_offset = rdata.info.index.max()
+      idx_offset = rdata._idx_offset()
 
       _args = []
       for idx, arg in zip(range(0, n_new_rasters, len(self.operations)), args):
@@ -670,7 +670,7 @@ try:
       max_i0 = rdata.array.shape[0]
       rows_per_job = math.ceil(max_i0 / self.n_jobs)
 
-      idx_offset = rdata.info.index.max()
+      idx_offset = rdata._idx_offset()
 
       args = []
       for i in range(0, max_i0, rows_per_job):
@@ -1070,7 +1070,7 @@ try:
 
       ref_array = ref_memmap(rdata.array)
 
-      idx_offset = rdata.info.index.max()
+      idx_offset = rdata._idx_offset()
       idx_counter = 0
       n_new_groups = len(self.new_groups)
       for _, rows in rdata.info.groupby(self.date_cols):
