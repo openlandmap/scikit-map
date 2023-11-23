@@ -950,19 +950,10 @@ class RasterData(SKMapBase):
       else:
         data_mask = (data_mask != self.raster_mask_val)
 
-    #for band in list(self.info[RasterData.PATH_COL].unique()):
-    #if expected_shape is None:
-    #  base_raster = self._base_raster()
-    #  ds = rasterio.open(base_raster)
-    #  width, height = ds.width, ds.height
-    #else:
-    #  width, height = expected_shape[0], expected_shape[1]
-    
-    #n_rows = self.info.shape[0]
-    #self.array = np.empty((width, height, n_rows), dtype=dtype)
     self.base_raster = self._base_raster()
     raster_files = []
 
+    # FIXME: add supporting for band_list
     for band, rows in self.info.groupby(RasterData.BAND_COL):
       raster_files += [ Path(r) for r in rows[RasterData.PATH_COL] ]
       
@@ -1008,12 +999,9 @@ class RasterData(SKMapBase):
       _, new_info = process.run(**kwargs)
 
       if new_info.shape[0] > 0:
-      #  new_array.insert(0, self.array)
-      #  self.array = concat_memmap(new_array, axis=2)
         idx_offset = self._idx_offset()
         new_info.index = list(range(idx_offset, idx_offset + new_info.shape[0]))
         self.info = pd.concat([self.info, new_info])
-        #self.info.reset_index(drop=True, inplace=True)
       
       self._verbose(f"Execution"
         + f" time for {process_name}: {(time.time() - start):.2f} segs")
@@ -1060,12 +1048,6 @@ class RasterData(SKMapBase):
 
     _, new_info = process.run(self, group_list, ginfo_list, outname)
       
-    #if drop_input:
-    #  self._verbose(f"Dropping info for {group_list}")
-    #  for group, ginfo in zip(group_list, ginfo_list):
-    #    to_drop += list(ginfo.index)
-    #  self.info = self.info.drop(to_drop)
-        
     to_add_info.append(new_info)
       
     self._verbose(f"Execution"
@@ -1073,49 +1055,13 @@ class RasterData(SKMapBase):
 
     self._active_group = None
 
-    #to_del_idx = []
-    #for idx in to_drop:
-    #  to_del_idx += list(idx)
-    
-    #self.info = self.info.drop(to_del_idx)
-    #keep_idx = []
-    #for idx in range(0, self.array.shape[2]):
-    #  if idx not in to_del_idx:
-    #    keep_idx.append(idx)
+    if len(to_add_info) > 0:
 
-    #
-    #self.array = np.delete(self.array, to_del_idx, axis=-1) 
-    
-    #if len(to_del_idx):
-      #new_shape = list(self.array.shape)
-      #new_shape[2] -= len(to_del_idx)
-      #new_shape = tuple(new_shape)
-      #new_array = new_memmap(self.array.dtype, new_shape)
-      #print("Begin reducing")
-      #new_array[:,:,:] = self.array[:,:,keep_idx]
-      #print("End reducing")
-      #del_memmap(self.array)
-      #self.array = new_array
-      #self.array = shrink_memmap(self.array, keep_idx, 2)
-
-    if len(to_add_info) > 0: #new_array.shape[0] > 0:
-      #to_add_arr.insert(0, self.array)
-      #print("Begin concat")
-      #self.array = concat_memmap(to_add_arr, axis=2)
-      #print("End concat")
-      
       new_info = pd.concat(to_add_info)
+      
       idx_offset = self._idx_offset()
       new_info.index = list(range(idx_offset, idx_offset + new_info.shape[0]))
-      print('####', idx_offset)
-
-      #to_add_info.insert(0, self.info)
       self.info = pd.concat([self.info, new_info])
-      #self.info.reset_index(drop=True, inplace=True)
-
-      #self.array = np.concatenate( [self.array] + to_add_arr, axis=-1)
-      #self.info = pd.concat( [self.info] + to_add_info)
-      #self.info.reset_index(drop=True, inplace=True)
 
     return self
 
@@ -1126,11 +1072,7 @@ class RasterData(SKMapBase):
 
     self._verbose(f"Dropping data and info for groups: {group}")
     idx = self.info[self.info[RasterData.GROUP_COL].isin(group)].index
-    #print(idx)
-    #self.array = np.delete(self.array, idx, axis=-1) 
     self.info = self.info.drop(idx)
-    #print(self._idx_offset())
-    #self.info.reset_index(drop=True, inplace=True)
 
     return self
 

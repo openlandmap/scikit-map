@@ -70,6 +70,7 @@ try:
 
       return new_info
 
+    # FIXME: adapt for group_list, ginfo_list
     def run(self, 
       rdata:RasterData,
       group:str,
@@ -107,7 +108,7 @@ try:
       temporal = False
     ):
       super().__init__(verbose=verbose, temporal=temporal)
-
+      
     def run(self, 
       rdata:RasterData,
       group_list:str,
@@ -542,11 +543,8 @@ try:
         _arg = list(arg)
         _arg.insert(0, idx_offset + idx)
         _args.append(tuple(_arg))
-        #print(idx, idx_offset + idx)
 
       args = _args
-
-      #new_array = []
       new_info = []
 
       self._verbose(f"Computing {len(args)} "
@@ -573,9 +571,6 @@ try:
               dates=[dt1, dt2])
           )
 
-        #new_array.append(out_array)
-        
-      #new_array = np.concatenate(new_array, axis=-1)
       rdata._active_group = None
       
       return None, DataFrame(new_info)
@@ -600,11 +595,10 @@ try:
       self.n_jobs = n_jobs
 
       self.name_misc = [
-        ('peaks', 'm', 100), ('peaks', 'n', 1), 
+        ('peaks', 'm', 1), ('peaks', 'n', 1), 
       ]
 
       self.scale_arr = np.array([ scale for _, _, scale in self.name_misc ])
-      #print(self.scale_arr.shape)
 
     def _find_peaks(self, data):
 
@@ -613,54 +607,33 @@ try:
       ts_size = data.shape[0]
       idxs = [ (i, i + self.season_size) for i in range(0, ts_size, self.season_size) ]
 
-      #print(f'{len(idxs)}')
-
       n_bands = self.scale_arr.shape
       result = np.empty((len(idxs) * 2))
       
       if has_nan == 0:
         o2 = 0
         for i0, i1 in idxs:
-          #i0, i1 = idxs[i]
           
           peaks, _ = find_peaks(data[i0:i1], height=self.min_height, prominence=self.min_prominence, distance=self.min_distance)
           nos = len(peaks)
           
-          #print(f"nos = {nos}")
           mean, los = np.nan, 0
           if nos > 0:
             mean = np.mean(data[peaks])
             los = np.sum(data > mean * self.min_height) / ts_size
-            #print(f"los = {los}")
 
-          #print(f"mean = {mean}")
-          result[o2] = mean
-          result[o2 + 1] = los
+          result[o2] = mean * self.scale_arr[0]
+          result[o2 + 1] = los * self.scale_arr[1]
           o2 += 2
 
-      return result #* self.scale_arr
+      return result
 
     def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset):
       
       array = load_memmap(**ref_array)
-      #print("###", i0_0, i0_1)
-      #print("#####", array[i0_0:i0_1, :, i2].shape)
       result = np.apply_along_axis(self._find_peaks, 2, array[i0_0:i0_1, :, i2])
-      #print(result.shape)
       o2 = list(range(idx_offset, idx_offset + result.shape[2]))
-      #print("###", i0_0, i0_1, o2)
-      #print(i0_0, i0_1, np.nanmean(result))
       array[i0_0:i0_1, :, o2] = result
-
-
-      #for i0 in range(i0_0, i0_1):
-      #  print('#', i0_0, i0_1)
-      #  for i1 in range(0, array.shape[1]):
-      #    print('#', i0, i1)
-          #print(array[i0, i1, i2])
-      #    result = self._find_peaks(array[i0, i1, i2])
-      #    o2 = list(range(idx_offset, idx_offset + len(result)))
-      #    array[i0, i1, o2] = result * self.scale_arr
           
       return True
 
@@ -680,7 +653,6 @@ try:
 
         i2 = ginfo.index
         args.append((i0_0, i0_1, i2, ref_array, idx_offset))
-        #print((i0_0, i0_1, i2, ref_array, idx_offset))
 
       return args
 
@@ -704,27 +676,20 @@ try:
         ts_size = ginfo.shape[0]
         
         args = self._args(rdata, ginfo)
-        #print(len(args))
+        
         for r in parallel.job(self._unpack, args, n_jobs=self.n_jobs, joblib_args={'backend': 'multiprocessing'}):
           continue
-
-        #new_array = parallel.apply_along_axis(self._find_peaks, 
-        #  axis=2, arr=array, n_jobs=self.n_jobs)
 
         for i in range(0, ts_size, self.season_size):
           
           _i = int(i /  self.season_size)
           i0, i1 = (i, i + self.season_size - 1)
-          #print('###', i0, i1, ginfo.shape)
           
           start_dt_min = ginfo.iloc[i0][RasterData.START_DT_COL]
           end_dt_max = ginfo.iloc[i1][RasterData.END_DT_COL]
           
-          #print(_i, new_array.shape)
           for j, (nm, pr, _) in zip(range(_i, _i + len(self.name_misc)), self.name_misc):
             
-            #new_array[:,:,j] *= scale
-
             name = rdata._set_date(outname, start_dt_min, 
               end_dt_max, nm=nm, pr=pr, gr=group)
 
@@ -734,14 +699,6 @@ try:
               rdata._new_info_row(rdata.base_raster, group=new_group, name=name, dates=[start_dt_min, end_dt_max])
             )
           
-      #idx_offset = rdata.info.shape[0]
-      #i0, i1 = idx_offset, (idx_offset + new_array.shape[2])
-      #print(i0, i1)
-      #rdata.array[:,:,i0:i1] = new_array
-      #_new_array = new_memmap(array.dtype, new_array.shape)
-      #_new_array[:] = new_array[:]
-      #del new_array
-
       return None, DataFrame(new_info)
 
   class TrendAnalysis(Derivator):
@@ -878,130 +835,6 @@ try:
         )
 
       return new_array, DataFrame(new_info)
-
-  class Map(SKMapRunner):
-    
-    def __init__(self,
-      fn:Callable,
-      n_jobs:int = os.cpu_count(),
-      verbose = False
-    ):
-
-      super().__init__(verbose=verbose)
-      
-      self.n_jobs = n_jobs
-      self.fn = fn
-
-    def _map(self, ref_array, gmap):
-      
-      array_dict, idx_dict = {}, {}
-      array = load_memmap(**ref_array)
-
-      for group in gmap.keys():
-        idx = gmap[group]
-        array_dict[group] = array[:,:,idx]
-        idx_dict[group] = idx
-
-      result_fn = self.fn(array_dict)
-      new_groups = []
-
-      for group in result_fn.keys():
-        if group in idx_dict:
-          idx = idx_dict[group]
-          array[:,:,idx] = result_fn[group]
-        else:
-          new_groups.append(group)
-
-      new_shape = list(array.shape)
-      new_shape[2] = len(new_groups)
-      new_shape = tuple(new_shape)
-      new_array = new_memmap(array.dtype, new_shape)
-
-      for i in range(0, len(new_groups)):
-        new_array[:,:,i] = result_fn[new_groups[i]]
-      
-      ref_new_array = ref_memmap(new_array)
-      fidx = list(idx_dict.values())[0]
-
-      return(fidx, new_groups, ref_new_array)
-
-    def run(self, 
-      rdata:RasterData,
-      outname:str = 'skmap_{gr}_{dt}'
-    ):
-
-      args = []
-
-      group_cols = [RasterData.START_DT_COL, RasterData.END_DT_COL]
-      ref_array = ref_memmap(rdata.array)
-
-      for _, rows in rdata.info.groupby(group_cols):
-        gidx = rows.index
-        ggroup = list(rdata.info.iloc[gidx]['group'])
-
-        gmap = {}
-        
-        for idx, group in zip(gidx, ggroup):
-          gmap[group] = idx
-        
-        args.append((ref_array, gmap))
-      
-      new_array = []
-      new_info = []
-
-      for fidx, new_groups, ref_new_array in parallel.job(self._map, args, n_jobs=self.n_jobs, joblib_args={'backend': 'multiprocessing'}):
-        
-        new_array.append(load_memmap(**ref_new_array))
-        row = rdata.info.iloc[fidx]
-
-        start_dt, end_dt = row[RasterData.START_DT_COL], row[RasterData.END_DT_COL]
-        group = row[RasterData.GROUP_COL]
-
-        date_format = rdata.date_args[group]['date_format']
-        date_style = rdata.date_args[group]['date_style']
-
-        for new_group in new_groups:
-          name = rdata._set_date(outname, start_dt, end_dt, 
-            date_format=date_format, date_style=date_style,  gr=new_group)
-          new_info.append(
-            rdata._new_info_row(rdata.base_raster, 
-              date_format=date_format, date_style=date_style,
-              group=new_group, name=name, dates=[start_dt, end_dt]
-            )
-          )
-
-      return new_array, DataFrame(new_info)
-
-  class Calc2(Map):
-
-    def __init__(self,
-      expressions:dict,
-      mask_group:str = None,
-      mask_values:list = [],
-      n_jobs:int = os.cpu_count(),
-      verbose = False
-    ):
-
-      super().__init__(fn=self._calc, n_jobs=n_jobs, verbose=verbose)
-
-      self.expressions = expressions
-      self.mask_group = mask_group
-      self.mask_values = mask_values
-
-    def _calc(self, array_dict):
-
-      if self.mask_group is not None and len(self.mask_values) >= 1:
-        array_mask = np.isin(array_dict[self.mask_group], self.mask_values)
-
-        for g in array_dict.keys():
-          if g != self.mask_group:
-            array_dict[g][array_mask] = np.nan
-
-      for group in self.expressions.keys():
-        expression = self.expressions[group]
-        array_dict[group] = ne.evaluate(expression, local_dict=array_dict)
-    
-      return array_dict
     
   class Calc(SKMapRunner):
 
@@ -1044,9 +877,6 @@ try:
           idx = new_gmap[group]
         array[:,:,idx] = ne.evaluate(expression, local_dict=array_dict)
       
-      #del array_dict
-      #gc.collect()
-      
       fidx = list(gmap.values())[0]
 
       return(fidx)
@@ -1064,8 +894,6 @@ try:
         if key not in self.groups:
           self.new_groups.append(key)
 
-      print(self.new_groups)
-      
       args = []
 
       ref_array = ref_memmap(rdata.array)
@@ -1086,33 +914,31 @@ try:
         new_group_offset = idx_offset + (idx_counter * n_new_groups)
         for idx, new_group in zip(range(0, n_new_groups), self.new_groups):
           new_gmap[new_group] = (new_group_offset + idx)
-          #print(new_group, (new_group_offset + idx))
         
         args.append((ref_array, gmap, new_gmap))
         idx_counter += 1
       
-      #new_array = [ new_array ]
       new_info = []
 
       for fidx in parallel.job(self._map, args, n_jobs=self.n_jobs, joblib_args={'backend': 'multiprocessing'}):
         
-          row = rdata.info.iloc[fidx]
+        row = rdata.info.iloc[fidx]
 
-          start_dt, end_dt = row[RasterData.START_DT_COL], row[RasterData.END_DT_COL]
-          group = row[RasterData.GROUP_COL]
+        start_dt, end_dt = row[RasterData.START_DT_COL], row[RasterData.END_DT_COL]
+        group = row[RasterData.GROUP_COL]
 
-          date_format = rdata.date_args[group]['date_format']
-          date_style = rdata.date_args[group]['date_style']
+        date_format = rdata.date_args[group]['date_format']
+        date_style = rdata.date_args[group]['date_style']
 
-          for new_group in self.new_groups:
-            name = rdata._set_date(outname, start_dt, end_dt, 
-              date_format=date_format, date_style=date_style,  gr=new_group)
-            new_info.append(
-              rdata._new_info_row(rdata.base_raster, 
-                date_format=date_format, date_style=date_style,
-                group=new_group, name=name, dates=[start_dt, end_dt]
-              )
+        for new_group in self.new_groups:
+          name = rdata._set_date(outname, start_dt, end_dt, 
+            date_format=date_format, date_style=date_style,  gr=new_group)
+          new_info.append(
+            rdata._new_info_row(rdata.base_raster, 
+              date_format=date_format, date_style=date_style,
+              group=new_group, name=name, dates=[start_dt, end_dt]
             )
+          )
 
       return None, DataFrame(new_info)
 
