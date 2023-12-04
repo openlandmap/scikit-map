@@ -1045,6 +1045,7 @@ try:
       >>> stac_generator.save_all(output_dir='stac_odse', thumb_base_url=f'https://s3.eu-central-1.wasabisys.com/stac')
 
       """
+
       output_dir = Path(output_dir)
       if not self.vector_files:
         self._generate_thumbs(output_dir, thumb_base_url)

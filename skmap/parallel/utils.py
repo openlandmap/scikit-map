@@ -207,8 +207,9 @@ def job(
 
   joblib_args['n_jobs'] = n_jobs
 
-  for worker_result in Parallel(**joblib_args)(delayed(worker)(*args) for args in worker_args):
-    yield worker_result
+  with Parallel(**joblib_args) as parallel:
+    for worker_result in parallel(delayed(worker)(*args) for args in worker_args):
+      yield worker_result
 
 def apply_along_axis(
   worker:Callable,
