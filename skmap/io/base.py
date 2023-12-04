@@ -28,7 +28,7 @@ import traceback
 from shapely.geometry import box,shape
 
 from typing import List, Union, TypedDict, Callable
-from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, shrink_memmap, del_memmap, ref_memmap, load_memmap, concat_memmap
+from skmap.misc import ttprint, _eval, update_by_separator, date_range, new_memmap, del_memmap, ref_memmap, load_memmap
 from skmap.misc import vrt_warp
 from skmap import SKMapGroupRunner, SKMapRunner, SKMapBase, parallel
 
