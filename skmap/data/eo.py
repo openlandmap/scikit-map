@@ -6,10 +6,12 @@ import numpy as np
 import bottleneck as bc
 import joblib
 from pathlib import Path
+from pystac.extensions.file import FileExtension
 import gc
 import os
 
 import warnings
+import hashlib, json
 from skmap import parallel
 from skmap.misc import date_range
 from skmap.io import read_auth_rasters, save_rasters
@@ -443,7 +445,7 @@ try:
         'item': [
           "https://stac-extensions.github.io/eo/v1.0.0/schema.json",
           "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
-          "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+          "https://stac-extensions.github.io/file/v2.0.0/schema.json"
         ]
       }
 
@@ -479,7 +481,8 @@ try:
         'provider': ['name', 'description', 'roles', 'url'],
         'catalog': ['id', 'title', 'description'],
         'common_metadata': ['constellation', 'platform', 'instruments', 'gsd'],
-        'internal': ['start_date', 'end_date', 'date_step', 'date_unit', 'date_style','catalog', 'providers', 'main_url', 'ignore_29feb', 'depth','ignore']
+        'internal': ['start_date', 'end_date', 'date_step', 'date_unit', 'date_style','catalog', 'providers', 'main_url', 'ignore_29feb', 
+          'depth', 'ignore', 'extent_list', 'img_preview_url']
       }
 
       self.fields['internal'] += self.additional_url_cols
@@ -498,7 +501,13 @@ try:
         self.catalogs = self._catalogs()
       else:
         self.catalogs = catalogs
-      self._populate()
+      
+      self.vector_files = ('extent' in gsheet.collections)
+
+      if self.vector_files:
+        self._populate_vector()
+      else:
+        self._populate()
 
     def _verbose(self, *args, **kwargs):
       if self.verbose:
@@ -538,24 +547,116 @@ try:
       for dt1, dt2 in date_range(row['start_date'].strftime(dt_fmt), row['end_date'].strftime(dt_fmt), date_unit=date_unit,
           date_step=date_step, date_offset=date_offset, ignore_29feb=ignore_29feb, date_format=dt_fmt, return_str=True):
         
-        item_urls = []        
+        asset_urls = []        
         for dp in depth:
-          item_urls.append(_eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
+          asset_urls.append(_eval(row['main_url'],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
           for ac_url in self.additional_url_cols:
             if row[ac_url]:
-              item_urls.append(_eval(row[ac_url],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
+              asset_urls.append(_eval(row[ac_url],{'dt': f"{dt1}_{dt2}", 'dp': dp}))
           
-        main_url = item_urls[0]
+        main_url = asset_urls[0]
+        style_urls = [ row['sld_url'], row['qml_url'] ]
 
         if main_url in bbox_footprint_results:
             bbox, footprint = bbox_footprint_results[main_url]
 
-            items.append(self._new_item(row, dt1, dt2, bbox, footprint, item_urls))
+            items.append(self._new_item(row, dt1, dt2, bbox, footprint, asset_urls, style_urls))
         else:
           self._verbose(f"The url {main_url} is invalid.")
 
       return (key, row, items)
 
+    def _populate_vector(self):
+      self.new_collections = {}
+        
+      for rid, row in self.gsheet.collections.iterrows():
+    
+        start_date, end_date = datetime.strftime(row['start_date'], '%Y%m%d'), datetime.strftime(row['end_date'], '%Y%m%d')
+
+        start_date_item = datetime.strptime(start_date, '%Y%m%d').strftime('%Y-%m-%d')
+        end_date_item = datetime.strptime(end_date, '%Y%m%d').strftime('%Y-%m-%d')
+
+        left_wgs84, bottom_wgs84, right_wgs84, top_wgs84 = tuple(row.extent)
+        bbox = tuple(row.extent)
+        footprint = Polygon([
+            [left_wgs84, bottom_wgs84],
+            [left_wgs84, top_wgs84],
+            [right_wgs84, top_wgs84],
+            [right_wgs84, bottom_wgs84]
+        ])
+
+        item_id = f'{row["id"]}_{start_date}_{end_date}'
+        
+        item = pystac.Item(id=item_id,
+                      geometry=mapping(footprint),
+                      bbox=bbox,
+                      datetime=datetime.strptime(start_date, '%Y%m%d'),
+                      properties={'start_datetime': start_date_item, 'end_datetime': end_date_item},
+                      stac_extensions=["https://stac-extensions.github.io/file/v2.0.0/schema.json"])
+
+        item.common_metadata.gsd = row['gsd']
+        item.common_metadata.instruments = row['instruments']
+
+        if 'platform' in row and row['platform']:
+            item.common_metadata.platform = row['platform']
+        if 'constellation' in row:
+            item.common_metadata.constellation = row['constellation']
+
+        aid = f'{row["id"]}_{Path(row["main_url"]).stem.split("?")[0].lower()}'
+        item.add_asset(aid, pystac.Asset(href=row['main_url'], roles=['data']))
+        
+        for aurl in self.additional_url_cols:
+            if (row[aurl] != ''):
+                aid = f'{row["id"]}_{Path(row[aurl]).stem.split("?")[0].lower()}'
+                item.add_asset(aid, pystac.Asset(href=row[aurl], roles=['data']))
+        
+        if row['img_preview_url']:
+            item.add_asset('thumbnail', pystac.Asset(href=row['img_preview_url'], media_type=pystac.MediaType.PNG, roles=['thumbnail']))
+        
+        start_date = item.properties['start_datetime']
+        end_date = item.properties['end_datetime']
+
+        collection_interval = sorted([
+          datetime.strptime(start_date, '%Y-%m-%d'), 
+          datetime.strptime(end_date, '%Y-%m-%d')
+        ])
+        
+        print(collection_interval)
+
+        unioned_footprint = shape(item.geometry)
+        collection_bbox = list(unioned_footprint.bounds)
+
+        collection = pystac.Collection(
+              extent=pystac.Extent(
+                spatial=pystac.SpatialExtent(bboxes=[collection_bbox]), 
+                temporal=pystac.TemporalExtent(intervals=[collection_interval])
+              ),
+              providers=[ self.providers[p] for p in row['providers'] ],
+              stac_extensions=[
+                'https://stac-extensions.github.io/item-assets/v1.0.0/schema.json',
+                "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+                "https://stac-extensions.github.io/scientific/v1.0.0/schema.json",
+                "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+              ],
+              **self._kargs(row, 'collection', True)
+            )
+        
+        items = [item]
+        collection.add_items(items)
+        
+        key = row['catalog']
+        
+        item = self.catalogs[key].get_child(collection.id)
+        if item is not None:
+          self.catalogs[key].remove_child(collection.id)
+
+        self.catalogs[key].add_child(collection)
+        if key not in self.new_collections:
+          self.new_collections[key] = []
+          self.new_collections[key].append(collection)
+
+        self._verbose(f"Creating collection {collection.id} with {len(items)}")
+    
     def _populate(self):
 
       self.new_collections = {}
@@ -652,10 +753,11 @@ try:
                   .joinpath(Path(asset.href).stem + '.png')
                 
                 thumb_fn.parent.mkdir(parents=True, exist_ok=True)
-                if 'main' in asset.extra_fields:
-                  args.append((asset.href, str(thumb_fn), item.id, True, cmap, vmin, vmax))
-                else:
-                  args.append((asset.href, str(thumb_fn), item.id, False))
+                if asset.media_type in (pystac.MediaType.COG):
+                    if 'main' in asset.extra_fields:
+                      args.append((asset.href, str(thumb_fn), item.id, True, cmap, vmin, vmax))
+                    else:
+                      args.append((asset.href, str(thumb_fn), item.id, False))
 
         self._verbose(f"Generating {len(args)} thumbnails for catalog {catalog.id}")
 
@@ -794,10 +896,29 @@ try:
 
       return delim.join(result)
 
-    def _new_item(self, row, start_date, end_date, bbox, footprint, item_urls = []):
+    def _ext_file_asset(self, asset):
+      if asset.href:
+        r = requests.head(asset.href)
+        
+        keys = [ 'Content-Length', 'Content-Type', 'Last-Modified']
+        if r.status_code == 200:
+            headers = { k: r.headers[k] for k in keys }
+            checksum = hashlib.md5(
+              json.dumps(headers, sort_keys=True, ensure_ascii=True).encode('utf-8')
+            ).hexdigest()
+
+            asset = FileExtension.ext(asset).apply(
+              checksum=checksum, size=headers['Content-Length']
+            )
+        else:
+            ttprint(f"Status code {r.status_code} for {asset.href}")
+
+      return asset
+
+    def _new_item(self, row, start_date, end_date, bbox, footprint, asset_urls = [], style_urls = []):
       
-      main_url = item_urls[0]
-      additional_urls = item_urls[1:]
+      main_url = asset_urls[0]
+      additional_urls = asset_urls[1:]
 
       start_date_item = datetime.strptime(start_date, self.url_date_format).strftime('%Y-%m-%d')
       end_date_item = datetime.strptime(end_date, self.url_date_format).strftime('%Y-%m-%d')
@@ -809,7 +930,7 @@ try:
                       bbox=bbox,
                       datetime=datetime.strptime(start_date, self.url_date_format),
                       properties={'start_datetime': start_date_item, 'end_datetime': end_date_item},
-                      stac_extensions=stac_extensions=self.stac_extensions['item'])
+                      stac_extensions=self.stac_extensions['item'])
 
       item.common_metadata.gsd = row['gsd']
       item.common_metadata.instruments = row['instruments']
@@ -825,10 +946,27 @@ try:
       #])
 
       item.add_asset(self._asset_id(main_url, self.asset_id_delim, self.asset_id_fields), \
-        pystac.Asset(href=main_url, media_type=pystac.MediaType.GEOTIFF, roles=['data'], extra_fields={'main': True}))
+        pystac.Asset(href=main_url, media_type=pystac.MediaType.COG, roles=['data'], extra_fields={'main': True}))
       for aurl in additional_urls:
         item.add_asset(self._asset_id(aurl, self.asset_id_delim, self.asset_id_fields), \
-          pystac.Asset(href=aurl, media_type=pystac.MediaType.GEOTIFF, roles=['data']))
+          pystac.Asset(href=aurl, media_type=pystac.MediaType.COG, roles=['data']))
+
+      for surl in style_urls:
+        suffixes = Path(surl).suffixes
+        if len(suffixes) > 0:
+          sid = suffixes[-1].split('.')[1]
+          title = None
+          
+          if sid == 'sld':
+            title = 'Style Layer Descriptor (SLD)'
+          elif sid == 'qml':
+            title = 'QGIS Layer Style (QML)'
+
+          item.add_asset(sid, \
+            pystac.Asset(title=title, href=surl, media_type=pystac.MediaType.XML, roles=['style']))
+
+      for _, asset in item.assets.items():
+        asset = self._ext_file_asset(asset)
 
       return item
 
@@ -907,9 +1045,9 @@ try:
       >>> stac_generator.save_all(output_dir='stac_odse', thumb_base_url=f'https://s3.eu-central-1.wasabisys.com/stac')
 
       """
-
       output_dir = Path(output_dir)
-      self._generate_thumbs(output_dir, thumb_base_url)
+      if not self.vector_files:
+        self._generate_thumbs(output_dir, thumb_base_url)
 
       for key, catalog in self.catalogs.items():
         catalog.normalize_and_save(
