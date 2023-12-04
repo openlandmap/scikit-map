@@ -1237,9 +1237,9 @@ class RasterData(SKMapBase):
       return outfiles
     else:
       return self
-
+    
   def to_s3(self,
-    host:str,
+    host: Union[str,list],
     access_key:str,
     secret_key:str,
     path:str,
@@ -1249,7 +1249,7 @@ class RasterData(SKMapBase):
     dtype:str = None,
     nodata = None,
     fit_in_dtype:bool = False,
-    n_jobs:int = 4,
+    n_jobs:int = None,
     verbose_cp = False,
   ):
 
@@ -1261,25 +1261,30 @@ class RasterData(SKMapBase):
       tmp_dir = tmp_dir.joinpath(prefix)
 
     def _to_s3(outfile):
-      
-      client = Minio(host, access_key, secret_key, secure=secure)
+
+      _host = host
+      if isinstance(host, list):
+        ih = int.from_bytes(str(outfile.stem).encode(), 'little') % len(host)
+        _host = host[ih]
+
+      client = Minio(_host, access_key, secret_key, secure=secure)
       name = f'{outfile.name}'
-      
+
       if verbose_cp:
         ttprint(f"Copying {outfile} to http://{host}/{bucket}/{prefix}/{name}")
-      
+
       client.fput_object(bucket, f'{prefix}/{name}', outfile)
       os.remove(outfile)
-    
+
     outfiles = self.to_dir(
-      tmp_dir, group_expr=group_expr, dtype=dtype, nodata=nodata, 
-      fit_in_dtype=fit_in_dtype, n_jobs=n_jobs, 
+      tmp_dir, group_expr=group_expr, dtype=dtype, nodata=nodata,
+      fit_in_dtype=fit_in_dtype, n_jobs=n_jobs,
       return_outfiles=True, on_each_outfile = _to_s3
     )
 
     name = outfiles[len(outfiles)-1].name
     last_url = f'http://{host}/{bucket}/{prefix}/{name}'
-    
+
     self._verbose(f"{len(outfiles)} rasters copied to s3")
     self._verbose(f"Last raster in s3: {last_url}")
 
