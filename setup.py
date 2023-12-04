@@ -21,7 +21,7 @@ setuptools.setup(
         'GDAL>=3.1',
         'affine>=2.3',
         'geopandas>=0.13',
-        'joblib>=1.1.0',
+        'joblib>=1.3.2',
         'numpy>=1.19',
         'pyproj>=3.1',
         'pandas>=2.0',
