@@ -582,6 +582,7 @@ try:
       min_height:float = 0.5,
       min_prominence:float = 0.2,
       min_distance:float = 1.0,
+      scale_expr:str = None,
       n_jobs:int = os.cpu_count(),
       verbose = False
     ):
@@ -592,15 +593,19 @@ try:
       self.min_height = min_height
       self.min_prominence = min_prominence
       self.min_distance = min_distance
+      self.scale_expr = scale_expr
       self.n_jobs = n_jobs
 
       self.name_misc = [
-        ('peaks', 'm', 1), ('peaks', 'n', 1), 
+        ('peaks', 'm', 100), ('peaks', 'n', 1), 
       ]
 
       self.scale_arr = np.array([ scale for _, _, scale in self.name_misc ])
 
     def _find_peaks(self, data):
+
+      if self.scale_expr is not None:
+        data = ne.evaluate(self.scale_expr, { 'data': data })
 
       has_nan = np.sum(np.isnan(data).astype('int'))
       
@@ -611,20 +616,25 @@ try:
       result = np.empty((len(idxs) * 2))
       
       if has_nan == 0:
-        o2 = 0
-        for i0, i1 in idxs:
-          
-          peaks, _ = find_peaks(data[i0:i1], height=self.min_height, prominence=self.min_prominence, distance=self.min_distance)
-          nos = len(peaks)
-          
-          mean, los = np.nan, 0
-          if nos > 0:
-            mean = np.mean(data[peaks])
-            los = np.sum(data > mean * self.min_height) / ts_size
+        
+        peaks, _ = find_peaks(data, height=self.min_height, prominence=self.min_prominence, distance=self.min_distance)
+        _peaks = list(peaks)
 
-          result[o2] = mean * self.scale_arr[0]
-          result[o2 + 1] = los * self.scale_arr[1]
-          o2 += 2
+        o2 = 0
+
+        if len(peaks) > 0:
+          for i0, i1 in idxs:
+            seas_peaks = list(( i for i in range(i0, i1) if i in _peaks))
+            nos = len(seas_peaks)
+            
+            mean, los = np.nan, 0
+            if nos > 0:
+              mean = np.mean(data[seas_peaks])
+              los = np.sum(data[i0:i1] > mean * 0.5) / self.season_size
+
+            result[o2] = los * self.scale_arr[0]
+            result[o2 + 1] = nos * self.scale_arr[1]
+            o2 += 2
 
       return result
 
