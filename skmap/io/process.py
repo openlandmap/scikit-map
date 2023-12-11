@@ -175,6 +175,87 @@ try:
     def _gapfill(self, data):
       pass
 
+
+  class SircleTransformer(Transformer):
+    """
+    :param data: N_timeseries x N_samples matrix where the time series are stored one per each row
+    :param w_0: convolution coefficent associated with the present
+    :param w_f: convolution coefficents associated with the future
+    :param w_p: convolution coefficents associated with the past
+    :param use_mask: decide if to use a mask for weights renormalization
+    :param return_den: in case of usage of the mask will return the denominator matrix in the Hadamard division
+    :param S: optional N_timeseries x N_samples matrix where per element scalings are stored
+    :param use_fft_backend: force usage of FFT backend computation of the convolution
+    :param n_jobs: number of CPU to be used in parallel
+    """
+    
+    def __init__(self,
+      w_0:float,
+      w_f = [],
+      w_p = [],
+      use_mask:bool = False,
+      return_den:bool = False,
+      S = [],
+      use_fft_backend:bool = False,
+      verbose = False
+    ):
+      super().__init__(name='SIRCLE', verbose=verbose, temporal=True)
+      self.w_0 = w_0
+      self.w_f = w_f
+      self.w_p = w_p
+      self.use_mask = use_mask
+      self.return_den = return_den
+      self.S = S
+
+    def _run(self, data):
+      # Convolution and normalization
+      try:
+        import mkl
+        mkl_threads = mkl.get_num_threads()
+        mkl.set_num_threads(self.n_jobs)
+      except:
+        pass
+      np.seterr(divide='ignore', invalid='ignore')
+      orig_shape = data.shape
+      data = np.reshape(data,(data.shape[0]*data.shape[1],data.shape[2]))
+      # @TODO avoid this and include the multiband case
+      orig_dtype = data.dtype
+      if data.ndim > 1:
+        n_t = data.shape[0]
+        n_s = data.shape[1]
+      else:
+        n_t = 1
+        n_s = data.size
+
+      assert self.w_p.ndim == 1, "w_p must be a 1D array"
+      assert self.w_f.ndim == 1, "w_f must be a 1D array"
+      n_l = self.w_p.size
+      n_r = self.w_f.size
+      n_e = n_s + max(n_l, n_r)
+
+      V_e = np.zeros((n_t, n_e), dtype=np.float64, order='F')
+      V_e[:, 0:n_s] = data
+      if self.use_mask:
+        valid_mask = ~np.isnan(V_e).astype(bool)
+        V_e[~valid_mask] = 0.0
+        M_e = valid_mask.astype(np.float64)
+      from scipy.linalg import circulant
+      w_e = np.zeros((15,))
+      w_e[0] = self.w_0
+      w_e[1:n_r+1] = self.w_f
+      w_e[-n_l:] = self.w_p
+      W_e = circulant(w_e)
+      print(W_e)
+      
+
+      # RESHAAAAAAAPEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE 
+      if self.return_den:
+        return np.reshape(data, orig_shape)
+      else:
+        return np.reshape(data, orig_shape)
+
+
+
   class SeasConvFill(Filler):
     """
     :param season_size: number of images per year
