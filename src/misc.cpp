@@ -28,8 +28,8 @@ std::vector<std::string> outDatesEnd = {
 };
 
 // RowMajor to match the WrapFFT format
-using MatrixFloat = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-using MatrixComplexFloat = Eigen::Matrix<std::complex<float>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using MatrixFloat = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using MatrixComplexFloat = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 // ColMajor to match the GDAL format
 using MatrixUI16 = Eigen::Matrix<unsigned short, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
 using MatrixUI8 = Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;

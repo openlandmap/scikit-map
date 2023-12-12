@@ -54,18 +54,17 @@ public:
 
 
     template <class ReadMatrix>
-    unsigned char readInputFilesMB(std::string fileUrl,
+    void readInputFilesMB(std::string fileUrl,
                         int* bandList,
                         size_t N_bands,
                         ReadMatrix& bandsData,
                         GDALDataType readType) {
         GDALDataset *readDataset = (GDALDataset *)GDALOpen(fileUrl.c_str(), GA_ReadOnly);
         if (readDataset == nullptr) {
-            bandsData.block(0, m_id, m_N_row * m_N_col * N_bands, 1).setZero();
+            bandsData.block(0, m_id, m_N_pix * N_bands, 1).setZero();
             std::cerr << "scikit-map ERROR 1: issues in opening the file with URL " << fileUrl << std::endl;
             std::cout << "Issues in opening the file with URL " << fileUrl << ", considering as gap." << std::endl;
             GDALClose(readDataset);
-            return 1;
         } else
         {
             // Read the data for one band
@@ -73,14 +72,49 @@ public:
                                m_N_row, m_N_col, readType, N_bands, bandList, 0, 0, 0);
            
             if (outRead != CE_None) {
-                bandsData.block(0, m_id, m_N_row * m_N_col * N_bands, 1).setZero();
+                bandsData.block(0, m_id, m_N_pix * N_bands, 1).setZero();
                 std::cerr << "Error 2: issues in reading the file with URL " << fileUrl << std::endl;
                 std::cout << "Issues in reading the file with URL " << fileUrl << ", considering as gap." << std::endl;
                 GDALClose(readDataset);
             }
             GDALClose(readDataset);
         }
-        return 0;
+    }
+
+    
+    template <class ReadMatrix>
+    unsigned char readAggregatedInputFilesMB(std::string fileDate,
+                        std::string in_folder,
+                        std::vector<std::string> bandNames,
+                        int* bandList,
+                        size_t N_bands,
+                        ReadMatrix& bandsData,
+                        GDALDataType readType) {
+        unsigned char ret = 0;
+        for (size_t bandId = 0; bandId < N_bands; ++bandId) {
+            std::string fileUrl = in_folder + "/" + bandNames[bandId] + ".ard2_m_30m_s_" + fileDate + "_go_epsg.4326_v20230908.tif";
+            GDALDataset *readDataset = (GDALDataset *)GDALOpen(fileUrl.c_str(), GA_ReadOnly);
+            if (readDataset == nullptr) {
+                bandsData.block(m_N_pix * bandId, m_id, m_N_pix, 1).setZero();
+                std::cerr << "scikit-map ERROR 1: issues in opening the file with URL " << fileUrl << std::endl;
+                std::cout << "Issues in opening the file with URL " << fileUrl << ", considering as gap." << std::endl;
+                GDALClose(readDataset);
+                ret = 1;
+            } else
+            {
+                // Read the data for one band
+                CPLErr outRead = readDataset->RasterIO(GF_Read, 0, 0, m_N_row, m_N_col, bandsData.data() + m_id * m_N_pix * N_bands + bandId * m_N_pix,
+                                   m_N_row, m_N_col, readType, 1, bandList, 0, 0, 0);               
+                if (outRead != CE_None) {
+                    bandsData.block(m_N_pix * bandId, m_id, m_N_pix, 1).setZero();
+                    std::cerr << "Error 2: issues in reading the file with URL " << fileUrl << std::endl;
+                    std::cout << "Issues in reading the file with URL " << fileUrl << ", considering as gap." << std::endl;
+                    GDALClose(readDataset);
+                }
+                GDALClose(readDataset);
+            }
+        }
+        return ret;
     }
 
     
@@ -108,15 +142,37 @@ public:
             (unsigned short) 1, bandsData.block(band_offset, 0, N_pix_slice, m_N_img));
     }
 
-    void computeClearSkyFractionMB(TypesEigen<float>::VectorReal& clearSkyFraction,
+    
+    template <class ReadMatrix>
+    void processAggregatedMaskMB(ReadMatrix& bandsData,
+                       MatrixBool& clearSkyMask,
+                       size_t offset) {
+        size_t band_offset;
+        size_t N_pix_slice;
+        if (m_id < m_slice_proc_step) {
+            band_offset = offset + m_id * m_N_slice_proc;
+            N_pix_slice = m_N_slice_proc;
+        } else {
+            band_offset = offset + m_N_slice_proc * m_slice_proc_step + (m_N_slice_proc - 1) * (m_id - m_slice_proc_step);
+            N_pix_slice = m_N_slice_proc - 1;
+        }
+
+        clearSkyMask.block(band_offset - offset, 0, N_pix_slice, m_N_img) =
+             (bandsData.block(band_offset, 0, N_pix_slice, m_N_img).array() == 1);
+        bandsData.block(band_offset, 0, N_pix_slice, m_N_img) = clearSkyMask.block(band_offset - offset, 0, N_pix_slice, m_N_img).select(
+            (unsigned short) 1, bandsData.block(band_offset, 0, N_pix_slice, m_N_img));
+    }
+
+    void computeClearSkyFractionMB(TypesEigen<double>::VectorReal& clearSkyFraction,
                                    size_t offset,
                                    MatrixUI16& bandsData) {
         clearSkyFraction(m_id) = (float) bandsData.block(offset, m_id, m_N_pix, 1).cast<int>().sum() / (float) m_N_pix;
     }
 
+    template <class ReadMatrix>
     void maskDataMB(size_t bandOffset,
                     MatrixBool& clearSkyMask,
-                    MatrixUI16& bandsData) {
+                    ReadMatrix& bandsData) {
         size_t band_offset;
         size_t N_pix_slice;
         if (m_id < m_slice_proc_step) {
@@ -127,12 +183,12 @@ public:
             N_pix_slice = m_N_slice_proc - 1;
         }
 
-        bandsData.block(band_offset, 0, N_pix_slice, m_N_img) = (!clearSkyMask.block(band_offset - bandOffset, 0, N_pix_slice, m_N_img).array()).select(
+        bandsData.block(band_offset, 0, N_pix_slice, m_N_img) = (clearSkyMask.block(band_offset - bandOffset, 0, N_pix_slice, m_N_img).array() == false).select(
             (unsigned short) 0, bandsData.block(band_offset, 0, N_pix_slice, m_N_img));
     }
 
     void aggregationSummationMB(MatrixUI16& bandsData,
-                                TypesEigen<float>::VectorReal& clearSkyFraction,
+                                TypesEigen<double>::VectorReal& clearSkyFraction,
                                 MatrixFloat& aggrData) {
         size_t band_offset;
         size_t N_pix_slice;
@@ -144,7 +200,7 @@ public:
             N_pix_slice = m_N_slice_procMB - 1;
         }
 
-        Eigen::SparseMatrix<float> aggMatrix(m_N_img, m_N_aimg);
+        Eigen::SparseMatrix<double> aggMatrix(m_N_img, m_N_aimg);
         aggMatrix.reserve(m_N_aimg*m_N_aggr);
         // Fill the sparse matrix with ones to perform the aggregation
         for (size_t y = 0; y < m_N_years; ++y) {
@@ -160,7 +216,7 @@ public:
         }
         aggMatrix.finalize();
 
-        aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg) = bandsData.block(band_offset, 0, N_pix_slice, m_N_img).cast<float>() * aggMatrix;
+        aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg) = bandsData.block(band_offset, 0, N_pix_slice, m_N_img).cast<double>() * aggMatrix;
     }
 
 
@@ -191,6 +247,7 @@ public:
             0., aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg));
     }
 
+    
     void normalizeAndConvertAggrDataMB(size_t bandOffset,
                              size_t maskOffset,
                              float scaling,
@@ -218,91 +275,64 @@ public:
     }
 
 
-    void computeConvolutionVectorMB(TypesEigen<float>::VectorReal& normQa,
-                                    TypesEigen<float>::VectorComplex& convExtFFT,
+    void computeConvolutionVectorMB(TypesEigen<double>::VectorComplex& convExtFFT,
+                                    bool useFuture,
                                     float attSeas,
-                                    float attEnv) {
+                                    float attEnv,
+                                    double &minConvValue,
+                                    double &maxNormQa) {
 
-        size_t N_ext = m_N_aimg * 2;
-        size_t N_fft = m_N_aimg + 1;
+        size_t N_ext = m_N_aimg * 2 - 1;
+        size_t N_fft = m_N_aimg;
         // Plan the FFT computation
 
-        TypesEigen<float>::VectorReal conv(m_N_aimg);
-        TypesEigen<float>::VectorReal convExt(N_ext);
+        TypesEigen<double>::VectorReal conv_past(m_N_aimg);
+        TypesEigen<double>::VectorReal conv_future(m_N_aimg - 1);
+        TypesEigen<double>::VectorReal convExt = TypesEigen<double>::VectorReal::Zero(N_ext);
+        TypesEigen<double>::VectorReal normQa = TypesEigen<double>::VectorReal::Ones(N_ext);
+        TypesEigen<double>::VectorComplex normQaFFT(N_fft);
 
-        fftwf_plan plan_forward = 
-            fftwf_plan_dft_r2c_1d(N_ext, convExt.data(), reinterpret_cast<fftwf_complex*>(convExtFFT.data()), FFTW_MEASURE);
-        fftwf_plan plan_backward = 
-            fftwf_plan_dft_c2r_1d(N_ext, reinterpret_cast<fftwf_complex*>(convExtFFT.data()), convExt.data(), FFTW_MEASURE);
+        fftw_plan plan_forward = 
+            fftw_plan_dft_r2c_1d(N_ext, convExt.data(), reinterpret_cast<fftw_complex*>(convExtFFT.data()), FFTW_MEASURE);
+        fftw_plan plan_backward = 
+            fftw_plan_dft_c2r_1d(N_ext, reinterpret_cast<fftw_complex*>(convExtFFT.data()), convExt.data(), FFTW_MEASURE);
 
-        convExt.setOnes();
-        TypesEigen<float>::VectorComplex normQaFFT(N_fft);
-        compute_conv_vec<float>(conv, m_N_years, m_N_aipy, attSeas, attEnv);
-        convExt.segment(0,m_N_aimg) = conv;
-        convExt.segment(m_N_aimg+1, m_N_aimg-1) = conv.reverse().segment(0,m_N_aimg-1);
-        normQa.setOnes();
-        normQa.segment(m_N_aimg, m_N_aimg).setZero();
+        compute_conv_vec<double>(conv_past, m_N_years, m_N_aipy, attSeas, attEnv);
+        if (useFuture) {
+            TypesEigen<double>::VectorReal conv_future = conv_past.reverse().segment(0, m_N_aimg-1);
+            convExt.segment(m_N_aimg+1, m_N_aimg-1) = conv_future;
+        }
+        convExt.segment(0,m_N_aimg) = conv_past;
+        minConvValue = convExt.maxCoeff();
+        for (size_t i = 0; i < N_ext; i++) {
+            if ((convExt(i) > 0.) && (convExt(i) < minConvValue)) {
+                minConvValue = convExt(i);
+            }
+        }
+        normQa.segment(m_N_aimg, m_N_aimg-1).setZero();
         normQa(0) = 0.;
 
-        fftwf_execute_dft_r2c(plan_forward, convExt.data(), reinterpret_cast<fftwf_complex*>(convExtFFT.data()));
-        fftwf_execute_dft_r2c(plan_forward, normQa.data(), reinterpret_cast<fftwf_complex*>(normQaFFT.data()));
+        fftw_execute_dft_r2c(plan_forward, convExt.data(), reinterpret_cast<fftw_complex*>(convExtFFT.data()));
+        fftw_execute_dft_r2c(plan_forward, normQa.data(), reinterpret_cast<fftw_complex*>(normQaFFT.data()));
 
         normQaFFT.array() *= convExtFFT.array()/N_ext;
 
-        fftwf_execute_dft_c2r(plan_backward, reinterpret_cast<fftwf_complex*>(normQaFFT.data()), normQa.data());
+        fftw_execute_dft_c2r(plan_backward, reinterpret_cast<fftw_complex*>(normQaFFT.data()), normQa.data());
+        maxNormQa = normQa.segment(0, m_N_aimg).maxCoeff();
 
-        fftwf_destroy_plan(plan_forward);
-        fftwf_destroy_plan(plan_backward);
-    }
-
-    float computeConvolutionVectorNoFutureMB(TypesEigen<float>::VectorReal& normQa,
-                                    TypesEigen<float>::VectorComplex& convExtFFT,
-                                    float attSeas,
-                                    float attEnv) {
-
-        size_t N_ext = m_N_aimg * 2;
-        size_t N_fft = m_N_aimg + 1;
-        // Plan the FFT computation
-
-        TypesEigen<float>::VectorReal conv(m_N_aimg);
-        TypesEigen<float>::VectorReal convExt(N_ext);
-
-        fftwf_plan plan_forward = 
-            fftwf_plan_dft_r2c_1d(N_ext, convExt.data(), reinterpret_cast<fftwf_complex*>(convExtFFT.data()), FFTW_MEASURE);
-        fftwf_plan plan_backward = 
-            fftwf_plan_dft_c2r_1d(N_ext, reinterpret_cast<fftwf_complex*>(convExtFFT.data()), convExt.data(), FFTW_MEASURE);
-
-        TypesEigen<float>::VectorComplex normQaFFT(N_fft);
-        compute_conv_vec<float>(conv, m_N_years, m_N_aipy, attSeas, attEnv);
-        convExt.setOnes();
-        convExt.segment(0,m_N_aimg).setZero();
-        convExt.segment(m_N_aimg+1, m_N_aimg-1) = conv.reverse().segment(0,m_N_aimg-1);
-        std::cout << "convExt" << std::endl;
-        std::cout << convExt << std::endl;
-        normQa.setOnes();
-        normQa.segment(m_N_aimg, m_N_aimg).setZero();
-        normQa(0) = 0.;
-
-        fftwf_execute_dft_r2c(plan_forward, convExt.data(), reinterpret_cast<fftwf_complex*>(convExtFFT.data()));
-        fftwf_execute_dft_r2c(plan_forward, normQa.data(), reinterpret_cast<fftwf_complex*>(normQaFFT.data()));
-
-        normQaFFT.array() *= convExtFFT.array()/N_ext;
-
-        fftwf_execute_dft_c2r(plan_backward, reinterpret_cast<fftwf_complex*>(normQaFFT.data()), normQa.data());
-
-        fftwf_destroy_plan(plan_forward);
-        fftwf_destroy_plan(plan_backward);
-        return conv.minCoeff();
-
+        fftw_destroy_plan(plan_forward);
+        fftw_destroy_plan(plan_backward);
     }
 
 
+
+    template <class AggrMatrix>
     void convolutionSeasConvMB(size_t offset,
-                               MatrixFloat& aggrData,
+                               MatrixUI8& aggrData,
                                MatrixFloat& convData,
-                               TypesEigen<float>::VectorComplex convExtFFT,
-                               fftwf_plan plan_forward,
-                               fftwf_plan plan_backward) {
+                               TypesEigen<double>::VectorComplex convExtFFT,
+                               fftw_plan plan_forward,
+                               fftw_plan plan_backward) {
 
         size_t band_offset;
         size_t N_pix_slice;
@@ -314,36 +344,58 @@ public:
             N_pix_slice = m_N_slice_proc - 1;
         }
 
-        size_t N_ext = m_N_aimg * 2;
-        size_t N_fft = m_N_aimg + 1;
+        size_t N_ext = m_N_aimg * 2 - 1;
+        size_t N_fft = m_N_aimg;
 
         MatrixFloat aggrDataExt = MatrixFloat::Zero(N_pix_slice, N_ext);
-        MatrixComplexFloat aggrMatrixFFT = MatrixComplexFloat::Zero(N_pix_slice, N_fft);
-     
-        aggrDataExt.block(0, 0, N_pix_slice, m_N_aimg) = aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg);
+        MatrixComplexFloat aggrDataFFT = MatrixComplexFloat::Zero(N_pix_slice, N_fft);
+        
+        aggrDataExt.block(0, 0, N_pix_slice, m_N_aimg) = aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg).cast<double>();
 
         // Compute the forward transforms 
         for (std::size_t i = 0; i < N_pix_slice; ++i) {
-            fftwf_execute_dft_r2c(plan_forward, aggrDataExt.data() + i * N_ext, reinterpret_cast<fftwf_complex*>(aggrMatrixFFT.data()) + i * N_fft);
+            fftw_execute_dft_r2c(plan_forward, aggrDataExt.data() + i * N_ext, reinterpret_cast<fftw_complex*>(aggrDataFFT.data()) + i * N_fft);
         }
         
         // Convolve the vectors
-        aggrMatrixFFT.array().rowwise() *= convExtFFT.array().transpose();
-
+        aggrDataFFT.array().rowwise() *= convExtFFT.array().transpose();
+        
         // Compute backward transformations
         for (std::size_t i = 0; i < N_pix_slice; ++i) {
-            fftwf_execute_dft_c2r(plan_backward, reinterpret_cast<fftwf_complex*>(aggrMatrixFFT.data()) + i * N_fft, aggrDataExt.data() + i * N_ext);
+            fftw_execute_dft_c2r(plan_backward, reinterpret_cast<fftw_complex*>(aggrDataFFT.data()) + i * N_fft, aggrDataExt.data() + i * N_ext);
         }
         
         convData.block(band_offset, 0, N_pix_slice, m_N_aimg) = aggrDataExt.block(0, 0, N_pix_slice, m_N_aimg);
     }
 
+    template <class ReadMatrix>
+    void maskNonFilledDataMB(ReadMatrix& bandsData,
+                       MatrixBool& nonFilledMask,
+                       double minConvValue,
+                       size_t offset) {
+        size_t band_offset;
+        size_t N_pix_slice;
+        if (m_id < m_slice_proc_step) {
+            band_offset = offset + m_id * m_N_slice_proc;
+            N_pix_slice = m_N_slice_proc;
+        } else {
+            band_offset = offset + m_N_slice_proc * m_slice_proc_step + (m_N_slice_proc - 1) * (m_id - m_slice_proc_step);
+            N_pix_slice = m_N_slice_proc - 1;
+        }
+
+
+
+        nonFilledMask.block(band_offset - offset, 0, N_pix_slice, m_N_img) = (bandsData.block(band_offset, 0, N_pix_slice, m_N_img).array() < minConvValue);
+    }
+
+
 
     void renormalizeSeasConvMB(size_t bandOffset,
                                 size_t maskOffset,
                                 MatrixFloat& convData,
-                                MatrixFloat& aggrData,
-                                MatrixBool& gapMask,
+                                MatrixUI8& aggrData,
+                                MatrixBool& clearSkyMask,
+                                MatrixBool& nonFilledMask,
                                 MatrixUI8& writeData) {
         size_t band_offset;
         size_t mask_offset;
@@ -367,15 +419,14 @@ public:
             convData.block(band_offset, 0, N_pix_slice, m_N_aimg).cast<unsigned char>();
 
         // Set to 255 the values that are still not gap-filled
-        // In the following the absolute value in the selections of not filled pixels (NaN) takes care of the case -0.0
         writeData.block(band_offset, 0, N_pix_slice, m_N_aimg) = 
-            (convData.block(mask_offset, 0, N_pix_slice, m_N_aimg).cwiseAbs().array() == (float)0.).select(
+            nonFilledMask.block(band_offset-bandOffset, 0, N_pix_slice, m_N_aimg).select(
                 (unsigned char)255, writeData.block(band_offset, 0, N_pix_slice, m_N_aimg));
 
         // Restore the values that were already not gap
         writeData.block(band_offset, 0, N_pix_slice, m_N_aimg) =
-                (!gapMask.block(band_offset-bandOffset, 0, N_pix_slice, m_N_aimg).array()).select(
-                aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg).cast<unsigned char>(), 
+            clearSkyMask.block(band_offset-bandOffset, 0, N_pix_slice, m_N_aimg).select(
+                aggrData.block(band_offset, 0, N_pix_slice, m_N_aimg), 
                 writeData.block(band_offset, 0, N_pix_slice, m_N_aimg));
 
     }
@@ -401,10 +452,11 @@ public:
     }
 
 
-    void extractQaMB(TypesEigen<float>::VectorReal& normQa,
+    void extractQaMB(double maxNormQa,
                     size_t maskOffset,
-                    MatrixFloat& aggrDataExt,
-                    MatrixBool& gapMask,
+                    MatrixFloat& convData,
+                    MatrixBool& clearSkyMask,
+                    MatrixBool& nonFilledMask,
                     MatrixUI8& writeData) {
         size_t mask_offset;
         size_t N_pix_slice;
@@ -417,29 +469,32 @@ public:
         }
 
         // Renormalize the result
-        aggrDataExt.block(mask_offset, 0, N_pix_slice, m_N_aimg) = 
-            (aggrDataExt.block(mask_offset, 0, N_pix_slice, m_N_aimg).array().rowwise() / 
-            normQa.segment(0,m_N_aimg).array().transpose()) / (2. * (float)m_N_aimg) * 249.;
+        // Divide by the "best possible filling" QA value: / maxNormQa
+        // Scaling from backward transformation in FFTW (N_ext): / (2. * (float)m_N_aimg -1.)
+        // Multiply by 249: the gap filled walues will span a QA between 0 to 249
+        convData.block(mask_offset, 0, N_pix_slice, m_N_aimg) = 
+            convData.block(mask_offset, 0, N_pix_slice, m_N_aimg).array()
+            / maxNormQa / (2. * (float)m_N_aimg -1.) * 249.;
 
         // Saturate to 249 higher values to avoid numerical issues in the conversion
-        aggrDataExt.block(mask_offset, 0, N_pix_slice, m_N_aimg) = 
-            (aggrDataExt.block(mask_offset, 0, N_pix_slice, m_N_aimg).array() > 249.).select(
-                249., aggrDataExt.block(mask_offset, 0, N_pix_slice, m_N_aimg));
+        convData.block(mask_offset, 0, N_pix_slice, m_N_aimg) = 
+            (convData.block(mask_offset, 0, N_pix_slice, m_N_aimg).array() > 249.).select(
+            249., convData.block(mask_offset, 0, N_pix_slice, m_N_aimg));
 
-        // Store in byte the QA values rounding to the higher integer
+        // Store in byte the QA values rounding to the nearest integer
         writeData.block(mask_offset, 0, N_pix_slice, m_N_aimg) = 
-            aggrDataExt.block(mask_offset, 0, N_pix_slice, m_N_aimg).array().ceil().cast<unsigned char>();
+            (convData.block(mask_offset, 0, N_pix_slice, m_N_aimg).array() + 0.5).floor().cast<unsigned char>();
 
         // Set to 255 the values that are still not gap-filled
         // In the following the absolute value in the selections of not filled pixels (NaN) takes care of the case -0.0
         writeData.block(mask_offset, 0, N_pix_slice, m_N_aimg) = 
-            (aggrDataExt.block(mask_offset, 0, N_pix_slice, m_N_aimg).cwiseAbs().array() == (float)0.).select(
+            nonFilledMask.block(mask_offset-maskOffset, 0, N_pix_slice, m_N_aimg).select(
             (unsigned char)255, writeData.block(mask_offset, 0, N_pix_slice, m_N_aimg));
 
         // Set to 250 the values that were already not gap
         writeData.block(mask_offset, 0, N_pix_slice, m_N_aimg) =
-                (!gapMask.block(mask_offset-maskOffset, 0, N_pix_slice, m_N_aimg).array()).select(
-                (unsigned char)250, writeData.block(mask_offset, 0, N_pix_slice, m_N_aimg));
+            clearSkyMask.block(mask_offset-maskOffset, 0, N_pix_slice, m_N_aimg).select(
+            (unsigned char)250, writeData.block(mask_offset, 0, N_pix_slice, m_N_aimg));
     }
 
 
