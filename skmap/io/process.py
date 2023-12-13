@@ -3,7 +3,6 @@ import os
 import warnings
 from enum import Enum
 from typing import Callable
-from scipy.linalg import matmul_toeplitz
 
 try:
 
@@ -27,6 +26,9 @@ try:
   from datetime import datetime
   from pandas import DataFrame
   import pandas as pd
+  from scipy.linalg import circulant
+  from scipy.linalg import matmul_toeplitz
+
 
   from dateutil.relativedelta import relativedelta
 
@@ -196,7 +198,8 @@ try:
       use_mask:bool = False,
       return_den:bool = False,
       S = [],
-      use_fft_backend:bool = False,
+      backend:str = "dense",
+      n_jobs:int = os.cpu_count(),
       verbose = False
     ):
       super().__init__(name='SIRCLE', verbose=verbose, temporal=True)
@@ -206,6 +209,8 @@ try:
       self.use_mask = use_mask
       self.return_den = return_den
       self.S = S
+      self.backend = backend
+      self.n_jobs = n_jobs
 
     def _run(self, data):
       # Convolution and normalization
@@ -229,9 +234,9 @@ try:
 
       assert self.w_p.ndim == 1, "w_p must be a 1D array"
       assert self.w_f.ndim == 1, "w_f must be a 1D array"
-      n_l = self.w_p.size
-      n_r = self.w_f.size
-      n_e = n_s + max(n_l, n_r)
+      n_p = self.w_p.size
+      n_f = self.w_f.size
+      n_e = n_s + max(n_p, n_f)
 
       V_e = np.zeros((n_t, n_e), dtype=np.float64, order='F')
       V_e[:, 0:n_s] = data
@@ -239,20 +244,73 @@ try:
         valid_mask = ~np.isnan(V_e).astype(bool)
         V_e[~valid_mask] = 0.0
         M_e = valid_mask.astype(np.float64)
-      from scipy.linalg import circulant
-      w_e = np.zeros((15,))
-      w_e[0] = self.w_0
-      w_e[1:n_r+1] = self.w_f
-      w_e[-n_l:] = self.w_p
-      W_e = circulant(w_e)
-      print(W_e)
-      
 
-      # RESHAAAAAAAPEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE 
-      if self.return_den:
-        return np.reshape(data, orig_shape)
+      
+      if self.backend == "dense":
+        w_e = np.zeros((n_e,))
+        w_e[0] = self.w_0
+        w_e[1:n_f+1] = self.w_f
+        w_e[-n_p:] = self.w_p
+        W_e = circulant(w_e)
+        Vt_e = V_e @ W_e
+        Vt_e = np.dot(V_e, W_e)
+      elif self.backend == "sparse":
+        n_nnz = n_p+n_f+1
+        r_s = np.zeros((n_nnz*n_e,))
+        c_s = np.zeros((n_nnz*n_e,))
+        d_s = np.zeros((n_nnz*n_e,))
+        for i in range(n_e):
+          # w_0
+          r_s[n_nnz*i] = i
+          c_s[n_nnz*i] = i
+          d_s[n_nnz*i] = self.w_0
+          for j in range(n_f):
+            # w_f
+            r_s[n_nnz*i+j+1] = (i+j+1+n_e)%n_e
+            c_s[n_nnz*i+j+1] = i
+            d_s[n_nnz*i+j+1] = self.w_f[j]
+          for j in range(n_p):
+            # w_p
+            r_s[n_nnz*i+n_f+j+1] = (i+n_e-n_p+j)%n_e
+            c_s[n_nnz*i+n_f+j+1] = i
+            d_s[n_nnz*i+n_f+j+1] = self.w_p[j]
+        W_e = sparse.csc_matrix((d_s, (r_s, c_s)), shape=(n_e, n_e), dtype=np.float64).tocsr()
+        Vt_e = V_e @ W_e
+      elif self.backend == "FFT":
+        w_e = np.zeros((n_e,))
+        w_e[0] = self.w_0
+        w_e[1:n_p+1] = self.w_p[::-1]
+        w_e[-n_f:] = self.w_f[::-1]
+        Vt_e = np.empty((n_t, n_e), dtype=np.float64)
+        pyfftw.config.NUM_THREADS = self.n_jobs
+        in_fft = pyfftw.empty_aligned(n_e, dtype='float64')
+        in_ifft = pyfftw.empty_aligned(n_e, dtype='complex128')
+        in_fft[:] = w_e
+        W_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
+        for i in range(n_t):
+          in_fft[:] = V_e[i,:]
+          V_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
+          in_ifft[:] = V_fft * W_fft
+          Vt_e[i] = pyfftw.interfaces.numpy_fft.ifft(in_ifft).real
+      elif self.backend == "iterative":
+        Vt_e = np.zeros((n_t, n_e), dtype=np.float64)
+        for i in range(n_t):
+          for j in range(n_e):
+            Vt_e[i,j] = self.w_0 * V_e[i,j]
+            for k in range(n_f):
+              Vt_e[i,j] += self.w_f[k] * V_e[i,(n_e+j+k+1)%n_e]
+            for k in range(n_p):
+              Vt_e[i,j] += self.w_p[n_p-k-1] * V_e[i,(n_e+j-k-1)%n_e]
       else:
-        return np.reshape(data, orig_shape)
+          raise ValueError("Invalid backend specified")
+
+
+
+      # REturn de DENOMINATORRRRRRRRRRRR
+      if self.return_den:
+        return np.reshape(Vt_e[:,:n_s], orig_shape)
+      else:
+        return np.reshape(Vt_e[:,:n_s], orig_shape)
 
 
 
