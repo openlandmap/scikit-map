@@ -714,6 +714,7 @@ try:
     
     def __init__(self,
       scale_expr:str = None,
+      scaling:float = 1.,
       n_jobs:int = os.cpu_count(),
       verbose = False
     ):
@@ -721,6 +722,7 @@ try:
       super().__init__(verbose=verbose, temporal=True)
       
       self.scale_expr = scale_expr
+      self.scaling = scaling
       self.n_jobs = n_jobs
 
     def _theil_slopes(self, data):
@@ -736,7 +738,7 @@ try:
         result[0], _, _, _ = theilslopes(data, np.arange(0,data.shape[0]))
       else:
         result[0] = np.nan
-
+      result[0] *= self.scaling
       return result
 
     def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset):
