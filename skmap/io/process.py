@@ -806,6 +806,117 @@ try:
           
       return None, DataFrame(new_info)
 
+  class FindMinMax(Derivator):
+    
+    def __init__(self,
+      scale_expr:str = None,
+      season_size:int = None,
+      scaling:float = 1.,
+      min_max:str = None,
+      n_jobs:int = os.cpu_count(),
+      verbose = False
+    ):
+
+      super().__init__(verbose=verbose, temporal=True)
+      
+      self.scale_expr = scale_expr
+      self.season_size = season_size
+      self.min_max = min_max
+      self.scaling = scaling
+      self.n_jobs = n_jobs
+
+    def _find_min_max(self, data):
+
+      if self.scale_expr is not None:
+        data = ne.evaluate(self.scale_expr, { 'data': data })
+        
+      ts_size = data.shape[0]
+
+      idxs = [ (i, i + self.season_size) for i in range(0, ts_size, self.season_size) ]
+      result = np.empty(len(idxs))
+
+      for j, (i0, i1) in enumerate(idxs):
+        has_nan = np.sum(np.isnan(data[i0:i1]).astype('int'))   
+        if has_nan == 0:
+          if self.min_max == 'min':
+            result[j] = np.min(data[i0:i1])
+          elif self.min_max == 'max':
+            result[j] = np.max(data[i0:i1])
+          else:
+            assert False, "min_max can be ether 'min' or 'max'"
+        else:
+          result[j] = np.nan
+        result[j] *= self.scaling
+      return result
+
+    def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset):
+      
+      array = load_memmap(**ref_array)
+      result = np.apply_along_axis(self._find_min_max, 2, array[i0_0:i0_1, :, i2])
+      o2 = list(range(idx_offset, idx_offset + result.shape[2]))
+      array[i0_0:i0_1, :, o2] = result
+          
+      return True
+
+    def _args(self, rdata, ginfo):
+
+      ref_array = ref_memmap(rdata.array)
+      max_i0 = rdata.array.shape[0]
+      rows_per_job = math.ceil(max_i0 / self.n_jobs)
+
+      idx_offset = rdata._idx_offset()
+
+      args = []
+      for i in range(0, max_i0, rows_per_job):
+        i0_0, i0_1 = i, (i + rows_per_job)
+        if i0_1 > max_i0:
+          i0_1 = max_i0
+
+        i2 = ginfo.index
+        args.append((i0_0, i0_1, i2, ref_array, idx_offset))
+
+      return args
+
+    def _run(self, 
+      rdata:RasterData,
+      group_list:list,
+      ginfo_list:list,
+      outname:str = '{gr}.{nm}_{pr}_{dt}'
+    ):
+
+      new_info = []
+
+      for group, ginfo in zip(group_list, ginfo_list):
+
+        rdata._active_group = group
+        array = rdata._array()
+
+        start_dt_min = ginfo[RasterData.START_DT_COL].min()
+        end_dt_max = ginfo[RasterData.END_DT_COL].max()
+
+        ts_size = ginfo.shape[0]
+        
+        args = self._args(rdata, ginfo)
+        
+        for r in parallel.job(self._unpack, args, n_jobs=self.n_jobs, joblib_args={'backend': 'multiprocessing'}):
+          continue
+        nm = self.min_max
+        pr = 'm'
+        
+        for i0, i1 in [ (i, i + self.season_size - 1) for i in range(0, ts_size, self.season_size) ]:
+          start_dt_min = ginfo.iloc[i0][RasterData.START_DT_COL]
+          end_dt_max = ginfo.iloc[i1][RasterData.END_DT_COL]
+          name = rdata._set_date(outname, start_dt_min, 
+            end_dt_max, nm=nm, pr=pr, gr=group)
+
+          new_group = f'{group}.{nm}'
+
+          new_info.append(
+            rdata._new_info_row(rdata.base_raster, group=new_group, name=name, dates=[start_dt_min, end_dt_max])
+          )        
+      return None, DataFrame(new_info)
+
+
   class TrendAnalysis(Derivator):
     
     def __init__(self,
