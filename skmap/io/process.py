@@ -17,6 +17,7 @@ try:
   from scipy.special import log1p
   from statsmodels.tsa.seasonal import STL
   import statsmodels.api as sm
+  import concurrent.futures
 
   import scipy.sparse as sparse
   from scipy.sparse.linalg import splu
@@ -28,6 +29,7 @@ try:
   import pandas as pd
   from scipy.linalg import circulant
   from scipy.linalg import matmul_toeplitz
+  from scipy.ndimage import convolve1d
 
 
   from dateutil.relativedelta import relativedelta
@@ -244,71 +246,75 @@ try:
         valid_mask = ~np.isnan(V_e).astype(bool)
         V_e[~valid_mask] = 0.0
         M_e = valid_mask.astype(np.float64)
-
       
       if self.backend == "dense":
         w_e = np.zeros((n_e,))
         w_e[0] = self.w_0
         w_e[1:n_f+1] = self.w_f
-        w_e[-n_p:] = self.w_p
+        if n_p > 0:
+          w_e[-n_p:] = self.w_p
         W_e = circulant(w_e)
         Vt_e = V_e @ W_e
         Vt_e = np.dot(V_e, W_e)
+        if self.use_mask:
+          Mt_e = np.dot(M_e, W_e)
+
       elif self.backend == "sparse":
-        n_nnz = n_p+n_f+1
-        r_s = np.zeros((n_nnz*n_e,))
-        c_s = np.zeros((n_nnz*n_e,))
-        d_s = np.zeros((n_nnz*n_e,))
-        for i in range(n_e):
-          # w_0
-          r_s[n_nnz*i] = i
-          c_s[n_nnz*i] = i
-          d_s[n_nnz*i] = self.w_0
-          for j in range(n_f):
-            # w_f
-            r_s[n_nnz*i+j+1] = (i+j+1+n_e)%n_e
-            c_s[n_nnz*i+j+1] = i
-            d_s[n_nnz*i+j+1] = self.w_f[j]
-          for j in range(n_p):
-            # w_p
-            r_s[n_nnz*i+n_f+j+1] = (i+n_e-n_p+j)%n_e
-            c_s[n_nnz*i+n_f+j+1] = i
-            d_s[n_nnz*i+n_f+j+1] = self.w_p[j]
-        W_e = sparse.csc_matrix((d_s, (r_s, c_s)), shape=(n_e, n_e), dtype=np.float64).tocsr()
-        Vt_e = V_e @ W_e
+        n_pad = max(len(self.w_f), len(self.w_p))
+        w_e = np.zeros(n_pad*2+1)
+        w_e[n_pad] = self.w_0
+        w_e[n_pad-len(self.w_f):n_pad] = self.w_f[::-1]
+        w_e[n_pad+1:n_pad+1+len(self.w_p)] = self.w_p[::-1]
+        Vt_e = convolve1d(V_e[:, 0:n_s], w_e, mode='constant', cval=0, axis=-1)
+        if self.use_mask:
+          Mt_e = convolve1d(M_e[:, 0:n_s], w_e, mode='constant', cval=0, axis=-1)
+
       elif self.backend == "FFT":
         w_e = np.zeros((n_e,))
         w_e[0] = self.w_0
         w_e[1:n_p+1] = self.w_p[::-1]
-        w_e[-n_f:] = self.w_f[::-1]
+        if n_f > 0:
+          w_e[-n_f:] = self.w_f[::-1]
         Vt_e = np.empty((n_t, n_e), dtype=np.float64)
-        pyfftw.config.NUM_THREADS = self.n_jobs
-        in_fft = pyfftw.empty_aligned(n_e, dtype='float64')
-        in_ifft = pyfftw.empty_aligned(n_e, dtype='complex128')
-        in_fft[:] = w_e
-        W_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
-        for i in range(n_t):
+        def parallel_calculation(i):
+          pyfftw.config.NUM_THREADS = self.n_jobs
+          in_fft = pyfftw.empty_aligned(n_e, dtype='float64')
+          in_ifft = pyfftw.empty_aligned(n_e, dtype='complex128')
+          in_fft[:] = w_e
+          W_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
           in_fft[:] = V_e[i,:]
           V_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
           in_ifft[:] = V_fft * W_fft
-          Vt_e[i] = pyfftw.interfaces.numpy_fft.ifft(in_ifft).real
-      elif self.backend == "iterative":
-        Vt_e = np.zeros((n_t, n_e), dtype=np.float64)
-        for i in range(n_t):
-          for j in range(n_e):
-            Vt_e[i,j] = self.w_0 * V_e[i,j]
-            for k in range(n_f):
-              Vt_e[i,j] += self.w_f[k] * V_e[i,(n_e+j+k+1)%n_e]
-            for k in range(n_p):
-              Vt_e[i,j] += self.w_p[n_p-k-1] * V_e[i,(n_e+j-k-1)%n_e]
+          return pyfftw.interfaces.numpy_fft.ifft(in_ifft).real
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            results = list(executor.map(parallel_calculation, range(n_t)))
+        Vt_e = np.array(results)
+        if self.use_mask:
+          Mt_e = np.empty((n_t, n_e), dtype=np.float64)
+          def parallel_calculation(i):
+            pyfftw.config.NUM_THREADS = self.n_jobs
+            in_fft = pyfftw.empty_aligned(n_e, dtype='float64')
+            in_ifft = pyfftw.empty_aligned(n_e, dtype='complex128')
+            in_fft[:] = w_e
+            W_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
+            in_fft[:] = M_e[i,:]
+            M_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
+            in_ifft[:] = M_fft * W_fft
+            return pyfftw.interfaces.numpy_fft.ifft(in_ifft).real
+          with concurrent.futures.ThreadPoolExecutor() as executor:
+              results = list(executor.map(parallel_calculation, range(n_t)))
+          Mt_e = np.array(results)
       else:
           raise ValueError("Invalid backend specified")
 
+      if self.use_mask:
+        Vt_e = Vt_e / Mt_e
+        Vt_e[valid_mask] = V_e[valid_mask]
+        min_non_zero = np.min(w_e[w_e!=0.0])
+        Mt_e[np.abs(Mt_e)<min_non_zero] = 0.0
 
-
-      # REturn de DENOMINATORRRRRRRRRRRR
       if self.return_den:
-        return np.reshape(Vt_e[:,:n_s], orig_shape)
+        return np.reshape(Vt_e[:,:n_s], orig_shape), np.reshape(Mt_e[:,:n_s], orig_shape)
       else:
         return np.reshape(Vt_e[:,:n_s], orig_shape)
 
