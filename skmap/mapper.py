@@ -1579,7 +1579,7 @@ class _ParallelOverlay:
         self.result = self.sample_v3()
       else:
         if self.verbose:
-          ttprint('You already did run the overlay. Geting the cached result')
+          ttprint('You already ran the overlay. Getting the cached result.')
 
       return self.result
 
