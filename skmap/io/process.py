@@ -194,22 +194,30 @@ try:
     """
     
     def __init__(self,
-      w_0:float,
-      w_f = [],
-      w_p = [],
+      wv_0:float,
+      wv_f = [],
+      wv_p = [],
+      wm_0:float = None,
+      wm_f = [],
+      wm_p = [],
       use_mask:bool = False,
       return_den:bool = False,
+      keep_original_values:bool = True,
       S = [],
       backend:str = "dense",
       n_jobs:int = os.cpu_count(),
       verbose = False
     ):
       super().__init__(name='SIRCLE', verbose=verbose, temporal=True)
-      self.w_0 = w_0
-      self.w_f = w_f
-      self.w_p = w_p
+      self.wv_0 = wv_0
+      self.wv_f = wv_f
+      self.wv_p = wv_p
+      self.wm_0 = wm_0
+      self.wm_f = wm_f
+      self.wm_p = wm_p
       self.use_mask = use_mask
       self.return_den = return_den
+      self.keep_original_values = keep_original_values
       self.S = S
       self.backend = backend
       self.n_jobs = n_jobs
@@ -234,89 +242,136 @@ try:
         n_t = 1
         n_s = data.size
 
-      assert self.w_p.ndim == 1, "w_p must be a 1D array"
-      assert self.w_f.ndim == 1, "w_f must be a 1D array"
-      n_p = self.w_p.size
-      n_f = self.w_f.size
+      assert self.wv_p.ndim == 1, "wv_p must be a 1D array"
+      assert self.wv_f.ndim == 1, "wv_f must be a 1D array"
+      if self.use_mask:
+        if self.wm_0 == None:
+          self.wm_0 = self.wv_0
+        if self.wm_p == []:
+          self.wm_p = self.wv_p.copy()
+        else:
+          assert self.wv_p.ndim == 1, "wm_p must be a 1D array"
+        if self.wm_f == []:
+          self.wm_f = self.wv_f.copy()
+        else:
+          assert self.wv_f.ndim == 1, "wm_f must be a 1D array"
+        assert self.wm_p.shape == self.wv_p.shape, "wm_p must be of the same size of wv_p"
+        assert self.wm_f.shape == self.wv_f.shape, "wm_f must be of the same size of wv_f"
+      n_p = self.wv_p.size
+      n_f = self.wv_f.size
       n_e = n_s + max(n_p, n_f)
+      assert max(n_p, n_f) <= n_s, "the size of wv_p and of wv_f should be inferior to the one of the time series"
 
       V_e = np.zeros((n_t, n_e), dtype=np.float64, order='F')
       V_e[:, 0:n_s] = data
       if self.use_mask:
         valid_mask = ~np.isnan(V_e).astype(bool)
+        valid_mask[:, n_s:] = False
         V_e[~valid_mask] = 0.0
         M_e = valid_mask.astype(np.float64)
       
       if self.backend == "dense":
-        w_e = np.zeros((n_e,))
-        w_e[0] = self.w_0
-        w_e[1:n_f+1] = self.w_f
+        wv_e = np.zeros((n_e,))
+        wv_e[0] = self.wv_0
+        wv_e[1:n_f+1] = self.wv_f
         if n_p > 0:
-          w_e[-n_p:] = self.w_p
-        W_e = circulant(w_e)
-        Vt_e = V_e @ W_e
-        Vt_e = np.dot(V_e, W_e)
+          wv_e[-n_p:] = self.wv_p
+        Wv_e = circulant(wv_e)
+        Vt_e = np.dot(V_e, Wv_e)[:, 0:n_s]
         if self.use_mask:
-          Mt_e = np.dot(M_e, W_e)
+          wm_e = np.zeros((n_e,))
+          wm_e[0] = self.wm_0
+          wm_e[1:n_f+1] = self.wm_f
+          if n_p > 0:
+            wm_e[-n_p:] = self.wm_p
+          Wm_e = circulant(wm_e)
+          Mt_e = np.dot(M_e, Wm_e)[:, 0:n_s]
 
       elif self.backend == "sparse":
-        n_pad = max(len(self.w_f), len(self.w_p))
-        w_e = np.zeros(n_pad*2+1)
-        w_e[n_pad] = self.w_0
-        w_e[n_pad-len(self.w_f):n_pad] = self.w_f[::-1]
-        w_e[n_pad+1:n_pad+1+len(self.w_p)] = self.w_p[::-1]
-        Vt_e = convolve1d(V_e[:, 0:n_s], w_e, mode='constant', cval=0, axis=-1)
+        n_pad = max(len(self.wv_f), len(self.wv_p))
+        wv_e = np.zeros(n_pad*2+1)
+        wv_e[n_pad] = self.wv_0
+        wv_e[n_pad-len(self.wv_f):n_pad] = self.wv_f[::-1]
+        wv_e[n_pad+1:n_pad+1+len(self.wv_p)] = self.wv_p[::-1]
+        Vt_e = convolve1d(V_e[:, 0:n_s], wv_e, mode='constant', cval=0, axis=-1)
         if self.use_mask:
-          Mt_e = convolve1d(M_e[:, 0:n_s], w_e, mode='constant', cval=0, axis=-1)
+          wm_e = np.zeros(n_pad*2+1)
+          wm_e[n_pad] = self.wm_0
+          wm_e[n_pad-len(self.wm_f):n_pad] = self.wm_f[::-1]
+          wm_e[n_pad+1:n_pad+1+len(self.wm_p)] = self.wm_p[::-1]
+          Mt_e = convolve1d(M_e[:, 0:n_s], wm_e, mode='constant', cval=0, axis=-1)
 
       elif self.backend == "FFT":
-        w_e = np.zeros((n_e,))
-        w_e[0] = self.w_0
-        w_e[1:n_p+1] = self.w_p[::-1]
+        wv_e = np.zeros((n_e,))
+        wv_e[0] = self.wv_0
+        wv_e[1:n_p+1] = self.wv_p[::-1]
         if n_f > 0:
-          w_e[-n_f:] = self.w_f[::-1]
-        Vt_e = np.empty((n_t, n_e), dtype=np.float64)
+          wv_e[-n_f:] = self.wv_f[::-1]
+        if self.use_mask:
+          wm_e = np.zeros((n_e,))
+          wm_e[0] = self.wm_0
+          wm_e[1:n_p+1] = self.wm_p[::-1]
+          if n_f > 0:
+            wm_e[-n_f:] = self.wm_f[::-1]
         def parallel_calculation(i):
           pyfftw.config.NUM_THREADS = self.n_jobs
           in_fft = pyfftw.empty_aligned(n_e, dtype='float64')
           in_ifft = pyfftw.empty_aligned(n_e, dtype='complex128')
-          in_fft[:] = w_e
-          W_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
+          in_fft[:] = wv_e
+          Wv_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
           in_fft[:] = V_e[i,:]
           V_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
-          in_ifft[:] = V_fft * W_fft
+          in_ifft[:] = V_fft * Wv_fft
           return pyfftw.interfaces.numpy_fft.ifft(in_ifft).real
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            results = list(executor.map(parallel_calculation, range(n_t)))
-        Vt_e = np.array(results)
+          results = list(executor.map(parallel_calculation, range(n_t)))
+        Vt_e = np.array(results)[:, 0:n_s]
         if self.use_mask:
-          Mt_e = np.empty((n_t, n_e), dtype=np.float64)
           def parallel_calculation(i):
             pyfftw.config.NUM_THREADS = self.n_jobs
             in_fft = pyfftw.empty_aligned(n_e, dtype='float64')
             in_ifft = pyfftw.empty_aligned(n_e, dtype='complex128')
-            in_fft[:] = w_e
-            W_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
+            in_fft[:] = wm_e
+            Wm_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
             in_fft[:] = M_e[i,:]
             M_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
-            in_ifft[:] = M_fft * W_fft
+            in_ifft[:] = M_fft * Wm_fft
             return pyfftw.interfaces.numpy_fft.ifft(in_ifft).real
           with concurrent.futures.ThreadPoolExecutor() as executor:
-              results = list(executor.map(parallel_calculation, range(n_t)))
-          Mt_e = np.array(results)
+            results = list(executor.map(parallel_calculation, range(n_t)))
+          Mt_e = np.array(results)[:, 0:n_s]
       else:
           raise ValueError("Invalid backend specified")
 
       if self.use_mask:
         Vt_e = Vt_e / Mt_e
-        Vt_e[valid_mask] = V_e[valid_mask]
-        min_non_zero = np.min(w_e[w_e!=0.0])
-        Mt_e[np.abs(Mt_e)<min_non_zero] = 0.0
-
-      if self.return_den:
-        return np.reshape(Vt_e[:,:n_s], orig_shape), np.reshape(Mt_e[:,:n_s], orig_shape)
+        if self.keep_original_values:
+          Vt_e[valid_mask[:, 0:n_s]] = V_e[valid_mask]
+        min_non_zero = np.min(wm_e[wm_e!=0.0])
+        assert min_non_zero > pow(10.0,-np.finfo(Mt_e.dtype).precision-1), \
+          "Use larger values for the non-zero elements of the mask weighting vector, \
+          otherise numerical noise could make indistinguishable actual zeros form numerical zeros."
+        numerical_zeros_mask = np.abs(Mt_e)<min_non_zero
+        Vt_e[numerical_zeros_mask] = np.nan
+        if self.return_den:
+          Mt_e[numerical_zeros_mask] = 0.0
+          n_pad = max(len(self.wv_f), len(self.wv_p))
+          wm_e = np.zeros(n_pad*2+1)
+          wm_e[n_pad] = self.wm_0
+          wm_e[n_pad-len(self.wm_f):n_pad] = self.wm_f[::-1]
+          wm_e[n_pad+1:n_pad+1+len(self.wm_p)] = self.wm_p[::-1]
+          tmp_vec = np.zeros((n_e,), dtype=np.float64)
+          tmp_vec[0:n_s] = 1.0
+          norm_mask = max(convolve1d(tmp_vec, wm_e, mode='constant', cval=0, axis=-1))
+          Mt_e[:,:n_s] = Mt_e[:,:n_s]/norm_mask
+          # Normalize by the best acheavable weight
+          if self.keep_original_values:
+            Mt_e[valid_mask[:, 0:n_s]] = 1.0
+          return np.reshape(Vt_e, orig_shape), np.reshape(Mt_e, orig_shape)
+        else:
+          return np.reshape(Vt_e, orig_shape)
       else:
-        return np.reshape(Vt_e[:,:n_s], orig_shape)
+        return np.reshape(Vt_e, orig_shape)
 
 
 
