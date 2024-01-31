@@ -26,7 +26,6 @@ from sklearn.pipeline import Pipeline
 from sklearn import preprocessing
 from sklearn import metrics
 
-from rasterio.windows import Window
 from pandas import DataFrame
 from pathlib import Path
 
@@ -218,11 +217,13 @@ class LandMapper():
     target_col:str,
     feat_cols:Union[List, None] = [],
     feat_col_prfxs:Union[List, None] = [],
+    feature_weights:List = None,
     weight_col:Union[str, None] = None,
     nodata_imputer:Union[BaseEstimator, None] = None,
     estimator:Union[BaseEstimator, None] = DEFAULT['ESTIMATOR'],
     estimator_list:Union[List[BaseEstimator], None] = None,
     meta_estimator:BaseEstimator = DEFAULT['META_ESTIMATOR'],
+    calibration_idx:any = None,
     hyperpar_selection:Union[BaseEstimator, None] = None,
     hyperpar_selection_list:Union[BaseEstimator, None] = None,
     hyperpar_selection_meta:Union[List[BaseEstimator], None] = None,
@@ -235,6 +236,7 @@ class LandMapper():
     pred_method:str = 'predict',
     verbose:bool = True,
     apply_corr_factor:bool = False,
+
     **autosklearn_kwargs
   ):
 
@@ -266,12 +268,21 @@ class LandMapper():
     self._min_samples_restriction(min_samples_per_class)
     self.features = np.ascontiguousarray(self.pts[self.feature_cols].to_numpy(), dtype=np.float32)
     self.target = target = np.ascontiguousarray(self.pts[self.target_col].to_numpy(), dtype=np.float32)
+    if calibration_idx is not None:
+      calibration_mask = self.pts.index.isin(calibration_idx)
+      if np.any(calibration_mask):
+        self.calibration_mask = calibration_mask
+      else:
+        self.calibration_mask = numpy.full(self.target.shape[0], True)
+      print(f'calibration_mask = {self.calibration_mask.shape})')
+
 
     self._target_transformation()
 
     self.samples_weight = self._get_column_if_exists(weight_col, 'weight_col')
     self.cv_groups = self._get_column_if_exists(cv_group_col, 'cv_group_col')
 
+    self.feature_weights = feature_weights
     self.corr_factor = 1
     self.apply_corr_factor = apply_corr_factor
 
@@ -483,16 +494,24 @@ class LandMapper():
       self.eval_metrics['log_loss'] = metrics.log_loss(self.target, self.eval_pred)
       self.eval_report = self._classification_report_prob()
 
-  def _fit_params(self, estimator):
+  def _fit_params(self, estimator, calibration_mask = None):
+    fit_params = {}
     if isinstance(estimator, Pipeline):
-      return {'estimator__sample_weight': self.samples_weight}
+      result = {}
+      if has_fit_parameter(estimator['estimator'], "sample_weight"):
+         result['estimator__sample_weight'] = self.samples_weight
+      if has_fit_parameter(estimator['estimator'], "feature_weights"):
+         result['estimator__feature_weights'] = self.feature_weights
+      return result
     if self.is_automl_estimator:
       ttprint('LandMapper is using AutoSklearnClassifier, which not supports fit_params (ex: sample_weight)')
       return {}
-    elif has_fit_parameter(estimator, "sample_weight"):
-      return {'sample_weight': self.samples_weight}
     else:
-      return {}
+      if has_fit_parameter(estimator, "sample_weight"):
+        fit_params['sample_weight'] = self.samples_weight
+      if has_fit_parameter(estimator, "feature_weights"):
+        fit_params['feature_weights'] = self.feature_weights
+    return {}
 
   def _is_catboost_model(self,estimator):
     try:
@@ -545,7 +564,8 @@ class LandMapper():
       n_jobs = self.cv_njobs
     )
 
-    hyperpar_selection.fit(features, self.target, groups=self.cv_groups, **self._fit_params(estimator))
+    hyperpar_selection.fit(features[self.calibration_mask,:], self.target[self.calibration_mask], 
+      groups=self.cv_groups[self.calibration_mask], **self._fit_params(estimator, self.calibration_mask))
     estimator.set_params(**self._best_params(hyperpar_selection))
 
   def _do_cv_prediction(self, estimator, features):
@@ -628,13 +648,14 @@ class LandMapper():
 
     return np.stack(sorted_input_data, axis=2), sorted_raster_files
 
-  def _read_layers(self, dirs_layers:List = [], fn_layers:List = [], spatial_win = None,
+  def _read_layers(self, dirs_layers:List = [], fn_layers:List = [], bounds = None,
     dtype = 'Float32', allow_additional_layers = False, inmem_calc_func = None, dict_layers_newnames={},
     n_jobs_io = 5, verbose_renaming=True):
 
-    raster_data, raster_files = read_rasters(raster_dirs=dirs_layers, raster_files=fn_layers, \
-                                      spatial_win=spatial_win, dtype=dtype, n_jobs=n_jobs_io, \
-                                      verbose=self.verbose,)
+    raster_files = fn_layers
+    raster_data = read_rasters(raster_files=fn_layers, \
+                               bounds=bounds, dtype=dtype, n_jobs=n_jobs_io, \
+                               verbose=self.verbose,)
 
     feature_cols_set = set(self.feature_cols)
     layernames = []
@@ -655,12 +676,12 @@ class LandMapper():
       layernames.append(layername)
 
     if inmem_calc_func is not None:
-      layernames, raster_data = inmem_calc_func(layernames, raster_data, spatial_win)
+      layernames, raster_data = inmem_calc_func(layernames, raster_data, bounds)
 
     return self._reorder_layers(layernames, dict_layers_newnames, raster_data, raster_files)
 
   def _write_layer(self, fn_base_layer, fn_output, input_data_shape, output_data,
-    nan_mask, separate_probs = True, spatial_win = None, scale=1,
+    nan_mask, separate_probs = True, bounds = None, scale=1,
     dtype = 'float32', new_suffix = None):
 
     if len(output_data.shape) < 2:
@@ -688,18 +709,18 @@ class LandMapper():
         fn_output_c = Path(str(fn_output).replace(out_ext, f'_b{i+1}' + out_ext))
 
         write_new_raster(fn_base_layer, fn_output_c, output_data[:,:,i:i+1], 
-          spatial_win = spatial_win, dtype=dtype, nodata=255)
+          bounds = bounds, dtype=dtype, nodata=255)
         fn_output_list += [ fn_output_c ]
 
     else:
       write_new_raster(fn_base_layer, fn_output, output_data, 
-        spatial_win = spatial_win, dtype=dtype, nodata=255)
+        bounds = bounds, dtype=dtype, nodata=255)
       fn_output_list += [ fn_output ]
 
     return fn_output_list
 
   def _write_layers(self, fn_base_layer, fn_output, input_data_shape, pred_result,
-    pred_uncer, nan_mask, spatial_win, separate_probs, hard_class, dtype = 'float32'):
+    pred_uncer, nan_mask, bounds, separate_probs, hard_class, dtype = 'float32'):
 
     fn_out_files = []
 
@@ -710,7 +731,7 @@ class LandMapper():
       scale = 100
 
     fn_pred_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_result, nan_mask,
-      separate_probs = separate_probs, spatial_win = spatial_win, dtype = dtype, scale = scale)
+      separate_probs = separate_probs, bounds = bounds, dtype = dtype, scale = scale)
     fn_out_files += fn_pred_files
 
     if self.pred_method == 'predict_proba':
@@ -718,7 +739,7 @@ class LandMapper():
       if pred_uncer is not None:
 
         fn_uncer_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_uncer, nan_mask,
-          separate_probs = separate_probs, spatial_win = spatial_win, dtype = 'uint8', scale=100, new_suffix = '_uncertainty')
+          separate_probs = separate_probs, bounds = bounds, dtype = 'uint8', scale=100, new_suffix = '_uncertainty')
         fn_out_files += fn_uncer_files
 
       if hard_class:
@@ -732,16 +753,16 @@ class LandMapper():
         pred_argmax += 1
 
         fn_hcl_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax, nan_mask,
-          separate_probs = False, spatial_win = spatial_win, dtype = dtype, new_suffix = '_hcl')
+          separate_probs = False, bounds = bounds, dtype = dtype, new_suffix = '_hcl')
         fn_out_files += fn_hcl_file
 
         fn_hcl_prob_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_prob, nan_mask,
-          separate_probs = False, spatial_win = spatial_win, dtype = 'uint8', scale=100, new_suffix = '_hcl_prob')
+          separate_probs = False, bounds = bounds, dtype = 'uint8', scale=100, new_suffix = '_hcl_prob')
         fn_out_files += fn_hcl_prob_files
 
         if pred_uncer is not None and pred_uncer.ndim > 2:
           fn_hcl_uncer_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_uncer, nan_mask,
-            separate_probs = False, spatial_win = spatial_win, dtype = 'uint8', scale=100, new_suffix = '_hcl_uncertainty')
+            separate_probs = False, bounds = bounds, dtype = 'uint8', scale=100, new_suffix = '_hcl_uncertainty')
           fn_out_files += fn_hcl_uncer_file
 
     return fn_out_files
@@ -881,7 +902,7 @@ class LandMapper():
     dirs_layers:List = [],
     fn_layers:List = [],
     fn_output:str = None,
-    spatial_win:Window = None,
+    bounds:any = None,
     dtype = 'float32',
     fill_nodata:bool = False,
     separate_probs:bool = True,
@@ -901,7 +922,7 @@ class LandMapper():
     :param fn_layers: A list with the raster paths. Provide it and the ``dirs_layers`` is ignored.
     :param fn_output: File path where the prediction result is saved. For multiple outputs (probabilities,
       uncertainty) the same location is used, adding specific suffixes in the provided file path.
-    :param spatial_win: Read the data and predict according to the spatial window. By default is ``None``,
+    :param bounds: Read the data and predict according to the spatial bounds. By default is ``None``,
       which means all the data is read and predict.
     :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
       converted to ``np.nan``.
@@ -925,7 +946,7 @@ class LandMapper():
     :rtype: List[Path]
     """
 
-    input_data, fn_layers = self._read_layers(dirs_layers, fn_layers, spatial_win, \
+    input_data, fn_layers = self._read_layers(dirs_layers, fn_layers, bounds, \
       dtype=dtype, inmem_calc_func=inmem_calc_func, dict_layers_newnames=dict_layers_newnames, \
       allow_additional_layers=allow_additional_layers, n_jobs_io=n_jobs_io, \
       verbose_renaming=verbose_renaming)
@@ -947,7 +968,7 @@ class LandMapper():
     pred_result, pred_uncer = self._predict(input_data)
 
     fn_out_files = self._write_layers(fn_base_layer, fn_output, input_data_shape, pred_result, \
-      pred_uncer, nan_mask, spatial_win, separate_probs, hard_class, dtype = dtype)
+      pred_uncer, nan_mask, bounds, separate_probs, hard_class, dtype = dtype)
 
     fn_out_files.sort()
 
@@ -957,7 +978,7 @@ class LandMapper():
     dirs_layers_list:List[List] = [],
     fn_layers_list:List[List] = [],
     fn_output_list:List[List] = [],
-    spatial_win:Window = None,
+    bounds:any = None,
     dtype:str = 'float32',
     fill_nodata:bool = False,
     separate_probs:bool = True,
@@ -976,7 +997,7 @@ class LandMapper():
       ``dirs_layers_list`` is ignored.
     :param fn_output_list: A list of file path where the prediction result is saved. For multiple outputs (probabilities,
       uncertainty) the same location is used, adding specific suffixes in the provided file path.
-    :param spatial_win: Read the data and predict according to the spatial window. By default is ``None``,
+    :param bounds: Read the data and predict according to the spatial bounds. By default is ``None``,
       which means all the data is read and predict.
     :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
       converted to ``np.nan``.
@@ -1005,7 +1026,7 @@ class LandMapper():
       PredictionStrategyClass = _EagerLoadPrediction
 
     prediction_strategy = PredictionStrategyClass(self, dirs_layers_list, fn_layers_list, fn_output_list,
-        spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
+        bounds, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
         dict_layers_newnames_list, allow_additional_layers)
 
     return prediction_strategy.run()
@@ -1086,7 +1107,7 @@ class _PredictionStrategy(ABC):
                dirs_layers_list:List = [],
                fn_layers_list:List = [],
                fn_output_list:List = [],
-               spatial_win = None,
+               bounds = None,
                dtype = 'float32',
                fill_nodata = False,
                separate_probs = True,
@@ -1100,7 +1121,7 @@ class _PredictionStrategy(ABC):
     self.fn_layers_list = self._fn_layers_list(dirs_layers_list, fn_layers_list)
     self.fn_output_list = fn_output_list
 
-    self.spatial_win = spatial_win
+    self.bounds = bounds
     self.dtype = dtype
     self.fill_nodata = fill_nodata
     self.separate_probs = separate_probs
@@ -1129,7 +1150,7 @@ class _EagerLoadPrediction(_PredictionStrategy):
                dirs_layers_list:List = [],
                fn_layers_list:List = [],
                fn_output_list:List = [],
-               spatial_win = None,
+               bounds = None,
                dtype = 'float32',
                fill_nodata = False,
                separate_probs = True,
@@ -1139,7 +1160,7 @@ class _EagerLoadPrediction(_PredictionStrategy):
                allow_additional_layers=False):
 
     super().__init__(landmapper, dirs_layers_list, fn_layers_list, fn_output_list,
-      spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
+      bounds, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
       dict_layers_newnames_list, allow_additional_layers)
 
     self.reading_futures = []
@@ -1158,7 +1179,7 @@ class _EagerLoadPrediction(_PredictionStrategy):
 
     start = time.time()
     input_data, _ = self.landmapper._read_layers(fn_layers=fn_layers,
-      spatial_win=self.spatial_win, inmem_calc_func = self.inmem_calc_func,
+      bounds=self.bounds, inmem_calc_func = self.inmem_calc_func,
       dict_layers_newnames = dict_layers_newnames,
       allow_additional_layers=self.allow_additional_layers)
 
@@ -1178,7 +1199,7 @@ class _EagerLoadPrediction(_PredictionStrategy):
 
     start = time.time()
     fn_out_files = self.landmapper._write_layers(fn_base_layer, fn_output, input_shape, pred_result, \
-      pred_uncer, nan_mask, self.spatial_win, self.separate_probs, self.hard_class)
+      pred_uncer, nan_mask, self.bounds, self.separate_probs, self.hard_class)
     self.landmapper._verbose(f'{i+1}) Saving time: {(time.time() - start):.2f} segs')
 
     return fn_out_files
@@ -1244,7 +1265,7 @@ class _LazyLoadPrediction(_PredictionStrategy):
                dirs_layers_list:List = [],
                fn_layers_list:List = [],
                fn_output_list:List = [],
-               spatial_win = None,
+               bounds = None,
                dtype = 'float32',
                fill_nodata = False,
                separate_probs = True,
@@ -1257,7 +1278,7 @@ class _LazyLoadPrediction(_PredictionStrategy):
                writing_pool_size = 1):
 
     super().__init__(landmapper, dirs_layers_list, fn_layers_list, fn_output_list,
-      spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
+      bounds, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
       dict_layers_newnames_list, allow_additional_layers)
 
     self.data_pool = {}
@@ -1281,7 +1302,7 @@ class _LazyLoadPrediction(_PredictionStrategy):
 
     start = time.time()
     input_data, _ = self.landmapper._read_layers(fn_layers=fn_layers,
-      spatial_win=self.spatial_win, inmem_calc_func = self.inmem_calc_func,
+      bounds=self.bounds, inmem_calc_func = self.inmem_calc_func,
       dict_layers_newnames = dict_layers_newnames,
       allow_additional_layers=self.allow_additional_layers)
 
@@ -1331,7 +1352,7 @@ class _LazyLoadPrediction(_PredictionStrategy):
 
     start = time.time()
     fn_out_files = self.landmapper._write_layers(fn_base_layer, fn_output, input_data_shape, pred_result, \
-      pred_uncer, nan_mask, self.spatial_win, self.separate_probs, self.hard_class)
+      pred_uncer, nan_mask, self.bounds, self.separate_probs, self.hard_class)
     self.landmapper._verbose(f'{i+1}) Saving time: {(time.time() - start):.2f} segs')
 
     del self.result_pool[input_data_key]
@@ -1579,7 +1600,7 @@ class _ParallelOverlay:
         self.result = self.sample_v3()
       else:
         if self.verbose:
-          ttprint('You already ran the overlay. Getting the cached result.')
+          ttprint('You already did run the overlay. Geting the cached result')
 
       return self.result
 
@@ -1630,8 +1651,8 @@ class SpaceOverlay():
     if not isinstance(points, gpd.GeoDataFrame):
       points = gpd.read_file(points)
 
-    self.pts = points
-    self.pts['overlay_id'] = range(1,len(self.pts)+1)
+    self.pts = points.copy()
+    self.pts.loc[:,'overlay_id'] = range(1,len(self.pts)+1)
 
     self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
       fn_layers, max_workers, verbose)
@@ -1766,6 +1787,6 @@ class SpaceTimeOverlay():
       if self.result is None:
         self.result = year_result
       else:
-        self.result = self.result.append(year_result)
+        self.result = pd.concat([self.result, year_result], ignore_index=True)
 
     return self.result

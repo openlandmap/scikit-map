@@ -85,11 +85,15 @@ def _bounds_crs(raster_file, dst_crs):
     return raster_file, bounds, crs, tr
 
 def _build_vrt(raster_file, band, tr, dst_crs, r_method, outdir, te, tr_min):
-  outfile_1 = str(Path(outdir).joinpath(str(Path(raster_file.split('?')[0]).stem + f'_b{band}.vrt')))
-  ds_1 = BuildVRT(outfile_1, f'/vsicurl/{raster_file}', bandList = [band], xRes = tr_min, yRes = tr_min)
+
+  if 'http' in str(raster_file):
+    raster_file = f'/vsicurl/http://{str(raster_file)[6:]}'
+
+  outfile_1 = str(Path(outdir).joinpath(str(Path(str(raster_file).split('?')[0]).stem + f'_b{band}.vrt')))
+  ds_1 = BuildVRT(outfile_1, f'{raster_file}', bandList = [band], xRes = tr_min, yRes = tr_min)
   ds_1.FlushCache()
 
-  outfile_2 = str(Path(outdir).joinpath(str(Path(raster_file.split('?')[0]).stem + f'_b{band}_wrapped.vrt')))
+  outfile_2 = str(Path(outdir).joinpath(str(Path(str(raster_file).split('?')[0]).stem + f'.vrt')))
   ds_2 = Warp(outfile_2, ds_1, xRes = tr, yRes = tr, resampleAlg=r_method, dstSRS=dst_crs, outputBounds=te)
   ds_2.FlushCache()
 
@@ -99,6 +103,7 @@ def vrt_warp(raster_files,
   dst_crs='EPSG:4326',
   band = 1, 
   tr = None,
+  te = None,
   r_method = 'near', 
   outdir=None, 
   n_jobs=-1,
@@ -119,17 +124,20 @@ def vrt_warp(raster_files,
   args_vrt = []
   tr_arr = []
   for raster_file, bounds, crs, tr1 in parallel.job(_bounds_crs, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
-
     total_bounds.append(box(*bounds))
     tr_arr.append(tr1)
     args_vrt.append( (raster_file, band, tr, dst_crs, r_method, outdir) )
   
   tr_min = np.min(tr_arr)
-  te = gp.GeoSeries(total_bounds).unary_union.bounds
+  
+  if te is None:
+    te = gp.GeoSeries(total_bounds).unary_union.bounds
+
   args_vrt = [ a + (te, tr_min) for a in args_vrt ]
   
   vrt_files = []
   input_files = []
+  #print(args_vrt)
   for input_file, vrt_file in parallel.job(_build_vrt, args_vrt, n_jobs=-1, joblib_args={'backend': 'multiprocessing'}):
     input_files.append(input_file)
     vrt_files.append(vrt_file)
