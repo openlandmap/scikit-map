@@ -86,8 +86,10 @@ def _fit_in_dtype(data, dtype, nodata):
 
   return data
 
-def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_mask, expected_shape, 
+def _read_raster(raster_idx, raster_files, band, window, dtype, data_mask, expected_shape, 
   try_without_window, scale, gdal_opts, overview, verbose):
+
+  #array_mm = load_memmap(**ref_array)
 
   for key in gdal_opts.keys():
     gdal.SetConfigOption(key,gdal_opts[key])
@@ -99,14 +101,17 @@ def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_m
   try:
     ds = rasterio.open(raster_file)
     
+    ttprint("Start reading")
+    array_mm = None
     if overview is not None:
       overviews = ds.overviews(band)
       if overview in overviews:
-          ds.read(band, out=array_mm[:,:,raster_idx], out_dtype=dtype, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
+          array_mm = ds.read(band, out_dtype=dtype, out_shape=(1, math.ceil(ds.height // overview), math.ceil(ds.width // overview)), window=window)
       else:
-        ds.read(band, out=array_mm[:,:,raster_idx],  out_dtype=dtype, window=window)
+        array_mm = ds.read(band, out_dtype=dtype, window=window)
     else:
-      ds.read(band, out=array_mm[:,:,raster_idx],  out_dtype=dtype, window=window)
+      array_mm = ds.read(band, out_dtype=dtype, window=window)
+    ttprint("End reading")
 
     #if band_data.size == 0 and try_without_window:
     #  band_data = ds.read(band, out=array_mm[:,:,raster_idx])
@@ -122,14 +127,14 @@ def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_m
     if window is not None:
       if verbose:
         ttprint(f'ERROR: Failed to read {raster_file} window {window}')
-      array_mm[:,:,raster_idx] = np.empty((int(window.height), int(window.width)))
-      array_mm[:,:,raster_idx] = _nodata_replacement(dtype)
+      array_mm = np.empty((int(window.height), int(window.width)))
+      array_mm = _nodata_replacement(dtype)
 
     if expected_shape is not None:
       if verbose:
         ttprint(f'Full nan image for {raster_file}')
-      array_mm[:,:,raster_idx] = np.empty(expected_shape)
-      array_mm[:,:,raster_idx] = _nodata_replacement(dtype)
+      array_mm = np.empty(expected_shape)
+      array_mm = _nodata_replacement(dtype)
 
   if data_exists:
     if data_mask is not None:
@@ -138,17 +143,21 @@ def _read_raster(raster_idx, raster_files, array_mm, band, window, dtype, data_m
         data_mask = data_mask[:,:,0]
 
       if (data_mask.shape == band_data.shape):
-        array_mm[:,:,raster_idx][np.logical_not(data_mask)] = np.nan
+        array_mm[np.logical_not(data_mask)] = np.nan
       else:
         ttprint(f'WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}')
     
     if nodata is not None:
-      array_mm[:,:,raster_idx][array_mm[:,:,raster_idx] == nodata] = _nodata_replacement(dtype)
+      ttprint("Start _nodata_replacement")
+      array_mm[array_mm == nodata] = _nodata_replacement(dtype)
+      ttprint("End _nodata_replacement")
 
   if scale != 1.0:
-    array_mm[:,:,raster_idx] = array_mm[:,:,raster_idx] * scale
+    ttprint("Start scaling")
+    array_mm = array_mm * scale
+    ttprint("Start scaling")
 
-  return raster_idx, data_exists
+  return array_mm, raster_idx, data_exists
 
 def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, nodata):
 
@@ -376,26 +385,35 @@ def read_rasters(
   else:
     n_bands, height, width,  = ds.count, ds.height, ds.width
 
+  ttprint(f'Start new_memmap')
   if max_rasters is not None:
     array_mm = new_memmap(dtype, shape=(height, width, max_rasters))
   else:
     array_mm = new_memmap(dtype, shape=(height, width, len(raster_files) * 10))
+  ttprint(f'End new_memmap')
 
+  #ref_array = ref_memmap(array_mm)
+  #print(ref_array)
 
   args = [ 
-    (raster_idx, raster_files, array_mm, band, window, dtype, data_mask, 
+    (raster_idx, raster_files, band, window, dtype, data_mask, 
       expected_shape, try_without_window, scale, gdal_opts, overview, verbose) 
     for raster_idx in range(0,len(raster_files)) 
   ]
   
-  for raster_idx, data_exists in parallel.job(_read_raster, args, n_jobs=n_jobs, 
+  for array, raster_idx, data_exists in parallel.job(_read_raster, args, n_jobs=n_jobs, 
     joblib_args={
-      'backend': 'threading', 
-      'pre_dispatch': math.ceil(n_jobs / 3), 
-      'batch_size': math.floor(len(args) / n_jobs),
+      'backend': 'loky', 
       'return_as': 'generator'
     }):
-    
+    #joblib_args={
+    #  'backend': 'threading', 
+    #  'pre_dispatch': math.ceil(n_jobs / 3), 
+    #  'batch_size': math.floor(len(args) / n_jobs),
+    #  'return_as': 'generator'
+    #}):
+      print(array.shape)
+      array_mm[:,:,raster_idx] = array
       if (not data_exists):
         raster_file = raster_files[raster_idx]
         raise Exception(f'The raster {raster_file} not exists')
