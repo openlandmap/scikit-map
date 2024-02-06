@@ -265,7 +265,6 @@ if __name__ == '__main__':
   import SharedArray as sa
 
   import multiprocessing as mp
-  import praster
 
   TMP_DIR = tempfile.gettempdir()
 

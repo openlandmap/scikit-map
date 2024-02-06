@@ -11,7 +11,7 @@ module_skmap_bindings = setuptools.Extension('skmap_bindings',
                                        include_dirs=[np.get_include(), 'pybind11/include', 'skmap/include', 'skmap/src'],
                                        extra_compile_args=['-fopenmp'],
                                        extra_link_args=['-lgomp', '-std=c++11'],
-                                       libraries=['fftw3_threads', 'fftw3', 'm', 'gomp'])
+                                       libraries=['fftw3_threads', 'fftw3', 'm', 'gomp', 'gdal'])
 
 setuptools.setup(
     name='scikit-map',
