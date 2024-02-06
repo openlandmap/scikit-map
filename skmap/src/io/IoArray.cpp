@@ -25,7 +25,6 @@ void IoArray::readData(uint_t n_row,
 	auto lambda = [&] (int i)
     {
     	int perm_id = perm_vec[i];
-    	std::cout << "Perm id = " << perm_id << ", i = " << i << std::endl;
     	if(perm_id != -1)
     	{
     		int bandList[1];
@@ -35,17 +34,17 @@ void IoArray::readData(uint_t n_row,
 	    	GDALDataset *readDataset = (GDALDataset *)GDALOpen(file_url.c_str(), GA_ReadOnly);
 	    	if (readDataset == nullptr) 
 	    	{
-				m_data.block(perm_id, 0, 1, m_n_pix).setZero();
+				m_data.block(i, 0, 1, m_n_pix).setZero();
 				std::cerr << "scikit-map ERROR 1: issues in opening the file with URL " << file_url << std::endl;
 				std::cout << "Issues in opening the file with URL " << file_url << ", considering as gap." << std::endl;
 				GDALClose(readDataset);
 			} else
 			{
-				CPLErr outRead = readDataset->RasterIO(GF_Read, 0, 0, n_row, n_col, m_data.data() + perm_id * m_n_pix,
+				CPLErr outRead = readDataset->RasterIO(GF_Read, 0, 0, n_row, n_col, m_data.data() + i * m_n_pix,
 				               n_row, n_col, read_type, 1, bandList, 0, 0, 0);
 				if (outRead != CE_None)
 				{
-					m_data.block(perm_id, 0, 1, m_n_pix).setZero();
+					m_data.block(i, 0, 1, m_n_pix).setZero();
 					std::cerr << "Error 2: issues in reading the file with URL " << file_url << std::endl;
 					std::cout << "Issues in reading the file with URL " << file_url << ", considering as gap." << std::endl;
 				}
