@@ -2,58 +2,44 @@
 
 namespace skmap {
 
-IoArray::IoArray(Eigen::Ref<MatFloat> data, const uint_t n_feat, const uint_t n_pix, const uint_t n_threads)
-: ParArray(data, n_feat, n_pix, n_threads) 
+IoArray::IoArray(Eigen::Ref<MatFloat> data, const uint_t n_threads)
+: ParArray(data, n_threads) 
 {
 }
 
-void IoArray::readData(uint_t n_row,
-	                   uint_t n_col,
-	                   std::vector<std::string> file_urls,
-	                   std::vector<int> perm_vec,
-	                   GDALDataType read_type)
+void IoArray::setupGdal(dict_t dict)
 {
-	CPLSetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif");
-    CPLSetConfigOption("GDAL_HTTP_MULTIRANGE", "SINGLE_GET");
-    CPLSetConfigOption("GDAL_HTTP_CONNECTTIMEOUT", "320");
-    CPLSetConfigOption("CPL_VSIL_CURL_USE_HEAD", "NO");
-    CPLSetConfigOption("GDAL_HTTP_VERSION", "1.0");
-    CPLSetConfigOption("GDAL_HTTP_TIMEOUT", "320");
-    CPLSetConfigOption("CPL_CURL_GZIP", "NO");
-    GDALAllRegister();  // Initialize GDAL
+    for (auto& pair : dict) {
+        CPLSetConfigOption(pair.first.c_str(), pair.second.c_str());
+    }
+    GDALAllRegister(); // Initialize GDAL
+}
 
-	auto lambda = [&] (int i)
+
+
+void IoArray::readData(std::vector<std::string> file_locs,
+                       std::vector<uint_t> perm_vec,
+                       uint_t x_off,
+                       uint_t y_off,
+                       uint_t x_size,
+                       uint_t y_size,
+                       GDALDataType read_type,                       
+                       std::vector<int> bands_list)
+{
+	skmapAssertIfTrue(m_data.cols() < x_size * y_size, "scikit-map ERROR 0: reading region size smaller then the number of columns");
+    auto readTiff = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
     {
-    	int perm_id = perm_vec[i];
-    	if(perm_id != -1)
-    	{
-    		int bandList[1];
-	        bandList[0] = 1;
-	    	std::string file_url = file_urls[perm_id];
-    		std::cout << "I'm inside, perm id = " << perm_id << ", i = " << i << ", file_url = " << file_url << std::endl;
-	    	GDALDataset *readDataset = (GDALDataset *)GDALOpen(file_url.c_str(), GA_ReadOnly);
-	    	if (readDataset == nullptr) 
-	    	{
-				m_data.block(i, 0, 1, m_n_pix).setZero();
-				std::cerr << "scikit-map ERROR 1: issues in opening the file with URL " << file_url << std::endl;
-				std::cout << "Issues in opening the file with URL " << file_url << ", considering as gap." << std::endl;
-				GDALClose(readDataset);
-			} else
-			{
-				CPLErr outRead = readDataset->RasterIO(GF_Read, 0, 0, n_row, n_col, m_data.data() + i * m_n_pix,
-				               n_row, n_col, read_type, 1, bandList, 0, 0, 0);
-				if (outRead != CE_None)
-				{
-					m_data.block(i, 0, 1, m_n_pix).setZero();
-					std::cerr << "Error 2: issues in reading the file with URL " << file_url << std::endl;
-					std::cout << "Issues in reading the file with URL " << file_url << ", considering as gap." << std::endl;
-				}
-				GDALClose(readDataset);
-			}
-    	}
-    	
+        std::string file_loc = file_locs[i];
+        GDALDataset *readDataset = (GDALDataset *)GDALOpen(file_loc.c_str(), GA_ReadOnly);
+        skmapAssertIfTrue(readDataset == nullptr, "scikit-map ERROR 1: issues in opening the file with URL " + file_loc);
+    	// It is assumed that the X/Y buffers size is equevalent to the portion of data to read
+        CPLErr outRead = readDataset->RasterIO(GF_Read, x_off, y_off, x_size, y_size, row.data(),
+                       x_size, y_size, read_type, bands_list.size(), &bands_list[0], 0, 0, 0);
+        skmapAssertIfTrue(outRead != CE_None, "Error 2: issues in reading the file with URL " + file_loc);
+        GDALClose(readDataset);
+        
     };
-    this->parFeat(lambda);
+    this->parRowPerm(readTiff, perm_vec);
 }
 
 
