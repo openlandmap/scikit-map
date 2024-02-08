@@ -55,6 +55,73 @@ void computeNormalizedDifference(Eigen::Ref<MatFloat> data,
 }
 
 
+void computeBsi(Eigen::Ref<MatFloat> data,
+                const uint_t n_threads,
+                std::vector<uint_t> swir1_indices,
+                std::vector<uint_t> red_indices,
+                std::vector<uint_t> nir_indices,
+                std::vector<uint_t> blue_indices,
+                std::vector<uint_t> result_indices,
+                float_t swir1_scaling,
+                float_t red_scaling,
+                float_t nir_scaling,
+                float_t blue_scaling,
+                float_t result_scaling,
+                float_t result_offset)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeBsi(swir1_indices, red_indices, nir_indices, blue_indices, result_indices,
+                          swir1_scaling, red_scaling, nir_scaling, blue_scaling, result_scaling, result_offset);
+
+}
+
+void computeEvi(Eigen::Ref<MatFloat> data,
+                const uint_t n_threads,
+                std::vector<uint_t> red_indices,
+                std::vector<uint_t> nir_indices,
+                std::vector<uint_t> blue_indices,
+                std::vector<uint_t> result_indices,
+                float_t red_scaling,
+                float_t nir_scaling,
+                float_t blue_scaling,
+                float_t result_scaling,
+                float_t result_offset)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeEvi(red_indices, nir_indices, blue_indices, result_indices,
+                          red_scaling, nir_scaling, blue_scaling, result_scaling, result_offset);
+}
+
+void computeNirv(Eigen::Ref<MatFloat> data,
+                const uint_t n_threads,
+                std::vector<uint_t> red_indices,
+                std::vector<uint_t> nir_indices,
+                std::vector<uint_t> result_indices,
+                float_t red_scaling,
+                float_t nir_scaling,
+                float_t result_scaling,
+                float_t result_offset)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeNirv(red_indices, nir_indices, result_indices,
+                           red_scaling, nir_scaling, result_scaling, result_offset);
+}
+
+void computeFapar(Eigen::Ref<MatFloat> data,
+                const uint_t n_threads,
+                std::vector<uint_t> red_indices,
+                std::vector<uint_t> nir_indices,
+                std::vector<uint_t> result_indices,
+                float_t red_scaling,
+                float_t nir_scaling,
+                float_t result_scaling,
+                float_t result_offset)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeFapar(red_indices, nir_indices, result_indices,
+                           red_scaling, nir_scaling, result_scaling, result_offset);
+}
+
 
 PYBIND11_MODULE(skmap_bindings, m)
 {
@@ -63,4 +130,8 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg("value_to_mask") = std::nullopt, py::arg("value_to_set") = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("computeNormalizedDifference", &computeNormalizedDifference, "Compute normalized difference indices");
+    m.def("computeBsi", &computeBsi, "Compute BSI");
+    m.def("computeEvi", &computeEvi, "Compute EVI");
+    m.def("computeNirv", &computeNirv, "Compute EVI");
+    m.def("computeFapar", &computeFapar, "Compute EVI");
 }
