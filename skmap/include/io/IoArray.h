@@ -20,7 +20,9 @@ class IoArray: public ParArray
                        uint_t x_size,
                        uint_t y_size,
                        GDALDataType read_type,                       
-                       std::vector<int> bands_list);
+                       std::vector<int> bands_list,
+                       std::optional<float_t> value_to_mask,
+                       std::optional<float_t> value_to_set);
 
         void setupGdal(dict_t dict);
 
