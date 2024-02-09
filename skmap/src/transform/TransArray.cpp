@@ -14,7 +14,8 @@ void TransArray::computeNormalizedDifference(std::vector<uint_t> positive_indice
                                              float_t positive_scaling,
                                              float_t negative_scaling,
                                              float_t result_scaling,
-                                             float_t result_offset)
+                                             float_t result_offset,
+                                             std::vector<float_t> clip_value)
 {
     skmapAssertIfTrue((positive_indices.size() != negative_indices.size()) || (positive_indices.size() != result_indices.size()),
                        "scikit-map ERROR 3: positive_i, negative_i, result_i must be of the same size");
@@ -28,6 +29,8 @@ void TransArray::computeNormalizedDifference(std::vector<uint_t> positive_indice
         row = (row.array()).round();
         row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
         row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
+        row = (row.array() < clip_value[0]).select(clip_value[0], row);
+        row = (row.array() > clip_value[1]).select(clip_value[1], row);
     };
     this->parRowPerm(computeNormalizedDifferenceRow, result_indices);
 }
@@ -43,7 +46,8 @@ void TransArray::computeBsi(std::vector<uint_t> swir1_indices,
                             float_t nir_scaling,
                             float_t blue_scaling,
                             float_t result_scaling,
-                            float_t result_offset)
+                            float_t result_offset,
+                            std::vector<float_t> clip_value)
 {
     auto computeBsiRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
     {
@@ -63,6 +67,8 @@ void TransArray::computeBsi(std::vector<uint_t> swir1_indices,
         row = (row.array()).round();
         row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
         row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
+        row = (row.array() < clip_value[0]).select(clip_value[0], row);
+        row = (row.array() > clip_value[1]).select(clip_value[1], row);
     };
     this->parRowPerm(computeBsiRow, result_indices);
 }
@@ -76,7 +82,8 @@ void TransArray::computeEvi(std::vector<uint_t> red_indices,
                             float_t nir_scaling,
                             float_t blue_scaling,
                             float_t result_scaling,
-                            float_t result_offset)
+                            float_t result_offset,
+                            std::vector<float_t> clip_value)
 {
     auto computeEviRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
     {
@@ -86,13 +93,15 @@ void TransArray::computeEvi(std::vector<uint_t> red_indices,
         row = (m_data.row(nir_i) * nir_scaling
              - m_data.row(red_i) * red_scaling).array() / 
              ((m_data.row(nir_i) * nir_scaling
-             + m_data.row(red_i) * red_scaling * 6
+             + m_data.row(red_i) * red_scaling * 6.0
              - m_data.row(blue_i) * blue_scaling * 7.5).array()
              + 1.0).array() *
               result_scaling * 2.5 + result_offset;
         row = (row.array()).round();
         row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
         row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
+        row = (row.array() < clip_value[0]).select(clip_value[0], row);
+        row = (row.array() > clip_value[1]).select(clip_value[1], row);
     };
     this->parRowPerm(computeEviRow, result_indices);
 }
@@ -104,7 +113,8 @@ void TransArray::computeNirv(std::vector<uint_t> red_indices,
                             float_t red_scaling,
                             float_t nir_scaling,
                             float_t result_scaling,
-                            float_t result_offset)
+                            float_t result_offset,
+                            std::vector<float_t> clip_value)
 {
     auto computeNirvRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
     {
@@ -120,6 +130,8 @@ void TransArray::computeNirv(std::vector<uint_t> red_indices,
         row = (row.array()).round();
         row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
         row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
+        row = (row.array() < clip_value[0]).select(clip_value[0], row);
+        row = (row.array() > clip_value[1]).select(clip_value[1], row);
     };
     this->parRowPerm(computeNirvRow, result_indices);
 }
@@ -132,21 +144,24 @@ void TransArray::computeFapar(std::vector<uint_t> red_indices,
                             float_t red_scaling,
                             float_t nir_scaling,
                             float_t result_scaling,
-                            float_t result_offset)
+                            float_t result_offset,
+                            std::vector<float_t> clip_value)
 {
     auto computeFaparRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
     {
         uint_t red_i = red_indices[i];
         uint_t nir_i = nir_indices[i];
-        row = (((((m_data.row(nir_i) * nir_scaling
-                 - m_data.row(red_i) * red_scaling).array() / 
-                  (m_data.row(nir_i) * nir_scaling
-                 + m_data.row(red_i) * red_scaling).array())
-                 - 0.03).array() * 1.020430108) + 0.001) *
+        row = ((((((m_data.row(nir_i) * nir_scaling
+                  - m_data.row(red_i) * red_scaling).array() / 
+                   (m_data.row(nir_i) * nir_scaling
+                  + m_data.row(red_i) * red_scaling).array())
+                  - 0.03).array() * (0.95 - 0.001)).array() / (0.96 - 0.03)) + 0.001).array() *
                    result_scaling + result_offset;
         row = (row.array()).round();
         row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
         row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
+        row = (row.array() < clip_value[0]).select(clip_value[0], row);
+        row = (row.array() > clip_value[1]).select(clip_value[1], row);
     };
     this->parRowPerm(computeFaparRow, result_indices);
 }
