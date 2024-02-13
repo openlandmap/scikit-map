@@ -12,7 +12,6 @@ module_skmap_bindings = setuptools.Extension('skmap_bindings',
                                        extra_compile_args=['-fopenmp', '-std=c++17', '-std=gnu++17'],
                                        extra_link_args=['-lgomp'],
                                        libraries=['fftw3_threads', 'fftw3', 'm', 'gomp', 'gdal'])
-
 setuptools.setup(
     name='scikit-map',
     version='0.7.3',

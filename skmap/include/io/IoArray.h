@@ -26,6 +26,12 @@ class IoArray: public ParArray
 
         void setupGdal(dict_t dict);
 
+        void getLatLonArray(std::string file_loc,
+                               uint_t x_off,
+                               uint_t y_off,
+                               uint_t x_size,
+                               uint_t y_size);
+
 };
 
 }
