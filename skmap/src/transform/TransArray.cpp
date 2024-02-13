@@ -108,69 +108,6 @@ void TransArray::computeBsi(std::vector<uint_t> swir1_indices,
 }
 
 
-void TransArray::computeEvi(std::vector<uint_t> red_indices,
-                            std::vector<uint_t> nir_indices,
-                            std::vector<uint_t> blue_indices,
-                            std::vector<uint_t> result_indices,
-                            float_t red_scaling,
-                            float_t nir_scaling,
-                            float_t blue_scaling,
-                            float_t result_scaling,
-                            float_t result_offset,
-                            std::vector<float_t> clip_value)
-{
-    auto computeEviRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
-    {
-        uint_t red_i = red_indices[i];
-        uint_t nir_i = nir_indices[i];
-        uint_t blue_i = blue_indices[i];
-        row = (m_data.row(nir_i) * nir_scaling
-             - m_data.row(red_i) * red_scaling).array() / 
-             ((m_data.row(nir_i) * nir_scaling
-             + m_data.row(red_i) * red_scaling * 6.0
-             - m_data.row(blue_i) * blue_scaling * 7.5).array()
-             + 1.0).array() *
-              result_scaling * 2.5 + result_offset;
-        row = (row.array()).round();
-        row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
-        row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
-        row = (row.array() < clip_value[0]).select(clip_value[0], row);
-        row = (row.array() > clip_value[1]).select(clip_value[1], row);
-    };
-    this->parRowPerm(computeEviRow, result_indices);
-}
-
-
-void TransArray::computeNirv(std::vector<uint_t> red_indices,
-                            std::vector<uint_t> nir_indices,
-                            std::vector<uint_t> result_indices,
-                            float_t red_scaling,
-                            float_t nir_scaling,
-                            float_t result_scaling,
-                            float_t result_offset,
-                            std::vector<float_t> clip_value)
-{
-    auto computeNirvRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
-    {
-        uint_t red_i = red_indices[i];
-        uint_t nir_i = nir_indices[i];
-        row = (((m_data.row(nir_i) * nir_scaling
-               - m_data.row(red_i) * red_scaling).array() / 
-                (m_data.row(nir_i) * nir_scaling
-               + m_data.row(red_i) * red_scaling).array())
-               - 0.08).array() *
-                 (m_data.row(nir_i) * nir_scaling).array() *
-                 result_scaling + result_offset;
-        row = (row.array()).round();
-        row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
-        row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
-        row = (row.array() < clip_value[0]).select(clip_value[0], row);
-        row = (row.array() > clip_value[1]).select(clip_value[1], row);
-    };
-    this->parRowPerm(computeNirvRow, result_indices);
-}
-
-
 
 void TransArray::computeFapar(std::vector<uint_t> red_indices,
                             std::vector<uint_t> nir_indices,
@@ -200,26 +137,6 @@ void TransArray::computeFapar(std::vector<uint_t> red_indices,
     this->parRowPerm(computeFaparRow, result_indices);
 }
 
-void TransArray::computeBsf(std::vector<std::vector<uint_t>> indices_matrix,
-                std::vector<uint_t> result_indices,
-                float_t threshold,
-                float_t result_scaling)
-{
-    skmapAssertIfTrue(indices_matrix.size() != result_indices.size(),
-                       "scikit-map ERROR 4: rows of indices_matrix must be same size of result_indices");
-    auto computeBsfRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
-    {
-
-        std::vector<uint_t> rows_indices = indices_matrix[i];
-        row.setZero();
-        for (uint_t row_index : rows_indices) {
-            auto res = (m_data.row(row_index).array() <= threshold).cast<float_t>();
-            row = row.array() + res.array();
-        }
-        row = (row.array() * result_scaling / rows_indices.size()).round();
-    };
-    this->parRowPerm(computeBsfRow, result_indices);
-}
 
 void TransArray::computeGeometricTemperature(Eigen::Ref<MatFloat> latitude,
                                              Eigen::Ref<MatFloat> elevation,

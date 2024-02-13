@@ -32,6 +32,52 @@ class IoArray: public ParArray
                                uint_t x_size,
                                uint_t y_size);
 
+
+        template<typename T>
+        void writeData(std::string base_file,
+                        std::string base_folder,
+                        std::vector<std::string> layer_names,
+                        std::vector<uint_t> data_indices,
+                        uint_t x_off,
+                        uint_t y_off,
+                        uint_t x_size,
+                        uint_t y_size,
+                        GDALDataType write_type,
+                        T no_data_value,
+                        std::string bash_compression_command)
+        {
+            skmapAssertIfTrue(m_data.cols() < x_size * y_size, "scikit-map ERROR 9: reading region size smaller then the number of columns");
+            GDALDataset *inputDataset = (GDALDataset *)GDALOpen(base_file.c_str(), GA_ReadOnly);
+            double geotransform[6];
+            inputDataset->GetGeoTransform(geotransform);
+            auto projection = inputDataset->GetProjectionRef();
+            auto spatial_ref = inputDataset->GetSpatialRef();
+            auto writeTiff = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
+            {
+                std::string layer_name = layer_names[i];
+                GDALDriver *driver = GetGDALDriverManager()->GetDriverByName("GTiff");
+                Eigen::RowVectorX<T> casted_row = row.cast<T>();
+                GDALDataset *writeDataset = driver->Create((base_folder + "/" + layer_name + "_tmp.tif").c_str(),
+                    inputDataset->GetRasterXSize(), inputDataset->GetRasterYSize(), 1, write_type, nullptr);
+                writeDataset->SetGeoTransform(geotransform);
+                writeDataset->SetSpatialRef(spatial_ref);
+                writeDataset->SetProjection(projection);
+                GDALRasterBand *writeBand = writeDataset->GetRasterBand(1);
+                writeBand->SetNoDataValue(no_data_value);
+                auto out_write = writeBand->RasterIO(
+                    GF_Write, x_off, y_off, x_size, y_size, casted_row.data(),
+                    x_size, y_size, write_type, 0, 0);
+                skmapAssertIfTrue(out_write != CE_None,
+                   "scikit-map ERROR 11: issues in writing the file " + layer_name);
+                GDALClose(writeDataset);
+                runBashCommand(bash_compression_command + " " + base_folder + "/" + layer_name + "_tmp.tif "
+                             + base_folder + "/" + layer_name + ".tif");
+                runBashCommand("rm " + base_folder + "/" + layer_name + "_tmp.tif");
+
+            };
+            this->parRowPerm(writeTiff, data_indices);
+        }
+
 };
 
 }
