@@ -116,7 +116,10 @@ def save_rasters(base_raster, out_files, idx_list, array_fn, minx = None, maxy =
 def run_model(model_type, model, model_fn, array_fn, out_fn, i0, i1):
 
   array = sa.attach(array_fn, False)
-  #array = array[:,:,0:169]
+  start = time.time()
+  array = array[0:169,:].transpose((1,0))
+  #array = array[:,0:169]
+  ttprint(f"Not so silly array copy / transpose: {(time.time() - start):.2f} segs")
   out = sa.attach(out_fn, False)
   n_features = array.shape[-1]
 
@@ -124,20 +127,20 @@ def run_model(model_type, model, model_fn, array_fn, out_fn, i0, i1):
   if model_type == 'tl2cgen':
     import tl2cgen
     model = tl2cgen.Predictor(libpath=model_fn)
-    out[:,:,i0:i1] = model.predict(tl2cgen.DMatrix(array.transpose(1,0))).reshape((out.shape[0],out.shape[1],-1))
+    out[:,:,i0:i1] = model.predict(tl2cgen.DMatrix(array)).reshape((out.shape[0],out.shape[1],-1))
 
   elif model_type == 'xgboost':
     #ttprint(f"Running a {model_type} model ({model_fn})")
     #import xgboost
     #model = xgboost.XGBClassifier() 
     #model.load_model("model/xgb_model.bin")
-    out[:,:,i0:i1] = model.predict_proba(array.transpose(1,0)).reshape((out.shape[0],out.shape[1],-1))
+    out[:,:,i0:i1] = model.predict_proba(array).reshape((out.shape[0],out.shape[1],-1))
 
   elif model_type == 'hummingbird':
     #ttprint(f"Running a {model_type} model ({model_fn})")
     from hummingbird.ml import load
     model = load(model_fn)
-    out[:,:,i0:i1] = model.predict_proba(array.transpose(1,0)).reshape((out.shape[0],out.shape[1],-1))
+    out[:,:,i0:i1] = model.predict_proba(array).reshape((out.shape[0],out.shape[1],-1))
 
   else:
     raise Exception(f'Invalid model type {model_type}')
@@ -169,52 +172,75 @@ def in_mem_calc(data, df_feat, n_threads):
 
   swir1_idx = list(df_feat[df_feat['name'].str.contains('swir1_glad')].index)
   swir2_idx = list(df_feat[df_feat['name'].str.contains('swir2_glad')].index)
+  bsf_idx = list(df_feat[df_feat['name'].str.contains('bsf')].index)
+
+  elev_idx = list(df_feat[df_feat['name'].str.contains('dtm.bareearth_ensemble')].index)
+  lst_min_idx = list(df_feat[df_feat['name'].str.contains('clm_lst_min.geom.temp')].index)
+  lst_max_idx = list(df_feat[df_feat['name'].str.contains('clm_lst_max.geom.temp')].index)
 
   # NDVI
   ndvi_idx = list(df_feat[df_feat['name'].str.contains('ndvi_glad')].index)
   skmap_bindings.computeNormalizedDifference(data, n_threads,
                               nir_idx, red_idx, ndvi_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset)
+                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
   # NDWI
   ndwi_idx = list(df_feat[df_feat['name'].str.contains('ndwi_glad')].index)
   skmap_bindings.computeNormalizedDifference(data, n_threads,
                               nir_idx, swir1_idx, ndwi_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset)
+                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
   # BSI
   bsi_idx = list(df_feat[df_feat['name'].str.contains('bsi_glad')].index)
   skmap_bindings.computeBsi(data, n_threads,
                               swir1_idx, red_idx, nir_idx, blue_idx, bsi_idx,
-                              band_scaling, band_scaling, band_scaling, band_scaling, result_scaling, result_offset)
+                              band_scaling, band_scaling, band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
   # NDTI
   ndti_idx = list(df_feat[df_feat['name'].str.contains('ndti_glad')].index)
   skmap_bindings.computeNormalizedDifference(data, n_threads,
                               swir1_idx, swir2_idx, ndti_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset)
+                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
   # NIRV
   nirv_idx = list(df_feat[df_feat['name'].str.contains('nirv_glad')].index)
   skmap_bindings.computeNirv(data, n_threads,
                               red_idx, nir_idx, nirv_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset)
+                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
   # EVI
   evi_idx = list(df_feat[df_feat['name'].str.contains('evi_glad')].index)
   skmap_bindings.computeEvi(data, n_threads,
                               red_idx, nir_idx, blue_idx, evi_idx,
-                              band_scaling, band_scaling, band_scaling, result_scaling, result_offset)
+                              band_scaling, band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
   # FAPAR
   fapar_idx = list(df_feat[df_feat['name'].str.contains('fapar_glad')].index)
   skmap_bindings.computeFapar(data, n_threads,
                               red_idx, nir_idx, fapar_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset)
+                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
 
   data_ndvi = data[ndvi_idx,:]
   expr = f'( where( ndvi_0101_0228 <= 169, 100, 0) + where( ndvi_0301_0430 <= 169, 100, 0) + ' + \
          f'  where( ndvi_0501_0630 <= 169, 100, 0) + where( ndvi_0701_0831 <= 169, 100, 0) + ' + \
          f'  where( ndvi_0501_0630 <= 169, 100, 0) + where( ndvi_0701_0831 <= 169, 100, 0) ) / 6'
-  data[-1,:] = ne.evaluate(expr, local_dict={
+  data[bsf_idx,:] = ne.evaluate(expr, local_dict={
     'ndvi_0101_0228': data_ndvi[0,:], 'ndvi_0301_0430': data_ndvi[1,:],
     'ndvi_0501_0630': data_ndvi[2,:], 'ndvi_0701_0831': data_ndvi[3,:],
     'ndvi_0501_0630': data_ndvi[4,:], 'ndvi_0701_0831': data_ndvi[5,:],
   }).round()
+
+  base_file = list(feat_df.loc[feat_df['name'].str.contains('swir1'),'path'])[0]
+  data_elev = data[elev_idx,:]
+  with rasterio.open(base_file) as ds:
+    pixel_size = ds.transform[0]
+    lon = np.arange(2, 4000)
+    lat = np.arange(2, 4000)
+
+    lon_grid, lat_grid = ds.transform * np.meshgrid(lon, lat)
+
+    elev_corr = 0.006 * data_elev * 0.1
+
+    for m in range(1,13):
+        doy = (datetime.strptime(f'2000-{m}-15', '%Y-%m-%d').timetuple().tm_yday)
+        print(f"Adding {max_temp_name} & {min_temp_name}")
+
+        data[lst_min_idx[m-1],:] = ((geo_temp(lat_grid, day=doy, a=37.03043, b=-15.43029) - elev_corr) * 100).round()
+        data[lst_max_idx[m-1],:] = ((geo_temp(lat_grid, day=doy, a=24.16453, b=-15.71751) - elev_corr) * 100).round()
 
 def _model_input(tile, start_year = 2000, end_year = 2022, bands = ['blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'thermal'], base_url='http://192.168.49.30:8333'):
   prediction_layers = []
@@ -262,9 +288,15 @@ if __name__ == '__main__':
   
   TMP_DIR = tempfile.gettempdir()
 
+  model_dir = Path('/mnt/tupi/WRI/prod_new_samples/prediction_v2024_gpw_ultimate/model_v20240210/compiled/')
+  rf_fn = str(model_dir.joinpath('landmapper_100_rf.so'))
+  xgb_fn = str(model_dir.joinpath('landmapper_100_xgb.bin'))
+  ann_fn = str(model_dir.joinpath('landmapper_100_ann.zip'))
+  log_fn = str(model_dir.joinpath('landmapper_100_logreg.zip'))
+
   ttprint("Reading tiles gpkg")
-  tiles = gpd.read_file('../ard2_final_status.gpkg')
-  df_features = pd.read_csv('../model/features.csv')
+  tiles = gpd.read_file('/mnt/tupi/WRI/prod_new_samples/gpw_tiles.gpkg')
+  df_features = pd.read_csv('/mnt/tupi/WRI/prod_new_samples/model_v20240210/features.csv')
 
   n_threads = 96
   tile = '029E_51N'
@@ -289,20 +321,20 @@ if __name__ == '__main__':
   start = time.time()
   import xgboost
   model_xgb = xgboost.XGBClassifier() 
-  model_xgb.load_model('../model/xgb_model.bin')
+  model_xgb.load_model(xgb_fn)
   ttprint(f"Loading xgb model: {(time.time() - start):.2f} segs")
 
   start = time.time()
   from hummingbird.ml import load
-  model_ann = load('../model/ann.torch')
+  model_ann = load(ann_fn)
   ttprint(f"Loading ann model: {(time.time() - start):.2f} segs")
 
   start = time.time()
   from hummingbird.ml import load
-  model_meta = load('../model/log-reg.torch.zip')
+  model_meta = load(log_fn)
   ttprint(f"Loading log-reg models: {(time.time() - start):.2f} segs")
 
-  for year in [2020]: #range(2000, 2023, 2):
+  for year in range(2020,2022,2): #range(2000, 2023, 2):
     
     landsat_files, landsat_idx = _raster_paths(df_features, 'landsat', tile, year)
 
@@ -327,6 +359,12 @@ if __name__ == '__main__':
     start = time.time()
     #import tl2cgen
     #model_rf = tl2cgen.Predictor(libpath='model/skl_rf_intel.so')
+    
+    #start = time.time()
+    #array_fn_2 = 'file://' + str(make_tempfile(prefix='shm_array'))
+    #array_2 = sa.create(array_fn_2, (x_size * y_size, n_features), dtype=np.float32)
+    #array_2[:,:] = array.transpose((1,0))
+    #ttprint(f"Silly transpose: {(time.time() - start):.2f} segs")
 
     n_classes = 3
     shape = (4000, 4000, n_classes * 5 + 1)
@@ -336,7 +374,7 @@ if __name__ == '__main__':
     args = [
       {
         'model_type': 'tl2cgen',
-        'model_fn': '../model/skl_rf_intel.so',
+        'model_fn': rf_fn,
         'model': None,
         'array_fn': array_fn,
         'out_fn': out_fn,
@@ -345,7 +383,7 @@ if __name__ == '__main__':
       },
       {
         'model_type': 'xgboost',
-        'model_fn': '../model/xgb_model.bin',
+        'model_fn': xgb_fn,
         'model': model_xgb,
         'array_fn': array_fn,
         'out_fn': out_fn,
@@ -354,7 +392,7 @@ if __name__ == '__main__':
       },
       {
         'model_type': 'hummingbird',
-        'model_fn': '../model/ann.torch',
+        'model_fn': ann_fn,
         'model': model_ann,
         'array_fn': array_fn,
         'out_fn': out_fn,
@@ -389,11 +427,11 @@ if __name__ == '__main__':
 
     start = time.time()
     out_files = [
-      f'./gpw_eml.seeded.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./gpw_eml.semi.nat.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./gpw_eml.seeded.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./gpw_eml.semi.nat.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./gpw_eml.grass.type_30m_c_{year}0101_{year}1231_go_epsg.4326_v20240206.tif'
+      f'./prod_predictions/{tile}/gpw_eml.seeded.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
+      f'./prod_predictions/{tile}/gpw_eml.semi.nat.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
+      f'./prod_predictions/{tile}/gpw_eml.seeded.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
+      f'./prod_predictions/{tile}/gpw_eml.semi.nat.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
+      f'./prod_predictions/{tile}/gpw_eml.grass.type_30m_c_{year}0101_{year}1231_go_epsg.4326_v20240206.tif'
     ]
 
     out_idx = [ 9, 10, 12, 13, 15 ]

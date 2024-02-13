@@ -236,7 +236,25 @@ def eval_calc(array_fn, feature, expr, local_dict, idx):
 
   return feature
 
-def in_mem_calc(lookup, array):
+def geo_temp(fi, day, a=37.03043, b=-15.43029):
+  f =fi
+  pi = math.pi 
+
+  #math.cos((day - 18) * math.pi / 182.5 + math.pow(2, (1 - math.copysign(1, fi))) * math.pi) 
+  sign = 'where(abs(fi) - fi == 0, 1, -1)'
+  costeta = f"cos((day - 18) * pi / 182.5 + 2**(1 - {sign}) * pi)"
+
+  #math.cos(fi * math.pi / 180)
+  cosfi = "cos(fi * pi / 180)"
+  A = cosfi
+
+  #(1 - costeta) * abs(math.sin(fi * math.pi / 180) )
+  B = f"(1 - {costeta}) * abs(sin(fi * pi / 180) )"
+
+  x = f"(a * {A} + b * {B})"
+  return ne.evaluate(x)
+
+def in_mem_calc(lookup, array, base_file):
   pref = 'glad.SeasConv.ard2_m_30m_s'
   suff = 'go_epsg.4326_v20230908'
   dates = ['0101_0228','0301_0430','0501_0630','0701_0831','0901_1031','1101_1231']
@@ -247,6 +265,7 @@ def in_mem_calc(lookup, array):
   for dt in dates:
     #local_dict = { b: array[:, :, lookup[f'{b}_{pref}_{dt}_{suff}']:lookup[f'{b}_{pref}_{dt}_{suff}']+1 ] for b in bands}
     local_dict = { b: lookup[f'{b}_{pref}_{dt}_{suff}'] for b in bands}
+
     features[f'ndvi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (red * 0.004) ) / ( (nir * 0.004) + (red * 0.004) ) ) * 125 + 125', local_dict
     features[f'ndwi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (swir1 * 0.004) ) / ( (nir * 0.004) + (swir1 * 0.004) ) ) * 125 + 125', local_dict
     #features[f'savi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (red * 0.004) )*1.5 / ( (nir * 0.004) + (red * 0.004)  + 0.5) ) * 125 + 125', local_dict
@@ -254,13 +273,13 @@ def in_mem_calc(lookup, array):
     #features[f'nbr_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - ( swir2 * 0.004) ) / ( (nir * 0.004) + ( swir2 * 0.004) ) ) * 125 + 125', local_dict
     #features[f'ndmi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) -  (swir1 * 0.004)) / ( (nir * 0.004) +  (swir1 * 0.004)) ) * 125 + 125', local_dict
     #features[f'nbr2_{pref}_{dt}_{suff}'] = f'( ( (swir1 * 0.004) - ( thermal * 0.004) ) / ( (swir1 * 0.004) + ( thermal * 0.004) ) ) * 125 + 125', local_dict
-    #features[f'rei_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - blue)/( (nir * 0.004) + blue *  (nir * 0.004)) ) * 125 + 125', local_dict
-    features[f'bsi_{pref}_{dt}_{suff}'] = f'( ( ( (swir1 * 0.004) + (red * 0.004) ) - ( (nir * 0.004) + blue) ) / ( ( (swir1 * 0.004) + (red * 0.004) ) + ( (nir * 0.004) + blue) ) ) * 125 + 125', local_dict
+    #features[f'rei_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - blue * 0.004)/( (nir * 0.004) + (blue * 0.004) *  (nir * 0.004)) ) * 125 + 125', local_dict
+    features[f'bsi_{pref}_{dt}_{suff}'] = f'( ( ( (swir1 * 0.004) + (red * 0.004) ) - ( (nir * 0.004) + blue * 0.004) ) / ( ( (swir1 * 0.004) + (red * 0.004) ) + ( (nir * 0.004) + (blue * 0.004)) ) ) * 125 + 125', local_dict
     features[f'ndti_{pref}_{dt}_{suff}'] = f'( ( (swir1 * 0.004) - (swir2 * 0.004) )  / ( (swir1 * 0.004) + (swir2 * 0.004) )  ) * 125 + 125', local_dict
     #features[f'ndsi_{pref}_{dt}_{suff}'] = f'( ( (green * 0.004) -  (swir1 * 0.004) ) / ( (green * 0.004) +  (swir1 * 0.004) ) ) * 125 + 125', local_dict
     #features[f'ndsmi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (swir2 * 0.004) )  / ( (nir * 0.004) + (swir2 * 0.004) )  ) * 125 + 125', local_dict
     features[f'nirv_{pref}_{dt}_{suff}'] = f'( ( ( ( (nir * 0.004) - (red * 0.004) ) / ( (nir * 0.004) + (red * 0.004) ) ) - 0.08) *  (nir * 0.004) ) * 125 + 125', local_dict
-    features[f'evi_{pref}_{dt}_{suff}'] = f'( 2.5 * ( (nir * 0.004) - (red * 0.004) ) / ( (nir * 0.004) + 6 * (red * 0.004) - 7.5 * ( blue * 0.004) + 1) ) * 125 + 125', local_dict
+    features[f'evi_{pref}_{dt}_{suff}'] = f'( 2.5 * ( (nir * 0.004) - (red * 0.004) ) / ( (nir * 0.004) + 6 * (red * 0.004) - 7.5 * (blue * 0.004) + 1) ) * 125 + 125', local_dict
     features[f'fapar_{pref}_{dt}_{suff}'] = f'( ((( (( (nir * 0.004) - (red * 0.004) ) / ( (nir * 0.004) + (red * 0.004) )) - 0.03) * (0.95 - 0.001)) / (0.96 - 0.03)) + 0.001 ) * 125 + 125', local_dict
 
   new_lookup = []
@@ -289,6 +308,27 @@ def in_mem_calc(lookup, array):
 
   feature = f'bsf_{pref}_{suff}'
   eval_calc(array.base.name, feature, expr, bcf_local_dict, lookup[feature])
+
+  b = 'dtm.bareearth_ensemble_p10_30m_s_2018_go_epsg4326_v20230210'
+  data_elev = array[:,:,lookup[b]]
+  ds = gdal.Open(base_file)
+  lon = np.arange(2, 4002)
+  lat = np.arange(2, 4002)
+  
+  transform = affine.Affine.from_gdal(*ds.GetGeoTransform())
+  lon_grid, lat_grid = transform * np.meshgrid(lon, lat)
+
+  elev_corr = 0.006 * data_elev * 0.1
+
+  for m in range(1,13):
+    doy = (datetime.strptime(f'2000-{m}-15', '%Y-%m-%d').timetuple().tm_yday)
+    max_temp_name = f'clm_lst_max.geom.temp_m_30m_s_m{m}' 
+    min_temp_name = f'clm_lst_min.geom.temp_m_30m_s_m{m}'
+    print(f"Adding {max_temp_name} & {min_temp_name}")
+
+    array[:,:,lookup[max_temp_name]] = ((geo_temp(lat_grid, day=doy, a=37.03043, b=-15.43029) - elev_corr) * 100).round()
+    array[:,:,lookup[min_temp_name]] = ((geo_temp(lat_grid, day=doy, a=24.16453, b=-15.71751) - elev_corr) * 100).round()
+
   #ttprint(f'Calculating {feature}')
   #newdata = ne.evaluate(expr, local_dict=bcf_local_dict).round()
   #array[:,:,gi:gi+1] = newdata
@@ -297,10 +337,10 @@ def in_mem_calc(lookup, array):
   #new_lookup = {new_lookup[i]: len(lookup) + i for i in range(0, len(new_lookup))}
   #lookup = {**lookup, **new_lookup}
 
-def run_model(model_type, model, model_fn, array_fn, out_fn, i0, i1):
+def run_model(model_type, model, model_fn, array_fn, out_fn, selected, i0, i1):
 
   array = sa.attach(array_fn, False)
-  array = array[:,:,0:169]
+  array = array[:,:,selected]
   out = sa.attach(out_fn, False)
   n_features = array.shape[-1]
 
@@ -377,11 +417,21 @@ if __name__ == '__main__':
   import bottleneck as bn
   import time
 
-  ttprint("Reading tiles gpkg")
-  tiles = gpd.read_file('ard2_final_status.gpkg')
-  df_features = pd.read_csv('./model/features.csv')
+  import affine
+  from datetime import datetime
 
-  tile = '029E_51N'
+  ttprint("Reading tiles gpkg")
+
+  model_dir = Path('/mnt/tupi/WRI/prod_new_samples/model_v20240210/compiled/')
+  rf_fn = str(model_dir.joinpath('landmapper_100_rf.so'))
+  xgb_fn = str(model_dir.joinpath('landmapper_100_xgb.bin'))
+  ann_fn = str(model_dir.joinpath('landmapper_100_ann.zip'))
+  log_fn = str(model_dir.joinpath('landmapper_100_logreg.zip'))
+
+  tiles = gpd.read_file('/mnt/tupi/WRI/prod_new_samples/gpw_tiles.gpkg')
+  df_features = pd.read_csv('/mnt/tupi/WRI/prod_new_samples/model_v20240210/features.csv')
+
+  tile = '055W_17S'
   minx, miny, maxx, maxy = tiles[tiles['TILE'] == tile].iloc[0].geometry.bounds
 
   static_files, static_idx = _raster_paths(df_features, 'static')
@@ -392,18 +442,19 @@ if __name__ == '__main__':
   array = sa.create(array_fn, shape, dtype=np.float32)
 
   start = time.time()
+  static_files = [ str(f'../{f}') for f in static_files ]
   read_rasters(static_files, static_idx, array_fn=array_fn, minx=minx, maxy=maxy)
   ttprint(f"Reading static: {(time.time() - start):.2f} segs")
 
   import xgboost
   model_xgb = xgboost.XGBClassifier() 
-  model_xgb.load_model('model/xgb_model.bin')
+  model_xgb.load_model(xgb_fn)
 
   from hummingbird.ml import load
-  model_ann = load('model/ann.torch')
+  model_ann = load(ann_fn)
 
   from hummingbird.ml import load
-  model_meta = load('model/log-reg.torch.zip')
+  model_meta = load(log_fn)
   ttprint(f"Loading models: {(time.time() - start):.2f} segs")
 
   for year in [2020]:
@@ -418,7 +469,8 @@ if __name__ == '__main__':
     lockup = { row['name']: row['idx'] for _, row in df_features[['idx','name']].iterrows() }
 
     start = time.time()
-    in_mem_calc(lockup, array)
+    base_file = landsat_files[0]
+    in_mem_calc(lockup, array, base_file)
     ttprint(f"In memory calc: {(time.time() - start):.2f} segs")
     ttprint(f"Number of feature: {n_features}")
     ttprint(f"Array shape: {array.shape}")
@@ -431,32 +483,36 @@ if __name__ == '__main__':
     shape = (4000, 4000, n_classes * 5 + 1)
     out_fn = 'file://' + str(make_tempfile(prefix='shm_output'))
     out = sa.create(out_fn, shape, dtype=np.float32)
+    selected = list(df_features[df_features['selected'] > -1]['idx'])
 
     args = [
       {
         'model_type': 'tl2cgen',
-        'model_fn': 'model/skl_rf_intel.so',
+        'model_fn': rf_fn,
         'model': None,
         'array_fn': array_fn,
         'out_fn': out_fn,
+        'selected': selected,
         'i0': 0,
         'i1': 3
       },
       {
         'model_type': 'xgboost',
-        'model_fn': 'model/xgb_model.bin',
+        'model_fn': xgb_fn,
         'model': model_xgb,
         'array_fn': array_fn,
         'out_fn': out_fn,
+        'selected': selected,
         'i0': 3,
         'i1': 6
       },
       {
         'model_type': 'hummingbird',
-        'model_fn': 'model/ann.torch',
-        'model': model_ann,
+        'model_fn': ann_fn,
+        'model': None,
         'array_fn': array_fn,
         'out_fn': out_fn,
+        'selected': selected,
         'i0': 6,
         'i1': 9
       }
@@ -487,12 +543,15 @@ if __name__ == '__main__':
     ttprint(f'Probabilities are in {out_fn}')
 
     start = time.time()
+    outdir= Path(f'./prod_predictions/{tile}/')
+    outdir.mkdir(parents=True, exist_ok=True)
+
     out_files = [
-      f'./gpw_eml.seeded.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./gpw_eml.semi.nat.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./gpw_eml.seeded.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./gpw_eml.semi.nat.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./gpw_eml.grass.type_30m_c_{year}0101_{year}1231_go_epsg.4326_v20240206.tif'
+      f'{outdir}/gpw_eml.seeded.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
+      f'{outdir}/gpw_eml.semi.nat.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
+      f'{outdir}/gpw_eml.seeded.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
+      f'{outdir}/gpw_eml.semi.nat.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
+      f'{outdir}/gpw_eml.grass.type_30m_c_{year}0101_{year}1231_go_epsg.4326_v20240206.tif'
     ]
 
     out_idx = [ 9, 10, 12, 13, 15 ]
