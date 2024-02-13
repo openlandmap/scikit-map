@@ -135,7 +135,7 @@ def inmem_calc_func(layernames, raster_data, bounds):
     
     return layernames, raster_data
 
-fn_landmapper =  './model_v20240210/landmapper.lz4' #'global_model_v1.lz4'
+fn_landmapper =  './model_v20240210/landmapper_100.lz4' #'global_model_v1.lz4'
 m = LandMapper.load_instance(fn_landmapper)
 static_raster = find_files('./static', '*.vrt')
 tiles = gpd.read_file('ard2_final_status.gpkg')
@@ -143,7 +143,7 @@ tiles = gpd.read_file('ard2_final_status.gpkg')
 #_tiles = ['003W_57N','006E_45N','016E_12S','029E_51N','047W_11S','055W_17S','055W_28S','056W_10S','061W_28S','075E_25N','081E_60N','081E_60N','091W_17N','101E_28N','102W_43N','103E_46N','115E_28S','121E_04S','145E_18S','146W_62N','147E_25S']
 #_years = [2020, 2000, 2005, 2010, 2015, 2016, 2017, 2018, 2019, 2022]
 
-_tiles = ['055W_17S', '091W_17N']
+_tiles = ['055W_17S','003W_57N','081E_60N','016E_12S','029E_51N']
 #_tiles = ['055W_17S', '091W_17N', '003W_57N','006E_45N','016E_12S','029E_51N','047W_11S','055W_28S','056W_10S','061W_28S','075E_25N','081E_60N','081E_60N','101E_28N','102W_43N','103E_46N','115E_28S','121E_04S','145E_18S','146W_62N','147E_25S'] #_tiles = ['003W_57N','006E_45N','016E_12S','029E_51N','047W_11S','055W_28S','056W_10S','061W_28S','075E_25N','081E_60N','081E_60N','101E_28N','102W_43N','103E_46N','115E_28S','121E_04S','145E_18S','146W_62N','147E_25S']
 _years = [2022, 2020, 2018] #[2001,2002,2003,2004,2006,2007,2008,2009,2011,2012,2013,2014,2001]
 
@@ -159,7 +159,7 @@ for year in _years:
       vrt_files = vrt_warp(raster_files, dst_crs='EPSG:4326', tr=0.00025, te = bounds)
       vrt_files = [ Path(f) for f in vrt_files ]
 
-      m.predict(fn_layers=vrt_files, fn_output=f'prediction_v2024/{tile}/pasture.class_{year}_{tile}.tif', 
+      m.predict(fn_layers=vrt_files, fn_output=f'prediction_v2024_gpw_ultimate/{tile}/pasture.class_{year}_{tile}.tif', 
                 allow_additional_layers=True, 
                 dict_layers_newnames=dict_layers_newnames, 
                 inmem_calc_func=inmem_calc_func, 
