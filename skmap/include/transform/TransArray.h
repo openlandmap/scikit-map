@@ -40,26 +40,6 @@ class TransArray: public ParArray
                             float_t result_offset,
                             std::vector<float_t> clip_value);
 
-        void computeEvi(std::vector<uint_t> red_indices,
-                            std::vector<uint_t> nir_indices,
-                            std::vector<uint_t> blue_indices,
-                            std::vector<uint_t> result_indices,
-                            float_t red_scaling,
-                            float_t nir_scaling,
-                            float_t blue_scaling,
-                            float_t result_scaling,
-                            float_t result_offset,
-                            std::vector<float_t> clip_value);
-
-        void computeNirv(std::vector<uint_t> red_indices,
-                            std::vector<uint_t> nir_indices,
-                            std::vector<uint_t> result_indices,
-                            float_t red_scaling,
-                            float_t nir_scaling,
-                            float_t result_scaling,
-                            float_t result_offset,
-                            std::vector<float_t> clip_value);
-
         void computeFapar(std::vector<uint_t> red_indices,
                             std::vector<uint_t> nir_indices,
                             std::vector<uint_t> result_indices,
@@ -69,11 +49,6 @@ class TransArray: public ParArray
                             float_t result_offset,
                             std::vector<float_t> clip_value);
         
-        void computeBsf(std::vector<std::vector<uint_t>> indices_matrix,
-                std::vector<uint_t> result_indices,
-                float_t threshold,
-                float_t result_scaling);
-
 
         void computeGeometricTemperature(Eigen::Ref<MatFloat> latitude,
                                          Eigen::Ref<MatFloat> elevation,

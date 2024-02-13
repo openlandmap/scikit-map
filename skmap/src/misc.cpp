@@ -14,8 +14,16 @@
 #include <cmath>
 #include <optional>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 namespace skmap {
+
+template<typename T>
+inline void skmapPrint(T message)
+{
+    std::cout << message << std::endl;
+}
 
 
 inline void skmapAssertIfTrue(bool cond, std::string message)
@@ -28,11 +36,20 @@ inline void skmapAssertIfTrue(bool cond, std::string message)
     }
 }
 
+inline void runBashCommand(std::string command)
+{
+    command += " > /dev/null 2>&1";
+    int result = system(command.c_str());
+    skmapAssertIfTrue(result != 0, "scikit-map ERROR 10: issues running the command " + command);
+}
+
 using uint_t = unsigned int;
 using float_t = float;
+using byte_t = unsigned char;
 inline float_t nan_v = std::numeric_limits<float_t>::quiet_NaN();
 inline float_t inf_v = std::numeric_limits<float_t>::infinity();
 using dict_t = std::unordered_map<std::string, std::string>;
+using map_t = std::unordered_map<uint_t, std::string>;
 // RowMajor -> C order ,  ColMajor -> F order 
 // C order is default in Numpy and Eigen pybind11 require it to get this input
 using MatFloat = Eigen::Matrix<float_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;

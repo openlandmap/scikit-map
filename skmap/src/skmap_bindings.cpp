@@ -17,6 +17,7 @@ dict_t convPyDict(py::dict in_dict)
 }
 
 
+
 void readData(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
               const std::vector<std::string>& file_locs,
@@ -112,39 +113,6 @@ void computeBsi(Eigen::Ref<MatFloat> data,
 
 }
 
-void computeEvi(Eigen::Ref<MatFloat> data,
-                const uint_t n_threads,
-                std::vector<uint_t> red_indices,
-                std::vector<uint_t> nir_indices,
-                std::vector<uint_t> blue_indices,
-                std::vector<uint_t> result_indices,
-                float_t red_scaling,
-                float_t nir_scaling,
-                float_t blue_scaling,
-                float_t result_scaling,
-                float_t result_offset,
-                std::vector<float_t> clip_value)
-{
-    TransArray transArray(data, n_threads);
-    transArray.computeEvi(red_indices, nir_indices, blue_indices, result_indices,
-                          red_scaling, nir_scaling, blue_scaling, result_scaling, result_offset, clip_value);
-}
-
-void computeNirv(Eigen::Ref<MatFloat> data,
-                const uint_t n_threads,
-                std::vector<uint_t> red_indices,
-                std::vector<uint_t> nir_indices,
-                std::vector<uint_t> result_indices,
-                float_t red_scaling,
-                float_t nir_scaling,
-                float_t result_scaling,
-                float_t result_offset,
-                std::vector<float_t> clip_value)
-{
-    TransArray transArray(data, n_threads);
-    transArray.computeNirv(red_indices, nir_indices, result_indices,
-                           red_scaling, nir_scaling, result_scaling, result_offset, clip_value);
-}
 
 void computeFapar(Eigen::Ref<MatFloat> data,
                 const uint_t n_threads,
@@ -162,18 +130,6 @@ void computeFapar(Eigen::Ref<MatFloat> data,
                            red_scaling, nir_scaling, result_scaling, result_offset, clip_value);
 }
 
-void computeBsf(Eigen::Ref<MatFloat> data,
-                const uint_t n_threads,
-                std::vector<std::vector<uint_t>> indices_matrix,
-                std::vector<uint_t> result_indices,
-                float_t threshold,
-                float_t result_scaling)
-{
-    TransArray transArray(data, n_threads);
-    transArray.computeBsf(indices_matrix, result_indices, threshold, result_scaling);
-}
-
-
 void computeGeometricTemperature(Eigen::Ref<MatFloat> data,
                                  const uint_t n_threads,
                                  Eigen::Ref<MatFloat> latitude,
@@ -189,6 +145,29 @@ void computeGeometricTemperature(Eigen::Ref<MatFloat> data,
     transArray.computeGeometricTemperature(latitude, elevation, elevation_scaling, a, b, result_scaling, result_indices, days_of_year);
 }
 
+
+
+void writeByteData(Eigen::Ref<MatFloat> data,
+                   const uint_t n_threads,
+                   py::dict conf_GDAL,
+                   std::string base_file,
+                   std::string base_folder,
+                   std::vector<std::string> file_names,
+                   std::vector<uint_t> data_indices,
+                   uint_t x_off,
+                   uint_t y_off,
+                   uint_t x_size,
+                   uint_t y_size,
+                   byte_t no_data_value,
+                   std::string bash_compression_command)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.writeData(base_file, base_folder, file_names, data_indices,
+        x_off, y_off, x_size, y_size, GDT_Byte, no_data_value, bash_compression_command);
+
+}
+
 PYBIND11_MODULE(skmap_bindings, m)
 {
     m.def("readData", &readData,
@@ -196,14 +175,12 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
+    m.def("writeByteData", &writeByteData, "Write data in Byte format");
     m.def("getLatLonArray", &getLatLonArray, "Compute latitude and longitude for each pixel of a GeoTIFF");
     m.def("reorderTransposeArray", &reorderTransposeArray, "Reorder and transpose an array into a new one");
     m.def("computeNormalizedDifference", &computeNormalizedDifference, "Compute normalized difference indices");
     m.def("computeBsi", &computeBsi, "Compute BSI");
-    m.def("computeEvi", &computeEvi, "Compute EVI");
-    m.def("computeNirv", &computeNirv, "Compute NIRV");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
-    m.def("computeBsf", &computeBsf, "Compute BSF");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
 }
 
