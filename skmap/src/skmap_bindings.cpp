@@ -159,12 +159,13 @@ void writeByteData(Eigen::Ref<MatFloat> data,
                    uint_t x_size,
                    uint_t y_size,
                    byte_t no_data_value,
-                   std::string bash_compression_command)
+                   std::optional<std::string> bash_compression_command,
+                   std::optional<std::vector<std::string>> seaweed_path)
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
     ioArray.writeData(base_file, base_folder, file_names, data_indices,
-        x_off, y_off, x_size, y_size, GDT_Byte, no_data_value, bash_compression_command);
+        x_off, y_off, x_size, y_size, GDT_Byte, no_data_value, bash_compression_command, seaweed_path);
 
 }
 
@@ -175,7 +176,11 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
-    m.def("writeByteData", &writeByteData, "Write data in Byte format");
+    m.def("writeByteData", &writeByteData, 
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg() = std::nullopt, py::arg() = std::nullopt,
+        "Write data in Byte format");
     m.def("getLatLonArray", &getLatLonArray, "Compute latitude and longitude for each pixel of a GeoTIFF");
     m.def("reorderTransposeArray", &reorderTransposeArray, "Reorder and transpose an array into a new one");
     m.def("computeNormalizedDifference", &computeNormalizedDifference, "Compute normalized difference indices");
