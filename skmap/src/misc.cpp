@@ -1,8 +1,10 @@
 #ifndef MISC_CPP
 #define MISC_CPP
 
+#define _USE_MATH_DEFINES
 #include <iostream>
 #include <Eigen/Dense>
+#include <gdal/gdal.h>
 #include <gdal/gdal.h>
 #include <gdal/gdal_priv.h>
 #include <omp.h>
@@ -11,6 +13,7 @@
 #include <unordered_map>
 #include <cmath>
 #include <optional>
+#include <math.h>
 
 namespace skmap {
 
@@ -33,7 +36,6 @@ using dict_t = std::unordered_map<std::string, std::string>;
 // RowMajor -> C order ,  ColMajor -> F order 
 // C order is default in Numpy and Eigen pybind11 require it to get this input
 using MatFloat = Eigen::Matrix<float_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
 
 
 }

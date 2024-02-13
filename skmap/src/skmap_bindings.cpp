@@ -7,10 +7,10 @@ namespace py = pybind11;
 
 using namespace skmap;
 
-dict_t convPyDict(py::dict py_dict)
+dict_t convPyDict(py::dict in_dict)
 {
     dict_t cpp_dict;
-    for (auto item : py_dict) {
+    for (auto item : in_dict) {
         cpp_dict[py::str(item.first)] = py::str(item.second);
     }
     return cpp_dict;
@@ -37,6 +37,41 @@ void readData(Eigen::Ref<MatFloat> data,
 
 }
 
+void getLatLonArray(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    py::dict conf_GDAL,
+                    std::string file_loc,
+                    uint_t x_off,
+                    uint_t y_off,
+                    uint_t x_size,
+                    uint_t y_size)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.getLatLonArray(file_loc, x_off, y_off, x_size, y_size);
+
+}
+
+void reorderArray(Eigen::Ref<MatFloat> data,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> out_data,
+                  std::vector<std::vector<uint_t>> indices_matrix)
+{
+    TransArray transArray(data, n_threads);
+    transArray.reorderArray(out_data, indices_matrix);
+
+}
+
+
+void reorderTransposeArray(Eigen::Ref<MatFloat> data,
+                          const uint_t n_threads,
+                          Eigen::Ref<MatFloat> out_data,
+                          std::vector<std::vector<uint_t>> indices_matrix)
+{
+    TransArray transArray(data, n_threads);
+    transArray.reorderTransposeArray(out_data, indices_matrix);
+
+}
 
 void computeNormalizedDifference(Eigen::Ref<MatFloat> data,
                                  const uint_t n_threads,
@@ -127,16 +162,49 @@ void computeFapar(Eigen::Ref<MatFloat> data,
                            red_scaling, nir_scaling, result_scaling, result_offset, clip_value);
 }
 
+void computeBsf(Eigen::Ref<MatFloat> data,
+                const uint_t n_threads,
+                std::vector<std::vector<uint_t>> indices_matrix,
+                std::vector<uint_t> result_indices,
+                float_t threshold,
+                float_t result_scaling)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeBsf(indices_matrix, result_indices, threshold, result_scaling);
+}
+
+
+void computeGeometricTemperature(Eigen::Ref<MatFloat> data,
+                                 const uint_t n_threads,
+                                 Eigen::Ref<MatFloat> latitude,
+                                 Eigen::Ref<MatFloat> elevation,
+                                 float_t elevation_scaling,
+                                 float_t a,
+                                 float_t b,
+                                 float_t result_scaling,
+                                 std::vector<uint_t> result_indices,
+                                 std::vector<float_t> days_of_year)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeGeometricTemperature(latitude, elevation, elevation_scaling, a, b, result_scaling, result_indices, days_of_year);
+}
 
 PYBIND11_MODULE(skmap_bindings, m)
 {
     m.def("readData", &readData,
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
-        py::arg("value_to_mask") = std::nullopt, py::arg("value_to_set") = std::nullopt,
+        py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
+    m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
+    m.def("getLatLonArray", &getLatLonArray, "Compute latitude and longitude for each pixel of a GeoTIFF");
+    m.def("reorderTransposeArray", &reorderTransposeArray, "Reorder and transpose an array into a new one");
     m.def("computeNormalizedDifference", &computeNormalizedDifference, "Compute normalized difference indices");
     m.def("computeBsi", &computeBsi, "Compute BSI");
     m.def("computeEvi", &computeEvi, "Compute EVI");
     m.def("computeNirv", &computeNirv, "Compute NIRV");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
+    m.def("computeBsf", &computeBsf, "Compute BSF");
+    m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
 }
+
+
