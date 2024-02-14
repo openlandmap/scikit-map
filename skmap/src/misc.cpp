@@ -49,7 +49,7 @@ using byte_t = unsigned char;
 inline float_t nan_v = std::numeric_limits<float_t>::quiet_NaN();
 inline float_t inf_v = std::numeric_limits<float_t>::infinity();
 using dict_t = std::unordered_map<std::string, std::string>;
-using map_t = std::unordered_map<uint_t, std::string>;
+using map_t = std::map<std::string, std::vector<uint_t>>;
 // RowMajor -> C order ,  ColMajor -> F order 
 // C order is default in Numpy and Eigen pybind11 require it to get this input
 using MatFloat = Eigen::Matrix<float_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;

@@ -17,6 +17,16 @@ dict_t convPyDict(py::dict in_dict)
 }
 
 
+map_t convPyMap(py::dict in_map)
+{
+    map_t cpp_map;
+    for (auto item : in_map) {
+        cpp_map[py::str(item.first)] = item.second.cast<std::vector<uint_t>>();
+    }
+    return cpp_map;
+}
+
+
 
 void readData(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
@@ -53,6 +63,20 @@ void getLatLonArray(Eigen::Ref<MatFloat> data,
 
 }
 
+// void rearrangeChunks(Eigen::Ref<MatFloat> data,
+//                      const uint_t n_threads,
+//                      uint_t x_chunk,
+//                      uint_t y_chunk,
+//                      map_t input_map,
+//                      Eigen::Ref<MatFloat> out_data,
+//                      map_t output_map)
+// {
+//     TransArray transArray(data, n_threads);
+//     transArray.rearrangeChunks(x_chunk, y_chunk, input_map, out_data, output_map);
+
+// }
+
+
 void reorderArray(Eigen::Ref<MatFloat> data,
                   const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
@@ -71,6 +95,15 @@ void reorderTransposeArray(Eigen::Ref<MatFloat> data,
 {
     TransArray transArray(data, n_threads);
     transArray.reorderTransposeArray(out_data, indices_matrix);
+
+}
+
+void transposeArray(Eigen::Ref<MatFloat> data,
+                          const uint_t n_threads,
+                          Eigen::Ref<MatFloat> out_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.transposeArray(out_data);
 
 }
 
@@ -175,7 +208,9 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
+    m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
+    // m.def("rearrangeChunks", &rearrangeChunks, "Rearrange chunks of data in a new array");
     m.def("writeByteData", &writeByteData, 
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),

@@ -8,6 +8,20 @@ TransArray::TransArray(Eigen::Ref<MatFloat> data, const uint_t n_threads)
 }
 
 
+// void TransArray::rearrangeChunks(uint_t x_chunk,
+//                                  uint_t y_chunk,
+//                                  map_t input_map,
+//                                  Eigen::Ref<MatFloat> out_data,
+//                                  map_t output_map)
+// {
+//         auto rearrangeChunk = [&] (uint_t i)
+//     {
+//         skmapPrint(input_map[i]);
+//     };
+//     this->parForRange(rearrangeChunk, out_data.rows());
+// }
+
+
 void TransArray::reorderArray(Eigen::Ref<MatFloat> out_data,
                               std::vector<std::vector<uint_t>> indices_matrix)
 {
@@ -39,6 +53,20 @@ void TransArray::reorderTransposeArray(Eigen::Ref<MatFloat> out_data,
         }
     };
     this->parForRange(reorderTransposeArrayCol, out_data.cols());
+}
+
+
+
+void TransArray::transposeArray(Eigen::Ref<MatFloat> out_data)
+{
+    skmapAssertIfTrue((m_data.rows() != out_data.cols()) ||
+                      (m_data.cols() != out_data.rows()),
+                       "scikit-map ERROR 13: size of the new array does not match the transpose input array");
+    auto transposeArrayCol = [&] (uint_t i)
+    {
+        out_data.row(i) = m_data.col(i).transpose();
+    };
+    this->parForRange(transposeArrayCol, out_data.rows());
 }
 
 
