@@ -45,7 +45,6 @@ void readData(Eigen::Ref<MatFloat> data,
     ioArray.setupGdal(convPyDict(conf_GDAL));
     ioArray.readData(file_locs, perm_vec, x_off, y_off, x_size, y_size, GDALDataType::GDT_Float32,
                      bands_list, value_to_mask, value_to_set);
-
 }
 
 void getLatLonArray(Eigen::Ref<MatFloat> data,
@@ -60,21 +59,7 @@ void getLatLonArray(Eigen::Ref<MatFloat> data,
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
     ioArray.getLatLonArray(file_loc, x_off, y_off, x_size, y_size);
-
 }
-
-// void rearrangeChunks(Eigen::Ref<MatFloat> data,
-//                      const uint_t n_threads,
-//                      uint_t x_chunk,
-//                      uint_t y_chunk,
-//                      map_t input_map,
-//                      Eigen::Ref<MatFloat> out_data,
-//                      map_t output_map)
-// {
-//     TransArray transArray(data, n_threads);
-//     transArray.rearrangeChunks(x_chunk, y_chunk, input_map, out_data, output_map);
-
-// }
 
 
 void reorderArray(Eigen::Ref<MatFloat> data,
@@ -84,18 +69,16 @@ void reorderArray(Eigen::Ref<MatFloat> data,
 {
     TransArray transArray(data, n_threads);
     transArray.reorderArray(out_data, indices_matrix);
-
 }
 
 
-void reorderTransposeArray(Eigen::Ref<MatFloat> data,
+void inverseReorderArray(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,
                           Eigen::Ref<MatFloat> out_data,
                           std::vector<std::vector<uint_t>> indices_matrix)
 {
     TransArray transArray(data, n_threads);
-    transArray.reorderTransposeArray(out_data, indices_matrix);
-
+    transArray.inverseReorderArray(out_data, indices_matrix);
 }
 
 void transposeArray(Eigen::Ref<MatFloat> data,
@@ -104,7 +87,6 @@ void transposeArray(Eigen::Ref<MatFloat> data,
 {
     TransArray transArray(data, n_threads);
     transArray.transposeArray(out_data);
-
 }
 
 void computeNormalizedDifference(Eigen::Ref<MatFloat> data,
@@ -121,7 +103,6 @@ void computeNormalizedDifference(Eigen::Ref<MatFloat> data,
     TransArray transArray(data, n_threads);
     transArray.computeNormalizedDifference(positive_indices, negative_indices, result_indices,
                                            positive_scaling, negative_scaling, result_scaling, result_offset, clip_value);
-
 }
 
 
@@ -210,14 +191,13 @@ PYBIND11_MODULE(skmap_bindings, m)
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
-    // m.def("rearrangeChunks", &rearrangeChunks, "Rearrange chunks of data in a new array");
+    m.def("inverseReorderArray", &inverseReorderArray, "Reorder and transpose an array into a new one");
     m.def("writeByteData", &writeByteData, 
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Write data in Byte format");
     m.def("getLatLonArray", &getLatLonArray, "Compute latitude and longitude for each pixel of a GeoTIFF");
-    m.def("reorderTransposeArray", &reorderTransposeArray, "Reorder and transpose an array into a new one");
     m.def("computeNormalizedDifference", &computeNormalizedDifference, "Compute normalized difference indices");
     m.def("computeBsi", &computeBsi, "Compute BSI");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
