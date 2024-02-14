@@ -14,6 +14,9 @@ class TransArray: public ParArray
 
         void reorderArray(Eigen::Ref<MatFloat> out_data,
                           std::vector<std::vector<uint_t>> indices_matrix);
+        
+        void selArrayRows(Eigen::Ref<MatFloat> out_data,
+                              std::vector<uint_t> row_select);
 
         void inverseReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> indices_matrix);

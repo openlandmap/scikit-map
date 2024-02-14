@@ -72,6 +72,17 @@ void reorderArray(Eigen::Ref<MatFloat> data,
 }
 
 
+
+void selArrayRows(Eigen::Ref<MatFloat> data,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> out_data,
+                  std::vector<uint_t> row_select)
+{
+    TransArray transArray(data, n_threads);
+    transArray.selArrayRows(out_data, row_select);
+}
+
+
 void inverseReorderArray(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,
                           Eigen::Ref<MatFloat> out_data,
@@ -189,6 +200,7 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
+    m.def("selArrayRows", &selArrayRows, "Mask array rows");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
     m.def("inverseReorderArray", &inverseReorderArray, "Reorder and transpose an array into a new one");
