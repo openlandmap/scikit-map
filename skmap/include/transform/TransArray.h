@@ -15,7 +15,7 @@ class TransArray: public ParArray
         void reorderArray(Eigen::Ref<MatFloat> out_data,
                           std::vector<std::vector<uint_t>> indices_matrix);
 
-        void reorderTransposeArray(Eigen::Ref<MatFloat> out_data,
+        void inverseReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> indices_matrix);
 
         void transposeArray(Eigen::Ref<MatFloat> out_data);
@@ -60,13 +60,6 @@ class TransArray: public ParArray
                                          float_t result_scaling,
                                          std::vector<uint_t> result_indices,
                                          std::vector<float_t> days_of_year);
-
-        // void rearrangeChunks(uint_t x_chunk,
-        //                          uint_t y_chunk,
-        //                          map_t input_map,
-        //                          Eigen::Ref<MatFloat> out_data,
-        //                          map_t output_map);
-
 
 
 

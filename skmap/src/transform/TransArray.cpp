@@ -7,21 +7,6 @@ TransArray::TransArray(Eigen::Ref<MatFloat> data, const uint_t n_threads)
 {
 }
 
-
-// void TransArray::rearrangeChunks(uint_t x_chunk,
-//                                  uint_t y_chunk,
-//                                  map_t input_map,
-//                                  Eigen::Ref<MatFloat> out_data,
-//                                  map_t output_map)
-// {
-//         auto rearrangeChunk = [&] (uint_t i)
-//     {
-//         skmapPrint(input_map[i]);
-//     };
-//     this->parForRange(rearrangeChunk, out_data.rows());
-// }
-
-
 void TransArray::reorderArray(Eigen::Ref<MatFloat> out_data,
                               std::vector<std::vector<uint_t>> indices_matrix)
 {
@@ -39,20 +24,16 @@ void TransArray::reorderArray(Eigen::Ref<MatFloat> out_data,
 }
 
 
-void TransArray::reorderTransposeArray(Eigen::Ref<MatFloat> out_data,
-                              std::vector<std::vector<uint_t>> indices_matrix)
+void TransArray::inverseReorderArray(Eigen::Ref<MatFloat> out_data,
+                                     std::vector<std::vector<uint_t>> indices_matrix)
 {
-    skmapAssertIfTrue((indices_matrix.size() != (uint_t) out_data.cols()) ||
-                      (indices_matrix[0].size() * (uint_t) m_data.cols() != (uint_t) out_data.rows()),
-                       "scikit-map ERROR 6: size of the new array does not match the input array and the requred reordering");
-    auto reorderTransposeArrayCol = [&] (uint_t i)
+    skmapAssertIfTrue((indices_matrix.size() != (uint_t) out_data.rows()),
+                       "scikit-map ERROR 6: size of the new array does not match the size of the reordering matrix");
+    auto inverseReorderArrayCol = [&] (uint_t i)
     {
-        for (uint_t j = 0; j < indices_matrix[i].size(); j++)
-        {
-            out_data.block(j*m_data.cols(), i, m_data.cols(), 1) = m_data.row(indices_matrix[i][j]).transpose();
-        }
+        out_data.row(i) = m_data.block(indices_matrix[i][0], indices_matrix[i][1]*out_data.cols(), 1, out_data.cols());
     };
-    this->parForRange(reorderTransposeArrayCol, out_data.cols());
+    this->parForRange(inverseReorderArrayCol, out_data.rows());
 }
 
 
