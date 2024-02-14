@@ -53,6 +53,7 @@ using map_t = std::map<std::string, std::vector<uint_t>>;
 // RowMajor -> C order ,  ColMajor -> F order 
 // C order is default in Numpy and Eigen pybind11 require it to get this input
 using MatFloat = Eigen::Matrix<float_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using MatBool = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
 
 }

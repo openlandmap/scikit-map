@@ -38,6 +38,20 @@ void TransArray::inverseReorderArray(Eigen::Ref<MatFloat> out_data,
 
 
 
+void TransArray::selArrayRows(Eigen::Ref<MatFloat> out_data,
+                              std::vector<uint_t> row_select)
+{
+    skmapAssertIfTrue((row_select.size() != (uint_t) out_data.rows()),
+                       "scikit-map ERROR 14: size of the new array does not match the size of selected indices");
+    auto selArrayRow = [&] (uint_t i)
+    {
+        out_data.row(i) = m_data.row(row_select[i]);
+    };
+    this->parForRange(selArrayRow, out_data.rows());
+}
+
+
+
 void TransArray::transposeArray(Eigen::Ref<MatFloat> out_data)
 {
     skmapAssertIfTrue((m_data.rows() != out_data.cols()) ||
