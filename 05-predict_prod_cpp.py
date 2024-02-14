@@ -1,8 +1,24 @@
-from typing import Callable, Iterator, List,  Union
+import os
+os.environ['USE_PYGEOS'] = '0'
+
+from datetime import datetime
 from osgeo import gdal, gdal_array
+from pathlib import Path
+from typing import Callable, Iterator, List,  Union
+import bottleneck as bn
+import geopandas as gpd
+import numexpr as ne
 import numpy as np
+import pandas as pd
 import SharedArray as sa
 import skmap_bindings
+import tempfile
+import time
+from hummingbird.ml import load
+
+import concurrent.futures
+import multiprocessing
+from itertools import islice
 
 gdal_opts = {
  #'GDAL_HTTP_MULTIRANGE': 'SINGLE_GET',
@@ -33,15 +49,8 @@ def ProcessGeneratorLazy(
   args:Iterator[tuple],
   max_workers:int = None
 ):
-  import concurrent.futures
-  import multiprocessing
-  from itertools import islice
 
   global executor
-
-  if executor is None:
-    max_workers = multiprocessing.cpu_count()
-    executor = concurrent.futures.ProcessPoolExecutor(max_workers=max_workers)
 
   #with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
   futures = { executor.submit(worker, **arg) for arg in args }
@@ -53,32 +62,6 @@ def ProcessGeneratorLazy(
       raise err
     else:
         yield task.result()
-
-def save_raster(base_raster, out_file, array_fn, i, minx = None, maxy = None, co = []):
-    
-  #for key in gdal_opts.keys():
-  #  gdal.SetConfigOption(key,gdal_opts[key])
-  
-  array = sa.attach(array_fn, False)
-  base_ds = gdal.Open(base_raster)
-
-  driver = gdal.GetDriverByName('GTiff')
-  #cols, rows = ds.RasterXSize, ds.RasterYSize
-
-  out_ds = driver.CreateCopy(out_file, base_ds, options=co)
-  #out_ds = driver.Create(out_file, cols, rows, 1, dtype)
-  #out_ds.SetGeoTransform(*base_ds.GetGeoTransform())
-  out_band = out_ds.GetRasterBand(1)
-
-  xoff, yoff = 0, 0
-  if minx is not None and maxy is not None:
-    gt = base_ds.GetGeoTransform()
-    gti = gdal.InvGeoTransform(gt)
-
-    xoff, yoff = gdal.ApplyGeoTransform(gti, minx, maxy)
-    xoff, yoff = int(xoff), int(yoff)
-
-  gdal_array.BandWriteArray(out_band, array[:,:,i], xoff=xoff, yoff=yoff)
 
 def make_tempdir(basedir='skmap', make_subdir = True):
   tempdir = Path(TMP_DIR).joinpath(basedir)
@@ -93,175 +76,56 @@ def make_tempfile(basedir='skmap', prefix='', suffix='', make_subdir = False):
   return tempdir.joinpath(
     Path(tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix).name).name
   )
+        
+def _features(csv_file, years, tile_id):
 
-def save_rasters(base_raster, out_files, idx_list, array_fn, minx = None, maxy = None):
+  df_features = pd.read_csv(csv_file,index_col=0).reset_index(drop=True)
+  df_features.loc[df_features['type'] == 'static',['path']] = df_features[df_features['type'] == 'static']['path'].apply(lambda f: f'../{f}')
 
-  ttprint(f"Saving {len(out_files)} raster files.")
+  df_list = []
+
+  df_list += [ df_features[np.logical_and(df_features['type'] == 'static', df_features['selected'] > -1)] ]
+
+  for year in years:
+    mask = (df_features['type'] == 'landsat')
+    df = df_features[mask].copy()
+    df['path'] = df['path'].apply(lambda p: p.replace('{tile}', tile_id).replace('{year}', str(year)))
+    df_list += [ df ]
+
+  otf_mask = df_features['type'] == 'on-the-fly'
+  otf_sel = df_features[np.logical_and(otf_mask,df_features['selected'] > -1)]['name'].apply(lambda f: '_'.join(f.split('_')[0:2])).unique()
+  for year in years:
+    df_list += [ df_features[np.logical_and(otf_mask, df_features['name'].str.contains('|'.join(otf_sel)))] ]
+
+  df_features = pd.concat(df_list)
+  df_features = df_features.reset_index(drop=True)
+  df_features['idx'] = df_features.index
+
+  matrix_idx = []
+
+  for i in range(0, df_features['selected'].max()+1):
+      sel_mask = df_features['selected'] == i
+      idx = list(df_features[sel_mask]['idx'])
+      if len(idx) == 1:
+          idx = [ idx[0] for i in range(0,len(years)) ]
+      matrix_idx.append(idx)
+
+  matrix_idx = np.array(matrix_idx)
   
-  args = []
-  for out_file, i in zip(out_files, idx_list):
-    args.append({
-      'base_raster': base_raster, 
-      'out_file': out_file, 
-      'array_fn': array_fn, 
-      'i': i,
-      'minx': minx,
-      'maxy': maxy,
-      'co': co
-    })
+  return df_features, matrix_idx
 
-  for result in ProcessGeneratorLazy(save_raster, args, len(args)):
-    continue
-
-def run_model(model_type, model, model_fn, array_fn, out_fn, i0, i1):
-
-  array = sa.attach(array_fn, False)
-  start = time.time()
-  array = array[0:169,:].transpose((1,0))
-  #array = array[:,0:169]
-  ttprint(f"Not so silly array copy / transpose: {(time.time() - start):.2f} segs")
-  out = sa.attach(out_fn, False)
-  n_features = array.shape[-1]
-
-  start = time.time()
-  if model_type == 'tl2cgen':
-    import tl2cgen
-    model = tl2cgen.Predictor(libpath=model_fn)
-    out[:,:,i0:i1] = model.predict(tl2cgen.DMatrix(array)).reshape((out.shape[0],out.shape[1],-1))
-
-  elif model_type == 'xgboost':
-    #ttprint(f"Running a {model_type} model ({model_fn})")
-    #import xgboost
-    #model = xgboost.XGBClassifier() 
-    #model.load_model("model/xgb_model.bin")
-    out[:,:,i0:i1] = model.predict_proba(array).reshape((out.shape[0],out.shape[1],-1))
-
-  elif model_type == 'hummingbird':
-    #ttprint(f"Running a {model_type} model ({model_fn})")
-    from hummingbird.ml import load
-    model = load(model_fn)
-    out[:,:,i0:i1] = model.predict_proba(array).reshape((out.shape[0],out.shape[1],-1))
-
-  else:
-    raise Exception(f'Invalid model type {model_type}')
-  ttprint(f"Model {model_type} ({model_fn}): {(time.time() - start):.2f} segs")
-
-def _raster_paths(df_features, ftype, tile = None, year = None):
+def _raster_paths(df_features, ftype):
 
   mask = (df_features['type'] == ftype)
-
-  path_col = 'path'
-  if ftype == 'landsat':
-    df_features['ypath'] = df_features[mask]['path'].apply(lambda p: p.replace('{tile}', tile).replace('{year}', str(year)))
-    path_col = 'ypath'
-
   ids_list = list(df_features[mask]['idx'])
-  raster_files = list(df_features[mask][path_col])
+  raster_files = list(df_features[mask]['path'])
 
   return raster_files, ids_list
 
-def in_mem_calc(data, df_feat, n_threads):
-
-  band_scaling = 0.004
-  result_scaling = 125.
-  result_offset = 125.
-
-  blue_idx = list(df_feat[df_feat['name'].str.contains('blue_glad')].index)
-  red_idx = list(df_feat[df_feat['name'].str.contains('red_glad')].index)
-  nir_idx = list(df_feat[df_feat['name'].str.contains('nir_glad')].index)
-
-  swir1_idx = list(df_feat[df_feat['name'].str.contains('swir1_glad')].index)
-  swir2_idx = list(df_feat[df_feat['name'].str.contains('swir2_glad')].index)
-  bsf_idx = list(df_feat[df_feat['name'].str.contains('bsf')].index)
-
-  elev_idx = list(df_feat[df_feat['name'].str.contains('dtm.bareearth_ensemble')].index)
-  lst_min_idx = list(df_feat[df_feat['name'].str.contains('clm_lst_min.geom.temp')].index)
-  lst_max_idx = list(df_feat[df_feat['name'].str.contains('clm_lst_max.geom.temp')].index)
-
-  # NDVI
-  ndvi_idx = list(df_feat[df_feat['name'].str.contains('ndvi_glad')].index)
-  skmap_bindings.computeNormalizedDifference(data, n_threads,
-                              nir_idx, red_idx, ndvi_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
-  # NDWI
-  ndwi_idx = list(df_feat[df_feat['name'].str.contains('ndwi_glad')].index)
-  skmap_bindings.computeNormalizedDifference(data, n_threads,
-                              nir_idx, swir1_idx, ndwi_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
-  # BSI
-  bsi_idx = list(df_feat[df_feat['name'].str.contains('bsi_glad')].index)
-  skmap_bindings.computeBsi(data, n_threads,
-                              swir1_idx, red_idx, nir_idx, blue_idx, bsi_idx,
-                              band_scaling, band_scaling, band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
-  # NDTI
-  ndti_idx = list(df_feat[df_feat['name'].str.contains('ndti_glad')].index)
-  skmap_bindings.computeNormalizedDifference(data, n_threads,
-                              swir1_idx, swir2_idx, ndti_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
-  # NIRV
-  nirv_idx = list(df_feat[df_feat['name'].str.contains('nirv_glad')].index)
-  skmap_bindings.computeNirv(data, n_threads,
-                              red_idx, nir_idx, nirv_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
-  # EVI
-  evi_idx = list(df_feat[df_feat['name'].str.contains('evi_glad')].index)
-  skmap_bindings.computeEvi(data, n_threads,
-                              red_idx, nir_idx, blue_idx, evi_idx,
-                              band_scaling, band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
-  # FAPAR
-  fapar_idx = list(df_feat[df_feat['name'].str.contains('fapar_glad')].index)
-  skmap_bindings.computeFapar(data, n_threads,
-                              red_idx, nir_idx, fapar_idx,
-                              band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
-
-  data_ndvi = data[ndvi_idx,:]
-  expr = f'( where( ndvi_0101_0228 <= 169, 100, 0) + where( ndvi_0301_0430 <= 169, 100, 0) + ' + \
-         f'  where( ndvi_0501_0630 <= 169, 100, 0) + where( ndvi_0701_0831 <= 169, 100, 0) + ' + \
-         f'  where( ndvi_0501_0630 <= 169, 100, 0) + where( ndvi_0701_0831 <= 169, 100, 0) ) / 6'
-  data[bsf_idx,:] = ne.evaluate(expr, local_dict={
-    'ndvi_0101_0228': data_ndvi[0,:], 'ndvi_0301_0430': data_ndvi[1,:],
-    'ndvi_0501_0630': data_ndvi[2,:], 'ndvi_0701_0831': data_ndvi[3,:],
-    'ndvi_0501_0630': data_ndvi[4,:], 'ndvi_0701_0831': data_ndvi[5,:],
-  }).round()
-
-  base_file = list(feat_df.loc[feat_df['name'].str.contains('swir1'),'path'])[0]
-  data_elev = data[elev_idx,:]
-  with rasterio.open(base_file) as ds:
-    pixel_size = ds.transform[0]
-    lon = np.arange(2, 4000)
-    lat = np.arange(2, 4000)
-
-    lon_grid, lat_grid = ds.transform * np.meshgrid(lon, lat)
-
-    elev_corr = 0.006 * data_elev * 0.1
-
-    for m in range(1,13):
-        doy = (datetime.strptime(f'2000-{m}-15', '%Y-%m-%d').timetuple().tm_yday)
-        print(f"Adding {max_temp_name} & {min_temp_name}")
-
-        data[lst_min_idx[m-1],:] = ((geo_temp(lat_grid, day=doy, a=37.03043, b=-15.43029) - elev_corr) * 100).round()
-        data[lst_max_idx[m-1],:] = ((geo_temp(lat_grid, day=doy, a=24.16453, b=-15.71751) - elev_corr) * 100).round()
-
-def _model_input(tile, start_year = 2000, end_year = 2022, bands = ['blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'thermal'], base_url='http://192.168.49.30:8333'):
-  prediction_layers = []
-
-  for year in range(start_year, end_year + 1):
-    for band in bands:
-      prediction_layers += [
-      f'{base_url}/prod-landsat-ard2/{tile}/seasconv/{band}_glad.SeasConv.ard2_m_30m_s_' + f'{year}0101_{year}0228_go_epsg.4326_v20230908.tif',
-      f'{base_url}/prod-landsat-ard2/{tile}/seasconv/{band}_glad.SeasConv.ard2_m_30m_s_' + f'{year}0301_{year}0430_go_epsg.4326_v20230908.tif',
-      f'{base_url}/prod-landsat-ard2/{tile}/seasconv/{band}_glad.SeasConv.ard2_m_30m_s_' + f'{year}0501_{year}0630_go_epsg.4326_v20230908.tif',
-      f'{base_url}/prod-landsat-ard2/{tile}/seasconv/{band}_glad.SeasConv.ard2_m_30m_s_' + f'{year}0701_{year}0831_go_epsg.4326_v20230908.tif',
-      f'{base_url}/prod-landsat-ard2/{tile}/seasconv/{band}_glad.SeasConv.ard2_m_30m_s_' + f'{year}0901_{year}1031_go_epsg.4326_v20230908.tif',
-      f'{base_url}/prod-landsat-ard2/{tile}/seasconv/{band}_glad.SeasConv.ard2_m_30m_s_' + f'{year}1101_{year}1231_go_epsg.4326_v20230908.tif'
-      ]
-
-  return prediction_layers
-
-def _get_static_layers_info(tiles, df_features, tile):
+def _get_static_layers_info(df_features, tiles, tile):
   
   min_x, _, _, max_y = tiles[tiles['TILE'] == tile].iloc[0].geometry.bounds
-  static_files, _ = _raster_paths(df_features, 'static')
+  static_files, static_idx = _raster_paths(df_features, 'static')
   
   gidal_ds = gdal.Open(static_files[0]) # It is assumed to be the same for all static layers
   gt = gidal_ds.GetGeoTransform()
@@ -269,172 +133,300 @@ def _get_static_layers_info(tiles, df_features, tile):
   x_off_s, y_off_s = gdal.ApplyGeoTransform(gti, min_x, max_y)
   x_off_s, y_off_s = int(x_off_s), int(y_off_s)
   
-  return static_files, x_off_s, y_off_s
+  return static_files, static_idx, x_off_s, y_off_s
 
-if __name__ == '__main__':
 
-  from osgeo import gdal, gdal_array
+def _geom_temperature(df_features, array, n_threads):
 
-  from pathlib import Path
-  import SharedArray as sa
-  import geopandas as gpd
-  import bottleneck as bn
-  import numexpr as ne
-  import pandas as pd
-  import numpy as np
-  import tempfile
-  import time
-  import os
+  elev_idx = list(df_features[df_features['name'].str.contains('dtm.bareearth_ensemble')].index)
+  lst_min_geo_idx = list(df_features[df_features['name'].str.contains('clm_lst_min.geom.temp')].index)
+  lst_max_geo_idx = list(df_features[df_features['name'].str.contains('clm_lst_max.geom.temp')].index)
+
+  x_off, y_off = (2, 2)
+  base_landsat = landsat_files[-1]
+  lon_lat = np.zeros((2, array.shape[1]), dtype=np.float32)
+  skmap_bindings.getLatLonArray(lon_lat, n_threads, gdal_opts, base_landsat, x_off, y_off, x_size, y_size)
+  latitude = lon_lat[1,:].copy()
+
+  doys = [ datetime.strptime(f'2000-{m}-15', '%Y-%m-%d').timetuple().tm_yday for m in range(1,13) ]
+  doys_all = sum([ doys for i in range(0, len(years)) ],[])
+
+  elevation = array[elev_idx[0],:]
+
+  skmap_bindings.computeGeometricTemperature(array, n_threads, latitude, elevation, 0.1, 37.03043, -15.43029, 100., lst_min_geo_idx, doys_all)
+  skmap_bindings.computeGeometricTemperature(array, n_threads, latitude, elevation, 0.1, 24.16453, -15.71751, 100., lst_max_geo_idx, doys_all)
+
+def in_mem_calc(data, df_features, n_threads):
+    
+  band_scaling = 0.004
+  result_scaling = 125.
+  result_offset = 125.
+
+  blue_idx = list(df_features[df_features['name'].str.contains('blue_glad')].index)
+  red_idx = list(df_features[df_features['name'].str.contains('red_glad')].index)
+  nir_idx = list(df_features[df_features['name'].str.contains('nir_glad')].index)
+
+  swir1_idx = list(df_features[df_features['name'].str.contains('swir1_glad')].index)
+  swir2_idx = list(df_features[df_features['name'].str.contains('swir2_glad')].index)
+  bsf_idx = list(df_features[df_features['name'].str.contains('bsf')].index)
+
+  ndvi_idx = list(df_features[df_features['name'].str.contains('ndvi_glad')].index)
+  ndwi_idx = list(df_features[df_features['name'].str.contains('ndwi_glad')].index)
+  bsi_idx = list(df_features[df_features['name'].str.contains('bsi_glad')].index)
+  ndti_idx = list(df_features[df_features['name'].str.contains('ndti_glad')].index)
+  fapar_idx = list(df_features[df_features['name'].str.contains('fapar_glad')].index)
+
+  # NDVI
+  skmap_bindings.computeNormalizedDifference(data, n_threads,
+                            nir_idx, red_idx, ndvi_idx,
+                            band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
+  # NDWI
+  skmap_bindings.computeNormalizedDifference(data, n_threads,
+                            nir_idx, swir1_idx, ndwi_idx,
+                            band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
+  # BSI
+  skmap_bindings.computeBsi(data, n_threads,
+                            swir1_idx, red_idx, nir_idx, blue_idx, bsi_idx,
+                            band_scaling, band_scaling, band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
+  # NDTI
+  skmap_bindings.computeNormalizedDifference(data, n_threads,
+                            swir1_idx, swir2_idx, ndti_idx,
+                            band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
+  # NIRV
+  #nirv_idx = list(df_feat[df_feat['name'].str.contains('nirv_glad')].index)
+  #skmap_bindings.computeNirv(data, n_threads,
+  #                          red_idx, nir_idx, nirv_idx,
+  #                          band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
+  # EVI
+  #evi_idx = list(df_feat[df_feat['name'].str.contains('evi_glad')].index)
+  #skmap_bindings.computeEvi(data, n_threads,
+  #                          red_idx, nir_idx, blue_idx, evi_idx,
+  #                          band_scaling, band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
+
+  # FAPAR
   
-  TMP_DIR = tempfile.gettempdir()
+  skmap_bindings.computeFapar(data, n_threads,
+                            red_idx, nir_idx, fapar_idx,
+                            band_scaling, band_scaling, result_scaling, result_offset, [0., 250.])
+  
+  _geom_temperature(df_features, array, n_threads)
 
-  model_dir = Path('/mnt/tupi/WRI/prod_new_samples/prediction_v2024_gpw_ultimate/model_v20240210/compiled/')
-  rf_fn = str(model_dir.joinpath('landmapper_100_rf.so'))
-  xgb_fn = str(model_dir.joinpath('landmapper_100_xgb.bin'))
-  ann_fn = str(model_dir.joinpath('landmapper_100_ann.zip'))
-  log_fn = str(model_dir.joinpath('landmapper_100_logreg.zip'))
+def run_model(model_type, model_fn, array_fn, out_fn, i0, i1):
 
-  ttprint("Reading tiles gpkg")
-  tiles = gpd.read_file('/mnt/tupi/WRI/prod_new_samples/gpw_tiles.gpkg')
-  df_features = pd.read_csv('/mnt/tupi/WRI/prod_new_samples/model_v20240210/features.csv')
+  import SharedArray as sa
 
-  n_threads = 96
-  tile = '029E_51N'
-  minx, miny, maxx, maxy = tiles[tiles['TILE'] == tile].iloc[0].geometry.bounds
-
-  static_files, static_idx = _raster_paths(df_features, 'static')
-  n_features = df_features.shape[0]
-
-  bands_list = [1,]
-  x_size, y_size = (4000, 4000)
-  shape = (n_features, x_size * y_size)
-  array_fn = 'file://' + str(make_tempfile(prefix='shm_array'))
-  array = sa.create(array_fn, shape, dtype=np.float32)
-  ttprint(f"Data in: {array_fn}")
+  array = sa.attach(array_fn, False)
+  #array = array
+  out = sa.attach(out_fn, False)
+  n_features = array.shape[-1]
 
   start = time.time()
-  static_files, x_off_s, y_off_s = _get_static_layers_info(tiles, df_features, tile)
-  n_static = len(static_files)
+  if model_type == 'tl2cgen':
+    import tl2cgen
+    model = tl2cgen.Predictor(libpath=model_fn)
+    out[:,i0:i1] = model.predict(tl2cgen.DMatrix(array))
+
+  elif model_type == 'xgboost':
+    import xgboost
+    model = xgboost.XGBClassifier() 
+    model.load_model(model_fn)
+    out[:,i0:i1] = model.predict_proba(array)
+
+  elif model_type == 'hummingbird':
+    from hummingbird.ml import load
+    model = load(model_fn)
+    out[:,i0:i1] = model.predict_proba(array)
+
+  else:
+    raise Exception(f'Invalid model type {model_type}')
+  ttprint(f"Model {model_type} ({model_fn}): {(time.time() - start):.2f} segs")
+
+TMP_DIR = tempfile.gettempdir()
+
+model_dir = Path('/mnt/tupi/WRI/prod_new_samples/model_v20240210/compiled/')
+rf_fn = str(model_dir.joinpath('landmapper_100_rf.so'))
+xgb_fn = str(model_dir.joinpath('landmapper_100_xgb.bin'))
+ann_fn = str(model_dir.joinpath('landmapper_100_ann.zip'))
+log_fn = str(model_dir.joinpath('landmapper_100_logreg.zip'))
+
+mask_prefix = 'http://192.168.1.30:8333/gpw/landmask'
+tiles_fn = '/mnt/tupi/WRI/prod_new_samples/gpw_tiles.gpkg'
+features_fn = '/mnt/tupi/WRI/prod_new_samples/model_v20240210/features.csv'
+years = range(2000,2022 + 1, 2)
+x_size, y_size = (4000, 4000)
+tiles_id = [ '052W_06S' ]
+n_threads = 96
+n_classes = 3
+s3_prefix = 'gpw/tmp-prod/'
+
+subnet = '192.168.49'
+hosts = [ f'{subnet}.{i}:8333' for i in range(30,43) ]
+
+ttprint("Reading tiling system")
+tiles = gpd.read_file(tiles_fn)
+
+start = time.time()
+executor = concurrent.futures.ProcessPoolExecutor(max_workers=3)
+ttprint(f"Creating python workers pool: {(time.time() - start):.2f} segs")
+
+for tile_id in tiles_id:
+
+  minx, miny, maxx, maxy = tiles[tiles['TILE'] == tile_id].iloc[0].geometry.bounds
+
+  df_features, matrix_idx = _features(features_fn, years, tile_id)
+  #ttprint(f"df_features={df_features.shape} & matrix_idx={matrix_idx.shape}")
+
+  bands_list = [1,]
+  n_rasters = df_features.shape[0]
+  
+  shape = (n_rasters, x_size * y_size)
+  array = np.empty(shape, dtype=np.float32)
+
+  landsat_files, landsat_idx = _raster_paths(df_features, 'landsat')
+  static_files, static_idx, x_off_s, y_off_s = _get_static_layers_info(df_features, tiles, tile_id)
+
+  start = time.time()
   skmap_bindings.readData(array, n_threads, static_files, static_idx, x_off_s, y_off_s, x_size, y_size, bands_list, gdal_opts)
   ttprint(f"Reading static: {(time.time() - start):.2f} segs")
 
   start = time.time()
-  import xgboost
-  model_xgb = xgboost.XGBClassifier() 
-  model_xgb.load_model(xgb_fn)
-  ttprint(f"Loading xgb model: {(time.time() - start):.2f} segs")
+  x_off_d, y_off_d = (2, 2)
+  landsat_files = [str(r).replace(f"{subnet}.30", f"{subnet}.{30 + int.from_bytes(Path(r).stem.encode(), 'little') % len(hosts)}") for r in landsat_files]
+  skmap_bindings.readData(array, n_threads, landsat_files, landsat_idx, x_off_d, y_off_d, x_size, y_size, bands_list, gdal_opts, 255., np.nan)
+  ttprint(f"Reading landsat: {(time.time() - start):.2f} segs")
 
   start = time.time()
-  from hummingbird.ml import load
-  model_ann = load(ann_fn)
-  ttprint(f"Loading ann model: {(time.time() - start):.2f} segs")
+  in_mem_calc(array, df_features, n_threads)
+  ttprint(f"In memory calc: {(time.time() - start):.2f} segs")
+
+  #mask_file = f'http://192.168.1.30:8333/gpw/landmask/{tile}.tif'
+  #mask = np.zeros((1,x_size * y_size), dtype=np.float32)
+  #skmap_bindings.readData(mask, n_threads, [mask_file,], [0,], x_off_d, x_off_d, x_size, y_size, [1,], gdal_opts)
+  #n_data = int(np.sum(mask))
 
   start = time.time()
-  from hummingbird.ml import load
+  n_features = df_features['selected'].max() + 1
+  n_pix = len(years) * x_size * y_size
+  array_mem_t = np.empty((n_pix, n_features), dtype=np.float32)
+  array_mem = np.empty((n_features, n_pix), dtype=np.float32)
+
+  skmap_bindings.reorderArray(array, n_threads, array_mem, matrix_idx)
+  skmap_bindings.transposeArray(array_mem, n_threads, array_mem_t)
+  ttprint(f"Transposing data: {(time.time() - start):.2f} segs")
+
+  start = time.time()
+  mask_file = f'{mask_prefix}/{tile_id}.tif'
+  mask = np.zeros((1,x_size * y_size), dtype=np.float32)
+
+  skmap_bindings.readData(mask, n_threads, [mask_file,], [0,], x_off_d, x_off_d, x_size, y_size, [1,], gdal_opts)
+  n_data = int(np.sum(mask)) * len(years)
+  selected_pix = np.arange(0, x_size * y_size)[mask[0,:]==1]
+  selected_rows = np.concatenate([ selected_pix + (x_size * y_size) * i for i in range(0,len(years)) ]).tolist()
+
+  array_fn = 'file://' + str(make_tempfile(prefix='shm_array'))
+  array_t = sa.create(array_fn, (n_data, n_features), dtype=np.float32)
+  skmap_bindings.selArrayRows(array_mem_t, n_threads, array_t, selected_rows)
+
+  shape = (array_t.shape[0], n_classes * 5 + 1)
+  out_fn = 'file://' + str(make_tempfile(prefix='shm_output'))
+  out = sa.create(out_fn, shape, dtype=np.float32)
+  ttprint(f"Masking data: {(time.time() - start):.2f} segs")
+
+  args = [
+    {
+      'model_type': 'tl2cgen',
+      'model_fn': rf_fn,
+      'array_fn': array_fn,
+      'out_fn': out_fn,
+      'i0': 0,
+      'i1': 3
+    },
+    {
+      'model_type': 'xgboost',
+      'model_fn': xgb_fn,
+      'array_fn': array_fn,
+      'out_fn': out_fn,
+      'i0': 3,
+      'i1': 6
+    },
+    {
+      'model_type': 'hummingbird',
+      'model_fn': ann_fn,
+      'array_fn': array_fn,
+      'out_fn': out_fn,
+      'i0': 6,
+      'i1': 9
+    }
+  ]
+
+  start = time.time()
+  n_predictions = len(args)
+  for index in ProcessGeneratorLazy(run_model, args, n_predictions):
+    continue
+  ttprint(f"Running models: {(time.time() - start):.2f} segs")
+
   model_meta = load(log_fn)
-  ttprint(f"Loading log-reg models: {(time.time() - start):.2f} segs")
+  mi = n_classes * n_predictions
 
-  for year in range(2020,2022,2): #range(2000, 2023, 2):
-    
-    landsat_files, landsat_idx = _raster_paths(df_features, 'landsat', tile, year)
+  start = time.time()
+  # EML probabilities
+  out[:,9:12] = model_meta.predict_proba(out[:,0:mi]).round(2) * 100
+  ttprint(f"Running meta-learner: {(time.time() - start):.2f} segs")
 
-    x_off_d, y_off_d = (2, 2)
-    subnet = '192.168.49'
-    hosts = [ f'{subnet}.{i}:8333' for i in range(30,43) ]
-    landsat_files = [str(r).replace(f"{subnet}.30", f"{subnet}.{30 + int.from_bytes(Path(r).stem.encode(), 'little') % len(hosts)}") for r in landsat_files]
+  # Model deviance
+  start = time.time()
+  out[:,12:15] = bn.nanstd(out[:,0:mi].reshape(-1, n_predictions, n_classes), axis=-2).round(2) * 100
+  ttprint(f"Model deviance: {(time.time() - start):.2f} segs")
 
-    start = time.time()
-    i = len(static_files) 
-    skmap_bindings.readData(array, n_threads, landsat_files, landsat_idx, x_off_d, y_off_d, x_size, y_size, bands_list, gdal_opts, 255., np.nan)
-    ttprint(f"Reading landsat: {(time.time() - start):.2f} segs")
+  # Final map
+  start = time.time()
+  out[:,15] = np.argmax(out[:,9:12], axis=-1) + 1
+  ttprint(f"Argmax (hard_class): {(time.time() - start):.2f} segs")
+  
+  start = time.time()  
+  out_exp = np.empty((array_mem_t.shape[0], out.shape[1]), dtype=np.float32)
+  skmap_bindings.fillArray(out_exp, n_threads, 255.)
+  skmap_bindings.expandArrayRows(out, n_threads, out_exp, selected_rows)
+  ttprint(f"Reversing mask: {(time.time() - start):.2f} segs")
 
-    lockup = { row['name']: row['idx'] for _, row in df_features[['idx','name']].iterrows() }
+  start = time.time()
+  out_idx = [ 9, 10, 12, 13, 15 ]
+  out_t = np.empty((out_exp.shape[1],out_exp.shape[0]), dtype=np.float32)
+  out_gdal = np.empty((len(out_idx) * len(years),x_size *y_size), dtype=np.float32)
+  skmap_bindings.transposeArray(out_exp, n_threads, out_t)
 
-    start = time.time()
-    in_mem_calc(array, df_features, n_threads)
-    ttprint(f"In memory calc: {(time.time() - start):.2f} segs")
-    ttprint(f"Number of feature: {n_features}")
-    ttprint(f"Array shape: {array.shape}")
+  subrows = np.arange(0, len(years))
+  rows = out_idx
+  subrows_grid, rows_grid = np.meshgrid(subrows, rows)
+  inverse_idx = np.empty((out_gdal.shape[0],2), dtype=np.uintc)
+  inverse_idx[:,0] = rows_grid.flatten()
+  inverse_idx[:,1] = subrows_grid.flatten()
+  
+  skmap_bindings.inverseReorderArray(out_t, n_threads, out_gdal, inverse_idx)
+  ttprint(f"Transposing output: {(time.time() - start):.2f} segs")
 
-    start = time.time()
-    #import tl2cgen
-    #model_rf = tl2cgen.Predictor(libpath='model/skl_rf_intel.so')
-    
-    #start = time.time()
-    #array_fn_2 = 'file://' + str(make_tempfile(prefix='shm_array'))
-    #array_2 = sa.create(array_fn_2, (x_size * y_size, n_features), dtype=np.float32)
-    #array_2[:,:] = array.transpose((1,0))
-    #ttprint(f"Silly transpose: {(time.time() - start):.2f} segs")
+  start = time.time()
+  write_idx = range(0, out_gdal.shape[0])
+  tmp_dir = str(make_tempdir(tile_id))
+  base_raster = landsat_files[-1]
+  
+  out_files = [ f'gpw_eml.seeded.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206' for year in years ] + \
+             [ f'gpw_eml.semi.nat.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206' for year in years ] + \
+             [ f'gpw_eml.seeded.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206' for year in years ] + \
+             [ f'gpw_eml.semi.nat.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206' for year in years ] + \
+             [ f'gpw_eml.grass.type_30m_c_{year}0101_{year}1231_go_epsg.4326_v20240206' for year in years ]
+  out_s3 = [ f'gaia/{s3_prefix}/{tile_id}' for o in out_files ]
 
-    n_classes = 3
-    shape = (4000, 4000, n_classes * 5 + 1)
-    out_fn = 'file://' + str(make_tempfile(prefix='shm_output'))
-    out = sa.create(out_fn, shape, dtype=np.float32)
+  x_off_d, y_off_d = (2, 2)
 
-    args = [
-      {
-        'model_type': 'tl2cgen',
-        'model_fn': rf_fn,
-        'model': None,
-        'array_fn': array_fn,
-        'out_fn': out_fn,
-        'i0': 0,
-        'i1': 3
-      },
-      {
-        'model_type': 'xgboost',
-        'model_fn': xgb_fn,
-        'model': model_xgb,
-        'array_fn': array_fn,
-        'out_fn': out_fn,
-        'i0': 3,
-        'i1': 6
-      },
-      {
-        'model_type': 'hummingbird',
-        'model_fn': ann_fn,
-        'model': model_ann,
-        'array_fn': array_fn,
-        'out_fn': out_fn,
-        'i0': 6,
-        'i1': 9
-      }
-    ]
+  nodata_val = 255
+  compression_command = "gdal_translate -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
 
-    n_models = len(args)
+  skmap_bindings.writeByteData(out_gdal, n_threads, gdal_opts, base_raster, tmp_dir, out_files, write_idx,
+        x_off_d, y_off_d, x_size, y_size, nodata_val, compression_command, out_s3)
+  ttprint(f"Exporting output to S3: {(time.time() - start):.2f} segs")
 
-    start = time.time()
-    for index in ProcessGeneratorLazy(run_model, args, len(args)):
-      continue
-    #for arg in args:
-    #  run_model(**arg)
-    ttprint(f"Running models: {(time.time() - start):.2f} segs")
-
-    mi = n_classes * n_models
-
-    start = time.time()
-    # EML probabilities
-    out[:,:,9:12] = model_meta.predict_proba(out[:,:,0:mi].reshape(-1,mi)).reshape(out.shape[0],out.shape[1],-1).round(2) * 100
-    
-    # Model deviance
-    out[:,:,12:15] = bn.nanstd(out[:,:,0:mi].reshape(out.shape[0],out.shape[1], n_models, n_classes), axis=-2).round(2) * 100
-
-    # Final map
-    out[:,:,15] = np.argmax(out[:,:,9:12], axis=-1) + 1
-
-    ttprint(f"Running meta-learner: {(time.time() - start):.2f} segs")
-    ttprint(f'Probabilities are in {out_fn}')
-
-    start = time.time()
-    out_files = [
-      f'./prod_predictions/{tile}/gpw_eml.seeded.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./prod_predictions/{tile}/gpw_eml.semi.nat.grass_30m_m_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./prod_predictions/{tile}/gpw_eml.seeded.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./prod_predictions/{tile}/gpw_eml.semi.nat.grass_30m_md_{year}0101_{year}1231_go_epsg.4326_v20240206.tif',
-      f'./prod_predictions/{tile}/gpw_eml.grass.type_30m_c_{year}0101_{year}1231_go_epsg.4326_v20240206.tif'
-    ]
-
-    out_idx = [ 9, 10, 12, 13, 15 ]
-
-    save_rasters(landsat_files[0], out_files, out_idx, out_fn, minx = minx, maxy = maxy)
-    ttprint(f"Writing files: {(time.time() - start):.2f} segs")
+  start = time.time()
+  sa.delete(array_fn)
+  sa.delete(out_fn)
+  ttprint(f"Cleaning SharedArray: {(time.time() - start):.2f} segs")  
