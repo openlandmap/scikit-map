@@ -42,12 +42,39 @@ void TransArray::selArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select)
 {
     skmapAssertIfTrue((row_select.size() != (uint_t) out_data.rows()),
-                       "scikit-map ERROR 14: size of the new array does not match the size of selected indices");
+                       "scikit-map ERROR 14: size of the new array does not match the size of selected");
     auto selArrayRow = [&] (uint_t i)
     {
         out_data.row(i) = m_data.row(row_select[i]);
     };
     this->parForRange(selArrayRow, out_data.rows());
+}
+
+
+
+
+void TransArray::expandArrayRows(Eigen::Ref<MatFloat> out_data,
+                              std::vector<uint_t> row_select)
+{
+    skmapAssertIfTrue((row_select.size() != (uint_t) m_data.rows()),
+                       "scikit-map ERROR 15: size of the old array does not match the size of selected");
+    auto expandArrayRow = [&] (uint_t i)
+    {
+        out_data.row(row_select[i]) = m_data.row(i);
+    };
+    this->parForRange(expandArrayRow, m_data.rows());
+}
+
+
+
+
+void TransArray::fillArray(float_t val)
+{
+    auto fillArrayRow = [&] (uint_t i)
+    {
+        m_data.row(i).array() =  val;
+    };
+    this->parForRange(fillArrayRow, m_data.rows());
 }
 
 

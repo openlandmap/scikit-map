@@ -83,6 +83,25 @@ void selArrayRows(Eigen::Ref<MatFloat> data,
 }
 
 
+void expandArrayRows(Eigen::Ref<MatFloat> data,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> out_data,
+                  std::vector<uint_t> row_select)
+{
+    TransArray transArray(data, n_threads);
+    transArray.expandArrayRows(out_data, row_select);
+}
+
+
+void fillArray(Eigen::Ref<MatFloat> data,
+                  const uint_t n_threads,
+                  float_t val)
+{
+    TransArray transArray(data, n_threads);
+    transArray.fillArray(val);
+}
+
+
 void inverseReorderArray(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,
                           Eigen::Ref<MatFloat> out_data,
@@ -200,7 +219,9 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
+    m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
+    m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
     m.def("inverseReorderArray", &inverseReorderArray, "Reorder and transpose an array into a new one");
@@ -215,5 +236,3 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
 }
-
-
