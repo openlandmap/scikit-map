@@ -68,6 +68,21 @@ void TransArray::expandArrayRows(Eigen::Ref<MatFloat> out_data,
 
 
 
+void TransArray::swapRowsValues(std::vector<uint_t> row_select,
+                                 float_t value_to_mask,
+                                 float_t new_value)
+{
+    auto swapRowValues = [&] (uint_t i)
+    {
+        m_data.row(row_select[i]) = (m_data.row(row_select[i]).array() == value_to_mask)
+                                    .select(new_value, m_data.row(row_select[i]));
+    };
+    this->parForRange(swapRowValues, row_select.size());
+}
+
+
+
+
 void TransArray::fillArray(float_t val)
 {
     auto fillArrayRow = [&] (uint_t i)

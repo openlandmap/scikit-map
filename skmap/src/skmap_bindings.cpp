@@ -92,6 +92,15 @@ void expandArrayRows(Eigen::Ref<MatFloat> data,
     transArray.expandArrayRows(out_data, row_select);
 }
 
+void swapRowsValues(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    std::vector<uint_t> row_select,
+                    float_t value_to_mask,
+                    float_t new_value)
+{
+    TransArray transArray(data, n_threads);
+    transArray.swapRowsValues(row_select, value_to_mask, new_value);
+}
 
 void fillArray(Eigen::Ref<MatFloat> data,
                   const uint_t n_threads,
@@ -221,6 +230,7 @@ PYBIND11_MODULE(skmap_bindings, m)
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
+    m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");

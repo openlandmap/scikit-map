@@ -69,6 +69,10 @@ class TransArray: public ParArray
                                          std::vector<uint_t> result_indices,
                                          std::vector<float_t> days_of_year);
 
+        void swapRowsValues(std::vector<uint_t> row_select,
+                                 float_t value_to_mask,
+                                 float_t new_value);
+
 
 
 };
