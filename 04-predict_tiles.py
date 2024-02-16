@@ -71,16 +71,16 @@ def inmem_calc_func(layernames, raster_data, bounds):
         local_dict = { b: raster_data[:, :, lockup[f'{b}_{pref}_{dt}_{suff}']:lockup[f'{b}_{pref}_{dt}_{suff}']+1 ] for b in bands}
         indices[f'ndvi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (red * 0.004) ) / ( (nir * 0.004) + (red * 0.004) ) ) * 125 + 125', local_dict
         indices[f'ndwi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (swir1 * 0.004) ) / ( (nir * 0.004) + (swir1 * 0.004) ) ) * 125 + 125', local_dict
-        indices[f'savi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (red * 0.004) )*1.5 / ( (nir * 0.004) + (red * 0.004)  + 0.5) ) * 125 + 125', local_dict
-        indices[f'msavi_{pref}_{dt}_{suff}'] = f'( (2 *  (nir * 0.004) + 1 - sqrt((2 *  (nir * 0.004) + 1)**2 - 8 * ( (nir * 0.004) - (red * 0.004) ))) / 2 ) * 125 + 125', local_dict
-        indices[f'nbr_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - ( swir2 * 0.004) ) / ( (nir * 0.004) + ( swir2 * 0.004) ) ) * 125 + 125', local_dict
-        indices[f'ndmi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) -  (swir1 * 0.004)) / ( (nir * 0.004) +  (swir1 * 0.004)) ) * 125 + 125', local_dict
-        indices[f'nbr2_{pref}_{dt}_{suff}'] = f'( ( (swir1 * 0.004) - ( thermal * 0.004) ) / ( (swir1 * 0.004) + ( thermal * 0.004) ) ) * 125 + 125', local_dict
-        indices[f'rei_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - blue * 0.004)/( (nir * 0.004) + (blue * 0.004) *  (nir * 0.004)) ) * 125 + 125', local_dict
-        indices[f'bsi_{pref}_{dt}_{suff}'] = f'( ( ( (swir1 * 0.004) + (red * 0.004) ) - ( (nir * 0.004) + blue * 0.004) ) / ( ( (swir1 * 0.004) + (red * 0.004) ) + ( (nir * 0.004) + (blue * 0.004)) ) ) * 125 + 125', local_dict
+        #indices[f'savi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (red * 0.004) )*1.5 / ( (nir * 0.004) + (red * 0.004)  + 0.5) ) * 125 + 125', local_dict
+        #indices[f'msavi_{pref}_{dt}_{suff}'] = f'( (2 *  (nir * 0.004) + 1 - sqrt((2 *  (nir * 0.004) + 1)**2 - 8 * ( (nir * 0.004) - (red * 0.004) ))) / 2 ) * 125 + 125', local_dict
+        #indices[f'nbr_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - ( swir2 * 0.004) ) / ( (nir * 0.004) + ( swir2 * 0.004) ) ) * 125 + 125', local_dict
+        #indices[f'ndmi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) -  (swir1 * 0.004)) / ( (nir * 0.004) +  (swir1 * 0.004)) ) * 125 + 125', local_dict
+        #indices[f'nbr2_{pref}_{dt}_{suff}'] = f'( ( (swir1 * 0.004) - ( thermal * 0.004) ) / ( (swir1 * 0.004) + ( thermal * 0.004) ) ) * 125 + 125', local_dict
+        #indices[f'rei_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - blue * 0.004)/( (nir * 0.004) + (blue * 0.004) *  (nir * 0.004)) ) * 125 + 125', local_dict
+        indices[f'bsi_{pref}_{dt}_{suff}'] = f'( ( ( (swir1 * 0.004) + (red * 0.004) ) - ( (nir * 0.004) + (blue * 0.004) ) ) / ( ( (swir1 * 0.004) + (red * 0.004) ) + ( (nir * 0.004) + (blue * 0.004)) ) ) * 125 + 125', local_dict
         indices[f'ndti_{pref}_{dt}_{suff}'] = f'( ( (swir1 * 0.004) - (swir2 * 0.004) )  / ( (swir1 * 0.004) + (swir2 * 0.004) )  ) * 125 + 125', local_dict
-        indices[f'ndsi_{pref}_{dt}_{suff}'] = f'( ( (green * 0.004) -  (swir1 * 0.004) ) / ( (green * 0.004) +  (swir1 * 0.004) ) ) * 125 + 125', local_dict
-        indices[f'ndsmi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (swir2 * 0.004) )  / ( (nir * 0.004) + (swir2 * 0.004) )  ) * 125 + 125', local_dict
+        #indices[f'ndsi_{pref}_{dt}_{suff}'] = f'( ( (green * 0.004) -  (swir1 * 0.004) ) / ( (green * 0.004) +  (swir1 * 0.004) ) ) * 125 + 125', local_dict
+        #indices[f'ndsmi_{pref}_{dt}_{suff}'] = f'( ( (nir * 0.004) - (swir2 * 0.004) )  / ( (nir * 0.004) + (swir2 * 0.004) )  ) * 125 + 125', local_dict
         indices[f'nirv_{pref}_{dt}_{suff}'] = f'( ( ( ( (nir * 0.004) - (red * 0.004) ) / ( (nir * 0.004) + (red * 0.004) ) ) - 0.08) *  (nir * 0.004) ) * 125 + 125', local_dict
         indices[f'evi_{pref}_{dt}_{suff}'] = f'( 2.5 * ( (nir * 0.004) - (red * 0.004) ) / ( (nir * 0.004) + 6 * (red * 0.004) - 7.5 * (blue * 0.004) + 1) ) * 125 + 125', local_dict
         indices[f'fapar_{pref}_{dt}_{suff}'] = f'( ((( (( (nir * 0.004) - (red * 0.004) ) / ( (nir * 0.004) + (red * 0.004) )) - 0.03) * (0.95 - 0.001)) / (0.96 - 0.03)) + 0.001 ) * 125 + 125', local_dict
@@ -116,18 +116,18 @@ def inmem_calc_func(layernames, raster_data, bounds):
 
         lon_grid, lat_grid = ds.transform * np.meshgrid(lon, lat)
 
-        elev_corr = 0.006 * raster_data[:, :, lockup['dtm.bareearth_ensemble_p10_30m_s_2018_go_epsg4326_v20230210']:lockup['dtm.bareearth_ensemble_p10_30m_s_2018_go_epsg4326_v20230210']+1 ]
+        elev_corr = 0.006 * raster_data[:, :, lockup['dtm.bareearth_ensemble_p10_30m_s_2018_go_epsg4326_v20230210'] ] * 0.1
 
         for m in range(1,13):
             doy = (datetime.strptime(f'2000-{m}-15', '%Y-%m-%d').timetuple().tm_yday)
             max_temp_name = f'clm_lst_max.geom.temp_m_30m_s_m{m}' 
             min_temp_name = f'clm_lst_min.geom.temp_m_30m_s_m{m}'
             print(f"Adding {max_temp_name} & {min_temp_name}")
-
+            print(lat_grid.shape, elev_corr.shape)
             layernames.append(max_temp_name)
-            result.append(((geo_temp(lat_grid, day=doy, a=37.03043, b=-15.43029) - elev_corr) * 100).round())
+            result.append(np.stack( [ ((geo_temp(lat_grid, day=doy, a=37.03043, b=-15.43029) - elev_corr) * 100).round() ], axis=2))
             layernames.append(min_temp_name)
-            result.append( ((geo_temp(lat_grid, day=doy, a=24.16453, b=-15.71751) - elev_corr) * 100).round())
+            result.append(np.stack( [ ((geo_temp(lat_grid, day=doy, a=24.16453, b=-15.71751) - elev_corr) * 100).round() ], axis=2))
 
     print(raster_data.shape)
     raster_data = np.concatenate(result, axis=-1)
@@ -143,9 +143,9 @@ tiles = gpd.read_file('ard2_final_status.gpkg')
 #_tiles = ['003W_57N','006E_45N','016E_12S','029E_51N','047W_11S','055W_17S','055W_28S','056W_10S','061W_28S','075E_25N','081E_60N','081E_60N','091W_17N','101E_28N','102W_43N','103E_46N','115E_28S','121E_04S','145E_18S','146W_62N','147E_25S']
 #_years = [2020, 2000, 2005, 2010, 2015, 2016, 2017, 2018, 2019, 2022]
 
-_tiles = ['055W_17S','003W_57N','081E_60N','016E_12S','029E_51N']
+_tiles = ['055W_17S']
 #_tiles = ['055W_17S', '091W_17N', '003W_57N','006E_45N','016E_12S','029E_51N','047W_11S','055W_28S','056W_10S','061W_28S','075E_25N','081E_60N','081E_60N','101E_28N','102W_43N','103E_46N','115E_28S','121E_04S','145E_18S','146W_62N','147E_25S'] #_tiles = ['003W_57N','006E_45N','016E_12S','029E_51N','047W_11S','055W_28S','056W_10S','061W_28S','075E_25N','081E_60N','081E_60N','101E_28N','102W_43N','103E_46N','115E_28S','121E_04S','145E_18S','146W_62N','147E_25S']
-_years = [2022, 2020, 2018] #[2001,2002,2003,2004,2006,2007,2008,2009,2011,2012,2013,2014,2001]
+_years = [2020] #[2001,2002,2003,2004,2006,2007,2008,2009,2011,2012,2013,2014,2001]
 
 for year in _years: 
   for tile in _tiles:
@@ -172,4 +172,4 @@ for year in _years:
     except:
       traceback.print_exc()
       print(f"Error {tile} {year}")
-      break
+      #break
