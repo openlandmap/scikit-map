@@ -1,5 +1,6 @@
 import os
 os.environ['USE_PYGEOS'] = '0'
+os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
 
 from datetime import datetime
 from osgeo import gdal, gdal_array
@@ -14,6 +15,8 @@ import SharedArray as sa
 import skmap_bindings
 import tempfile
 import time
+import sys
+import requests
 from hummingbird.ml import load
 
 import concurrent.futures
@@ -78,9 +81,9 @@ def make_tempfile(basedir='skmap', prefix='', suffix='', make_subdir = False):
   )
         
 def _features(csv_file, years, tile_id):
-
+  
   df_features = pd.read_csv(csv_file,index_col=0).reset_index(drop=True)
-  df_features.loc[df_features['type'] == 'static',['path']] = df_features[df_features['type'] == 'static']['path'].apply(lambda f: f'../{f}')
+  #df_features.loc[df_features['type'] == 'static',['path']] = df_features[df_features['type'] == 'static']['path'].apply(lambda f: f'../{f}')
 
   df_list = []
 
@@ -153,8 +156,8 @@ def _geom_temperature(df_features, array, n_threads):
 
   elevation = array[elev_idx[0],:]
 
-  skmap_bindings.computeGeometricTemperature(array, n_threads, latitude, elevation, 0.1, 37.03043, -15.43029, 100., lst_min_geo_idx, doys_all)
-  skmap_bindings.computeGeometricTemperature(array, n_threads, latitude, elevation, 0.1, 24.16453, -15.71751, 100., lst_max_geo_idx, doys_all)
+  skmap_bindings.computeGeometricTemperature(array, n_threads, latitude, elevation, 0.1, 24.16453, -15.71751, 100., lst_min_geo_idx, doys_all)
+  skmap_bindings.computeGeometricTemperature(array, n_threads, latitude, elevation, 0.1, 37.03043, -15.43029, 100., lst_max_geo_idx, doys_all)
 
 def in_mem_calc(data, df_features, n_threads):
     
@@ -241,35 +244,80 @@ def run_model(model_type, model_fn, array_fn, out_fn, i0, i1):
     raise Exception(f'Invalid model type {model_type}')
   ttprint(f"Model {model_type} ({model_fn}): {(time.time() - start):.2f} segs")
 
+def run_meta(model_type, n_classes, n_predictions, log_fn, out_fn, i0, i1):
+
+  import SharedArray as sa
+  out = sa.attach(out_fn, False)
+  mi = n_classes * n_predictions
+
+  start = time.time()
+  if model_type == 'proba':
+    model_meta = load(log_fn)
+    # EML probabilities
+    out[:,i0:i1] = model_meta.predict_proba(out[:,0:mi]).round(2) * 100
+    ttprint(f"Running meta-learner: {(time.time() - start):.2f} segs")
+
+  elif model_type == 'md':
+    out[:,i0:i1] = bn.nanstd(out[:,0:mi].reshape(-1, n_predictions, n_classes), axis=-2).round(2) * 100
+    ttprint(f"Model deviance: {(time.time() - start):.2f} segs")
+
+  elif model_type == 'class':
+    start = time.time()
+    out[:,i0] = np.argmax(out[:,9:12], axis=-1) + 1
+    out[:,i0][out[:,i0] == 3] = 255
+    ttprint(f"Argmax (hard_class): {(time.time() - start):.2f} segs")
+
+def _processed(tile):
+  url = f'http://192.168.49.30:8333/gpw/tmp-prod/{tile}/gpw_eml.grass.type_30m_c_20220101_20221231_go_epsg.4326_v20240206.tif'
+  r = requests.head(url)
+  return (r.status_code == 200)
+
 TMP_DIR = tempfile.gettempdir()
 
-model_dir = Path('/mnt/tupi/WRI/prod_new_samples/model_v20240210/compiled/')
+base_dir = Path('/mnt/slurm/jobs/wri_pasture_class')
+model_dir = Path('/mnt/gaia/tmp/WRI_GPW/models/compiled')
 rf_fn = str(model_dir.joinpath('landmapper_100_rf.so'))
 xgb_fn = str(model_dir.joinpath('landmapper_100_xgb.bin'))
 ann_fn = str(model_dir.joinpath('landmapper_100_ann.zip'))
 log_fn = str(model_dir.joinpath('landmapper_100_logreg.zip'))
 
 mask_prefix = 'http://192.168.1.30:8333/gpw/landmask'
-tiles_fn = '/mnt/tupi/WRI/prod_new_samples/gpw_tiles.gpkg'
-features_fn = '/mnt/tupi/WRI/prod_new_samples/model_v20240210/features.csv'
+tiles_fn = str(base_dir.joinpath('gpw_tiles.gpkg'))
+ids_fn = str(base_dir.joinpath('gpw_pasture.class_ids.csv'))
+features_fn = str(base_dir.joinpath('models/features.csv'))
+
 years = range(2000,2022 + 1, 2)
 x_size, y_size = (4000, 4000)
-tiles_id = [ '052W_06S' ]
+#tiles_id = [ '055W_17S' ]
+# '055W_17S', '091W_17N', '003W_57N','006E_45N',
+#tiles_id = ['016E_12S','029E_51N','047W_11S','055W_28S','056W_10S','061W_28S','075E_25N','081E_60N','081E_60N','101E_28N','102W_43N','103E_46N','115E_28S','121E_04S','145E_18S','146W_62N','147E_25S'] #_tiles = ['003W_57N','006E_45N','016E_12S','029E_51N','047W_11S','055W_28S','056W_10S','061W_28S','075E_25N','081E_60N','081E_60N','101E_28N','102W_43N','103E_46N','115E_28S','121E_04S','145E_18S','146W_62N','147E_25S'
 n_threads = 96
 n_classes = 3
-s3_prefix = 'gpw/tmp-prod/'
+s3_prefix = 'gpw/tmp-prod'
 
 subnet = '192.168.49'
 hosts = [ f'{subnet}.{i}:8333' for i in range(30,43) ]
 
+start_tile=int(sys.argv[1])
+end_tile=int(sys.argv[2])
+#server_name=sys.argv[3]
+
+tiles_id = pd.read_csv(ids_fn)['TILE'][start_tile:end_tile]
+
+ttprint(f"Processing {len(tiles_id)} tiles")
+
 ttprint("Reading tiling system")
 tiles = gpd.read_file(tiles_fn)
 
-start = time.time()
+#start = time.time()
 executor = concurrent.futures.ProcessPoolExecutor(max_workers=3)
-ttprint(f"Creating python workers pool: {(time.time() - start):.2f} segs")
+#ttprint(f"Creating python workers pool: {(time.time() - start):.2f} segs")
 
 for tile_id in tiles_id:
+
+  if _processed(tile_id):
+    ttprint(f"Tile {tile_id} is processed. Ignoring it.")
+    continue
 
   minx, miny, maxx, maxy = tiles[tiles['TILE'] == tile_id].iloc[0].geometry.bounds
 
@@ -287,17 +335,17 @@ for tile_id in tiles_id:
 
   start = time.time()
   skmap_bindings.readData(array, n_threads, static_files, static_idx, x_off_s, y_off_s, x_size, y_size, bands_list, gdal_opts)
-  ttprint(f"Reading static: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Reading static: {(time.time() - start):.2f} segs")
 
   start = time.time()
   x_off_d, y_off_d = (2, 2)
   landsat_files = [str(r).replace(f"{subnet}.30", f"{subnet}.{30 + int.from_bytes(Path(r).stem.encode(), 'little') % len(hosts)}") for r in landsat_files]
   skmap_bindings.readData(array, n_threads, landsat_files, landsat_idx, x_off_d, y_off_d, x_size, y_size, bands_list, gdal_opts, 255., np.nan)
-  ttprint(f"Reading landsat: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Reading landsat: {(time.time() - start):.2f} segs")
 
   start = time.time()
   in_mem_calc(array, df_features, n_threads)
-  ttprint(f"In memory calc: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - In memory calc: {(time.time() - start):.2f} segs")
 
   #mask_file = f'http://192.168.1.30:8333/gpw/landmask/{tile}.tif'
   #mask = np.zeros((1,x_size * y_size), dtype=np.float32)
@@ -312,7 +360,7 @@ for tile_id in tiles_id:
 
   skmap_bindings.reorderArray(array, n_threads, array_mem, matrix_idx)
   skmap_bindings.transposeArray(array_mem, n_threads, array_mem_t)
-  ttprint(f"Transposing data: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Transposing data: {(time.time() - start):.2f} segs")
 
   start = time.time()
   mask_file = f'{mask_prefix}/{tile_id}.tif'
@@ -330,7 +378,7 @@ for tile_id in tiles_id:
   shape = (array_t.shape[0], n_classes * 5 + 1)
   out_fn = 'file://' + str(make_tempfile(prefix='shm_output'))
   out = sa.create(out_fn, shape, dtype=np.float32)
-  ttprint(f"Masking data: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Masking data: {(time.time() - start):.2f} segs")
 
   args = [
     {
@@ -359,40 +407,78 @@ for tile_id in tiles_id:
     }
   ]
 
+  #  args_meta = [
+  #    {
+  #      'model_type': 'proba',
+  #      'n_classes': n_classes,
+  #      'n_predictions': len(args),
+  #      'log_fn': log_fn,
+  #      'out_fn': out_fn,
+  #      'i0': 9,
+  #      'i1': 12
+  #    },
+  #    {
+  #      'model_type': 'md',
+  #      'n_classes': n_classes,
+  #      'n_predictions': len(args),
+  #      'log_fn': None,
+  #      'out_fn': out_fn,
+  #      'i0': 12,
+  #      'i1': 15
+  #    },
+  #    {
+  #      'model_type': 'class',
+  #      'n_classes': n_classes,
+  #      'n_predictions': len(args),
+  #      'log_fn': None,
+  #      'out_fn': out_fn,
+  #      'i0': 15,
+  #      'i1': None
+  #    }
+  #  ]
+
   start = time.time()
-  n_predictions = len(args)
-  for index in ProcessGeneratorLazy(run_model, args, n_predictions):
+  for index in ProcessGeneratorLazy(run_model, args, len(args)):
     continue
-  ttprint(f"Running models: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Running models: {(time.time() - start):.2f} segs")
+
+  #start = time.time()
+  #for index in ProcessGeneratorLazy(run_meta, args_meta, len(args_meta)):
+  #  continue
+  #ttprint(f"Tile {tile_id} - Running meta models: {(time.time() - start):.2f} segs")
 
   model_meta = load(log_fn)
+  n_predictions = len(args)
   mi = n_classes * n_predictions
 
   start = time.time()
   # EML probabilities
   out[:,9:12] = model_meta.predict_proba(out[:,0:mi]).round(2) * 100
-  ttprint(f"Running meta-learner: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Running meta-learner: {(time.time() - start):.2f} segs")
 
-  # Model deviance
+   # Model deviance
   start = time.time()
   out[:,12:15] = bn.nanstd(out[:,0:mi].reshape(-1, n_predictions, n_classes), axis=-2).round(2) * 100
-  ttprint(f"Model deviance: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Model deviance: {(time.time() - start):.2f} segs")
 
   # Final map
   start = time.time()
   out[:,15] = np.argmax(out[:,9:12], axis=-1) + 1
-  ttprint(f"Argmax (hard_class): {(time.time() - start):.2f} segs")
+  out[:,15][out[:,15] == 3] = 255
+  ttprint(f"Tile {tile_id} - Argmax (hard_class): {(time.time() - start):.2f} segs")
   
   start = time.time()  
   out_exp = np.empty((array_mem_t.shape[0], out.shape[1]), dtype=np.float32)
   skmap_bindings.fillArray(out_exp, n_threads, 255.)
+  
   skmap_bindings.expandArrayRows(out, n_threads, out_exp, selected_rows)
-  ttprint(f"Reversing mask: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Reversing mask: {(time.time() - start):.2f} segs")
 
   start = time.time()
   out_idx = [ 9, 10, 12, 13, 15 ]
   out_t = np.empty((out_exp.shape[1],out_exp.shape[0]), dtype=np.float32)
   out_gdal = np.empty((len(out_idx) * len(years),x_size *y_size), dtype=np.float32)
+  skmap_bindings.fillArray(out_gdal, n_threads, 255.)
   skmap_bindings.transposeArray(out_exp, n_threads, out_t)
 
   subrows = np.arange(0, len(years))
@@ -403,7 +489,7 @@ for tile_id in tiles_id:
   inverse_idx[:,1] = subrows_grid.flatten()
   
   skmap_bindings.inverseReorderArray(out_t, n_threads, out_gdal, inverse_idx)
-  ttprint(f"Transposing output: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Transposing output: {(time.time() - start):.2f} segs")
 
   start = time.time()
   write_idx = range(0, out_gdal.shape[0])
@@ -420,13 +506,16 @@ for tile_id in tiles_id:
   x_off_d, y_off_d = (2, 2)
 
   nodata_val = 255
-  compression_command = "gdal_translate -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
+  compression_command = f"gdal_translate -a_nodata {nodata_val} -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
 
   skmap_bindings.writeByteData(out_gdal, n_threads, gdal_opts, base_raster, tmp_dir, out_files, write_idx,
         x_off_d, y_off_d, x_size, y_size, nodata_val, compression_command, out_s3)
-  ttprint(f"Exporting output to S3: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Exporting output to S3: {(time.time() - start):.2f} segs")
 
   start = time.time()
-  sa.delete(array_fn)
-  sa.delete(out_fn)
-  ttprint(f"Cleaning SharedArray: {(time.time() - start):.2f} segs")  
+  #sa.delete(array_fn)
+  #sa.delete(out_fn)
+  os.remove(array_fn.replace("file://",""))
+  os.remove(out_fn.replace("file://",""))
+  #ttprint(f"Tile {tile_id} - Cleaning SharedArray: {(time.time() - start):.2f} segs")
+  ttprint(f"Tile {tile_id} - Result available in gaia {out_s3[-1]}")
