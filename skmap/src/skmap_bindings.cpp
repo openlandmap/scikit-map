@@ -144,7 +144,6 @@ void computeNormalizedDifference(Eigen::Ref<MatFloat> data,
                                            positive_scaling, negative_scaling, result_scaling, result_offset, clip_value);
 }
 
-
 void computeBsi(Eigen::Ref<MatFloat> data,
                 const uint_t n_threads,
                 std::vector<uint_t> swir1_indices,
@@ -165,7 +164,6 @@ void computeBsi(Eigen::Ref<MatFloat> data,
                           swir1_scaling, red_scaling, nir_scaling, blue_scaling, result_scaling, result_offset, clip_value);
 
 }
-
 
 void computeFapar(Eigen::Ref<MatFloat> data,
                 const uint_t n_threads,
@@ -198,8 +196,6 @@ void computeGeometricTemperature(Eigen::Ref<MatFloat> data,
     transArray.computeGeometricTemperature(latitude, elevation, elevation_scaling, a, b, result_scaling, result_indices, days_of_year);
 }
 
-
-
 void writeByteData(Eigen::Ref<MatFloat> data,
                    const uint_t n_threads,
                    py::dict conf_GDAL,
@@ -220,6 +216,16 @@ void writeByteData(Eigen::Ref<MatFloat> data,
     ioArray.writeData(base_file, base_folder, file_names, data_indices,
         x_off, y_off, x_size, y_size, GDT_Byte, no_data_value, bash_compression_command, seaweed_path);
 
+}
+
+
+void computePercentiles(Eigen::Ref<MatFloat> data,
+                          const uint_t n_threads,
+                          Eigen::Ref<MatFloat> out_data,
+                          std::vector<float_t> percentiles)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computePercentiles(out_data, percentiles);
 }
 
 PYBIND11_MODULE(skmap_bindings, m)
@@ -245,4 +251,5 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeBsi", &computeBsi, "Compute BSI");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
+    m.def("computePercentiles", &computePercentiles, "Compute percentile");
 }

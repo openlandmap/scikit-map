@@ -230,7 +230,55 @@ void TransArray::computeGeometricTemperature(Eigen::Ref<MatFloat> latitude,
     };
     this->parRowPerm(computeGeometricTemperatureRow, result_indices);
 
-    
+}
+
+void TransArray::computePercentiles(Eigen::Ref<MatFloat> out_data,
+                                    std::vector<float_t> percentiles)
+{
+
+    skmapAssertIfTrue((uint_t) out_data.cols() != percentiles.size(),
+                      "scikit-map ERROR 19: out_data second dimension must be same size of percentiles");
+    // @FIXME: the clean way would be that also for out_data a ParArray oject is created and that only the corresponding cunk is sent
+    auto computePercentilesChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+    {
+        MatFloat sorted_chunk(chunk);
+        float_t max_float = std::numeric_limits<float_t>::max();
+        sorted_chunk = sorted_chunk.array().isNaN().select(max_float, sorted_chunk);
+        Eigen::VectorXi not_nan_count(chunk.rows());
+        for (uint_t i = 0; i < sorted_chunk.rows(); ++i) {
+            std::vector<float_t> sorted_row(sorted_chunk.row(i).data(), sorted_chunk.row(i).data() + sorted_chunk.row(i).size());
+            std::sort(sorted_row.begin(), sorted_row.end());
+            for (uint_t j = 0; j < sorted_chunk.cols(); ++j) {
+                sorted_chunk(i, j) = sorted_row[j];
+            }
+            not_nan_count(i) = chunk.cols() - (chunk.row(i).array().isNaN()).count();
+        }
+
+        for (uint_t k = 0; k < percentiles.size(); ++k) {
+            for (uint_t i = 0; i < sorted_chunk.rows(); ++i) {
+                if (not_nan_count(i) == 0)
+                {
+                    out_data(row_start+i, k) = nan_v;
+                } else
+                {
+                    float_t percentile_pos = (float_t) (not_nan_count(i) - 1) * (percentiles[k] / 100.0);
+                    uint_t percentile_pos_floor = floor(percentile_pos);
+                    uint_t percentile_pos_ceil = ceil(percentile_pos);
+                    if (percentile_pos_floor == percentile_pos_ceil)
+                    {
+                        out_data(row_start+i, k) = sorted_chunk(i, percentile_pos_floor);
+                    } else
+                    {
+                        float_t percentile_val_floor = sorted_chunk(i, percentile_pos_floor) * ((float_t) percentile_pos_ceil - percentile_pos);
+                        float_t percentile_val_ceil = sorted_chunk(i, percentile_pos_ceil) * (percentile_pos - (float_t) percentile_pos_floor);
+                        out_data(row_start+i, k) = percentile_val_floor + percentile_val_ceil;
+                    }
+                }
+            }
+
+        }
+    };
+    this->parChunk(computePercentilesChunk);
 
 }
 
