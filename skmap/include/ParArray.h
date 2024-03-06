@@ -26,7 +26,7 @@ class ParArray {
             Eigen::initParallel();
             Eigen::setNbThreads(m_n_threads);
             #pragma omp parallel for
-            for (size_t i = 0; i < n_max; ++i)
+            for (uint_t i = 0; i < n_max; ++i)
             {
                 f(i);
             }
@@ -41,6 +41,20 @@ class ParArray {
                 f_in(i, m_data.row(perm_vec[i]));
             };
             this->parForRange(f_out, perm_vec.size());
+        }        
+        
+
+        template<typename F>
+        void parChunk(F f_in)
+        {
+            uint_t chuck_size = std::ceil((float_t) m_data.rows() / (float_t) m_n_threads);
+            auto f_out = [&] (uint_t i)
+            {
+                uint_t row_start = i * chuck_size;
+                uint_t row_end = std::min((i+1) * chuck_size, (uint_t) m_data.rows());
+                f_in(m_data.block(row_start, 0, row_end-row_start, m_data.cols()), row_start, row_end);
+            };
+            this->parForRange(f_out, m_n_threads);
         }        
 };
 
