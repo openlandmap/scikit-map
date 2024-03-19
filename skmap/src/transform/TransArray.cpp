@@ -245,17 +245,17 @@ void TransArray::computePercentiles(Eigen::Ref<MatFloat> out_data,
         float_t max_float = std::numeric_limits<float_t>::max();
         sorted_chunk = sorted_chunk.array().isNaN().select(max_float, sorted_chunk);
         Eigen::VectorXi not_nan_count(chunk.rows());
-        for (uint_t i = 0; i < sorted_chunk.rows(); ++i) {
+        for (uint_t i = 0; i < (uint_t) sorted_chunk.rows(); ++i) {
             std::vector<float_t> sorted_row(sorted_chunk.row(i).data(), sorted_chunk.row(i).data() + sorted_chunk.row(i).size());
             std::sort(sorted_row.begin(), sorted_row.end());
-            for (uint_t j = 0; j < sorted_chunk.cols(); ++j) {
+            for (uint_t j = 0; j < (uint_t) sorted_chunk.cols(); ++j) {
                 sorted_chunk(i, j) = sorted_row[j];
             }
             not_nan_count(i) = chunk.cols() - (chunk.row(i).array().isNaN()).count();
         }
 
         for (uint_t k = 0; k < percentiles.size(); ++k) {
-            for (uint_t i = 0; i < sorted_chunk.rows(); ++i) {
+            for (uint_t i = 0; i < (uint_t) sorted_chunk.rows(); ++i) {
                 if (not_nan_count(i) == 0)
                 {
                     out_data(row_start+i, k) = nan_v;

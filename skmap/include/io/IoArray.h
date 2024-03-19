@@ -47,7 +47,7 @@ class IoArray: public ParArray
                         std::optional<std::string> bash_compression_command,
                         std::optional<std::vector<std::string>> seaweed_path)
         {
-            skmapAssertIfTrue(m_data.cols() < x_size * y_size, "scikit-map ERROR 9: reading region size smaller then the number of columns");
+            skmapAssertIfTrue((uint_t) m_data.cols() < x_size * y_size, "scikit-map ERROR 9: reading region size smaller then the number of columns");
             GDALDataset *inputDataset = (GDALDataset *)GDALOpen(base_file.c_str(), GA_ReadOnly);
             double geotransform[6];
             inputDataset->GetGeoTransform(geotransform);
