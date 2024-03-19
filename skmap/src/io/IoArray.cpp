@@ -28,7 +28,7 @@ void IoArray::readData(std::vector<std::string> file_locs,
                        std::optional<float_t> value_to_mask,
                        std::optional<float_t> value_to_set)
 {
-    skmapAssertIfTrue(m_data.cols() < x_size * y_size, "scikit-map ERROR 0: reading region size smaller then the number of columns");
+    skmapAssertIfTrue((uint_t) m_data.cols() < x_size * y_size, "scikit-map ERROR 0: reading region size smaller then the number of columns");
     auto readTiff = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
     {
         std::string file_loc = file_locs[i];
