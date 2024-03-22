@@ -268,6 +268,7 @@ class LandMapper():
     self._min_samples_restriction(min_samples_per_class)
     self.features = np.ascontiguousarray(self.pts[self.feature_cols].to_numpy(), dtype=np.float32)
     self.target = target = np.ascontiguousarray(self.pts[self.target_col].to_numpy(), dtype=np.float32)
+    self.calibration_mask = None
     if calibration_idx is not None:
       calibration_mask = self.pts.index.isin(calibration_idx)
       if np.any(calibration_mask):
@@ -564,8 +565,13 @@ class LandMapper():
       n_jobs = self.cv_njobs
     )
 
-    hyperpar_selection.fit(features[self.calibration_mask,:], self.target[self.calibration_mask], 
-      groups=self.cv_groups[self.calibration_mask], **self._fit_params(estimator, self.calibration_mask))
+    if self.calibration_mask is not None:
+      hyperpar_selection.fit(features[self.calibration_mask,:], self.target[self.calibration_mask], 
+        groups=self.cv_groups[self.calibration_mask], **self._fit_params(estimator, self.calibration_mask))
+    else:
+      hyperpar_selection.fit(features, self.target, 
+        groups=self.cv_groups, **self._fit_params(estimator))
+    
     estimator.set_params(**self._best_params(hyperpar_selection))
 
   def _do_cv_prediction(self, estimator, features):
