@@ -76,6 +76,11 @@ class TransArray: public ParArray
         void computePercentiles(Eigen::Ref<MatFloat> out_data,
                                 std::vector<float_t> percentiles);
 
+        void maskData(      std::vector<uint_t> row_select,
+                            Eigen::Ref<MatFloat> mask,
+                            float_t value_of_mask_to_mask,
+                            float_t new_value_in_data);
+
 
 
 };

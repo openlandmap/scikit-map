@@ -83,6 +83,23 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
 
 
 
+
+void TransArray::maskData(std::vector<uint_t> row_select,
+                    Eigen::Ref<MatFloat> mask,
+                    float_t value_of_mask_to_mask,
+                    float_t new_value_in_data)
+{
+    auto maskDataRow = [&] (uint_t i)
+    {
+        m_data.row(row_select[i]) = (mask.row(i).array() == value_of_mask_to_mask)
+                                    .select(new_value_in_data, m_data.row(row_select[i]));
+    };
+    this->parForRange(maskDataRow, row_select.size());
+}
+
+
+
+
 void TransArray::fillArray(float_t val)
 {
     auto fillArrayRow = [&] (uint_t i)

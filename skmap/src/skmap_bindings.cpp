@@ -103,6 +103,17 @@ void swapRowsValues(Eigen::Ref<MatFloat> data,
     transArray.swapRowsValues(row_select, value_to_mask, new_value);
 }
 
+void maskData(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    std::vector<uint_t> row_select,
+                    Eigen::Ref<MatFloat> mask,
+                    float_t value_of_mask_to_mask,
+                    float_t new_value_in_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.maskData(row_select, mask, value_of_mask_to_mask, new_value_in_data);
+}
+
 void fillArray(Eigen::Ref<MatFloat> data,
                   const uint_t n_threads,
                   float_t val)
@@ -200,7 +211,7 @@ void computeGeometricTemperature(Eigen::Ref<MatFloat> data,
 void writeByteData(Eigen::Ref<MatFloat> data,
                    const uint_t n_threads,
                    py::dict conf_GDAL,
-                   std::string base_file,
+                   std::vector<std::string> base_files,
                    std::string base_folder,
                    std::vector<std::string> file_names,
                    std::vector<uint_t> data_indices,
@@ -214,7 +225,7 @@ void writeByteData(Eigen::Ref<MatFloat> data,
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.writeData(base_file, base_folder, file_names, data_indices,
+    ioArray.writeData(base_files, base_folder, file_names, data_indices,
         x_off, y_off, x_size, y_size, GDT_Byte, no_data_value, bash_compression_command, seaweed_path);
 
 }
@@ -223,7 +234,7 @@ void writeByteData(Eigen::Ref<MatFloat> data,
 void writeInt16Data(Eigen::Ref<MatFloat> data,
                    const uint_t n_threads,
                    py::dict conf_GDAL,
-                   std::string base_file,
+                   std::vector<std::string> base_files,
                    std::string base_folder,
                    std::vector<std::string> file_names,
                    std::vector<uint_t> data_indices,
@@ -237,7 +248,7 @@ void writeInt16Data(Eigen::Ref<MatFloat> data,
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.writeData(base_file, base_folder, file_names, data_indices,
+    ioArray.writeData(base_files, base_folder, file_names, data_indices,
         x_off, y_off, x_size, y_size, GDT_Int16, no_data_value, bash_compression_command, seaweed_path);
 
 }
@@ -261,6 +272,7 @@ PYBIND11_MODULE(skmap_bindings, m)
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
+    m.def("maskData", &maskData, "Mask data"); 
     m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
