@@ -34,9 +34,9 @@ class IoArray: public ParArray
 
 
         template<typename T>
-        void writeData(std::string base_file,
+        void writeData(std::vector<std::string> base_files,
                         std::string base_folder,
-                        std::vector<std::string> layer_names,
+                        std::vector<std::string> file_names,
                         std::vector<uint_t> data_indices,
                         uint_t x_off,
                         uint_t y_off,
@@ -47,21 +47,23 @@ class IoArray: public ParArray
                         std::optional<std::string> bash_compression_command,
                         std::optional<std::vector<std::string>> seaweed_path)
         {
-            skmapAssertIfTrue((uint_t) m_data.cols() < x_size * y_size, "scikit-map ERROR 9: reading region size smaller then the number of columns");
-            GDALDataset *inputDataset = (GDALDataset *)GDALOpen(base_file.c_str(), GA_ReadOnly);
-            double geotransform[6];
-            inputDataset->GetGeoTransform(geotransform);
-            auto projection = inputDataset->GetProjectionRef();
-            auto spatial_ref = inputDataset->GetSpatialRef();
-            std::string ending;
-            if (bash_compression_command.has_value())
-                ending = "_tmp.tif";
-            else 
-                ending = ".tif";
+                         
 
             auto writeTiff = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
             {
-                std::string layer_name = layer_names[i];
+                skmapAssertIfTrue((uint_t) m_data.cols() < x_size * y_size, "scikit-map ERROR 9: reading region size smaller then the number of columns");
+                GDALDataset *inputDataset = (GDALDataset *)GDALOpen(base_files[i].c_str(), GA_ReadOnly);
+                double geotransform[6];
+                inputDataset->GetGeoTransform(geotransform);
+                auto projection = inputDataset->GetProjectionRef();
+                auto spatial_ref = inputDataset->GetSpatialRef();
+                std::string ending;
+                if (bash_compression_command.has_value())
+                    ending = "_tmp.tif";
+                else 
+                    ending = ".tif";
+                    
+                std::string layer_name = file_names[i];
                 GDALDriver *driver = GetGDALDriverManager()->GetDriverByName("GTiff");
                 Eigen::RowVectorX<T> casted_row = row.cast<T>();
                 GDALDataset *writeDataset = driver->Create((base_folder + "/" + layer_name + ending).c_str(),
