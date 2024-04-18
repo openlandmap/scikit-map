@@ -328,6 +328,8 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("getLatLonArray", &getLatLonArray, "Compute latitude and longitude for each pixel of a GeoTIFF");
     m.def("computeNormalizedDifference", &computeNormalizedDifference, "Compute normalized difference indices");
     m.def("computeBsi", &computeBsi, "Compute BSI");
+    m.def("computeEvi", &computeEvi, "Compute EVI");
+    m.def("computeNirv", &computeNirv, "Compute NIRv");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
     m.def("computePercentiles", &computePercentiles, "Compute percentile");
