@@ -50,7 +50,7 @@ class TransArray: public ParArray
                             float_t result_offset,
                             std::vector<float_t> clip_value);
 
-        void computeNirv(std::vector<uint_t> red_indices,
+        void computeEvi(std::vector<uint_t> red_indices,
                             std::vector<uint_t> nir_indices,
                             std::vector<uint_t> blue_indices,
                             std::vector<uint_t> result_indices,
@@ -61,7 +61,7 @@ class TransArray: public ParArray
                             float_t result_offset,
                             std::vector<float_t> clip_value);
 
-        void computeEvi(std::vector<uint_t> nir_indices,
+        void computeNirv(std::vector<uint_t> nir_indices,
                      std::vector<uint_t> red_indices,
                      std::vector<uint_t> result_indices,
                      float_t nir_scaling,

@@ -157,7 +157,7 @@ void computeNormalizedDifference(Eigen::Ref<MatFloat> data,
 }
 
 
-void computeEvi(Eigen::Ref<MatFloat> data,
+void computeNirv(Eigen::Ref<MatFloat> data,
                                  const uint_t n_threads,
                                  std::vector<uint_t> nir_indices,
                                  std::vector<uint_t> red_indices,
@@ -169,7 +169,7 @@ void computeEvi(Eigen::Ref<MatFloat> data,
                                  std::vector<float_t> clip_value)
 {
     TransArray transArray(data, n_threads);
-    transArray.computeEvi(nir_indices, red_indices, result_indices,
+    transArray.computeNirvx(nir_indices, red_indices, result_indices,
                           nir_scaling, red_scaling, result_scaling, result_offset, clip_value);
 }
 
@@ -195,7 +195,7 @@ void computeBsi(Eigen::Ref<MatFloat> data,
 }
 
 
-void computeNirv(Eigen::Ref<MatFloat> data,
+void computeEvi(Eigen::Ref<MatFloat> data,
                 const uint_t n_threads,
                 std::vector<uint_t> red_indices,
                 std::vector<uint_t> nir_indices,
@@ -209,7 +209,7 @@ void computeNirv(Eigen::Ref<MatFloat> data,
                 std::vector<float_t> clip_value)
 {
     TransArray transArray(data, n_threads);
-    transArray.computeNirv(red_indices, nir_indices, blue_indices, result_indices,
+    transArray.computeEvi(red_indices, nir_indices, blue_indices, result_indices,
                           red_scaling, nir_scaling, blue_scaling, result_scaling, result_offset, clip_value);
 
 }
