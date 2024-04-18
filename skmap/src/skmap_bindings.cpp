@@ -169,7 +169,7 @@ void computeNirv(Eigen::Ref<MatFloat> data,
                                  std::vector<float_t> clip_value)
 {
     TransArray transArray(data, n_threads);
-    transArray.computeNirvx(nir_indices, red_indices, result_indices,
+    transArray.computeNirv(nir_indices, red_indices, result_indices,
                           nir_scaling, red_scaling, result_scaling, result_offset, clip_value);
 }
 
