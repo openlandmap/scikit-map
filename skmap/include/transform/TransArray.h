@@ -102,6 +102,16 @@ class TransArray: public ParArray
                             float_t new_value_in_data);
 
 
+        void applySircle(Eigen::Ref<MatFloat> out_data,
+                         uint_t out_index_offset,
+                         float_t w_0,
+                         Eigen::Ref<VecFloat> w_p,
+                         Eigen::Ref<VecFloat> w_f,
+                         bool keep_original_values,
+                         const std::string& version,
+                         const std::string& backend);
+
+
 
 };
 
