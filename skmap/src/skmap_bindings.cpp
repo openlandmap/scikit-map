@@ -7,7 +7,6 @@ namespace py = pybind11;
 
 using namespace skmap;
 
-
 dict_t convPyDict(py::dict in_dict)
 {
     dict_t cpp_dict;
@@ -26,7 +25,6 @@ map_t convPyMap(py::dict in_map)
     }
     return cpp_map;
 }
-
 
 
 void readData(Eigen::Ref<MatFloat> data,
@@ -61,6 +59,7 @@ void getLatLonArray(Eigen::Ref<MatFloat> data,
     ioArray.setupGdal(convPyDict(conf_GDAL));
     ioArray.getLatLonArray(file_loc, x_off, y_off, x_size, y_size);
 }
+
 
 
 void reorderArray(Eigen::Ref<MatFloat> data,
@@ -289,8 +288,6 @@ void writeInt16Data(Eigen::Ref<MatFloat> data,
         x_off, y_off, x_size, y_size, GDT_Int16, no_data_value, bash_compression_command, seaweed_path);
 
 }
-
-
 
 void computePercentiles(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,

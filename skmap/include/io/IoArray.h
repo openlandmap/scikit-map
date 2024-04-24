@@ -57,6 +57,8 @@ class IoArray: public ParArray
                 inputDataset->GetGeoTransform(geotransform);
                 auto projection = inputDataset->GetProjectionRef();
                 auto spatial_ref = inputDataset->GetSpatialRef();
+                int x_size_in = inputDataset->GetRasterXSize();
+                int y_size_in = inputDataset->GetRasterYSize();
                 std::string ending;
                 if (bash_compression_command.has_value())
                     ending = "_tmp.tif";
@@ -72,11 +74,18 @@ class IoArray: public ParArray
                 writeDataset->SetSpatialRef(spatial_ref);
                 writeDataset->SetProjection(projection);
                 GDALRasterBand *writeBand = writeDataset->GetRasterBand(1);
-                writeBand->SetNoDataValue(no_data_value);
-                auto out_write = writeBand->RasterIO(
+                writeBand->SetNoDataValue((double) no_data_value);
+                using MatType = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+                MatType init_raster = MatType::Constant(1, x_size_in * y_size_in, no_data_value);
+                auto out_write1 = writeBand->RasterIO(
+                    GF_Write, 0, 0, x_size_in, y_size_in, init_raster.data(),
+                    x_size_in, y_size_in, write_type, 0, 0);
+                skmapAssertIfTrue(out_write1 != CE_None,
+                   "scikit-map ERROR 11: issues in writing the file " + layer_name);
+                auto out_write2 = writeBand->RasterIO(
                     GF_Write, x_off, y_off, x_size, y_size, casted_row.data(),
                     x_size, y_size, write_type, 0, 0);
-                skmapAssertIfTrue(out_write != CE_None,
+                skmapAssertIfTrue(out_write2 != CE_None,
                    "scikit-map ERROR 11: issues in writing the file " + layer_name);
                 GDALClose(writeDataset);
                 if (bash_compression_command.has_value())
