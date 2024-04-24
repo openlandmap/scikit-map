@@ -277,6 +277,7 @@ void TransArray::computeFapar(std::vector<uint_t> red_indices,
 }
 
 
+
 void TransArray::computeGeometricTemperature(Eigen::Ref<MatFloat> latitude,
                                              Eigen::Ref<MatFloat> elevation,
                                              float_t elevation_scaling,
@@ -356,4 +357,46 @@ void TransArray::computePercentiles(Eigen::Ref<MatFloat> out_data,
 
 }
 
+
+
+void TransArray::applySircle(Eigen::Ref<MatFloat> out_data,
+                             uint_t out_index_offset,
+                             float_t w_0,
+                             Eigen::Ref<VecFloat> w_p,
+                             Eigen::Ref<VecFloat> w_f,
+                             bool keep_original_values,
+                             const std::string& version,
+                             const std::string& backend)
+{
+
+    auto applySircleChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+    {
+        uint_t n_s = chunk.cols();
+        uint_t n_e = n_s + std::max(w_p.size(), w_f.size());
+        VecFloat w_e = VecFloat::Zero(n_e);
+        w_e(0) = w_0;
+        w_e.segment(1, w_f.size()) = w_f;
+        w_e.segment(n_e-w_p.size(), w_p.size()) = w_p;
+
+       
+        MatFloat W(n_s, n_s);
+        for (uint_t i = 0; i < n_s; ++i) 
+        {
+            for (uint_t j = 0; j < n_s; ++j)
+            {
+                W(j, i) = w_e((-i + j + n_e) % n_e);
+            }
+        }
+        MatBool gaps_mask = chunk.array().isNaN();
+        MatBool valid_mask = chunk.array().isFinite();
+        MatFloat chunk_masked = chunk;
+        chunk_masked = gaps_mask.select(0.0, chunk_masked);
+        out_data.block(out_index_offset + row_start, 0, row_end - row_start, n_s) = (chunk_masked * W).array() / (valid_mask.cast<float_t>() * W).array();
+        out_data.block(out_index_offset + row_start, 0, row_end - row_start, n_s) = valid_mask.select(chunk_masked, out_data.block(out_index_offset + row_start, 0, row_end - row_start, n_s));
+    };
+    this->parChunk(applySircleChunk);
+
 }
+
+}
+

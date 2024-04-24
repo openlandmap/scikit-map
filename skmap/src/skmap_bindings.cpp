@@ -298,6 +298,23 @@ void computePercentiles(Eigen::Ref<MatFloat> data,
     transArray.computePercentiles(out_data, percentiles);
 }
 
+void applySircle(Eigen::Ref<MatFloat> data,
+                 const uint_t n_threads,
+                 Eigen::Ref<MatFloat> out_data,
+                 uint_t out_index_offset,
+                 float_t w_0,
+                 Eigen::Ref<VecFloat> w_p,
+                 Eigen::Ref<VecFloat> w_f,
+                 bool keep_original_values,
+                 const std::string& version,
+                 const std::string& backend)
+
+{
+    TransArray transArray(data, n_threads);
+    transArray.applySircle(out_data, out_index_offset,
+                            w_0, w_p, w_f, keep_original_values, version, backend);
+}
+
 PYBIND11_MODULE(skmap_bindings, m)
 {
     m.def("readData", &readData,
@@ -330,4 +347,5 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
     m.def("computePercentiles", &computePercentiles, "Compute percentile");
+    m.def("applySircle", &applySircle, "Apply SIRCLE");
 }

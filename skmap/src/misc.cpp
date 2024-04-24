@@ -16,6 +16,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 namespace skmap {
 
@@ -55,6 +56,7 @@ using map_t = std::map<std::string, std::vector<uint_t>>;
 // C order is default in Numpy and Eigen pybind11 require it to get this input
 using MatFloat = Eigen::Matrix<float_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using MatBool = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using VecFloat = Eigen::Vector<float_t, Eigen::Dynamic>;
 
 
 }
