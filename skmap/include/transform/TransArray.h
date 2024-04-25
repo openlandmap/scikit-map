@@ -111,6 +111,10 @@ class TransArray: public ParArray
                          const std::string& version,
                          const std::string& backend);
 
+        void transposeReorderArray(Eigen::Ref<MatFloat> out_data,
+                                   std::vector<std::vector<uint_t>> permutation_matrix);
+
+
 
 
 };

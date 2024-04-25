@@ -131,6 +131,15 @@ void inverseReorderArray(Eigen::Ref<MatFloat> data,
     transArray.inverseReorderArray(out_data, indices_matrix);
 }
 
+void transposeReorderArray(Eigen::Ref<MatFloat> data,
+                         const uint_t n_threads,
+                         Eigen::Ref<MatFloat> out_data,
+                         std::vector<std::vector<uint_t>> permutation_matrix)
+{
+    TransArray transArray(data, n_threads);
+    transArray.transposeReorderArray(out_data, permutation_matrix);
+}
+
 void transposeArray(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,
                           Eigen::Ref<MatFloat> out_data)
@@ -345,6 +354,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeEvi", &computeEvi, "Compute EVI");
     m.def("computeNirv", &computeNirv, "Compute NIRv");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
+    m.def("transposeReorderArray", &transposeReorderArray, "Transpose and reorder an array into a new one");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
     m.def("computePercentiles", &computePercentiles, "Compute percentile");
     m.def("applySircle", &applySircle, "Apply SIRCLE");
