@@ -37,6 +37,17 @@ void TransArray::inverseReorderArray(Eigen::Ref<MatFloat> out_data,
 }
 
 
+void TransArray::transposeReorderArray(Eigen::Ref<MatFloat> out_data,
+                                     std::vector<std::vector<uint_t>> permutation_matrix)
+{
+    auto transposeReorderArrayRow = [&] (uint_t i)
+    {
+        out_data.row(permutation_matrix[i][0]) = m_data.block(permutation_matrix[i][1]*out_data.cols(), permutation_matrix[i][2], 1, out_data.cols()).transpose();
+    };
+    this->parForRange(transposeReorderArrayRow, permutation_matrix.size());
+}
+
+
 
 void TransArray::selArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select)
