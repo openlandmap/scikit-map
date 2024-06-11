@@ -94,6 +94,20 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
 
 
 
+void TransArray::maskNan(std::vector<uint_t> row_select,
+                                 float_t new_value)
+{
+    auto swapRowValues = [&] (uint_t i)
+    {
+        auto tmp_row = m_data.row(row_select[i]);
+        tmp_row = tmp_row.array().isNaN().select(new_value, tmp_row);
+    };
+    this->parForRange(swapRowValues, row_select.size());
+}
+
+
+
+
 
 void TransArray::maskData(std::vector<uint_t> row_select,
                     Eigen::Ref<MatFloat> mask,
@@ -319,11 +333,12 @@ void TransArray::computeGeometricTemperature(Eigen::Ref<MatFloat> latitude,
 }
 
 void TransArray::computePercentiles(Eigen::Ref<MatFloat> out_data,
+                                    uint_t out_index_offset,
                                     std::vector<float_t> percentiles)
 {
 
-    skmapAssertIfTrue((uint_t) out_data.cols() != percentiles.size(),
-                      "scikit-map ERROR 19: out_data second dimension must be same size of percentiles");
+    skmapAssertIfTrue((uint_t) out_data.cols() < out_index_offset + percentiles.size(),
+                      "scikit-map ERROR 19: out_data too small");
     // @FIXME: the clean way would be that also for out_data a ParArray oject is created and that only the corresponding cunk is sent
     auto computePercentilesChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
     {
@@ -344,7 +359,7 @@ void TransArray::computePercentiles(Eigen::Ref<MatFloat> out_data,
             for (uint_t i = 0; i < (uint_t) sorted_chunk.rows(); ++i) {
                 if (not_nan_count(i) == 0)
                 {
-                    out_data(row_start+i, k) = nan_v;
+                    out_data(row_start+i, out_index_offset + k) = nan_v;
                 } else
                 {
                     float_t percentile_pos = (float_t) (not_nan_count(i) - 1) * (percentiles[k] / 100.0);
@@ -352,12 +367,12 @@ void TransArray::computePercentiles(Eigen::Ref<MatFloat> out_data,
                     uint_t percentile_pos_ceil = ceil(percentile_pos);
                     if (percentile_pos_floor == percentile_pos_ceil)
                     {
-                        out_data(row_start+i, k) = sorted_chunk(i, percentile_pos_floor);
+                        out_data(row_start+i, out_index_offset + k) = sorted_chunk(i, percentile_pos_floor);
                     } else
                     {
                         float_t percentile_val_floor = sorted_chunk(i, percentile_pos_floor) * ((float_t) percentile_pos_ceil - percentile_pos);
                         float_t percentile_val_ceil = sorted_chunk(i, percentile_pos_ceil) * (percentile_pos - (float_t) percentile_pos_floor);
-                        out_data(row_start+i, k) = percentile_val_floor + percentile_val_ceil;
+                        out_data(row_start+i, out_index_offset + k) = percentile_val_floor + percentile_val_ceil;
                     }
                 }
             }
@@ -388,6 +403,7 @@ void TransArray::applySircle(Eigen::Ref<MatFloat> out_data,
         w_e(0) = w_0;
         w_e.segment(1, w_f.size()) = w_f;
         w_e.segment(n_e-w_p.size(), w_p.size()) = w_p;
+        auto out_block = out_data.block(out_index_offset + row_start, 0, row_end - row_start, n_s);
 
        
         MatFloat W(n_s, n_s);
@@ -402,8 +418,11 @@ void TransArray::applySircle(Eigen::Ref<MatFloat> out_data,
         MatBool valid_mask = chunk.array().isFinite();
         MatFloat chunk_masked = chunk;
         chunk_masked = gaps_mask.select(0.0, chunk_masked);
-        out_data.block(out_index_offset + row_start, 0, row_end - row_start, n_s) = (chunk_masked * W).array() / (valid_mask.cast<float_t>() * W).array();
-        out_data.block(out_index_offset + row_start, 0, row_end - row_start, n_s) = valid_mask.select(chunk_masked, out_data.block(out_index_offset + row_start, 0, row_end - row_start, n_s));
+        MatFloat den = valid_mask.cast<float_t>() * W;
+        out_block = (chunk_masked * W).array() / den.array();
+        MatFloat NaNs = MatFloat::Constant(out_block.rows(), out_block.cols(), nan_v);
+        out_block = (den.array() < w_e.minCoeff()).select(NaNs, out_block);
+        out_block = valid_mask.select(chunk_masked, out_data.block(out_index_offset + row_start, 0, row_end - row_start, n_s));
     };
     this->parChunk(applySircleChunk);
 
