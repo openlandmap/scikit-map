@@ -102,6 +102,15 @@ void swapRowsValues(Eigen::Ref<MatFloat> data,
     transArray.swapRowsValues(row_select, value_to_mask, new_value);
 }
 
+void maskNan(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    std::vector<uint_t> row_select,
+                    float_t new_value_in_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.maskNan(row_select, new_value_in_data);
+}
+
 void maskData(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     std::vector<uint_t> row_select,
@@ -301,10 +310,11 @@ void writeInt16Data(Eigen::Ref<MatFloat> data,
 void computePercentiles(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,
                           Eigen::Ref<MatFloat> out_data,
+                          uint_t out_index_offset,
                           std::vector<float_t> percentiles)
 {
     TransArray transArray(data, n_threads);
-    transArray.computePercentiles(out_data, percentiles);
+    transArray.computePercentiles(out_data, out_index_offset, percentiles);
 }
 
 void applySircle(Eigen::Ref<MatFloat> data,
@@ -333,6 +343,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
     m.def("maskData", &maskData, "Mask data"); 
+    m.def("maskNan", &maskNan, "Mask NaN"); 
     m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");

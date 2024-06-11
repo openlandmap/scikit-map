@@ -94,12 +94,16 @@ class TransArray: public ParArray
                                  float_t new_value);
 
         void computePercentiles(Eigen::Ref<MatFloat> out_data,
+                                uint_t out_index_offset,
                                 std::vector<float_t> percentiles);
 
-        void maskData(      std::vector<uint_t> row_select,
-                            Eigen::Ref<MatFloat> mask,
-                            float_t value_of_mask_to_mask,
-                            float_t new_value_in_data);
+        void maskNan(std::vector<uint_t> row_select,
+                     float_t new_value_in_data);
+
+        void maskData(std::vector<uint_t> row_select,
+                      Eigen::Ref<MatFloat> mask,
+                      float_t value_of_mask_to_mask,
+                      float_t new_value_in_data);
 
 
         void applySircle(Eigen::Ref<MatFloat> out_data,
