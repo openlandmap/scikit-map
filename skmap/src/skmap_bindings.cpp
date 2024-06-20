@@ -84,12 +84,21 @@ void selArrayRows(Eigen::Ref<MatFloat> data,
 
 
 void expandArrayRows(Eigen::Ref<MatFloat> data,
-                  const uint_t n_threads,
-                  Eigen::Ref<MatFloat> out_data,
-                  std::vector<uint_t> row_select)
+                     const uint_t n_threads,
+                     Eigen::Ref<MatFloat> out_data,
+                     std::vector<uint_t> row_select)
 {
     TransArray transArray(data, n_threads);
     transArray.expandArrayRows(out_data, row_select);
+}
+
+void extractArrayRows(Eigen::Ref<MatFloat> data,
+                     const uint_t n_threads,
+                     Eigen::Ref<MatFloat> out_data,
+                     std::vector<uint_t> row_select)
+{
+    TransArray transArray(data, n_threads);
+    transArray.extractArrayRows(out_data, row_select);
 }
 
 void swapRowsValues(Eigen::Ref<MatFloat> data,
@@ -123,11 +132,20 @@ void maskData(Eigen::Ref<MatFloat> data,
 }
 
 void fillArray(Eigen::Ref<MatFloat> data,
-                  const uint_t n_threads,
-                  float_t val)
+               const uint_t n_threads,
+               float_t val)
 {
     TransArray transArray(data, n_threads);
     transArray.fillArray(val);
+}
+
+void copyVecInMatrixRow(Eigen::Ref<MatFloat> data,
+               const uint_t n_threads,
+               Eigen::Ref<VecFloat> in_vec,
+               uint_t row_idx)
+{
+    TransArray transArray(data, n_threads);
+    transArray.copyVecInMatrixRow(in_vec, row_idx);
 }
 
 
@@ -155,6 +173,34 @@ void transposeArray(Eigen::Ref<MatFloat> data,
 {
     TransArray transArray(data, n_threads);
     transArray.transposeArray(out_data);
+}
+
+void offsetAndScale(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    float_t offset,
+                    float_t scaling)
+{
+    TransArray transArray(data, n_threads);
+    transArray.offsetAndScale(offset, scaling);
+}
+
+void averageAggregate(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<MatFloat> out_data,
+                      uint_t agg_factor)
+{
+    TransArray transArray(data, n_threads);
+    transArray.averageAggregate(out_data, agg_factor);
+}
+
+void maskDifference(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    float_t diff_th,
+                    uint_t count_th,
+                    Eigen::Ref<MatFloat> ref_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.maskDifference(diff_th, count_th, ref_data);
 }
 
 void computeNormalizedDifference(Eigen::Ref<MatFloat> data,
@@ -307,6 +353,18 @@ void writeInt16Data(Eigen::Ref<MatFloat> data,
 
 }
 
+
+void warpTile(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    py::dict conf_GDAL,
+                    std::string tilePath,
+                    std::string mosaicPath)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.warpTile(tilePath, mosaicPath);
+}
+
 void computePercentiles(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,
                           Eigen::Ref<MatFloat> out_data,
@@ -331,7 +389,7 @@ void applySircle(Eigen::Ref<MatFloat> data,
 {
     TransArray transArray(data, n_threads);
     transArray.applySircle(out_data, out_index_offset,
-                            w_0, w_p, w_f, keep_original_values, version, backend);
+                           w_0, w_p, w_f, keep_original_values, version, backend);
 }
 
 PYBIND11_MODULE(skmap_bindings, m)
@@ -340,14 +398,18 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
+    m.def("copyVecInMatrixRow", &copyVecInMatrixRow, "Copy a vector in a matrix row");
     m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
-    m.def("maskData", &maskData, "Mask data"); 
-    m.def("maskNan", &maskNan, "Mask NaN"); 
+    m.def("averageAggregate", &averageAggregate, "Average aggregate");
+    m.def("maskData", &maskData, "Mask data");
+    m.def("maskNan", &maskNan, "Mask NaN");
     m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
+    m.def("extractArrayRows", &extractArrayRows, "Extract array rows");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
+    m.def("offsetAndScale", &offsetAndScale, "Add an offset and muplitply by a scaling each array element");
     m.def("inverseReorderArray", &inverseReorderArray, "Reorder and transpose an array into a new one");
     m.def("writeByteData", &writeByteData, 
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
@@ -365,8 +427,10 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeEvi", &computeEvi, "Compute EVI");
     m.def("computeNirv", &computeNirv, "Compute NIRv");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
+    m.def("warpTile", &warpTile, "Compute FAPAR");
     m.def("transposeReorderArray", &transposeReorderArray, "Transpose and reorder an array into a new one");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
     m.def("computePercentiles", &computePercentiles, "Compute percentile");
     m.def("applySircle", &applySircle, "Apply SIRCLE");
+    m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
 }

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <Eigen/Dense>
 #include <gdal/gdal.h>
-#include <gdal/gdal.h>
+#include <gdal/gdalwarper.h>
 #include <gdal/gdal_priv.h>
 #include <omp.h>
 #include <functional>
@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+//#include <cpl_conv.h>
+//#include <ogr_spatialref.h>
 
 namespace skmap {
 
@@ -25,7 +27,6 @@ inline void skmapPrint(T message)
 {
     std::cout << message << std::endl;
 }
-
 
 inline void skmapAssertIfTrue(bool cond, std::string message)
 {

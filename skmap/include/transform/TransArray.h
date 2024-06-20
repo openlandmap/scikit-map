@@ -12,6 +12,19 @@ class TransArray: public ParArray
 
         TransArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
 
+        void copyVecInMatrixRow(Eigen::Ref<VecFloat> in_vec,
+                                uint_t row_idx);
+
+        void offsetAndScale(float_t offset,
+                            float_t scaling);
+
+        void averageAggregate(Eigen::Ref<MatFloat> out_data,
+                              uint_t agg_factor);
+
+        void maskDifference(float_t diff_th,
+                            uint_t count_th,
+                            Eigen::Ref<MatFloat> ref_data);
+
         void reorderArray(Eigen::Ref<MatFloat> out_data,
                           std::vector<std::vector<uint_t>> indices_matrix);
 
@@ -20,6 +33,10 @@ class TransArray: public ParArray
         
         void expandArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select);
+
+
+        void extractArrayRows(Eigen::Ref<MatFloat> out_data,
+                          std::vector<uint_t> row_select);
         
         void fillArray(float_t val);
 
