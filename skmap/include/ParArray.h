@@ -55,7 +55,7 @@ class ParArray {
                 f_in(m_data.block(row_start, 0, row_end-row_start, m_data.cols()), row_start, row_end);
             };
             this->parForRange(f_out, m_n_threads);
-        }        
+        }
 };
 
 }

@@ -13,13 +13,16 @@ class IoArray: public ParArray
 
         IoArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
 
+        void warpTile(std::string ref_tile_path,
+                      std::string mosaic_path);
+
         void readData(std::vector<std::string> file_locs,
                        std::vector<uint_t> perm_vec,
                        uint_t x_off,
                        uint_t y_off,
                        uint_t x_size,
                        uint_t y_size,
-                       GDALDataType read_type,                       
+                       GDALDataType read_type,
                        std::vector<int> bands_list,
                        std::optional<float_t> value_to_mask,
                        std::optional<float_t> value_to_set);
