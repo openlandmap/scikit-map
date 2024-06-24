@@ -58,6 +58,8 @@ using map_t = std::map<std::string, std::vector<uint_t>>;
 using MatFloat = Eigen::Matrix<float_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using MatBool = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using VecFloat = Eigen::Vector<float_t, Eigen::Dynamic>;
+using VecUint = Eigen::Vector<uint_t, Eigen::Dynamic>;
+using VecBool = Eigen::Vector<bool, Eigen::Dynamic>;
 
 
 }

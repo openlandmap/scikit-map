@@ -86,6 +86,7 @@ namespace skmap {
             CPLSetConfigOption(pair.first.c_str(), pair.second.c_str());
         }
         GDALAllRegister(); // Initialize GDAL
+        CPLPushErrorHandler(CPLQuietErrorHandler);
     }
 
 
