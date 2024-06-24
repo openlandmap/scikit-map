@@ -428,22 +428,24 @@ namespace skmap {
 
     void TransArray::maskDifference(float_t diff_th,
                                     uint_t count_th,
-                                    Eigen::Ref<MatFloat> ref_data)
+                                    Eigen::Ref<MatFloat> ref_data,
+                                    Eigen::Ref<MatFloat> mask_out)
     {
         auto maskDifferenceChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
         {
             auto ref_data_chunk = ref_data.block(row_start, 0, row_end - row_start, ref_data.cols());
-            MatFloat diff = (chunk - ref_data_chunk).cwiseAbs();
-            MatBool mask = (diff.array() > diff_th).matrix();
-            auto count = mask.cast<uint_t>().colwise().sum();
+            auto mask_out_chunk = mask_out.block(row_start, 0, row_end - row_start, ref_data.cols());
+            MatFloat diff = (chunk.array() - ref_data_chunk.array()).abs();
+            MatBool mask = (diff.array() > diff_th);
+            VecUint count = mask.cast<uint_t>().rowwise().sum();
             // If the masking is recurring in several columns it is not considered outlier and so not masked
-            auto mask_threshold = (count.array() <= count_th);
-            for (int i = 0; i < mask.rows(); ++i) {
-                if (mask_threshold(i)) {
+            VecBool mask_threshold = (count.array() > count_th);
+            for (uint_t i = 0; i < (uint_t) mask.rows(); ++i) 
+            {
+                if (mask_threshold(i)) 
                     mask.row(i).setConstant(false);
-                }
             }
-            chunk = mask.select(nan_v, chunk);
+            mask_out_chunk = mask.cast<uint_t>().cast<float_t>();
         };
         this->parChunk(maskDifferenceChunk);
     }

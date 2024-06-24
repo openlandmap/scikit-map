@@ -197,10 +197,11 @@ void maskDifference(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     float_t diff_th,
                     uint_t count_th,
-                    Eigen::Ref<MatFloat> ref_data)
+                    Eigen::Ref<MatFloat> ref_data,
+                    Eigen::Ref<MatFloat> mask_out)
 {
     TransArray transArray(data, n_threads);
-    transArray.maskDifference(diff_th, count_th, ref_data);
+    transArray.maskDifference(diff_th, count_th, ref_data, mask_out);
 }
 
 void computeNormalizedDifference(Eigen::Ref<MatFloat> data,

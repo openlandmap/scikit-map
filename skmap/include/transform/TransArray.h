@@ -23,7 +23,8 @@ class TransArray: public ParArray
 
         void maskDifference(float_t diff_th,
                             uint_t count_th,
-                            Eigen::Ref<MatFloat> ref_data);
+                            Eigen::Ref<MatFloat> ref_data,
+                                    Eigen::Ref<MatFloat> mask_out);
 
         void reorderArray(Eigen::Ref<MatFloat> out_data,
                           std::vector<std::vector<uint_t>> indices_matrix);
