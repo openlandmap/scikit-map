@@ -45,6 +45,20 @@ inline void runBashCommand(std::string command)
     skmapAssertIfTrue(result != 0, "scikit-map ERROR 10: issues running the command " + command);
 }
 
+inline float_t signFunc(float_t x)
+{
+    if (x > 0.)
+        return +1.;
+    else if (x == 0.)
+        return 0.;
+    else
+        return -1.;
+}
+
+inline float_t standardNormalCdf(float_t x) {
+    return 0.5 * (1. + erf(x / sqrt(2.)));
+}
+
 using uint_t = long unsigned int;
 using float_t = float;
 using byte_t = unsigned char;

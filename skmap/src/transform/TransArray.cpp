@@ -514,5 +514,47 @@ namespace skmap {
 
     }
 
+    void TransArray::nanMean(Eigen::Ref<VecFloat> out_data)
+    {
+        auto nanMeanChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            auto res = out_data.segment(row_start, row_end - row_start);
+            VecFloat count = (float_t) chunk.cols() - chunk.array().isNaN().cast<float_t>().rowwise().sum().array();
+            MatFloat data_no_nan = chunk;
+            data_no_nan = data_no_nan.array().isNaN().select(0., data_no_nan);
+            VecFloat sum = data_no_nan.rowwise().sum();
+            res = sum.array() / count.array();
+            res = (count.array() == 0.).select(nan_v, res);
+        };
+        this->parChunk(nanMeanChunk);
+
+    }
+
+    void TransArray::computeMannKendallPValues(Eigen::Ref<VecFloat> out_data)
+    {
+        auto computeMannKendallPValuesChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            float_t n_cols = chunk.cols();
+            float_t n = (float_t) n_cols;
+            float_t var_s = (n * (n - 1.) * (2. * n + 5.))/18.;
+            for (uint_t i = 0; i < (uint_t) chunk.rows(); i ++)
+            {
+                // Vectorized computation of differences
+                MatFloat mat = MatFloat::Zero(n_cols, n_cols);
+                mat.triangularView<Eigen::Upper>() = chunk.row(i).transpose().replicate(n_cols, 1) - chunk.row(i).replicate(1, n_cols);
+                // Mann-Kendal's score
+                float_t s = mat.unaryExpr(std::ptr_fun(signFunc)).array().sum();
+                float_t z_score = 0.;
+                if (s > 0.)
+                    z_score = (s - 1.) / std::sqrt(var_s);
+                else if (s < 0.)
+                    z_score = (s + 1.) / std::sqrt(var_s);
+                // p-value
+                out_data(row_start+i) = 2. * (1. - standardNormalCdf(std::abs(z_score)));
+            }
+        };
+        this->parChunk(computeMannKendallPValuesChunk);
+    }
+
 }
 

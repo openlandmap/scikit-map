@@ -184,6 +184,23 @@ void offsetAndScale(Eigen::Ref<MatFloat> data,
     transArray.offsetAndScale(offset, scaling);
 }
 
+
+void nanMean(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<VecFloat> out_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.nanMean(out_data);
+}
+
+void computeMannKendallPValues(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<VecFloat> out_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeMannKendallPValues(out_data);
+}
+
 void averageAggregate(Eigen::Ref<MatFloat> data,
                       const uint_t n_threads,
                       Eigen::Ref<MatFloat> out_data,
@@ -428,6 +445,8 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeEvi", &computeEvi, "Compute EVI");
     m.def("computeNirv", &computeNirv, "Compute NIRv");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
+    m.def("nanMean", &nanMean, "Compute average between available values");
+    m.def("computeMannKendallPValues", &computeMannKendallPValues, "Compute Mann-Kendall p-values");
     m.def("warpTile", &warpTile, "Compute FAPAR");
     m.def("transposeReorderArray", &transposeReorderArray, "Transpose and reorder an array into a new one");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
