@@ -47,12 +47,24 @@ class ParArray {
         template<typename F>
         void parChunk(F f_in)
         {
-            uint_t chuck_size = std::ceil((float_t) m_data.rows() / (float_t) m_n_threads);
+            uint_t a = std::floor((float_t) m_data.rows() / (float_t) m_n_threads);
+            uint_t b = (uint_t) ((float_t) a * (float_t) m_n_threads);
+            uint_t c = (uint_t) ((float_t) m_data.rows() - (float_t) b);
+
             auto f_out = [&] (uint_t i)
             {
-                uint_t row_start = i * chuck_size;
-                uint_t row_end = std::min((i+1) * chuck_size, (uint_t) m_data.rows());
-                f_in(m_data.block(row_start, 0, row_end-row_start, m_data.cols()), row_start, row_end);
+                uint_t row_start = i * (a + 1);
+                uint_t chuck_size = 0;
+                if (i >= c)
+                {
+                    chuck_size = a;
+                    row_start = (uint_t) ( (float_t) row_start - (float_t) i + (float_t) c);
+                }
+                else
+                    chuck_size = a + 1;
+                uint_t row_end = row_start + chuck_size;
+                if (chuck_size > 0)
+                    f_in(m_data.block(row_start, 0, row_end-row_start, m_data.cols()), row_start, row_end);
             };
             this->parForRange(f_out, m_n_threads);
         }

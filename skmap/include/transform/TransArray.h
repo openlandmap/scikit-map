@@ -31,6 +31,10 @@ class TransArray: public ParArray
 
         void selArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select);
+
+        void nanMean(Eigen::Ref<VecFloat> out_data);
+        
+        void computeMannKendallPValues(Eigen::Ref<VecFloat> out_data);
         
         void expandArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select);
