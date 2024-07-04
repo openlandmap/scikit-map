@@ -387,11 +387,12 @@ void warpTile(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     py::dict conf_GDAL,
                     std::string tilePath,
-                    std::string mosaicPath)
+                    std::string mosaicPath,
+                    std::string resample)
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.warpTile(tilePath, mosaicPath);
+    ioArray.warpTile(tilePath, mosaicPath, resample);
 }
 
 void computePercentiles(Eigen::Ref<MatFloat> data,

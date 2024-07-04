@@ -1,9 +1,29 @@
 #include "io/IoArray.h"
 
 namespace skmap {
+    
+    GDALResampleAlg hashResample(std::string const& inString) {
+        if (inString == "GRA_CubicSpline") return GRA_CubicSpline;
+        if (inString == "GRA_NearestNeighbour") return GRA_NearestNeighbour;
+        if (inString == "GRA_Bilinear") return GRA_Bilinear;
+        if (inString == "GRA_Cubic") return GRA_Cubic;
+        if (inString == "GRA_Lanczos") return GRA_Lanczos;
+        if (inString == "GRA_Average") return GRA_Average;
+        if (inString == "GRA_Mode") return GRA_Mode;
+        if (inString == "GRA_Max") return GRA_Max;
+        if (inString == "GRA_Min") return GRA_Min;
+        if (inString == "GRA_Med") return GRA_Med;
+        if (inString == "GRA_Q1") return GRA_Q1;
+        if (inString == "GRA_Q3") return GRA_Q3;
+        if (inString == "GRA_Sum") return GRA_Sum;
+        if (inString == "GRA_RMS") return GRA_RMS;
+        skmapAssertIfTrue(true, "scikit-map ERROR 38: failed to read raster data into Eigen matrix");
+        return GRA_NearestNeighbour;
+    }
 
     void IoArray::warpTile(std::string ref_tile_path,
-                           std::string mosaic_path)
+                           std::string mosaic_path,
+                           std::string resample)
     {
 
         // @FIXME: this function assumes that the data is single band
@@ -56,8 +76,7 @@ namespace skmap {
         psWarpOptions->hDstDS = dstDataset;
         psWarpOptions->pTransformerArg = GDALCreateGenImgProjTransformer(mosaicDataset, mosaicDataset->GetProjectionRef(), dstDataset, pszSRS_WKT, FALSE, 0.0, 1);
         psWarpOptions->pfnTransformer = GDALGenImgProjTransform;
-        // @FIXME: the interpolation strategy could be and input parameter
-        psWarpOptions->eResampleAlg = GRA_CubicSpline;
+        psWarpOptions->eResampleAlg = hashResample(resample);
 
         GDALRasterBand *poBand = dstDataset->GetRasterBand(1);
         GDALWarpOperation operation;

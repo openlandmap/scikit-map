@@ -14,7 +14,8 @@ class IoArray: public ParArray
         IoArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
 
         void warpTile(std::string ref_tile_path,
-                      std::string mosaic_path);
+                      std::string mosaic_path,
+                      std::string resample);
 
         void readData(std::vector<std::string> file_locs,
                        std::vector<uint_t> perm_vec,
