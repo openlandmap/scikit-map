@@ -11,6 +11,10 @@ class TransArray: public ParArray
     public :
 
         TransArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
+        
+        void linearRegression(Eigen::Ref<VecFloat> x,
+                                      Eigen::Ref<VecFloat> beta_0,
+                                      Eigen::Ref<VecFloat> beta_1);
 
         void copyVecInMatrixRow(Eigen::Ref<VecFloat> in_vec,
                                 uint_t row_idx);

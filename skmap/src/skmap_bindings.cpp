@@ -186,12 +186,23 @@ void offsetAndScale(Eigen::Ref<MatFloat> data,
 
 
 void nanMean(Eigen::Ref<MatFloat> data,
-                      const uint_t n_threads,
-                      Eigen::Ref<VecFloat> out_data)
+             const uint_t n_threads,
+             Eigen::Ref<VecFloat> out_data)
 {
     TransArray transArray(data, n_threads);
     transArray.nanMean(out_data);
 }
+
+void linearRegression(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<VecFloat> x,
+                      Eigen::Ref<VecFloat> beta_0,
+                      Eigen::Ref<VecFloat> beta_1)
+{
+    TransArray transArray(data, n_threads);
+    transArray.linearRegression(x, beta_0, beta_1);
+}
+
 
 void computeMannKendallPValues(Eigen::Ref<MatFloat> data,
                       const uint_t n_threads,
@@ -448,9 +459,11 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("nanMean", &nanMean, "Compute average between available values");
     m.def("computeMannKendallPValues", &computeMannKendallPValues, "Compute Mann-Kendall p-values");
     m.def("warpTile", &warpTile, "Compute FAPAR");
+    m.def("linearRegression", &linearRegression, "Compute linear regression slope and intercept");
     m.def("transposeReorderArray", &transposeReorderArray, "Transpose and reorder an array into a new one");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
     m.def("computePercentiles", &computePercentiles, "Compute percentile");
     m.def("applySircle", &applySircle, "Apply SIRCLE");
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
 }
+

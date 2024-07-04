@@ -556,5 +556,27 @@ namespace skmap {
         this->parChunk(computeMannKendallPValuesChunk);
     }
 
+    void TransArray::linearRegression(Eigen::Ref<VecFloat> x,
+                                      Eigen::Ref<VecFloat> beta_0,
+                                      Eigen::Ref<VecFloat> beta_1)
+    {
+        skmapAssertIfTrue((uint_t) m_data.cols() != (uint_t) x.size(),
+                          "scikit-map ERROR 37: regression variable is assumed to match size of data columns");
+        auto linearRegressionChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            float_t n_samp = chunk.cols();
+            VecFloat Y_mean = chunk.rowwise().mean();
+            float_t x_mean = x.mean();
+            MatFloat covariance_p1 = chunk.colwise() - Y_mean;
+            VecFloat covariance_p2 = x.array() - x_mean;
+            VecFloat covariance = covariance_p1 * covariance_p2;
+            covariance /= n_samp;
+            float_t x_variance = (x.array() - x_mean).square().sum() / n_samp;
+            beta_1.segment(row_start, row_end-row_start) = covariance.array() / x_variance;
+            beta_0.segment(row_start, row_end-row_start) = Y_mean - beta_1 * x_mean;
+        };
+        this->parChunk(linearRegressionChunk);
+    }
+
 }
 
