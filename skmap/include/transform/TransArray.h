@@ -49,6 +49,17 @@ class TransArray: public ParArray
         
         void fillArray(float_t val);
 
+        void fitPercentage(Eigen::Ref<MatFloat> in1,
+                           Eigen::Ref<MatFloat> in2);
+
+        void averageAi4sh(Eigen::Ref<MatFloat> in1,
+                          Eigen::Ref<MatFloat> in2,
+                          uint_t n_pix,
+                          uint_t y);
+
+        void hadamardProduct(Eigen::Ref<MatFloat> in1,
+                             Eigen::Ref<MatFloat> in2);
+
         void inverseReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> indices_matrix);
 

@@ -83,6 +83,12 @@ void selArrayRows(Eigen::Ref<MatFloat> data,
 }
 
 
+
+void testLib()
+{
+    std::cout << "Ciaoooo!" << std::endl;
+}
+
 void expandArrayRows(Eigen::Ref<MatFloat> data,
                      const uint_t n_threads,
                      Eigen::Ref<MatFloat> out_data,
@@ -182,6 +188,38 @@ void offsetAndScale(Eigen::Ref<MatFloat> data,
 {
     TransArray transArray(data, n_threads);
     transArray.offsetAndScale(offset, scaling);
+}
+
+
+void fitPercentage(Eigen::Ref<MatFloat> out,
+                   const uint_t n_threads,
+                   Eigen::Ref<MatFloat> in1,
+                   Eigen::Ref<MatFloat> in2)
+{
+    TransArray transArray(out, n_threads);
+    transArray.fitPercentage(in1, in2);
+}
+
+
+
+void averageAi4sh(Eigen::Ref<MatFloat> out,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> in1,
+                  Eigen::Ref<MatFloat> in2,
+                  uint_t n_pix,
+                  uint_t y)
+{
+    TransArray transArray(out, n_threads);
+    transArray.averageAi4sh(in1, in2, n_pix, y);
+}
+
+void hadamardProduct(Eigen::Ref<MatFloat> out,
+                     const uint_t n_threads,
+                     Eigen::Ref<MatFloat> in1,
+                     Eigen::Ref<MatFloat> in2)
+{
+    TransArray transArray(out, n_threads);
+    transArray.hadamardProduct(in1, in2);
 }
 
 
@@ -465,6 +503,10 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
     m.def("computePercentiles", &computePercentiles, "Compute percentile");
     m.def("applySircle", &applySircle, "Apply SIRCLE");
+    m.def("testLib", &testLib, "testLib");
+    m.def("fitPercentage", &fitPercentage, "Fit a three percages to 100 starting from 2");
+    m.def("hadamardProduct", &hadamardProduct, "Elemennt wise product");
+    m.def("averageAi4sh", &averageAi4sh, "Werid vecorized average of 4 elemnts made ad-hoc for AI4SH production");
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
 }
 
