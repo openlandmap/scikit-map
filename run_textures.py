@@ -18,6 +18,7 @@ QUANTILES = [0.025, 0.975]
 THREADS = 96
 COVS_PATH = '../ai4sh_robert/ai4sh_vrt.json'
 TILES_PATH = '../ai4sh_robert/eu_tiles_epsg.3035.gpkg'
+TILES_SHUF = '../ai4sh_robert/shuf.txt'
 MODEL_PATH = '../ai4sh_robert'
 MASK_PATH = '/vsicurl/http://192.168.49.30:8333/ai4sh/land.mask_ecodatacube.eu_c_30m_s_20210101_20211231_eu_epsg.3035_v20230719.tif'
 VALID_MASK_VALUE = 1
@@ -50,7 +51,9 @@ def main():
     elif len(sys.argv) == 4:
         start_tile=max(int(sys.argv[1]), 0)
         end_tile=min(int(sys.argv[2]), len(tiles))
-        tiles_id = tiles['id'][start_tile:end_tile]
+        with open(TILES_SHUF, 'r') as file:
+            shuf = [int(line.strip()) for line in file]
+        tiles_id = tiles['id'][shuf[start_tile:end_tile]]
         server_name=sys.argv[3]
         base_dir = f'/mnt/{server_name}/ai4sh_pred/tmp'
     else:

@@ -22,6 +22,9 @@ class TransArray: public ParArray
         void offsetAndScale(float_t offset,
                             float_t scaling);
 
+        void scaleAndOffset(float_t offset,
+                            float_t scaling);
+
         void averageAggregate(Eigen::Ref<MatFloat> out_data,
                               uint_t agg_factor);
 

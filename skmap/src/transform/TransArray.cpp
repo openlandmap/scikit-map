@@ -426,6 +426,18 @@ namespace skmap {
 
 
 
+    void TransArray::scaleAndOffset(float_t offset,
+                                    float_t scaling)
+    {
+        auto scaleAndOffsetChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            chunk.array() = chunk.array() * scaling + offset;
+        };
+        this->parChunk(scaleAndOffsetChunk);
+    }
+
+
+
     void TransArray::fitPercentage(Eigen::Ref<MatFloat> in1,
                                    Eigen::Ref<MatFloat> in2)
     {

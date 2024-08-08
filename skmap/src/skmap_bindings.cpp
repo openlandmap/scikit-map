@@ -190,6 +190,15 @@ void offsetAndScale(Eigen::Ref<MatFloat> data,
     transArray.offsetAndScale(offset, scaling);
 }
 
+void scaleAndOffset(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    float_t offset,
+                    float_t scaling)
+{
+    TransArray transArray(data, n_threads);
+    transArray.scaleAndOffset(offset, scaling);
+}
+
 
 void fitPercentage(Eigen::Ref<MatFloat> out,
                    const uint_t n_threads,
@@ -478,6 +487,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
     m.def("offsetAndScale", &offsetAndScale, "Add an offset and muplitply by a scaling each array element");
+    m.def("scaleAndOffset", &scaleAndOffset, "Muplitply by a scaling and add an offset each array element");
     m.def("inverseReorderArray", &inverseReorderArray, "Reorder and transpose an array into a new one");
     m.def("writeByteData", &writeByteData, 
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),

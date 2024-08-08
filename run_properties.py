@@ -8,6 +8,8 @@ import warnings
 import skmap_bindings as smb
 import time
 import random
+import gc
+
 warnings.filterwarnings("ignore", module="sklearn")
 #
 # global constants
@@ -19,6 +21,7 @@ THREADS = 96
 COVS_PATH = '../ai4sh_robert/ai4sh_vrt.json'
 TILES_PATH = '../ai4sh_robert/eu_tiles_epsg.3035.gpkg'
 MODEL_PATH = '../ai4sh_robert'
+TILES_SHUF = '../ai4sh_robert/shuf.txt'
 MASK_PATH = '/vsicurl/http://192.168.49.30:8333/ai4sh/land.mask_ecodatacube.eu_c_30m_s_20210101_20211231_eu_epsg.3035_v20230719.tif'
 VALID_MASK_VALUE = 1
 GDAL_OPTS = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'}
@@ -50,7 +53,9 @@ def main():
     elif len(sys.argv) == 4:
         start_tile=max(int(sys.argv[1]), 0)
         end_tile=min(int(sys.argv[2]), len(tiles))
-        tiles_id = tiles['id'][start_tile:end_tile]
+        with open(TILES_SHUF, 'r') as file:
+            shuf = [int(line.strip()) for line in file]
+        tiles_id = tiles['id'][shuf[start_tile:end_tile]]
         server_name=sys.argv[3]
         base_dir = f'/mnt/{server_name}/ai4sh_pred/tmp'
     else:
@@ -70,7 +75,7 @@ def main():
             predict_fn=lambda predictor, data: predictor.predict(data)
         ),
         'expm1':False,
-        'scale':10,
+        'scale':100,
         'nodata':32767,
         'dtype':'int16',
         'prop_file_name':'bd.core_iso.11272.2017.g.cm3',
@@ -89,7 +94,7 @@ def main():
             predict_fn=lambda predictor, data: predictor.predict(data)
         ),
         'expm1':True,
-        'scale':1,
+        'scale':10,
         'nodata':32767, 
         'dtype':'int16',
         'prop_file_name':'oc_iso.10694.1995.wpct',
@@ -165,7 +170,7 @@ def main():
             predict_fn=lambda predictor, data: predictor.predict(data)
         ),
         'expm1':True,
-        'scale':1,
+        'scale':10,
         'nodata':32767,
         'dtype':'int16',
         'prop_file_name':'n.tot_iso.13878.1998.wpct',
@@ -184,7 +189,7 @@ def main():
             predict_fn=lambda predictor, data: predictor.predict(data)
         ),
         'expm1':True,
-        'scale':0.1,
+        'scale':1,
         'nodata':32767,
         'dtype':'int16',
         'prop_file_name':'p.ext_iso.11263.1994.mg.kg',
@@ -203,7 +208,7 @@ def main():
             predict_fn=lambda predictor, data: predictor.predict(data)
         ),
         'expm1':True,
-        'scale':0.1,
+        'scale':1,
         'nodata':32767,
         'dtype':'int16',
         'prop_file_name':'k.ext_usda.nrcs.mg.kg',
@@ -260,7 +265,7 @@ def main():
             predict_fn=lambda predictor, data: predictor.predict(data)
         ),
         'expm1':True,
-        'scale':1,
+        'scale':10,
         'nodata':32767,
         'dtype':'int16',
         'prop_file_name':'caco3_iso.10693.1995.wpct',
@@ -271,21 +276,40 @@ def main():
     
     #
     # catalogs
-    
     catalog = DataCatalog.read_catalog('ai4sh', COVS_PATH)
+    
+    
+    
+    # properties_model_params = [
+    #     cec_params, 
+    #     ec_params, 
+    #     carbonates_params,
+    #     bulk_density_params, 
+    #     soc_params, 
+    #     ocd_params, 
+    #     ph_h2o_params, 
+    #     ph_cacl2_params, 
+    #     nitrogen_params, 
+    #     phosphorus_params, 
+    #     potassium_params
+    # ]
+    
     properties_model_params = [
-        bulk_density_params, 
-        soc_params, 
-        ocd_params, 
         ph_h2o_params, 
         ph_cacl2_params, 
         nitrogen_params, 
         phosphorus_params, 
-        potassium_params, 
-        cec_params, 
-        ec_params, 
-        carbonates_params
+        potassium_params
     ]
+    
+    # properties_model_params = [
+    #     cec_params, 
+    #     ec_params, 
+    #     carbonates_params,
+    #     bulk_density_params, 
+    #     soc_params, 
+    #     ocd_params
+    # ]
     properties_features = {f for params in properties_model_params for f in params['model'].model_features}
     properties_catalog = catalog.query('soil.properties', YEARS, properties_features)
     print_catalog_statistics(properties_catalog)
@@ -304,7 +328,7 @@ def main():
         with TimeTracker(f"tile {tile_id}", True):
             
             with TimeTracker(f" - Reading data", False):
-                # x_size, y_size = (100, 100) # To debug
+                # x_size, y_size = (200, 200) # To debug
                 # properties_data.load_tile_data(tile_id, THREADS, GDAL_OPTS, x_size, y_size)
                 properties_data.load_tile_data(tile_id, THREADS, GDAL_OPTS)
             
@@ -332,14 +356,13 @@ def main():
                     n_files_years = n_quant + 1 # Offset of the years
                     # Textures order: clay, sand, silt
                     out_data_t = np.empty((n_pix_val, n_files), dtype=np.float32)
-                    write_data_t = np.empty((n_pix, n_files), dtype=np.float32)
-                    write_data = np.empty((n_files, n_pix), dtype=np.float32)
                     nodata = params['nodata']
 
                     with TimeTracker(f" - Getting raw tree predictions", False):
                         # Get raw trees predictions            
                         # [n_depths](n_trees, n_samples)
                         pred_trees = [properties_model.predictDepth(properties_data, i) for i in range(n_depths)]
+                        
 
                     with TimeTracker(f" - Deriving statistics", False):
                         # Compute derived statistics
@@ -363,10 +386,14 @@ def main():
                                 for q in QUANTILES:
                                     formatted_p = 'p0' if (q == 0) else ('p100' if (q == 1) else str(q).replace('0.','p'))
                                     out_files.append(f"{params['prop_file_name']}_{formatted_p}_30m_b{DEPTHS[d]}cm..{DEPTHS[d+1]}cm_{YEARS[y]}0101_{YEARS[y+1]}1231_eu_epsg.3035_v20240804")
-
+                                                            
+                    del pred_trees
+                    gc.collect()
 
                     with TimeTracker(f" - Saving results", False):
-                        smb.offsetAndScale(out_data_t, THREADS, 0.5, 1.)
+                        write_data_t = np.empty((n_pix, n_files), dtype=np.float32)
+                        write_data = np.empty((n_files, n_pix), dtype=np.float32)
+                        smb.scaleAndOffset(out_data_t, THREADS, 0.5, params['scale'])
                         smb.fillArray(write_data_t, THREADS, nodata)
                         smb.expandArrayRows(out_data_t, THREADS, write_data_t, properties_data._pixels_valid_idx)
                         smb.transposeArray(write_data_t, THREADS, write_data)
@@ -386,6 +413,10 @@ def main():
                                                              write_idx, 0, 0, properties_data.x_size, properties_data.y_size, int(nodata), compress_cmd, s3_out)
                         else:
                             assert(False, 'Not available save data type')
+                            
+                    del write_data_t
+                    del write_data
+                    gc.collect()
 
                 # except:
                 #     trace = traceback.format_exc()
