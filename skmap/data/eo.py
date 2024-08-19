@@ -809,7 +809,7 @@ try:
                       bbox=bbox,
                       datetime=datetime.strptime(start_date, self.url_date_format),
                       properties={'start_datetime': start_date_item, 'end_datetime': end_date_item},
-                      stac_extensions=stac_extensions=self.stac_extensions['item'])
+                      stac_extensions=self.stac_extensions['item'])
 
       item.common_metadata.gsd = row['gsd']
       item.common_metadata.instruments = row['instruments']
