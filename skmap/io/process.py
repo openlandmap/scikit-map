@@ -180,7 +180,7 @@ try:
       pass
 
 
-  class SircleTransformer(Transformer):
+  class TsirfTransformer(Transformer):
     """
     :param data: N_timeseries x N_samples matrix where the time series are stored one per each row
     :param w_0: convolution coefficent associated with the present
@@ -208,7 +208,7 @@ try:
       n_jobs:int = os.cpu_count(),
       verbose = False
     ):
-      super().__init__(name='SIRCLE', verbose=verbose, temporal=True)
+      super().__init__(name='TSIRF', verbose=verbose, temporal=True)
       self.wv_0 = wv_0
       self.wv_f = wv_f
       self.wv_p = wv_p
