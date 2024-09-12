@@ -3,7 +3,7 @@ import numpy as np
 import sys
 
 
-def child_process(rank, tile_files, modis_mosaics, n_threads, n_pix):
+def child_process(rank, tile_files, modis_mosaics, n_threads, n_pix, resample):
     os.environ['USE_PYGEOS'] = '0'
     os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
     os.environ['NUMEXPR_MAX_THREADS'] = f'{n_threads}'
@@ -20,7 +20,7 @@ def child_process(rank, tile_files, modis_mosaics, n_threads, n_pix):
     }
     
     warp_data = np.empty((n_pix,), dtype=np.float32)
-    skmap_bindings.warpTile(warp_data, n_threads, gdal_opts, tile_files[rank], modis_mosaics[rank])
+    skmap_bindings.warpTile(warp_data, n_threads, gdal_opts, tile_files[rank], modis_mosaics[rank], resample)
     
     return warp_data
 
@@ -34,7 +34,8 @@ def main():
     modis_mosaics = sys.argv[2].split(',')
     n_threads = int(sys.argv[3])
     n_pix = int(sys.argv[4])
-    array = child_process(rank, tile_files, modis_mosaics, n_threads, n_pix)
+    resample = sys.argv[5]
+    array = child_process(rank, tile_files, modis_mosaics, n_threads, n_pix, resample)
     comm.Send(array, dest=0, tag=rank)
     comm.Disconnect()
 
