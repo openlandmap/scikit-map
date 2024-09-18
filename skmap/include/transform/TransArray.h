@@ -43,9 +43,11 @@ class TransArray: public ParArray
         void expandArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select);
 
-
         void extractArrayRows(Eigen::Ref<MatFloat> out_data,
                           std::vector<uint_t> row_select);
+                          
+        void extractArrayCols(Eigen::Ref<MatFloat> out_data,
+                          std::vector<uint_t> col_select);
         
         void fillArray(float_t val);
 
@@ -132,7 +134,7 @@ class TransArray: public ParArray
                       float_t new_value_in_data);
 
 
-        void applySircle(Eigen::Ref<MatFloat> out_data,
+        void applyTsirf(Eigen::Ref<MatFloat> out_data,
                          uint_t out_index_offset,
                          float_t w_0,
                          Eigen::Ref<VecFloat> w_p,
@@ -140,6 +142,11 @@ class TransArray: public ParArray
                          bool keep_original_values,
                          const std::string& version,
                          const std::string& backend);
+                         
+        void convolveRows(Eigen::Ref<MatFloat> out_data,
+                         float_t w_0,
+                         Eigen::Ref<VecFloat> w_p,
+                         Eigen::Ref<VecFloat> w_f);
 
         void transposeReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> permutation_matrix);

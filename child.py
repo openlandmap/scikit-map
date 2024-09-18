@@ -30,11 +30,22 @@ def main():
     
     comm = MPI.Comm.Get_parent()
     rank = comm.Get_rank()
-    tile_files = sys.argv[1].split(',')
-    modis_mosaics = sys.argv[2].split(',')
-    n_threads = int(sys.argv[3])
-    n_pix = int(sys.argv[4])
-    resample = sys.argv[5]
+    
+    args_file = sys.argv[1]
+    with open(args_file, 'r') as f:
+        args = f.read().strip().split('\n')
+    tile_files = args[0].split(',')
+    modis_mosaics = args[1].split(',')
+    n_threads = int(args[2])
+    n_pix = int(args[3])
+    resample = args[4]
+        
+    
+    # tile_files = sys.argv[1].split(',')
+    # modis_mosaics = sys.argv[2].split(',')
+    # n_threads = int(sys.argv[3])
+    # n_pix = int(sys.argv[4])
+    # resample = sys.argv[5]
     array = child_process(rank, tile_files, modis_mosaics, n_threads, n_pix, resample)
     comm.Send(array, dest=0, tag=rank)
     comm.Disconnect()
