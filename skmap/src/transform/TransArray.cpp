@@ -107,6 +107,19 @@ namespace skmap {
     }
 
 
+    void TransArray::extractArrayCols(Eigen::Ref<MatFloat> out_data,
+                                      std::vector<uint_t> col_select)
+    {
+        skmapAssertIfTrue((col_select.size() > (uint_t) out_data.cols()),
+                          "scikit-map ERROR 35: size of the old array does not match the size of selected");
+        auto extractArrayCol = [&] (uint_t i)
+        {
+            out_data.col(i) = m_data.col(col_select[i]);
+        };
+        this->parForRange(extractArrayCol, col_select.size());
+    }
+
+
 
 
     void TransArray::swapRowsValues(std::vector<uint_t> row_select,
@@ -451,7 +464,7 @@ namespace skmap {
     }
 
 
-    void TransArray::applySircle(Eigen::Ref<MatFloat> out_data,
+    void TransArray::applyTsirf(Eigen::Ref<MatFloat> out_data,
                                  uint_t out_index_offset,
                                  float_t w_0,
                                  Eigen::Ref<VecFloat> w_p,
@@ -461,7 +474,7 @@ namespace skmap {
                                  const std::string& backend)
     {
 
-        auto applySircleChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        auto applyTsirfChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
         {
             uint_t n_s = chunk.cols();
             uint_t n_e = n_s + std::max(w_p.size(), w_f.size());
@@ -490,10 +503,41 @@ namespace skmap {
             out_block = (den.array() < w_e.minCoeff()).select(NaNs, out_block);
             out_block = valid_mask.select(chunk_masked, out_block);
         };
-        this->parChunk(applySircleChunk);
+        this->parChunk(applyTsirfChunk);
 
     }
 
+    void TransArray::convolveRows(Eigen::Ref<MatFloat> out_data,
+                                 float_t w_0,
+                                 Eigen::Ref<VecFloat> w_p,
+                                 Eigen::Ref<VecFloat> w_f)
+    {
+
+        auto convolveRowsChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            uint_t n_s = chunk.cols();
+            uint_t n_e = n_s + std::max(w_p.size(), w_f.size());
+            VecFloat w_e = VecFloat::Zero(n_e);
+            w_e(0) = w_0;
+            w_e.segment(1, w_f.size()) = w_f;
+            w_e.segment(n_e-w_p.size(), w_p.size()) = w_p;
+            auto out_block = out_data.block(row_start, 0, row_end - row_start, n_s);
+            MatFloat W(n_s, n_s);
+            for (uint_t i = 0; i < n_s; ++i)
+            {
+                for (uint_t j = 0; j < n_s; ++j)
+                {
+                    W(j, i) = w_e((-i + j + n_e) % n_e);
+                }
+            }
+            out_block = chunk * W;
+        };
+        this->parChunk(convolveRowsChunk);
+
+    }
+
+   
+    
     void TransArray::averageAggregate(Eigen::Ref<MatFloat> out_data,
                                       uint_t agg_factor)
     {

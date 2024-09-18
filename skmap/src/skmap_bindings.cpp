@@ -101,6 +101,15 @@ void extractArrayRows(Eigen::Ref<MatFloat> data,
     transArray.extractArrayRows(out_data, row_select);
 }
 
+void extractArrayCols(Eigen::Ref<MatFloat> data,
+                     const uint_t n_threads,
+                     Eigen::Ref<MatFloat> out_data,
+                     std::vector<uint_t> col_select)
+{
+    TransArray transArray(data, n_threads);
+    transArray.extractArrayCols(out_data, col_select);
+}
+
 void swapRowsValues(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     std::vector<uint_t> row_select,
@@ -383,6 +392,30 @@ void writeInt16Data(Eigen::Ref<MatFloat> data,
 }
 
 
+
+void writeUInt16Data(Eigen::Ref<MatFloat> data,
+                   const uint_t n_threads,
+                   py::dict conf_GDAL,
+                   std::vector<std::string> base_files,
+                   std::string base_folder,
+                   std::vector<std::string> file_names,
+                   std::vector<uint_t> data_indices,
+                   uint_t x_off,
+                   uint_t y_off,
+                   uint_t x_size,
+                   uint_t y_size,
+                   int16_t no_data_value,
+                   std::optional<std::string> bash_compression_command,
+                   std::optional<std::vector<std::string>> seaweed_path)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.writeData(base_files, base_folder, file_names, data_indices,
+        x_off, y_off, x_size, y_size, GDT_UInt16, no_data_value, bash_compression_command, seaweed_path);
+
+}
+
+
 void warpTile(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     py::dict conf_GDAL,
@@ -405,7 +438,7 @@ void computePercentiles(Eigen::Ref<MatFloat> data,
     transArray.computePercentiles(out_data, out_index_offset, percentiles);
 }
 
-void applySircle(Eigen::Ref<MatFloat> data,
+void applyTsirf(Eigen::Ref<MatFloat> data,
                  const uint_t n_threads,
                  Eigen::Ref<MatFloat> out_data,
                  uint_t out_index_offset,
@@ -418,8 +451,21 @@ void applySircle(Eigen::Ref<MatFloat> data,
 
 {
     TransArray transArray(data, n_threads);
-    transArray.applySircle(out_data, out_index_offset,
+    transArray.applyTsirf(out_data, out_index_offset,
                            w_0, w_p, w_f, keep_original_values, version, backend);
+}
+
+
+void convolveRows(Eigen::Ref<MatFloat> data,
+                 const uint_t n_threads,
+                 Eigen::Ref<MatFloat> out_data,
+                 float_t w_0,
+                 Eigen::Ref<VecFloat> w_p,
+                 Eigen::Ref<VecFloat> w_f)
+
+{
+    TransArray transArray(data, n_threads);
+    transArray.convolveRows(out_data, w_0, w_p, w_f);
 }
 
 PYBIND11_MODULE(skmap_bindings, m)
@@ -437,6 +483,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
     m.def("extractArrayRows", &extractArrayRows, "Extract array rows");
+    m.def("extractArrayCols", &extractArrayCols, "Extract array cols");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
     m.def("offsetAndScale", &offsetAndScale, "Add an offset and muplitply by a scaling each array element");
@@ -447,6 +494,11 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Write data in Byte format");
     m.def("writeInt16Data", &writeInt16Data, 
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg() = std::nullopt, py::arg() = std::nullopt,
+        "Write data in Int16 format");
+    m.def("writeUInt16Data", &writeUInt16Data, 
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
@@ -464,7 +516,8 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("transposeReorderArray", &transposeReorderArray, "Transpose and reorder an array into a new one");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
     m.def("computePercentiles", &computePercentiles, "Compute percentile");
-    m.def("applySircle", &applySircle, "Apply SIRCLE");
+    m.def("applyTsirf", &applyTsirf, "Apply TSIRF");
+    m.def("convolveRows", &convolveRows, "Convolve rows");
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
 }
 
