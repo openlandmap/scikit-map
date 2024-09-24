@@ -133,6 +133,11 @@ class TransArray: public ParArray
                       float_t value_of_mask_to_mask,
                       float_t new_value_in_data);
 
+        void maskDataRows(std::vector<uint_t> row_select,
+                      Eigen::Ref<MatFloat> mask,
+                      float_t value_of_mask_to_mask,
+                      float_t new_value_in_data);
+
 
         void applyTsirf(Eigen::Ref<MatFloat> out_data,
                          uint_t out_index_offset,

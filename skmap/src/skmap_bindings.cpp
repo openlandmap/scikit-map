@@ -140,6 +140,18 @@ void maskData(Eigen::Ref<MatFloat> data,
     transArray.maskData(row_select, mask, value_of_mask_to_mask, new_value_in_data);
 }
 
+
+void maskDataRows(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    std::vector<uint_t> row_select,
+                    Eigen::Ref<MatFloat> mask,
+                    float_t value_of_mask_to_mask,
+                    float_t new_value_in_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.maskDataRows(row_select, mask, value_of_mask_to_mask, new_value_in_data);
+}
+
 void fillArray(Eigen::Ref<MatFloat> data,
                const uint_t n_threads,
                float_t val)
@@ -404,7 +416,7 @@ void writeUInt16Data(Eigen::Ref<MatFloat> data,
                    uint_t y_off,
                    uint_t x_size,
                    uint_t y_size,
-                   int16_t no_data_value,
+                   uint16_t no_data_value,
                    std::optional<std::string> bash_compression_command,
                    std::optional<std::vector<std::string>> seaweed_path)
 {
@@ -479,6 +491,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
     m.def("averageAggregate", &averageAggregate, "Average aggregate");
     m.def("maskData", &maskData, "Mask data");
+    m.def("maskDataRows", &maskDataRows, "Mask data rows");
     m.def("maskNan", &maskNan, "Mask NaN");
     m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
