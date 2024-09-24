@@ -62,7 +62,8 @@ inline float_t standardNormalCdf(float_t x) {
 using uint_t = long unsigned int;
 using float_t = float;
 using byte_t = unsigned char;
-using int16_t = short;
+using int16_t = std::int64_t;
+using uint16_t = std::uint16_t;
 inline float_t nan_v = std::numeric_limits<float_t>::quiet_NaN();
 inline float_t inf_v = std::numeric_limits<float_t>::infinity();
 using dict_t = std::unordered_map<std::string, std::string>;
