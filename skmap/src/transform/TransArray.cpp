@@ -392,6 +392,25 @@ namespace skmap {
 
     }
 
+    void TransArray::extractIndicators(Eigen::Ref<MatFloat> data_out,
+                               uint_t col_in_select,
+                               std::vector<uint_t> col_out_select,
+                               std::vector<uint_t> classes)
+    {
+        skmapAssertIfTrue(col_out_select.size() != classes.size(),
+                          "scikit-map ERROR 38: size of col_out_select differs from size of col_in_select times size of classes");
+
+        auto extractIndicatorsChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            for (uint_t k = 0; k < classes.size(); ++k) {
+                data_out.block(row_start, col_out_select[k], row_end - row_start, 1) = (chunk.col(col_in_select).array() == classes[k]).cast<float>();
+            }
+        };
+        this->parChunk(extractIndicatorsChunk);
+    }
+
+
+
     void TransArray::computePercentiles(Eigen::Ref<MatFloat> out_data,
                                         uint_t out_index_offset,
                                         std::vector<float_t> percentiles)

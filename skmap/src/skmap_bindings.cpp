@@ -46,6 +46,7 @@ void readData(Eigen::Ref<MatFloat> data,
                      bands_list, value_to_mask, value_to_set);
 }
 
+
 void getLatLonArray(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     py::dict conf_GDAL,
@@ -119,6 +120,19 @@ void swapRowsValues(Eigen::Ref<MatFloat> data,
     TransArray transArray(data, n_threads);
     transArray.swapRowsValues(row_select, value_to_mask, new_value);
 }
+
+
+void extractIndicators(Eigen::Ref<MatFloat> data_in,
+                            const uint_t n_threads,
+                            Eigen::Ref<MatFloat> data_out,
+                            uint_t col_in_select,
+                            std::vector<uint_t> col_out_select,
+                            std::vector<uint_t> classes)
+{
+    TransArray transArray(data_in, n_threads);
+    transArray.extractIndicators(data_out, col_in_select, col_out_select, classes);
+}
+
 
 void maskNan(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
@@ -532,5 +546,6 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("applyTsirf", &applyTsirf, "Apply TSIRF");
     m.def("convolveRows", &convolveRows, "Convolve rows");
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
+    m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
 }
 

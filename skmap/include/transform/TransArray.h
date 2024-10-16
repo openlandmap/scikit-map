@@ -156,6 +156,11 @@ class TransArray: public ParArray
         void transposeReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> permutation_matrix);
 
+        void extractIndicators(Eigen::Ref<MatFloat> data_out,
+                               uint_t col_in_select,
+                               std::vector<uint_t> col_out_select,
+                               std::vector<uint_t> classes);
+
 
 
 
