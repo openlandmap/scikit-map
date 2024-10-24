@@ -357,6 +357,23 @@ void computeFapar(Eigen::Ref<MatFloat> data,
                            red_scaling, nir_scaling, result_scaling, result_offset, clip_value);
 }
 
+
+void computeSavi(Eigen::Ref<MatFloat> data,
+                const uint_t n_threads,
+                std::vector<uint_t> red_indices,
+                std::vector<uint_t> nir_indices,
+                std::vector<uint_t> result_indices,
+                float_t red_scaling,
+                float_t nir_scaling,
+                float_t result_scaling,
+                float_t result_offset,
+                std::vector<float_t> clip_value)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeSavi(red_indices, nir_indices, result_indices,
+                           red_scaling, nir_scaling, result_scaling, result_offset, clip_value);
+}
+
 void computeGeometricTemperature(Eigen::Ref<MatFloat> data,
                                  const uint_t n_threads,
                                  Eigen::Ref<MatFloat> latitude,
@@ -536,6 +553,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeEvi", &computeEvi, "Compute EVI");
     m.def("computeNirv", &computeNirv, "Compute NIRv");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
+    m.def("computeSavi", &computeSavi, "Compute SAVI");
     m.def("nanMean", &nanMean, "Compute average between available values");
     m.def("computeMannKendallPValues", &computeMannKendallPValues, "Compute Mann-Kendall p-values");
     m.def("warpTile", &warpTile, "Compute FAPAR");

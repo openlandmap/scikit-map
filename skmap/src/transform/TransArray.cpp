@@ -362,6 +362,34 @@ namespace skmap {
     }
 
 
+    void TransArray::computeSavi(std::vector<uint_t> red_indices,
+                                  std::vector<uint_t> nir_indices,
+                                  std::vector<uint_t> result_indices,
+                                  float_t red_scaling,
+                                  float_t nir_scaling,
+                                  float_t result_scaling,
+                                  float_t result_offset,
+                                  std::vector<float_t> clip_value)
+    {
+        auto computeSaviRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
+        {
+            uint_t red_i = red_indices[i];
+            uint_t nir_i = nir_indices[i];
+            row = (((m_data.row(nir_i) * nir_scaling
+                        - m_data.row(red_i) * red_scaling).array() * 1.5).array() /
+                       ((m_data.row(nir_i) * nir_scaling
+                        + m_data.row(red_i) * red_scaling).array() + 0.5).array()).array() *
+                  result_scaling + result_offset;
+            row = (row.array()).round();
+            row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
+            row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
+            row = (row.array() < clip_value[0]).select(clip_value[0], row);
+            row = (row.array() > clip_value[1]).select(clip_value[1], row);
+        };
+        this->parRowPerm(computeSaviRow, result_indices);
+    }
+
+
 
     void TransArray::computeGeometricTemperature(Eigen::Ref<MatFloat> latitude,
                                                  Eigen::Ref<MatFloat> elevation,
