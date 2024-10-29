@@ -86,6 +86,19 @@ Installation
 - Geopandas (>= 0.13)
 - joblib (>= 1.1.1)
 
+C++ (skmap_bindings) requires:
+- Eigen
+- GDAL
+- pybind11
+
+Example for installation of dependencies in Ubuntu:
+$ sudo sudo apt install libeigen3-dev
+$ cd /usr/include
+$ sudo ln -sf eigen3/Eigen Eigen
+$ sudo ln -sf eigen3/unsupported unsupported
+$ sudo apt install libproj-dev libgeos-dev gdal-bin libgdal-dev postgis
+$ sudo apt-get install python3-pybind11
+
 If you already have a working installation of `gdal`, `scikit-learn` and `numpy`, you can install `scikit-map` is using pip:
 
 ```bash
