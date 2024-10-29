@@ -46,6 +46,7 @@ void readData(Eigen::Ref<MatFloat> data,
                      bands_list, value_to_mask, value_to_set);
 }
 
+
 void getLatLonArray(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     py::dict conf_GDAL,
@@ -84,12 +85,30 @@ void selArrayRows(Eigen::Ref<MatFloat> data,
 
 
 void expandArrayRows(Eigen::Ref<MatFloat> data,
-                  const uint_t n_threads,
-                  Eigen::Ref<MatFloat> out_data,
-                  std::vector<uint_t> row_select)
+                     const uint_t n_threads,
+                     Eigen::Ref<MatFloat> out_data,
+                     std::vector<uint_t> row_select)
 {
     TransArray transArray(data, n_threads);
     transArray.expandArrayRows(out_data, row_select);
+}
+
+void extractArrayRows(Eigen::Ref<MatFloat> data,
+                     const uint_t n_threads,
+                     Eigen::Ref<MatFloat> out_data,
+                     std::vector<uint_t> row_select)
+{
+    TransArray transArray(data, n_threads);
+    transArray.extractArrayRows(out_data, row_select);
+}
+
+void extractArrayCols(Eigen::Ref<MatFloat> data,
+                     const uint_t n_threads,
+                     Eigen::Ref<MatFloat> out_data,
+                     std::vector<uint_t> col_select)
+{
+    TransArray transArray(data, n_threads);
+    transArray.extractArrayCols(out_data, col_select);
 }
 
 void swapRowsValues(Eigen::Ref<MatFloat> data,
@@ -101,6 +120,19 @@ void swapRowsValues(Eigen::Ref<MatFloat> data,
     TransArray transArray(data, n_threads);
     transArray.swapRowsValues(row_select, value_to_mask, new_value);
 }
+
+
+void extractIndicators(Eigen::Ref<MatFloat> data_in,
+                            const uint_t n_threads,
+                            Eigen::Ref<MatFloat> data_out,
+                            uint_t col_in_select,
+                            std::vector<uint_t> col_out_select,
+                            std::vector<uint_t> classes)
+{
+    TransArray transArray(data_in, n_threads);
+    transArray.extractIndicators(data_out, col_in_select, col_out_select, classes);
+}
+
 
 void maskNan(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
@@ -122,12 +154,33 @@ void maskData(Eigen::Ref<MatFloat> data,
     transArray.maskData(row_select, mask, value_of_mask_to_mask, new_value_in_data);
 }
 
+
+void maskDataRows(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    std::vector<uint_t> row_select,
+                    Eigen::Ref<MatFloat> mask,
+                    float_t value_of_mask_to_mask,
+                    float_t new_value_in_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.maskDataRows(row_select, mask, value_of_mask_to_mask, new_value_in_data);
+}
+
 void fillArray(Eigen::Ref<MatFloat> data,
-                  const uint_t n_threads,
-                  float_t val)
+               const uint_t n_threads,
+               float_t val)
 {
     TransArray transArray(data, n_threads);
     transArray.fillArray(val);
+}
+
+void copyVecInMatrixRow(Eigen::Ref<MatFloat> data,
+               const uint_t n_threads,
+               Eigen::Ref<VecFloat> in_vec,
+               uint_t row_idx)
+{
+    TransArray transArray(data, n_threads);
+    transArray.copyVecInMatrixRow(in_vec, row_idx);
 }
 
 
@@ -155,6 +208,63 @@ void transposeArray(Eigen::Ref<MatFloat> data,
 {
     TransArray transArray(data, n_threads);
     transArray.transposeArray(out_data);
+}
+
+void offsetAndScale(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    float_t offset,
+                    float_t scaling)
+{
+    TransArray transArray(data, n_threads);
+    transArray.offsetAndScale(offset, scaling);
+}
+
+
+void nanMean(Eigen::Ref<MatFloat> data,
+             const uint_t n_threads,
+             Eigen::Ref<VecFloat> out_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.nanMean(out_data);
+}
+
+void linearRegression(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<VecFloat> x,
+                      Eigen::Ref<VecFloat> beta_0,
+                      Eigen::Ref<VecFloat> beta_1)
+{
+    TransArray transArray(data, n_threads);
+    transArray.linearRegression(x, beta_0, beta_1);
+}
+
+
+void computeMannKendallPValues(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<VecFloat> out_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeMannKendallPValues(out_data);
+}
+
+void averageAggregate(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<MatFloat> out_data,
+                      uint_t agg_factor)
+{
+    TransArray transArray(data, n_threads);
+    transArray.averageAggregate(out_data, agg_factor);
+}
+
+void maskDifference(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    float_t diff_th,
+                    uint_t count_th,
+                    Eigen::Ref<MatFloat> ref_data,
+                    Eigen::Ref<MatFloat> mask_out)
+{
+    TransArray transArray(data, n_threads);
+    transArray.maskDifference(diff_th, count_th, ref_data, mask_out);
 }
 
 void computeNormalizedDifference(Eigen::Ref<MatFloat> data,
@@ -247,6 +357,23 @@ void computeFapar(Eigen::Ref<MatFloat> data,
                            red_scaling, nir_scaling, result_scaling, result_offset, clip_value);
 }
 
+
+void computeSavi(Eigen::Ref<MatFloat> data,
+                const uint_t n_threads,
+                std::vector<uint_t> red_indices,
+                std::vector<uint_t> nir_indices,
+                std::vector<uint_t> result_indices,
+                float_t red_scaling,
+                float_t nir_scaling,
+                float_t result_scaling,
+                float_t result_offset,
+                std::vector<float_t> clip_value)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeSavi(red_indices, nir_indices, result_indices,
+                           red_scaling, nir_scaling, result_scaling, result_offset, clip_value);
+}
+
 void computeGeometricTemperature(Eigen::Ref<MatFloat> data,
                                  const uint_t n_threads,
                                  Eigen::Ref<MatFloat> latitude,
@@ -308,6 +435,42 @@ void writeInt16Data(Eigen::Ref<MatFloat> data,
 }
 
 
+
+void writeUInt16Data(Eigen::Ref<MatFloat> data,
+                   const uint_t n_threads,
+                   py::dict conf_GDAL,
+                   std::vector<std::string> base_files,
+                   std::string base_folder,
+                   std::vector<std::string> file_names,
+                   std::vector<uint_t> data_indices,
+                   uint_t x_off,
+                   uint_t y_off,
+                   uint_t x_size,
+                   uint_t y_size,
+                   uint16_t no_data_value,
+                   std::optional<std::string> bash_compression_command,
+                   std::optional<std::vector<std::string>> seaweed_path)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.writeData(base_files, base_folder, file_names, data_indices,
+        x_off, y_off, x_size, y_size, GDT_UInt16, no_data_value, bash_compression_command, seaweed_path);
+
+}
+
+
+void warpTile(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    py::dict conf_GDAL,
+                    std::string tilePath,
+                    std::string mosaicPath,
+                    std::string resample)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.warpTile(tilePath, mosaicPath, resample);
+}
+
 void computePercentiles(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,
                           Eigen::Ref<MatFloat> out_data,
@@ -318,7 +481,7 @@ void computePercentiles(Eigen::Ref<MatFloat> data,
     transArray.computePercentiles(out_data, out_index_offset, percentiles);
 }
 
-void applySircle(Eigen::Ref<MatFloat> data,
+void applyTsirf(Eigen::Ref<MatFloat> data,
                  const uint_t n_threads,
                  Eigen::Ref<MatFloat> out_data,
                  uint_t out_index_offset,
@@ -331,8 +494,21 @@ void applySircle(Eigen::Ref<MatFloat> data,
 
 {
     TransArray transArray(data, n_threads);
-    transArray.applySircle(out_data, out_index_offset,
+    transArray.applyTsirf(out_data, out_index_offset,
                            w_0, w_p, w_f, keep_original_values, version, backend);
+}
+
+
+void convolveRows(Eigen::Ref<MatFloat> data,
+                 const uint_t n_threads,
+                 Eigen::Ref<MatFloat> out_data,
+                 float_t w_0,
+                 Eigen::Ref<VecFloat> w_p,
+                 Eigen::Ref<VecFloat> w_f)
+
+{
+    TransArray transArray(data, n_threads);
+    transArray.convolveRows(out_data, w_0, w_p, w_f);
 }
 
 PYBIND11_MODULE(skmap_bindings, m)
@@ -341,14 +517,20 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
+    m.def("copyVecInMatrixRow", &copyVecInMatrixRow, "Copy a vector in a matrix row");
     m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
-    m.def("maskData", &maskData, "Mask data"); 
-    m.def("maskNan", &maskNan, "Mask NaN"); 
+    m.def("averageAggregate", &averageAggregate, "Average aggregate");
+    m.def("maskData", &maskData, "Mask data");
+    m.def("maskDataRows", &maskDataRows, "Mask data rows");
+    m.def("maskNan", &maskNan, "Mask NaN");
     m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
+    m.def("extractArrayRows", &extractArrayRows, "Extract array rows");
+    m.def("extractArrayCols", &extractArrayCols, "Extract array cols");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
+    m.def("offsetAndScale", &offsetAndScale, "Add an offset and muplitply by a scaling each array element");
     m.def("inverseReorderArray", &inverseReorderArray, "Reorder and transpose an array into a new one");
     m.def("writeByteData", &writeByteData, 
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
@@ -360,14 +542,28 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Write data in Int16 format");
+    m.def("writeUInt16Data", &writeUInt16Data, 
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg() = std::nullopt, py::arg() = std::nullopt,
+        "Write data in Int16 format");
     m.def("getLatLonArray", &getLatLonArray, "Compute latitude and longitude for each pixel of a GeoTIFF");
     m.def("computeNormalizedDifference", &computeNormalizedDifference, "Compute normalized difference indices");
     m.def("computeBsi", &computeBsi, "Compute BSI");
     m.def("computeEvi", &computeEvi, "Compute EVI");
     m.def("computeNirv", &computeNirv, "Compute NIRv");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
+    m.def("computeSavi", &computeSavi, "Compute SAVI");
+    m.def("nanMean", &nanMean, "Compute average between available values");
+    m.def("computeMannKendallPValues", &computeMannKendallPValues, "Compute Mann-Kendall p-values");
+    m.def("warpTile", &warpTile, "Compute FAPAR");
+    m.def("linearRegression", &linearRegression, "Compute linear regression slope and intercept");
     m.def("transposeReorderArray", &transposeReorderArray, "Transpose and reorder an array into a new one");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
     m.def("computePercentiles", &computePercentiles, "Compute percentile");
-    m.def("applySircle", &applySircle, "Apply SIRCLE");
+    m.def("applyTsirf", &applyTsirf, "Apply TSIRF");
+    m.def("convolveRows", &convolveRows, "Convolve rows");
+    m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
+    m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
 }
+

@@ -1,8 +1,0 @@
-{
-  "name": "skmap-devel",
-  "version": "0.8.1",
-  "dependencies": [
-      "gdal", "eigen3", "pybind11"
-  ],
-  "description": ""
-}

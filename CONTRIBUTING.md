@@ -8,29 +8,29 @@ All contributions to this software should fall within the scope described above,
 
 ## Issue reporting and suggestions
 
-For reporting issues and making feature suggestions please refer to the [issue tracker](https://github.com/scikit-map/scikit-map/issues) using the existing templates:
+For reporting issues and making feature suggestions please refer to the [issue tracker](https://github.com/openlandmap/scikit-map/issues) using the existing templates:
 
 ## Contributing code and documentation
 
 ### Initial setup
 
-1. Clone the repo: `git clone https://github.com/scikit-map/scikit-map.git`
+1. Clone the repo: `git clone https://github.com/openlandmap/scikit-map.git`
 2. Install dependencies (not needed if only contributing documentation):
   - for the Python package: `pip install -r requirements.txt` into a Python 3.6+ environment
 
 ### Development
 
-All changes to code and documentation should be made in a separate branch, created from an up-to-date local `master`. The **branch name** must refer a open issue (``i{ISSUE_ID}``):
+All changes to code and documentation should be made in a separate branch, created from an up-to-date local `main`. The **branch name** must refer a open issue (``i{ISSUE_ID}``):
 
 ```
-git checkout master
+git checkout main
 git pull
 git checkout -b i0
 
 git add [CHANGED FILES]
 git commit -m "closes #0; [GENERAL COMMENT]"
 
-git checkout master
+git checkout main
 git pull
 git merge i0
 git push
@@ -53,7 +53,7 @@ All commit message should be structured as follows:
 
 [optional footer(s)]
 
-```
+``` 
 
 **Type**
 
@@ -79,7 +79,7 @@ There are currently no style restrictions guidelines imposed upon code contribut
 
 ### Versioning
 
-We adthere to standard [semantic versioning](https://semver.org/). Since we release from `master` <!-- needs to be discussed -->
+We adthere to standard [semantic versioning](https://semver.org/). Since we release from `main` <!-- needs to be discussed -->
 all merge requests should be accompanied with a version increment and the responsibility for increasing the version number falls on the contributor merging a branch: when merging a request either increment the MINOR version and reset the PATCH version to zero (if the intent of the merge request is to add new features) or increment the PATCH version (if the merge request only contains bugfixes). When merging a branch made by another contributor (e.g. because they do not have the required permissions to do so) please confirm the intent of the merge request (i.e. which semver number needs to be incremented).
 
 When incrementing the version of `scikit-map` it is enough to write the version change into [`__init__.py`](./skmap/__init__.py) in the appropriate branch.

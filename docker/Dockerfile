@@ -12,7 +12,7 @@ COPY requirements.txt /app/
 
 # Install the necessary dependencies
 RUN pip install --no-cache-dir -r requirements.txt && \
-    git clone https://github.com/scikit-map/scikit-map.git && \
+    git clone https://github.com/openlandmap/scikit-map.git && \
     cd scikit-map && \
     python setup.py install
 

@@ -11,15 +11,43 @@ class TransArray: public ParArray
     public :
 
         TransArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
+        
+        void linearRegression(Eigen::Ref<VecFloat> x,
+                                      Eigen::Ref<VecFloat> beta_0,
+                                      Eigen::Ref<VecFloat> beta_1);
+
+        void copyVecInMatrixRow(Eigen::Ref<VecFloat> in_vec,
+                                uint_t row_idx);
+
+        void offsetAndScale(float_t offset,
+                            float_t scaling);
+
+        void averageAggregate(Eigen::Ref<MatFloat> out_data,
+                              uint_t agg_factor);
+
+        void maskDifference(float_t diff_th,
+                            uint_t count_th,
+                            Eigen::Ref<MatFloat> ref_data,
+                                    Eigen::Ref<MatFloat> mask_out);
 
         void reorderArray(Eigen::Ref<MatFloat> out_data,
                           std::vector<std::vector<uint_t>> indices_matrix);
 
         void selArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select);
+
+        void nanMean(Eigen::Ref<VecFloat> out_data);
+        
+        void computeMannKendallPValues(Eigen::Ref<VecFloat> out_data);
         
         void expandArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select);
+
+        void extractArrayRows(Eigen::Ref<MatFloat> out_data,
+                          std::vector<uint_t> row_select);
+                          
+        void extractArrayCols(Eigen::Ref<MatFloat> out_data,
+                          std::vector<uint_t> col_select);
         
         void fillArray(float_t val);
 
@@ -80,6 +108,16 @@ class TransArray: public ParArray
                             std::vector<float_t> clip_value);
         
 
+        void computeSavi(std::vector<uint_t> red_indices,
+                            std::vector<uint_t> nir_indices,
+                            std::vector<uint_t> result_indices,
+                            float_t red_scaling,
+                            float_t nir_scaling,
+                            float_t result_scaling,
+                            float_t result_offset,
+                            std::vector<float_t> clip_value);
+        
+
         void computeGeometricTemperature(Eigen::Ref<MatFloat> latitude,
                                          Eigen::Ref<MatFloat> elevation,
                                          float_t elevation_scaling,
@@ -105,8 +143,13 @@ class TransArray: public ParArray
                       float_t value_of_mask_to_mask,
                       float_t new_value_in_data);
 
+        void maskDataRows(std::vector<uint_t> row_select,
+                      Eigen::Ref<MatFloat> mask,
+                      float_t value_of_mask_to_mask,
+                      float_t new_value_in_data);
 
-        void applySircle(Eigen::Ref<MatFloat> out_data,
+
+        void applyTsirf(Eigen::Ref<MatFloat> out_data,
                          uint_t out_index_offset,
                          float_t w_0,
                          Eigen::Ref<VecFloat> w_p,
@@ -114,9 +157,19 @@ class TransArray: public ParArray
                          bool keep_original_values,
                          const std::string& version,
                          const std::string& backend);
+                         
+        void convolveRows(Eigen::Ref<MatFloat> out_data,
+                         float_t w_0,
+                         Eigen::Ref<VecFloat> w_p,
+                         Eigen::Ref<VecFloat> w_f);
 
         void transposeReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> permutation_matrix);
+
+        void extractIndicators(Eigen::Ref<MatFloat> data_out,
+                               uint_t col_in_select,
+                               std::vector<uint_t> col_out_select,
+                               std::vector<uint_t> classes);
 
 
 
