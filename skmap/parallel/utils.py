@@ -29,6 +29,8 @@ CPU_COUNT = multiprocessing.cpu_count()
 Number of CPU cores available.
 """
 
+executor = None
+
 def _mem_usage():
   mem = psutil.virtual_memory()
   return (mem.used / mem.total)
@@ -103,6 +105,31 @@ def ThreadGeneratorLazy(
       for arg in group:
         futures.add(executor.submit(worker,*arg + fixed_args))
 
+def ProcessGeneratorLazy2(
+  worker:Callable,
+  args:Iterator[tuple]
+):
+  import concurrent.futures
+  import multiprocessing
+  from itertools import islice
+
+  global executor
+
+  if executor is None:
+    max_workers = multiprocessing.cpu_count()
+    ttprint(f"Initializing pool with {max_workers} workers")
+    executor = concurrent.futures.ProcessPoolExecutor(max_workers=max_workers)
+
+  futures = { executor.submit(worker, *arg) for arg in args }
+
+  done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_EXCEPTION)
+  for task in done:
+    err = task.exception()
+    if err is not None:
+      raise err
+    else:
+        yield task.result()
+        
 def ProcessGeneratorLazy(
   worker:Callable,
   args:Iterator[tuple],
@@ -207,8 +234,9 @@ def job(
 
   joblib_args['n_jobs'] = n_jobs
 
-  for worker_result in Parallel(**joblib_args)(delayed(worker)(*args) for args in worker_args):
-    yield worker_result
+  with Parallel(**joblib_args) as parallel:
+    for worker_result in parallel(delayed(worker)(*args) for args in worker_args):
+      yield worker_result
 
 def apply_along_axis(
   worker:Callable,

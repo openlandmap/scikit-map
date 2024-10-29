@@ -3,6 +3,7 @@ Access to skmap toy demo datasets
 '''
 
 from pathlib import Path
+from geopandas import read_file
 from skmap.misc import find_files
 from skmap.io import read_rasters, RasterData
 
@@ -44,4 +45,4 @@ def ndvi_rdata(gappy=False, verbose=True):
   ).read()
 
 def lc_samples():
-  DATA_DIR.joinpath('lc').joinpath('samples.gpkg')
+  return read_file(DATA_DIR.joinpath('samples').joinpath('samples.gpkg'))

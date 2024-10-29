@@ -26,6 +26,7 @@ from sklearn.pipeline import Pipeline
 from sklearn import preprocessing
 from sklearn import metrics
 
+from rasterio.windows import Window
 from pandas import DataFrame
 from pathlib import Path
 
@@ -34,9 +35,15 @@ import pandas as pd
 import numpy as np
 import rasterio
 
+from shapely import box
+
 from skmap import parallel
 from skmap.misc import ttprint, find_files
 from skmap.io import read_rasters
+
+#import SharedArray as sa
+from skmap.misc import make_tempfile
+import hashlib
 
 import warnings
 # warnings.filterwarnings('ignore') # should not ignore all warnings
@@ -217,13 +224,11 @@ class LandMapper():
     target_col:str,
     feat_cols:Union[List, None] = [],
     feat_col_prfxs:Union[List, None] = [],
-    feature_weights:List = None,
     weight_col:Union[str, None] = None,
     nodata_imputer:Union[BaseEstimator, None] = None,
     estimator:Union[BaseEstimator, None] = DEFAULT['ESTIMATOR'],
     estimator_list:Union[List[BaseEstimator], None] = None,
     meta_estimator:BaseEstimator = DEFAULT['META_ESTIMATOR'],
-    calibration_idx:any = None,
     hyperpar_selection:Union[BaseEstimator, None] = None,
     hyperpar_selection_list:Union[BaseEstimator, None] = None,
     hyperpar_selection_meta:Union[List[BaseEstimator], None] = None,
@@ -236,7 +241,6 @@ class LandMapper():
     pred_method:str = 'predict',
     verbose:bool = True,
     apply_corr_factor:bool = False,
-
     **autosklearn_kwargs
   ):
 
@@ -268,22 +272,12 @@ class LandMapper():
     self._min_samples_restriction(min_samples_per_class)
     self.features = np.ascontiguousarray(self.pts[self.feature_cols].to_numpy(), dtype=np.float32)
     self.target = target = np.ascontiguousarray(self.pts[self.target_col].to_numpy(), dtype=np.float32)
-    self.calibration_mask = None
-    if calibration_idx is not None:
-      calibration_mask = self.pts.index.isin(calibration_idx)
-      if np.any(calibration_mask):
-        self.calibration_mask = calibration_mask
-      else:
-        self.calibration_mask = numpy.full(self.target.shape[0], True)
-      print(f'calibration_mask = {self.calibration_mask.shape})')
-
 
     self._target_transformation()
 
     self.samples_weight = self._get_column_if_exists(weight_col, 'weight_col')
     self.cv_groups = self._get_column_if_exists(cv_group_col, 'cv_group_col')
 
-    self.feature_weights = feature_weights
     self.corr_factor = 1
     self.apply_corr_factor = apply_corr_factor
 
@@ -495,24 +489,16 @@ class LandMapper():
       self.eval_metrics['log_loss'] = metrics.log_loss(self.target, self.eval_pred)
       self.eval_report = self._classification_report_prob()
 
-  def _fit_params(self, estimator, calibration_mask = None):
-    fit_params = {}
+  def _fit_params(self, estimator):
     if isinstance(estimator, Pipeline):
-      result = {}
-      if has_fit_parameter(estimator['estimator'], "sample_weight"):
-         result['estimator__sample_weight'] = self.samples_weight
-      if has_fit_parameter(estimator['estimator'], "feature_weights"):
-         result['estimator__feature_weights'] = self.feature_weights
-      return result
+      return {'estimator__sample_weight': self.samples_weight}
     if self.is_automl_estimator:
       ttprint('LandMapper is using AutoSklearnClassifier, which not supports fit_params (ex: sample_weight)')
       return {}
+    elif has_fit_parameter(estimator, "sample_weight"):
+      return {'sample_weight': self.samples_weight}
     else:
-      if has_fit_parameter(estimator, "sample_weight"):
-        fit_params['sample_weight'] = self.samples_weight
-      if has_fit_parameter(estimator, "feature_weights"):
-        fit_params['feature_weights'] = self.feature_weights
-    return {}
+      return {}
 
   def _is_catboost_model(self,estimator):
     try:
@@ -565,13 +551,7 @@ class LandMapper():
       n_jobs = self.cv_njobs
     )
 
-    if self.calibration_mask is not None:
-      hyperpar_selection.fit(features[self.calibration_mask,:], self.target[self.calibration_mask], 
-        groups=self.cv_groups[self.calibration_mask], **self._fit_params(estimator, self.calibration_mask))
-    else:
-      hyperpar_selection.fit(features, self.target, 
-        groups=self.cv_groups, **self._fit_params(estimator))
-    
+    hyperpar_selection.fit(features, self.target, groups=self.cv_groups, **self._fit_params(estimator))
     estimator.set_params(**self._best_params(hyperpar_selection))
 
   def _do_cv_prediction(self, estimator, features):
@@ -654,14 +634,13 @@ class LandMapper():
 
     return np.stack(sorted_input_data, axis=2), sorted_raster_files
 
-  def _read_layers(self, dirs_layers:List = [], fn_layers:List = [], bounds = None,
+  def _read_layers(self, dirs_layers:List = [], fn_layers:List = [], spatial_win = None,
     dtype = 'Float32', allow_additional_layers = False, inmem_calc_func = None, dict_layers_newnames={},
     n_jobs_io = 5, verbose_renaming=True):
 
-    raster_files = fn_layers
-    raster_data = read_rasters(raster_files=fn_layers, \
-                               bounds=bounds, dtype=dtype, n_jobs=n_jobs_io, \
-                               verbose=self.verbose,)
+    raster_data, raster_files = read_rasters(raster_dirs=dirs_layers, raster_files=fn_layers, \
+                                      spatial_win=spatial_win, dtype=dtype, n_jobs=n_jobs_io, \
+                                      verbose=self.verbose,)
 
     feature_cols_set = set(self.feature_cols)
     layernames = []
@@ -682,12 +661,12 @@ class LandMapper():
       layernames.append(layername)
 
     if inmem_calc_func is not None:
-      layernames, raster_data = inmem_calc_func(layernames, raster_data, bounds)
+      layernames, raster_data = inmem_calc_func(layernames, raster_data, spatial_win)
 
     return self._reorder_layers(layernames, dict_layers_newnames, raster_data, raster_files)
 
   def _write_layer(self, fn_base_layer, fn_output, input_data_shape, output_data,
-    nan_mask, separate_probs = True, bounds = None, scale=1,
+    nan_mask, separate_probs = True, spatial_win = None, scale=1,
     dtype = 'float32', new_suffix = None):
 
     if len(output_data.shape) < 2:
@@ -715,18 +694,18 @@ class LandMapper():
         fn_output_c = Path(str(fn_output).replace(out_ext, f'_b{i+1}' + out_ext))
 
         write_new_raster(fn_base_layer, fn_output_c, output_data[:,:,i:i+1], 
-          bounds = bounds, dtype=dtype, nodata=255)
+          spatial_win = spatial_win, dtype=dtype, nodata=255)
         fn_output_list += [ fn_output_c ]
 
     else:
       write_new_raster(fn_base_layer, fn_output, output_data, 
-        bounds = bounds, dtype=dtype, nodata=255)
+        spatial_win = spatial_win, dtype=dtype, nodata=255)
       fn_output_list += [ fn_output ]
 
     return fn_output_list
 
   def _write_layers(self, fn_base_layer, fn_output, input_data_shape, pred_result,
-    pred_uncer, nan_mask, bounds, separate_probs, hard_class, dtype = 'float32'):
+    pred_uncer, nan_mask, spatial_win, separate_probs, hard_class, dtype = 'float32'):
 
     fn_out_files = []
 
@@ -737,7 +716,7 @@ class LandMapper():
       scale = 100
 
     fn_pred_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_result, nan_mask,
-      separate_probs = separate_probs, bounds = bounds, dtype = dtype, scale = scale)
+      separate_probs = separate_probs, spatial_win = spatial_win, dtype = dtype, scale = scale)
     fn_out_files += fn_pred_files
 
     if self.pred_method == 'predict_proba':
@@ -745,7 +724,7 @@ class LandMapper():
       if pred_uncer is not None:
 
         fn_uncer_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_uncer, nan_mask,
-          separate_probs = separate_probs, bounds = bounds, dtype = 'uint8', scale=100, new_suffix = '_uncertainty')
+          separate_probs = separate_probs, spatial_win = spatial_win, dtype = 'uint8', scale=100, new_suffix = '_uncertainty')
         fn_out_files += fn_uncer_files
 
       if hard_class:
@@ -759,16 +738,16 @@ class LandMapper():
         pred_argmax += 1
 
         fn_hcl_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax, nan_mask,
-          separate_probs = False, bounds = bounds, dtype = dtype, new_suffix = '_hcl')
+          separate_probs = False, spatial_win = spatial_win, dtype = dtype, new_suffix = '_hcl')
         fn_out_files += fn_hcl_file
 
         fn_hcl_prob_files = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_prob, nan_mask,
-          separate_probs = False, bounds = bounds, dtype = 'uint8', scale=100, new_suffix = '_hcl_prob')
+          separate_probs = False, spatial_win = spatial_win, dtype = 'uint8', scale=100, new_suffix = '_hcl_prob')
         fn_out_files += fn_hcl_prob_files
 
         if pred_uncer is not None and pred_uncer.ndim > 2:
           fn_hcl_uncer_file = self._write_layer(fn_base_layer, fn_output, input_data_shape, pred_argmax_uncer, nan_mask,
-            separate_probs = False, bounds = bounds, dtype = 'uint8', scale=100, new_suffix = '_hcl_uncertainty')
+            separate_probs = False, spatial_win = spatial_win, dtype = 'uint8', scale=100, new_suffix = '_hcl_uncertainty')
           fn_out_files += fn_hcl_uncer_file
 
     return fn_out_files
@@ -908,7 +887,7 @@ class LandMapper():
     dirs_layers:List = [],
     fn_layers:List = [],
     fn_output:str = None,
-    bounds:any = None,
+    spatial_win:Window = None,
     dtype = 'float32',
     fill_nodata:bool = False,
     separate_probs:bool = True,
@@ -928,7 +907,7 @@ class LandMapper():
     :param fn_layers: A list with the raster paths. Provide it and the ``dirs_layers`` is ignored.
     :param fn_output: File path where the prediction result is saved. For multiple outputs (probabilities,
       uncertainty) the same location is used, adding specific suffixes in the provided file path.
-    :param bounds: Read the data and predict according to the spatial bounds. By default is ``None``,
+    :param spatial_win: Read the data and predict according to the spatial window. By default is ``None``,
       which means all the data is read and predict.
     :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
       converted to ``np.nan``.
@@ -952,7 +931,7 @@ class LandMapper():
     :rtype: List[Path]
     """
 
-    input_data, fn_layers = self._read_layers(dirs_layers, fn_layers, bounds, \
+    input_data, fn_layers = self._read_layers(dirs_layers, fn_layers, spatial_win, \
       dtype=dtype, inmem_calc_func=inmem_calc_func, dict_layers_newnames=dict_layers_newnames, \
       allow_additional_layers=allow_additional_layers, n_jobs_io=n_jobs_io, \
       verbose_renaming=verbose_renaming)
@@ -974,7 +953,7 @@ class LandMapper():
     pred_result, pred_uncer = self._predict(input_data)
 
     fn_out_files = self._write_layers(fn_base_layer, fn_output, input_data_shape, pred_result, \
-      pred_uncer, nan_mask, bounds, separate_probs, hard_class, dtype = dtype)
+      pred_uncer, nan_mask, spatial_win, separate_probs, hard_class, dtype = dtype)
 
     fn_out_files.sort()
 
@@ -984,7 +963,7 @@ class LandMapper():
     dirs_layers_list:List[List] = [],
     fn_layers_list:List[List] = [],
     fn_output_list:List[List] = [],
-    bounds:any = None,
+    spatial_win:Window = None,
     dtype:str = 'float32',
     fill_nodata:bool = False,
     separate_probs:bool = True,
@@ -1003,7 +982,7 @@ class LandMapper():
       ``dirs_layers_list`` is ignored.
     :param fn_output_list: A list of file path where the prediction result is saved. For multiple outputs (probabilities,
       uncertainty) the same location is used, adding specific suffixes in the provided file path.
-    :param bounds: Read the data and predict according to the spatial bounds. By default is ``None``,
+    :param spatial_win: Read the data and predict according to the spatial window. By default is ``None``,
       which means all the data is read and predict.
     :param dtype: Convert the read data to specific ``dtype``. For ``Float*`` the ``nodata`` values are
       converted to ``np.nan``.
@@ -1032,7 +1011,7 @@ class LandMapper():
       PredictionStrategyClass = _EagerLoadPrediction
 
     prediction_strategy = PredictionStrategyClass(self, dirs_layers_list, fn_layers_list, fn_output_list,
-        bounds, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
+        spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
         dict_layers_newnames_list, allow_additional_layers)
 
     return prediction_strategy.run()
@@ -1113,7 +1092,7 @@ class _PredictionStrategy(ABC):
                dirs_layers_list:List = [],
                fn_layers_list:List = [],
                fn_output_list:List = [],
-               bounds = None,
+               spatial_win = None,
                dtype = 'float32',
                fill_nodata = False,
                separate_probs = True,
@@ -1127,7 +1106,7 @@ class _PredictionStrategy(ABC):
     self.fn_layers_list = self._fn_layers_list(dirs_layers_list, fn_layers_list)
     self.fn_output_list = fn_output_list
 
-    self.bounds = bounds
+    self.spatial_win = spatial_win
     self.dtype = dtype
     self.fill_nodata = fill_nodata
     self.separate_probs = separate_probs
@@ -1156,7 +1135,7 @@ class _EagerLoadPrediction(_PredictionStrategy):
                dirs_layers_list:List = [],
                fn_layers_list:List = [],
                fn_output_list:List = [],
-               bounds = None,
+               spatial_win = None,
                dtype = 'float32',
                fill_nodata = False,
                separate_probs = True,
@@ -1166,7 +1145,7 @@ class _EagerLoadPrediction(_PredictionStrategy):
                allow_additional_layers=False):
 
     super().__init__(landmapper, dirs_layers_list, fn_layers_list, fn_output_list,
-      bounds, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
+      spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
       dict_layers_newnames_list, allow_additional_layers)
 
     self.reading_futures = []
@@ -1185,7 +1164,7 @@ class _EagerLoadPrediction(_PredictionStrategy):
 
     start = time.time()
     input_data, _ = self.landmapper._read_layers(fn_layers=fn_layers,
-      bounds=self.bounds, inmem_calc_func = self.inmem_calc_func,
+      spatial_win=self.spatial_win, inmem_calc_func = self.inmem_calc_func,
       dict_layers_newnames = dict_layers_newnames,
       allow_additional_layers=self.allow_additional_layers)
 
@@ -1205,7 +1184,7 @@ class _EagerLoadPrediction(_PredictionStrategy):
 
     start = time.time()
     fn_out_files = self.landmapper._write_layers(fn_base_layer, fn_output, input_shape, pred_result, \
-      pred_uncer, nan_mask, self.bounds, self.separate_probs, self.hard_class)
+      pred_uncer, nan_mask, self.spatial_win, self.separate_probs, self.hard_class)
     self.landmapper._verbose(f'{i+1}) Saving time: {(time.time() - start):.2f} segs')
 
     return fn_out_files
@@ -1271,7 +1250,7 @@ class _LazyLoadPrediction(_PredictionStrategy):
                dirs_layers_list:List = [],
                fn_layers_list:List = [],
                fn_output_list:List = [],
-               bounds = None,
+               spatial_win = None,
                dtype = 'float32',
                fill_nodata = False,
                separate_probs = True,
@@ -1284,7 +1263,7 @@ class _LazyLoadPrediction(_PredictionStrategy):
                writing_pool_size = 1):
 
     super().__init__(landmapper, dirs_layers_list, fn_layers_list, fn_output_list,
-      bounds, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
+      spatial_win, dtype, fill_nodata, separate_probs, hard_class, inmem_calc_func,
       dict_layers_newnames_list, allow_additional_layers)
 
     self.data_pool = {}
@@ -1308,7 +1287,7 @@ class _LazyLoadPrediction(_PredictionStrategy):
 
     start = time.time()
     input_data, _ = self.landmapper._read_layers(fn_layers=fn_layers,
-      bounds=self.bounds, inmem_calc_func = self.inmem_calc_func,
+      spatial_win=self.spatial_win, inmem_calc_func = self.inmem_calc_func,
       dict_layers_newnames = dict_layers_newnames,
       allow_additional_layers=self.allow_additional_layers)
 
@@ -1358,7 +1337,7 @@ class _LazyLoadPrediction(_PredictionStrategy):
 
     start = time.time()
     fn_out_files = self.landmapper._write_layers(fn_base_layer, fn_output, input_data_shape, pred_result, \
-      pred_uncer, nan_mask, self.bounds, self.separate_probs, self.hard_class)
+      pred_uncer, nan_mask, self.spatial_win, self.separate_probs, self.hard_class)
     self.landmapper._verbose(f'{i+1}) Saving time: {(time.time() - start):.2f} segs')
 
     del self.result_pool[input_data_key]
@@ -1387,228 +1366,156 @@ class _LazyLoadPrediction(_PredictionStrategy):
 
     return output_fn_files
 
+from shapely import box
+
 class _ParallelOverlay:
-    # optimized for up to 200 points and about 50 layers
-    # sampling only first band in every layer
-    # assumption is that all layers have same blocks
 
-    def __init__(self,
-      points_x: np.ndarray,
-      points_y:np.ndarray,
-      fn_layers:List[str],
-      max_workers:int = parallel.CPU_COUNT,
-      verbose:bool = True
-    ):
+  def __init__(self,
+    points_x: np.ndarray,
+    points_y:np.ndarray,
+    raster_files:List[str],
+    max_workers:int = parallel.CPU_COUNT,
+    verbose:bool = True
+  ):
 
-      self.error_val = -32768
-      self.points_x = points_x
-      self.points_y = points_y
-      self.points_len = len(points_x)
-      self.fn_layers = fn_layers
-      self.max_workers = max_workers
-      self.verbose = verbose
+    self.error_val = -32768
+    
+    raster_crs = rasterio.open(raster_files[0]).crs
 
-      self.layer_names = [fn_layer.with_suffix('').name for fn_layer in fn_layers]
-      sources = [rasterio.open(fn_layer) for fn_layer in self.fn_layers]
-      self.dimensions = [self._get_dimension(src) for src in sources]
+    samples = gpd.GeoDataFrame({ 
+        'x': points_x, 
+        'y': points_y }, 
+        geometry=gpd.points_from_xy(points_x, points_y), 
+        crs=raster_crs
+    ).reset_index(drop=True)
+  
+    self.raster_files = raster_files
+    self.verbose = verbose
 
-      self.points_blocks = self.find_blocks()
-      self.result = None
+    self.layers = pd.DataFrame({
+      'name': [ raster_file.with_suffix('').name for raster_file in raster_files ],
+      'path': self.raster_files
+    }).reset_index(drop=True
+    ).apply(_ParallelOverlay._layer_metadata, axis=1)
 
-    @staticmethod
-    def _get_dimension(src):
-      return (src.height, src.width, *src.block_shapes[0], *src.transform.to_gdal())
+    self.query_pixels = self._find_blocks(samples)
+    self.out_shape = (samples.shape[0], len(self.raster_files))
 
-    def _find_blocks_for_src_mt(self, ij, block, src, ptsx, ptsy):
-      left, bottom, right, top = rasterio.windows.bounds(block, src.transform)
-      ind = (ptsx>=left) & (ptsx<right) & (ptsy>bottom) & (ptsy<=top)
+    self.fn_array = 'file://' + str(make_tempfile(suffix='_overlay'))
+    #self.result = sa.create(self.fn_array, self.out_shape, dtype=np.float32)
+    #self.result[:] = np.nan
 
-      if ind.any():
-        inv_block_transform = ~rasterio.windows.transform(block, src.transform)
-        col, row = inv_block_transform * (ptsx[ind], ptsy[ind])
-        result = [block, np.nonzero(ind)[0], col.astype(int), row.astype(int)]
-        return ij, result
-      else:
-        return None, None
+    self.args = []
 
-    def _find_blocks_for_src(self, src, ptsx, ptsy):
-      # find blocks for every point in given source
-      blocks = {}
+    for ind_layer, layer in self.layers.iterrows(): #range(0, len(self.raster_files)):
+      blocks = self.query_pixels[layer['group']]
+      for window, block in blocks.groupby('block_id'):
+        (ind_samples, col, row) = block.index, block['sample_col'], block['sample_row']
+        self.args.append(
+          (self.fn_array, layer['path'], window, ind_layer, ind_samples, col, row, layer['nodata'])
+        )
 
-      args = src.block_windows(1)
-      fixed_args = (src, ptsx, ptsy)
+    if self.verbose:
+        ttprint(f"Number of blocks to read: {len(self.args )}")
+  
+  @staticmethod
+  def _layer_metadata(row):
+    src = rasterio.open(row['path'])
 
-      chunk_size = math.ceil(len(list(src.block_windows(1))) / self.max_workers)
+    row['nodata'] = src.nodata
+    _, window = next(src.block_windows(1))
+    row['block_height'] = window.height
+    row['block_width'] = window.width
 
-      for ij, result in parallel.ThreadGeneratorLazy(self._find_blocks_for_src_mt, args,
-                                      self.max_workers, chunk=chunk_size, fixed_args = fixed_args):
-        if ij is not None:
-          blocks[ij] = result
+    key = ''.join([str(src.height), str(src.width), str(src.block_shapes[0]), str(src.transform.to_gdal())])
+    row['group'] = str(
+      hashlib.md5(key.encode('utf-8')).hexdigest()
+    )
 
-      return blocks
+    return row
 
-    def find_blocks(self):
-      # for every type of dimension find block for each point
-
-      points_blocks = {}
-      dimensions_set = set(self.dimensions)
-      sources = [rasterio.open(fn_layer) for fn_layer in self.fn_layers]
-      for dim in dimensions_set:
-          src = sources[self.dimensions.index(dim)]
-          points_blocks[dim] = self._find_blocks_for_src(src, self.points_x, self.points_y)
-      return points_blocks
-
-    def _sample_one_layer_sp(self, fn_layer):
-      with rasterio.open(fn_layer) as src:
-        #src=rasterio.open(fn_layer)
-        dim = self._get_dimension(src)
-        # out_sample = np.full((self.points_len,), src.nodata, src.dtypes[0])
-        out_sample = np.full((self.points_len,), np.nan, np.float32)
-
-        blocks = self.points_blocks[dim]
-        for ij in blocks:
-          # ij=next(iter(blocks)); (window, ind, col, row) = blocks[ij]
-          (window, ind, col, row) = blocks[ij]
-          try:
+  @staticmethod
+  def _sample(fn_array, raster_file, window, ind_layer, ind_samples, col, row, nodata):
+    #result = sa.attach(fn_array)
+    try:
+        with rasterio.Env(CPL_VSIL_CURL_ALLOWED_EXTENSIONS='.tif'):
+            src = rasterio.open(raster_file)
             data = src.read(1, window=window)
-            mask = src.read_masks(1, window=window)
             sample = data[row,col].astype(np.float32)
-            sample_mask = mask[row,col].astype(bool)
-            sample[~sample_mask] = np.nan
-            #sample = data[row.astype(int),col.astype(int)]
-          except Exception as exception:
-            traceback.print_exc()
-            sample = self.error_val
+            sample[sample == nodata] = np.nan
+            result[ind_samples, ind_layer] = sample
+            del sample
+    except Exception as exception:
+      #ttprint(f"Error in {raster_file}")
+      pass
 
-          out_sample[ind] = sample
+  def _find_blocks_for_src(self, src, samples):
 
-      return out_sample, fn_layer
+    gdf_blocks = []
 
-    def _sample_one_block(self, args):
-      out_sample, fn_layer, window, ind, col, row = args
-      with rasterio.open(fn_layer) as src:
+    for (i,j), window in src.block_windows(1):
+      gdf_blocks.append({
+        'window': window,  
+        'geometry': box(*rasterio.windows.bounds(window, src.transform))
+      })
 
-        try:
-          data = src.read(1, window=window)
-          sample = data[row,col]
-        except Exception as exception:
-          traceback.print_exc()
-          sample = self.error_val
+    gdf_blocks = gpd.GeoDataFrame(gdf_blocks, crs=src.crs).reset_index(drop=True)
+    gdf_blocks = samples.sjoin(gdf_blocks, how='inner').rename(columns={ 'index_right': 'block_id' })
 
-        out_sample[ind] = sample
-          #return sample, ind
+    query_pixels = [] 
 
-    def _sample_one_layer_mt(self, fn_layer):
-      with rasterio.open(fn_layer) as src:
-          dim = self._get_dimension(src)
-          out_sample = np.full((self.points_len,), src.nodata, src.dtypes[0])
+    for (ij, block) in gdf_blocks.groupby('block_id'):
+      window = block.iloc[0]['window']
+      inv_block_transform = ~rasterio.windows.transform(window, src.transform)
+      block['block_col_off'] = window.col_off
+      block['block_row_off'] = window.row_off
 
-      blocks = self.points_blocks[dim]
-      args = ((out_sample, fn_layer, *blocks[ij]) for ij in blocks)
+      block.loc[:,'sample_col'], block.loc[:,'sample_row'] = inv_block_transform * (block['x'], block['y'])
+      block['sample_col'] = block['sample_col'].astype('int')
+      block['sample_row'] = block['sample_row'].astype('int')
+      block = block.drop(columns='geometry')
 
-      with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-        for _ in executor.map(self._sample_one_block, args, chunksize=1000):
-          pass #out_sample[ind] = sample
+      query_pixels.append(block)
 
-      return out_sample
+    return pd.concat(query_pixels).drop(columns=['window'])
 
-    def _sample_one_layer_mp(self, fn_layer):
-      with rasterio.open(fn_layer) as src:
-          dim = self._get_dimension(src)
-          out_sample = np.full((self.points_len,), src.nodata, src.dtypes[0])
+  def _find_blocks(self, samples):
 
-      blocks = self.points_blocks[dim]
-      args = ((out_sample, fn_layer, *blocks[ij]) for ij in blocks)
+    if self.verbose:
+      ttprint(f'Scanning blocks of {len(self.raster_files)} layers')
+    
+    query_pixels = {}
+    
+    for _, layers in self.layers.groupby('group'):
+      group = layers.iloc[0]['group']
+      path = layers.iloc[0]['path']
 
-      with concurrent.futures.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-        for _ in executor.map(self._sample_one_block, args, chunksize=1000):
-            pass #out_sample[ind] = sample
+      if self.verbose:
+        ttprint(f"Finding query pixels for {group} ({layers.shape[0]} layers)")
+      src = rasterio.open(path)
+      query_pixels[group] = self._find_blocks_for_src(src, samples)
 
-      return out_sample
+    if self.verbose:
+      ttprint(f'End')
+    
+    return query_pixels
 
-    def sample_v1(self):
-      '''
-      Serial sampling, block by block
-      '''
-      res={}
-      n_layers = len(self.fn_layers)
-
-      for i_layer, fn_layer in enumerate(self.fn_layers):
-        if self.verbose:
-          ttprint(f'{i_layer}/{n_layers} {Path(fn_layer).name}')
-        # fn_layer=self.fn_layers[0]
-        col = Path(fn_layer).with_suffix('').name
-        sample,_ = self._sample_one_layer_sp(fn_layer)
-        res[col]=sample
-
-      return res
-
-    def sample_v2(self):
-      '''
-      Serial layers, parallel blocks in layer
-      '''
-
-      res={}
-      n_layers = len(self.fn_layers)
-
-      for i_layer, fn_layer in enumerate(self.fn_layers):
-        if self.verbose:
-          ttprint(f'{i_layer}/{n_layers} {Path(fn_layer).name}')
-        # fn_layer=self.fn_layers[0]
-        col = Path(fn_layer).with_suffix('').name
-        sample = self._sample_one_layer_mt(fn_layer)
-        res[col]=sample
-
-      return res
-
-    def sample_v3(self):
-      '''
-      Parallel layers in threads, serial blocks in layer
-      '''
-      res={}
-      i_layer=1
-      n_layers=len(self.fn_layers)
-      args = ((fn_layer.as_posix(),) for fn_layer in self.fn_layers)
-
-      for sample, fn_layer in parallel.ThreadGeneratorLazy(self._sample_one_layer_sp, args,
-                          self.max_workers, self.max_workers*2):
-        col = Path(fn_layer).with_suffix('').name
-        if self.verbose:
-          ttprint(f'{i_layer}/{n_layers} {col}')
-        res[col] = sample
-        i_layer += 1
-
-      return res
-
-    def sample_v4(self):
-      '''
-      Parallel layers in processes, serial blocks in layer
-      '''
-      res={}
-      i_layer=1
-      n_layers=len(self.fn_layers)
-      args = ((fn_layer.as_posix(),) for fn_layer in self.fn_layers)
-      #with concurrent.futures.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-          #for sample, fn_layer in executor.map(self._sample_one_layer_sp, args, chunksize=n_layers//self.max_workers):
-
-      for sample, fn_layer in parallel.ProcessGeneratorLazy(self._sample_one_layer_sp, args, self.max_workers, 1):
-        col = Path(fn_layer).with_suffix('').name
-        if self.verbose:
-          ttprint(f'{i_layer}/{n_layers} {col}')
-        res[col] = sample
-        i_layer += 1
-
-      return res
-
-    def run(self):
-      # For now sample_v3 is the best method, because is parallel and use less memory than sample_v4
-      if self.result == None:
-        self.result = self.sample_v3()
-      else:
-        if self.verbose:
-          ttprint('You already did run the overlay. Geting the cached result')
-
-      return self.result
+  def run(self):
+    
+    if self.verbose:
+      ttprint(f'Running overlay in parallel.')
+    
+    for r in parallel.ProcessGeneratorLazy2(_ParallelOverlay._sample, self.args):
+      continue
+    
+    result = {}
+    for layer_name, i in zip(self.layer_names, range(0,self.result.shape[1])):
+        result[layer_name] = self.result[:,i]
+    
+    if self.verbose:
+      ttprint(f'End')
+    
+    return result
 
 class SpaceOverlay():
   """
@@ -1640,6 +1547,7 @@ class SpaceOverlay():
 
   """
 
+
   def __init__(self,
     points,
     fn_layers:List[str] = [],
@@ -1657,8 +1565,8 @@ class SpaceOverlay():
     if not isinstance(points, gpd.GeoDataFrame):
       points = gpd.read_file(points)
 
-    self.pts = points.copy()
-    self.pts.loc[:,'overlay_id'] = range(1,len(self.pts)+1)
+    self.pts = points
+    #self.pts['overlay_id'] = range(1,len(self.pts)+1)
 
     self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
       fn_layers, max_workers, verbose)
@@ -1752,7 +1660,7 @@ class SpaceTimeOverlay():
         max_workers=max_workers, verbose=verbose)
 
   def _replace_year(self, fn_layer, year = None):
-    y, y_m1, y_p1 = ('', '', '')
+    y, y_m1, y_p1 = ('year', 'year_minus_1', 'year_plus_1')
     if year != None:
       y, y_m1, y_p1 = str(year), str((year - 1)), str((year + 1))
 
@@ -1773,7 +1681,7 @@ class SpaceTimeOverlay():
       column per raster).
     :rtype: geopandas.GeoDataFrame
     """
-    self.result = None
+    self.result = []
 
     for year in self.uniq_years:
 
@@ -1788,11 +1696,15 @@ class SpaceTimeOverlay():
 
       if self.verbose:
         ttprint(f'Running the overlay for {year}')
-      year_result = self.overlay_objs[year].run(year_newnames)
-
-      if self.result is None:
-        self.result = year_result
-      else:
-        self.result = pd.concat([self.result, year_result], ignore_index=True)
-
+      self.result.append(self.overlay_objs[year].run(year_newnames))
+    
+      
+      #if self.result is None:
+      #  self.result = year_result
+      #else:
+      #  self.result = pd.concat([self.result, year_result], ignore_index=True)
+     
+    self.result = pd.concat(self.result)
+    
     return self.result
+
