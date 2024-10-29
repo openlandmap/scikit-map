@@ -14,6 +14,7 @@ import geopandas as gp
 import pandas as pd
 import numpy as np
 
+import math
 import time
 from pathlib import Path
 from osgeo.gdal import BuildVRT, Warp
@@ -31,28 +32,36 @@ def _warn_deps(e, module_name):
     )
 
 def new_memmap(dtype, shape): 
-  filename = str(make_tempfile(prefix='memmap', suffix='npy', make_subdir=False))
+  filename = str(make_tempfile(prefix='memmap', suffix='.npy', make_subdir=False))
+  ttprint(f"Creating {filename}")
   return np.memmap(filename, dtype=dtype, shape=shape, mode='w+')
 
 def load_memmap(filename, dtype, shape):
   return np.memmap(filename, dtype=dtype, mode='r+', shape=shape)
   #return np.lib.format.open_memmap(filename, dtype=dtype, mode='w+', shape=shape)
 
+def is_memmap(array_mm):
+  return hasattr(array_mm, 'filename')
+
 def del_memmap(array_mm, return_array=False):
   
   result = None
-  if return_array:
-    result = np.array(array_mm) # test np.ascontiguousarray
-  
-  os.remove(array_mm.filename)
-  #temp_folder = Path(array_mm.filename).parent
-  #try:
-  #  shutil.rmtree(temp_folder)
-  #except:
-  #  pass
-  
-  if return_array:
-    return result
+
+  if is_memmap(array_mm):
+    if return_array:
+      result = np.array(array_mm) # test np.ascontiguousarray
+    
+    os.remove(array_mm.filename)
+    #temp_folder = Path(array_mm.filename).parent
+    #try:
+    #  shutil.rmtree(temp_folder)
+    #except:
+    #  pass
+    
+    if return_array:
+      return result
+  else:
+    del array_mm
 
 def ref_memmap(array):
   array.flush()
@@ -61,6 +70,48 @@ def ref_memmap(array):
     'dtype': array.dtype,
     'shape': array.shape
   }
+
+def concat_memmap(arrs, axis = 0): 
+  
+  from skmap import parallel
+
+  ttprint("Begin concat")
+  shapes = np.stack([ a.shape for a in arrs ], axis=0)
+  noaxis = [ i for i in range(0, len(shapes[0])) if i != axis ]
+  all_noaxis = np.all(np.all(shapes == shapes[0], axis=0)[noaxis])
+  
+  if not all_noaxis:
+    raise Exception(f"All arrays must have same shape in all dimensions excepet in {axis}")
+  
+  newshape = list(shapes[0])
+  newshape[axis] = np.sum(shapes[:,axis])
+  newshape = tuple(newshape)
+  out_memmap = new_memmap(arrs[0].dtype, newshape)
+  ref_out_memmap = ref_memmap(out_memmap)
+
+  inds = [0] + list(np.cumsum(shapes[:,axis]))
+  
+  args = []
+  for arr, i1, i2 in zip(arrs, inds[:-1], np.roll(inds, -1)[:-1]):
+    ref_arr = ref_memmap(arr)
+    args.append((ref_out_memmap, ref_arr, i1, i2))
+  
+  n_jobs = parallel.CPU_COUNT
+  if len(args) < n_jobs:
+    n_jobs = len(args)
+
+  for r in parallel.job(_concat_memmap, args, joblib_args={
+      'backend': 'threading', 
+      'pre_dispatch': math.ceil(n_jobs / 3), 
+      'batch_size': math.floor(len(args) / n_jobs),
+      'return_as': 'generator'
+    }):
+    continue
+  #out_memmap[:,:,i1:i2] = arr
+  #del_memmap(arr)
+  ttprint("End concat")
+
+  return out_memmap
 
 def make_tempdir(basedir='skmap', make_subdir = True):
   tempdir = Path(TMP_DIR).joinpath(basedir)
@@ -85,15 +136,11 @@ def _bounds_crs(raster_file, dst_crs):
     return raster_file, bounds, crs, tr
 
 def _build_vrt(raster_file, band, tr, dst_crs, r_method, outdir, te, tr_min):
-
-  if 'http' in str(raster_file):
-    raster_file = f'/vsicurl/http://{str(raster_file)[6:]}'
-
-  outfile_1 = str(Path(outdir).joinpath(str(Path(str(raster_file).split('?')[0]).stem + f'_b{band}.vrt')))
-  ds_1 = BuildVRT(outfile_1, f'{raster_file}', bandList = [band], xRes = tr_min, yRes = tr_min)
+  outfile_1 = str(Path(outdir).joinpath(str(Path(raster_file.split('?')[0]).stem + f'_b{band}.vrt')))
+  ds_1 = BuildVRT(outfile_1, f'/vsicurl/{raster_file}', bandList = [band], xRes = tr_min, yRes = tr_min)
   ds_1.FlushCache()
 
-  outfile_2 = str(Path(outdir).joinpath(str(Path(str(raster_file).split('?')[0]).stem + f'.vrt')))
+  outfile_2 = str(Path(outdir).joinpath(str(Path(raster_file.split('?')[0]).stem + f'_b{band}_wrapped.vrt')))
   ds_2 = Warp(outfile_2, ds_1, xRes = tr, yRes = tr, resampleAlg=r_method, dstSRS=dst_crs, outputBounds=te)
   ds_2.FlushCache()
 
@@ -103,7 +150,6 @@ def vrt_warp(raster_files,
   dst_crs='EPSG:4326',
   band = 1, 
   tr = None,
-  te = None,
   r_method = 'near', 
   outdir=None, 
   n_jobs=-1,
@@ -124,20 +170,17 @@ def vrt_warp(raster_files,
   args_vrt = []
   tr_arr = []
   for raster_file, bounds, crs, tr1 in parallel.job(_bounds_crs, args, n_jobs=n_jobs, joblib_args={'backend': 'multiprocessing'}):
+
     total_bounds.append(box(*bounds))
     tr_arr.append(tr1)
     args_vrt.append( (raster_file, band, tr, dst_crs, r_method, outdir) )
   
   tr_min = np.min(tr_arr)
-  
-  if te is None:
-    te = gp.GeoSeries(total_bounds).unary_union.bounds
-
+  te = gp.GeoSeries(total_bounds).unary_union.bounds
   args_vrt = [ a + (te, tr_min) for a in args_vrt ]
   
   vrt_files = []
   input_files = []
-  #print(args_vrt)
   for input_file, vrt_file in parallel.job(_build_vrt, args_vrt, n_jobs=-1, joblib_args={'backend': 'multiprocessing'}):
     input_files.append(input_file)
     vrt_files.append(vrt_file)
