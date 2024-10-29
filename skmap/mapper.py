@@ -266,7 +266,6 @@ class LandMapper():
     self._min_samples_restriction(min_samples_per_class)
     self.features = np.ascontiguousarray(self.pts[self.feature_cols].to_numpy(), dtype=np.float32)
     self.target = target = np.ascontiguousarray(self.pts[self.target_col].to_numpy(), dtype=np.float32)
-
     self._target_transformation()
 
     self.samples_weight = self._get_column_if_exists(weight_col, 'weight_col')
@@ -547,7 +546,6 @@ class LandMapper():
 
     hyperpar_selection.fit(features, self.target, groups=self.cv_groups, **self._fit_params(estimator))
     estimator.set_params(**self._best_params(hyperpar_selection))
-
   def _do_cv_prediction(self, estimator, features):
 
     target = self.target
