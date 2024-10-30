@@ -439,16 +439,22 @@ namespace skmap {
 
 
 
-    void TransArray::computePercentiles(Eigen::Ref<MatFloat> out_data,
-                                        uint_t out_index_offset,
+    void TransArray::computePercentiles(std::vector<uint_t> col_in_select,
+                                        Eigen::Ref<MatFloat> out_data,
+                                        std::vector<uint_t> col_out_select,
                                         std::vector<float_t> percentiles)
     {
 
-        skmapAssertIfTrue((uint_t) out_data.cols() < out_index_offset + percentiles.size(),
+        skmapAssertIfTrue(col_out_select.size() != percentiles.size(),
                           "scikit-map ERROR 19: out_data too small");
         // @FIXME: the clean way would be that also for out_data a ParArray oject is created and that only the corresponding cunk is sent
-        auto computePercentilesChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        auto computePercentilesChunk = [&] (Eigen::Ref<MatFloat> rows_block, uint_t row_start, uint_t row_end)
         {
+            MatFloat chunk(rows_block.rows(), col_in_select.size());
+            for (size_t i = 0; i < col_in_select.size(); ++i) {
+                chunk.col(i) = rows_block.col(col_in_select[i]);
+            }
+
             MatFloat sorted_chunk(chunk);
             float_t max_float = std::numeric_limits<float_t>::max();
             sorted_chunk = sorted_chunk.array().isNaN().select(max_float, sorted_chunk);
@@ -466,7 +472,7 @@ namespace skmap {
                 for (uint_t i = 0; i < (uint_t) sorted_chunk.rows(); ++i) {
                     if (not_nan_count(i) == 0)
                     {
-                        out_data(row_start+i, out_index_offset + k) = nan_v;
+                        out_data(row_start+i, col_out_select[k]) = nan_v;
                     } else
                     {
                         float_t percentile_pos = (float_t) (not_nan_count(i) - 1) * (percentiles[k] / 100.0);
@@ -474,12 +480,12 @@ namespace skmap {
                         uint_t percentile_pos_ceil = ceil(percentile_pos);
                         if (percentile_pos_floor == percentile_pos_ceil)
                         {
-                            out_data(row_start+i, out_index_offset + k) = sorted_chunk(i, percentile_pos_floor);
+                            out_data(row_start+i, col_out_select[k]) = sorted_chunk(i, percentile_pos_floor);
                         } else
                         {
                             float_t percentile_val_floor = sorted_chunk(i, percentile_pos_floor) * ((float_t) percentile_pos_ceil - percentile_pos);
                             float_t percentile_val_ceil = sorted_chunk(i, percentile_pos_ceil) * (percentile_pos - (float_t) percentile_pos_floor);
-                            out_data(row_start+i, out_index_offset + k) = percentile_val_floor + percentile_val_ceil;
+                            out_data(row_start+i, col_out_select[k]) = percentile_val_floor + percentile_val_ceil;
                         }
                     }
                 }

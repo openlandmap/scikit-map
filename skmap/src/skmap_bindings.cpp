@@ -473,12 +473,13 @@ void warpTile(Eigen::Ref<MatFloat> data,
 
 void computePercentiles(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,
+                          std::vector<uint_t> col_in_select,
                           Eigen::Ref<MatFloat> out_data,
-                          uint_t out_index_offset,
+                          std::vector<uint_t> col_out_select,
                           std::vector<float_t> percentiles)
 {
     TransArray transArray(data, n_threads);
-    transArray.computePercentiles(out_data, out_index_offset, percentiles);
+    transArray.computePercentiles(col_in_select, out_data, col_out_select, percentiles);
 }
 
 void applyTsirf(Eigen::Ref<MatFloat> data,

@@ -131,8 +131,9 @@ class TransArray: public ParArray
                                  float_t value_to_mask,
                                  float_t new_value);
 
-        void computePercentiles(Eigen::Ref<MatFloat> out_data,
-                                uint_t out_index_offset,
+        void computePercentiles(std::vector<uint_t> col_in_select,
+                                Eigen::Ref<MatFloat> out_data,
+                                std::vector<uint_t> col_out_select,
                                 std::vector<float_t> percentiles);
 
         void maskNan(std::vector<uint_t> row_select,
