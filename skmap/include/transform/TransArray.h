@@ -35,6 +35,12 @@ class TransArray: public ParArray
 
         void selArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select);
+                              
+        void fitPercentage(Eigen::Ref<MatFloat> in1,
+                           Eigen::Ref<MatFloat> in2);
+                           
+        void hadamardProduct(Eigen::Ref<MatFloat> in1,
+                             Eigen::Ref<MatFloat> in2);
 
         void nanMean(Eigen::Ref<VecFloat> out_data);
         
@@ -50,6 +56,11 @@ class TransArray: public ParArray
                           std::vector<uint_t> col_select);
         
         void fillArray(float_t val);
+        
+        void blocksAverage(Eigen::Ref<MatFloat> in1,
+                          Eigen::Ref<MatFloat> in2,
+                          uint_t n_pix,
+                          uint_t y);
 
         void inverseReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> indices_matrix);
@@ -163,6 +174,9 @@ class TransArray: public ParArray
                          float_t w_0,
                          Eigen::Ref<VecFloat> w_p,
                          Eigen::Ref<VecFloat> w_f);
+                         
+        void scaleAndOffset(float_t offset,
+                            float_t scaling);
 
         void transposeReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> permutation_matrix);

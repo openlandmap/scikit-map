@@ -27,6 +27,24 @@ map_t convPyMap(py::dict in_map)
 }
 
 
+void readDataCore(Eigen::Ref<MatFloat> data,
+              const uint_t n_threads,
+              const std::string file_loc,
+              const uint_t x_off,
+              const uint_t y_off,
+              const uint_t x_size,
+              const uint_t y_size,
+              const std::vector<int> bands_list,
+              py::dict conf_GDAL,
+              std::optional<float_t> value_to_mask,
+              std::optional<float_t> value_to_set) 
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.readDataCore(data.row(0), file_loc, x_off, y_off, x_size, y_size, GDALDataType::GDT_Float32,
+                     bands_list, value_to_mask, value_to_set);
+}
+
 void readData(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
               const std::vector<std::string>& file_locs,
@@ -47,6 +65,27 @@ void readData(Eigen::Ref<MatFloat> data,
 }
 
 
+void readDataBlocks(Eigen::Ref<MatFloat> data,
+              const uint_t n_threads,
+              const std::vector<std::string>& file_locs,
+              const std::vector<uint_t> perm_vec,
+              const std::vector<uint_t> x_off_vec,
+              const std::vector<uint_t> y_off_vec,
+              const uint_t x_size,
+              const uint_t y_size,
+              const std::vector<int> bands_list,
+              py::dict conf_GDAL,
+              std::optional<std::vector<float_t>> value_to_mask_vec,
+              std::optional<float_t> value_to_set) 
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.readDataBlocks(file_locs, perm_vec, x_off_vec, y_off_vec, x_size, y_size, GDALDataType::GDT_Float32,
+                     bands_list, value_to_mask_vec, value_to_set);
+}
+
+
+
 void getLatLonArray(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     py::dict conf_GDAL,
@@ -61,6 +100,16 @@ void getLatLonArray(Eigen::Ref<MatFloat> data,
     ioArray.getLatLonArray(file_loc, x_off, y_off, x_size, y_size);
 }
 
+void blocksAverage(Eigen::Ref<MatFloat> out,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> in1,
+                  Eigen::Ref<MatFloat> in2,
+                  uint_t n_pix,
+                  uint_t y)
+{
+    TransArray transArray(out, n_threads);
+    transArray.blocksAverage(in1, in2, n_pix, y);
+}
 
 
 void reorderArray(Eigen::Ref<MatFloat> data,
@@ -154,6 +203,23 @@ void maskData(Eigen::Ref<MatFloat> data,
     transArray.maskData(row_select, mask, value_of_mask_to_mask, new_value_in_data);
 }
 
+void fitPercentage(Eigen::Ref<MatFloat> out,
+                   const uint_t n_threads,
+                   Eigen::Ref<MatFloat> in1,
+                   Eigen::Ref<MatFloat> in2)
+{
+    TransArray transArray(out, n_threads);
+    transArray.fitPercentage(in1, in2);
+}
+
+void hadamardProduct(Eigen::Ref<MatFloat> out,
+                     const uint_t n_threads,
+                     Eigen::Ref<MatFloat> in1,
+                     Eigen::Ref<MatFloat> in2)
+{
+    TransArray transArray(out, n_threads);
+    transArray.hadamardProduct(in1, in2);
+}
 
 void maskDataRows(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
@@ -499,6 +565,14 @@ void applyTsirf(Eigen::Ref<MatFloat> data,
                            w_0, w_p, w_f, keep_original_values, version, backend);
 }
 
+void scaleAndOffset(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    float_t offset,
+                    float_t scaling)
+{
+    TransArray transArray(data, n_threads);
+    transArray.scaleAndOffset(offset, scaling);
+}
 
 void convolveRows(Eigen::Ref<MatFloat> data,
                  const uint_t n_threads,
@@ -512,9 +586,18 @@ void convolveRows(Eigen::Ref<MatFloat> data,
     transArray.convolveRows(out_data, w_0, w_p, w_f);
 }
 
+
 PYBIND11_MODULE(skmap_bindings, m)
 {
+    m.def("readDataCore", &readDataCore,
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg() = std::nullopt, py::arg() = std::nullopt,
+        "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("readData", &readData,
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg() = std::nullopt, py::arg() = std::nullopt,
+        "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
+    m.def("readDataBlocks", &readDataBlocks,
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
@@ -553,6 +636,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeBsi", &computeBsi, "Compute BSI");
     m.def("computeEvi", &computeEvi, "Compute EVI");
     m.def("computeNirv", &computeNirv, "Compute NIRv");
+    m.def("scaleAndOffset", &scaleAndOffset, "Muplitply by a scaling and add an offset each array element");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
     m.def("computeSavi", &computeSavi, "Compute SAVI");
     m.def("nanMean", &nanMean, "Compute average between available values");
@@ -564,7 +648,11 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computePercentiles", &computePercentiles, "Compute percentile");
     m.def("applyTsirf", &applyTsirf, "Apply TSIRF");
     m.def("convolveRows", &convolveRows, "Convolve rows");
+    m.def("fitPercentage", &fitPercentage, "Fit a three percages to 100 starting from 2");
+    m.def("hadamardProduct", &hadamardProduct, "Elemennt wise product");
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
     m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
+    m.def("blocksAverage", &blocksAverage, "Vecorized average of 4 neighbor elemnts");
+
 }
 

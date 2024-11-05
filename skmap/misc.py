@@ -190,6 +190,34 @@ def vrt_warp(raster_files,
   else:
     return vrt_files
 
+class TimeTracker(object):
+    def __init__(self, task, enter_enabled=False, exit_enabled=True):
+        self.task = task
+        self.enter_enabled = enter_enabled
+        self.exit_enabled = exit_enabled
+        self.tracks = []
+    @staticmethod
+    def _print(*args, **kwargs):
+        print(f'[{datetime.now():%H:%M:%S}] ', end='')
+        print(*args, **kwargs, flush=True)
+    def __enter__(self):
+        self.tracks.append(time.time())
+        if self.enter_enabled:
+            print(f"{self.task}")
+        return self.tracks[-1]
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None and self.exit_enabled:
+            self._print(f"{self.task}: {(time.time() - self.tracks.pop()):.2f} secs")
+        else:
+            self.tracks.pop()
+#
+
+def _make_dir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path
+#
+
 def ttprint(*args, **kwargs):
   """
   A print function that displays the date and time.

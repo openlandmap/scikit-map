@@ -23,6 +23,15 @@ namespace skmap {
         this->parForRange(copyRowsChunk, m_n_threads);
     }
 
+    void TransArray::scaleAndOffset(float_t offset,
+                                    float_t scaling)
+    {
+        auto scaleAndOffsetChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            chunk.array() = chunk.array() * scaling + offset;
+        };
+        this->parChunk(scaleAndOffsetChunk);
+    }
 
 
     void TransArray::reorderArray(Eigen::Ref<MatFloat> out_data,
@@ -92,6 +101,22 @@ namespace skmap {
             out_data.row(row_select[i]) = m_data.row(i);
         };
         this->parForRange(expandArrayRow, row_select.size());
+    }
+    
+    
+    void TransArray::blocksAverage(Eigen::Ref<MatFloat> in1,
+                                  Eigen::Ref<MatFloat> in2,
+                                  uint_t n_pix,
+                                  uint_t y)
+    {
+        auto blocksAverageChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            chunk.array() = 0.25 * (in1.block(row_start, y*n_pix, row_end - row_start, (y+1)*n_pix).array() + 
+                                    in1.block(row_start, (y+1)*n_pix, row_end - row_start, (y+2)*n_pix).array() + 
+                                    in2.block(row_start, y*n_pix, row_end - row_start, (y+1)*n_pix).array() + 
+                                    in2.block(row_start, (y+1)*n_pix, row_end - row_start, (y+2)*n_pix).array());
+        };
+        this->parChunk(blocksAverageChunk);
     }
 
     void TransArray::extractArrayRows(Eigen::Ref<MatFloat> out_data,
@@ -194,6 +219,29 @@ namespace skmap {
         this->parForRange(fillArrayRow, m_data.rows());
     }
 
+    void TransArray::fitPercentage(Eigen::Ref<MatFloat> in1,
+                                   Eigen::Ref<MatFloat> in2)
+    {
+        auto fitPercentageChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            chunk.array() = 100. / (in1.block(row_start, 0, row_end - row_start, in1.cols()).array() + 
+                                    in2.block(row_start, 0, row_end - row_start, in2.cols()).array() +
+                                    1.);
+        };
+        this->parChunk(fitPercentageChunk);
+    }
+    
+    
+    void TransArray::hadamardProduct(Eigen::Ref<MatFloat> in1,
+                                     Eigen::Ref<MatFloat> in2)
+    {
+        auto hadamardProductChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            chunk.array() = in1.block(row_start, 0, row_end - row_start, in1.cols()).array() *
+                            in2.block(row_start, 0, row_end - row_start, in2.cols()).array();
+        };
+        this->parChunk(hadamardProductChunk);
+    }
 
 
     void TransArray::transposeArray(Eigen::Ref<MatFloat> out_data)

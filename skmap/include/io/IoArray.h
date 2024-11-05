@@ -17,6 +17,18 @@ class IoArray: public ParArray
                       std::string mosaic_path,
                       std::string resample);
 
+
+        void readDataCore(Eigen::Ref<MatFloat::RowXpr> row,
+                           std::string file_loc,
+                           uint_t x_off,
+                           uint_t y_off,
+                           uint_t x_size,
+                           uint_t y_size,
+                           GDALDataType read_type,
+                           std::vector<int> bands_list,
+                           std::optional<float_t> value_to_mask,
+                           std::optional<float_t> value_to_set);
+
         void readData(std::vector<std::string> file_locs,
                        std::vector<uint_t> perm_vec,
                        uint_t x_off,
@@ -27,6 +39,17 @@ class IoArray: public ParArray
                        std::vector<int> bands_list,
                        std::optional<float_t> value_to_mask,
                        std::optional<float_t> value_to_set);
+
+        void readDataBlocks(std::vector<std::string> file_locs,
+                           std::vector<uint_t> perm_vec,
+                           std::vector<uint_t> x_off_vec,
+                           std::vector<uint_t> y_off_vec,
+                           uint_t x_size,
+                           uint_t y_size,
+                           GDALDataType read_type,
+                           std::vector<int> bands_list,
+                           std::optional<std::vector<float_t>> value_to_mask_vec,
+                           std::optional<float_t> value_to_set);
 
         void setupGdal(dict_t dict);
 
