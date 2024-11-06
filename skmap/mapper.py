@@ -1598,9 +1598,10 @@ class SpaceOverlay():
 
         self.pts = points
         #self.pts['overlay_id'] = range(1,len(self.pts)+1)
+        self.max_workers = max_workers
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
-            fn_layers, max_workers, verbose)
+            fn_layers, self.max_workers, verbose)
 
     def run(self,
         dict_newnames:set = {}
@@ -1625,14 +1626,13 @@ class SpaceOverlay():
 
         return self.pts
     
-    def read_data(self, gdal_opts):
+    def read_data(self, gdal_opts, max_ram_mb):
         layers = self.parallelOverlay.layers
         layers['layer_id'] = layers.index
         query_pixels = self.parallelOverlay.query_pixels
         keys = list(query_pixels.keys())
-        n_threads = parallel.CPU_COUNT*2
         data_overlay = np.empty((layers.shape[0], query_pixels[keys[0]].shape[0]), dtype=np.float32)
-        sb.fillArray(data_overlay, n_threads, np.nan)
+        sb.fillArray(data_overlay, self.max_workers, np.nan)
         for i, key in enumerate(keys):
             key_layer_ids = [int(l) for l in list(layers[layers['group'] == keys[i]]['layer_id'])]
             block_height = list(layers[layers['group'] == keys[i]]['block_height'])[0]
@@ -1642,23 +1642,36 @@ class SpaceOverlay():
             unique_blocks_ids = unique_blocks['block_id'].tolist()
             comb = list(product(key_layer_ids, unique_blocks_ids))
             key_layer_ids_comb, unique_blocks_ids_comb = zip(*comb)
+            key_layer_ids_comb = list(key_layer_ids_comb)
+            unique_blocks_ids_comb = list(unique_blocks_ids_comb)
             block_row_off_comb = [unique_blocks.query(f"block_id == @ubid")['block_row_off'].iloc[0] for ubid in unique_blocks_ids_comb]
             block_col_off_comb = [unique_blocks.query(f"block_id == @ubid")['block_col_off'].iloc[0] for ubid in unique_blocks_ids_comb]
-            key_layer_paths_comb = [str(layers.query(f"layer_id == @ulid")['path'].iloc[0]) for ulid in key_layer_ids_comb]
-            key_layer_nodatas_comb = [layers.query(f"layer_id == @ulid")['nodata'].iloc[0] for ulid in key_layer_ids_comb]
-            n_comb = len(key_layer_paths_comb)       
+            key_layer_paths_comb = [path if path.startswith('/vsicurl/') else f'/vsicurl/{path}'
+                    for path in (str(layers.query(f"layer_id == @ulid")['path'].iloc[0]) for ulid in key_layer_ids_comb)]
+            key_layer_nodatas_comb = [np.nan if layers.query(f"layer_id == @ulid")['nodata'].iloc[0] is None 
+                                        else layers.query(f"layer_id == @ulid")['nodata'].iloc[0] 
+                                        for ulid in key_layer_ids_comb]
+            n_comb = len(key_layer_paths_comb)
             n_block_pix = block_height * block_width
-            data_array = np.empty((n_comb, n_block_pix), dtype=np.float32)
             bands_list = [1]
-            perm_vec = range(n_comb)
-            sb.readDataBlocks(data_array, n_threads, key_layer_paths_comb, perm_vec, block_col_off_comb, block_row_off_comb,
-                                        block_width, block_height, bands_list, gdal_opts, key_layer_nodatas_comb, np.nan)
-            pix_idxs = (key_query_pixels['sample_row'] * block_width + key_query_pixels['sample_col']).tolist()
-            pix_blok_ids = key_query_pixels['block_id'].tolist()
-            for i, (bid, pid) in enumerate(zip(pix_blok_ids, pix_idxs)):
-                for index, value in enumerate(unique_blocks_ids_comb):
-                    if value == bid:
-                        data_overlay[list(key_layer_ids_comb)[index],i] = data_array[index,pid]
+            # Factor 2 is heuristic to keep margin for temporary variables
+            max_comb_chunk = int(np.ceil((max_ram_mb - data_overlay.size*4/1024/1024)*1024*1024/4/n_block_pix/2))
+            assert max_comb_chunk > 1, "skmap-error 42: max_ram_mb too small, can not chunk"
+            for chunk_start in range(0, n_comb, max_comb_chunk):
+                key_layer_paths_chunk = key_layer_paths_comb[chunk_start:chunk_start + max_comb_chunk]
+                block_col_off_chunk = block_col_off_comb[chunk_start:chunk_start + max_comb_chunk]
+                block_row_off_chunk = block_row_off_comb[chunk_start:chunk_start + max_comb_chunk]
+                key_layer_nodatas_chunk = key_layer_nodatas_comb[chunk_start:chunk_start + max_comb_chunk]
+                unique_blocks_ids_chunk = unique_blocks_ids_comb[chunk_start:chunk_start + max_comb_chunk]
+                key_layer_ids_chunk = key_layer_ids_comb[chunk_start:chunk_start + max_comb_chunk]
+                chunk_size = len(key_layer_paths_chunk)
+                data_array = np.empty((chunk_size, n_block_pix), dtype=np.float32)
+                perm_vec = range(chunk_size)
+                sb.readDataBlocks(data_array, self.max_workers, key_layer_paths_chunk, perm_vec, block_col_off_chunk, block_row_off_chunk,
+                                            block_width, block_height, bands_list, gdal_opts, key_layer_nodatas_chunk, np.nan)
+                pix_inblock_idxs = (key_query_pixels['sample_row'] * block_width + key_query_pixels['sample_col']).tolist()
+                pix_blok_ids = key_query_pixels['block_id'].tolist()
+                sb.extractOverlay(data_array, self.max_workers, pix_blok_ids, pix_inblock_idxs, unique_blocks_ids_chunk, key_layer_ids_chunk, data_overlay)
         return data_overlay
     
     

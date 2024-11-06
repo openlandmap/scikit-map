@@ -59,6 +59,12 @@ class IoArray: public ParArray
                                uint_t x_size,
                                uint_t y_size);
 
+        void extractOverlay(std::vector<uint_t> pix_blok_ids,
+                                 std::vector<uint_t> pix_inblock_idxs,
+                                 std::vector<uint_t> unique_blocks_ids_comb,
+                                 std::vector<uint_t> key_layer_ids_comb,
+                                 Eigen::Ref<MatFloat> data_overlay);
+
 
         template<typename T>
         void writeData(std::vector<std::string> base_files,

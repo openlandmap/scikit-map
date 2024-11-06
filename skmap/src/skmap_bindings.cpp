@@ -45,6 +45,21 @@ void readDataCore(Eigen::Ref<MatFloat> data,
                      bands_list, value_to_mask, value_to_set);
 }
 
+
+
+void extractOverlay(Eigen::Ref<MatFloat> data,
+              const uint_t n_threads,
+              const std::vector<uint_t> pix_blok_ids,
+              const std::vector<uint_t> pix_inblock_idxs,
+              const std::vector<uint_t> unique_blocks_ids_comb,
+              const std::vector<uint_t> key_layer_ids_comb,
+              Eigen::Ref<MatFloat> data_overlay)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.extractOverlay(pix_blok_ids, pix_inblock_idxs, unique_blocks_ids_comb, key_layer_ids_comb, data_overlay);
+}
+
+
 void readData(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
               const std::vector<std::string>& file_locs,
@@ -653,6 +668,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
     m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
     m.def("blocksAverage", &blocksAverage, "Vecorized average of 4 neighbor elemnts");
+    m.def("extractOverlay", &extractOverlay, "Extract overlay data");
 
 }
 

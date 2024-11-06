@@ -211,6 +211,30 @@ namespace skmap {
 
 
 
+    void IoArray::extractOverlay(std::vector<uint_t> pix_blok_ids,
+                                 std::vector<uint_t> pix_inblock_idxs,
+                                 std::vector<uint_t> unique_blocks_ids_comb,
+                                 std::vector<uint_t> key_layer_ids_comb,
+                                 Eigen::Ref<MatFloat> data_overlay)
+    {
+        uint_t n_pix = pix_blok_ids.size();
+        uint_t n_bids = unique_blocks_ids_comb.size();
+        auto extractOverlayPix = [&] (uint_t i)
+        {
+            uint bid = pix_blok_ids[i];
+            uint pid = pix_inblock_idxs[i];
+            for (uint_t j = 0; j < n_bids; j++) 
+            {
+                if (unique_blocks_ids_comb[j] == bid)
+                    data_overlay(key_layer_ids_comb[j],i) = m_data(j,pid);
+            }
+        };
+        this->parForRange(extractOverlayPix, n_pix);
+
+    }
+
+
+
 
 
 }
