@@ -1401,33 +1401,51 @@ class _ParallelOverlay:
         # sampling only first band in every layer
         # assumption is that all layers have same blocks
 
+    TILE_PLACEHOLDER = '{tile_id}'
+
     def __init__(self,
         points_x: np.ndarray,
         points_y:np.ndarray,
         raster_files:List[str],
+        points_crs: None,
+        raster_tiles:Union[gpd.GeoDataFrame, str] = None,
+        tile_id_col:Union[str] = 'tile_id',
         max_workers:int = parallel.CPU_COUNT,
         verbose:bool = True
     ):
 
-        self.error_val = -32768
-        
-        raster_crs = rasterio.open(raster_files[0]).crs
-
-        samples = gpd.GeoDataFrame({ 
-                'x': points_x, 
-                'y': points_y }, 
-                geometry=gpd.points_from_xy(points_x, points_y), 
-                crs=raster_crs
-        ).reset_index(drop=True)
-    
-        self.raster_files = raster_files
         self.verbose = verbose
+
+        self.default_tile_id = ''
+        self.tile_id_col = tile_id_col
+
+        if raster_tiles is not None:
+          if not isinstance(raster_tiles, gpd.GeoDataFrame):
+            if self.verbose:
+              ttprint(f"Reading {raster_tiles}")
+            raster_tiles = gpd.read_file(raster_tiles)
+
+          self.default_tile_id = raster_tiles[self.tile_id_col].iloc[0]
+
+        self.raster_tiles = raster_tiles
+        
+        if points_crs is None:
+          points_crs = rasterio.open(
+            raster_files[0].replace(_ParallelOverlay.TILE_PLACEHOLDER, self.default_tile_id)
+          ).crs
+
+        samples = gpd.GeoDataFrame( 
+                geometry=gpd.points_from_xy(points_x, points_y), 
+                crs=points_crs
+        ).reset_index(drop=True)
+        
+        self.raster_files = raster_files
 
         self.layers = pd.DataFrame({
             'name': [ str(Path(raster_file).with_suffix('').name) for raster_file in raster_files ],
             'path': self.raster_files
         }).reset_index(drop=True
-        ).apply(_ParallelOverlay._layer_metadata, axis=1)
+        ).apply(_ParallelOverlay._layer_metadata, default_tile_id=self.default_tile_id, axis=1)
 
         self.query_pixels = self._find_blocks(samples)
         self.out_shape = (samples.shape[0], len(self.raster_files))
@@ -1450,15 +1468,25 @@ class _ParallelOverlay:
                 ttprint(f"Number of blocks to read: {len(self.args )}")
     
     @staticmethod
-    def _layer_metadata(row):
-        src = rasterio.open(row['path'])
+    def _layer_metadata(row, default_tile_id):
+        
+        path = row['path']
+        if _ParallelOverlay._is_tiled(path):
+          path = path.replace(_ParallelOverlay.TILE_PLACEHOLDER, default_tile_id)
+
+        src = rasterio.open(path)
 
         row['nodata'] = src.nodata
         _, window = next(src.block_windows(1))
         row['block_height'] = window.height
         row['block_width'] = window.width
 
-        key = ''.join([str(src.height), str(src.width), str(src.block_shapes[0]), str(src.transform.to_gdal())])
+        key = ''.join([
+          str(default_tile_id), 
+          str(src.height), str(src.width), 
+          str(src.block_shapes[0]), 
+          str(src.transform.to_gdal())
+        ])
         row['group'] = str(
             hashlib.md5(key.encode('utf-8')).hexdigest()
         )
@@ -1480,24 +1508,70 @@ class _ParallelOverlay:
             #ttprint(f"Error in {raster_file}")
             pass
 
-    def _find_blocks_for_src(self, src, samples):
+    @staticmethod
+    def _is_tiled(path):
+      return (_ParallelOverlay.TILE_PLACEHOLDER in str(path))
+
+    @staticmethod
+    def _tiled_blocks(tile_path, tile_id):
+      tile_blocks = []
+
+      with rasterio.Env(CPL_VSIL_CURL_ALLOWED_EXTENSIONS='.tif', GDAL_HTTP_VERSION='1.1'):
+        src = rasterio.open(tile_path)
+
+        for (i,j), window in src.block_windows(1):
+          tile_blocks.append({
+              'tile_id': tile_id,
+              'window': window,    
+              'geometry': box(*rasterio.windows.bounds(window, src.transform))
+          })
+
+      return tile_blocks
+
+    def _find_blocks_for_src(self, path, samples):
 
         gdf_blocks = []
 
-        for (i,j), window in src.block_windows(1):
-            gdf_blocks.append({
-                'window': window,    
-                'geometry': box(*rasterio.windows.bounds(window, src.transform))
-            })
+        if _ParallelOverlay._is_tiled(path):
+          
+          args = []
+
+          samp_tiles = self.raster_tiles.sjoin(samples.to_crs(self.raster_tiles.crs), how='inner')[self.tile_id_col].unique()
+          raster_tiles = self.raster_tiles[self.raster_tiles[self.tile_id_col].isin(samp_tiles)]
+          if self.verbose:
+            ttprint(f"Retrieving block information for {raster_tiles.shape[0]} tiles.")
+
+          for _, tile in raster_tiles.iterrows():
+            tile_id = tile[self.tile_id_col]
+            tile_path = path.replace(_ParallelOverlay.TILE_PLACEHOLDER, tile_id)
+            src = rasterio.open(tile_path)
+            for (i,j), window in src.block_windows(1):
+              gdf_blocks.append({
+                  'tile_id': tile_id,
+                  'window': window,  
+                  'inv_transform': ~rasterio.windows.transform(window, src.transform),
+                  'geometry': box(*rasterio.windows.bounds(window, src.transform))
+              })
+
+        else:
+          src = rasterio.open(path)
+
+          for (i,j), window in src.block_windows(1):
+              gdf_blocks.append({
+                  'window': window,
+                  'inv_transform': ~rasterio.windows.transform(window, src.transform),
+                  'geometry': box(*rasterio.windows.bounds(window, src.transform))
+              })
 
         gdf_blocks = gpd.GeoDataFrame(gdf_blocks, crs=src.crs).reset_index(drop=True)
-        gdf_blocks = samples.sjoin(gdf_blocks, how='inner').rename(columns={ 'index_right': 'block_id' })
+        gdf_blocks = samples.to_crs(gdf_blocks.crs).sjoin(gdf_blocks, how='inner').rename(columns={ 'index_right': 'block_id' })
 
         query_pixels = [] 
 
         for (ij, block) in gdf_blocks.groupby('block_id'):
-            window = block.iloc[0]['window']
-            inv_block_transform = ~rasterio.windows.transform(window, src.transform)
+            inv_block_transform = block['inv_transform'].iloc[0]
+            block['x'] = block.geometry.x
+            block['y'] = block.geometry.y
             block['block_col_off'] = window.col_off
             block['block_row_off'] = window.row_off
 
@@ -1508,7 +1582,7 @@ class _ParallelOverlay:
 
             query_pixels.append(block)
 
-        return pd.concat(query_pixels).drop(columns=['window'])
+        return pd.concat(query_pixels).drop(columns=['window', 'inv_transform'])
 
     def _find_blocks(self, samples):
 
@@ -1522,9 +1596,9 @@ class _ParallelOverlay:
             path = layers.iloc[0]['path']
 
             if self.verbose:
-                ttprint(f"Finding query pixels for {group} ({layers.shape[0]} layers)")
-            src = rasterio.open(path)
-            query_pixels[group] = self._find_blocks_for_src(src, samples)
+              ttprint(f"Finding query pixels for {group} ({layers.shape[0]} layers)")
+            
+            query_pixels[group] = self._find_blocks_for_src(path, samples)
 
         if self.verbose:
             ttprint(f'End')
@@ -1584,6 +1658,8 @@ class SpaceOverlay():
         fn_layers:List[str] = [],
         dir_layers:List[str] = [],
         regex_layers = '*.tif',
+        raster_tiles:Union[gpd.GeoDataFrame, str] = None,
+        tile_id_col:Union[str] = 'tile_id',
         max_workers:int = parallel.CPU_COUNT,
         verbose:bool = True
     ):
@@ -1601,7 +1677,8 @@ class SpaceOverlay():
         self.max_workers = max_workers
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
-            fn_layers, self.max_workers, verbose)
+            fn_layers, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
+            max_workers=self.max_workers, verbose=verbose)
 
     def run(self,
         dict_newnames:set = {}
@@ -1708,6 +1785,8 @@ class SpaceTimeOverlay():
         points,
         col_date:str,
         fn_layers:List[str] = [],
+        raster_tiles:Union[gpd.GeoDataFrame, str] = None,
+        tile_id_col:Union[str] = 'tile_id',
         max_workers:int = parallel.CPU_COUNT,
         verbose:bool = False
     ):
@@ -1739,7 +1818,7 @@ class SpaceTimeOverlay():
                 ttprint(f'Overlay {len(year_points)} points from {year} in {len(fn_layers_year)} raster layers')
 
             self.overlay_objs[year] = SpaceOverlay(points=year_points, fn_layers=fn_layers_year,
-                max_workers=max_workers, verbose=verbose)
+                raster_tiles=raster_tiles, tile_id_col=tile_id_col, max_workers=max_workers, verbose=verbose)
 
     def _replace_year(self, fn_layer, year = None):
         y, y_m1, y_p1 = ('', '', '')
