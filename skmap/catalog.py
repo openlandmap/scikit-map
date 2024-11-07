@@ -503,7 +503,7 @@ class DataLoaderTiled():
                 n_proc = len(tile_template_paths)
                 with MPIPoolExecutor(max_workers=n_proc) as executor:
                     futures = [
-                        executor.submit(warp_tile, i, tile_paths[i], mosaic_paths[i], self.threads, self.num_pixels, self.resampling_strategy)
+                        executor.submit(warp_tile, i, tile_template_paths[i], mosaic_paths[i], self.threads, self.num_pixels, self.resampling_strategy)
                         for i in range(n_proc)
                     ]
                     for i, future in enumerate(futures):
