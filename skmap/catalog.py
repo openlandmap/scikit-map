@@ -28,8 +28,36 @@ os.environ["OMP_NUM_THREADS"] = f'{n_threads}'
 os.environ["OPENBLAS_NUM_THREADS"] = f'{n_threads}' # export OPENBLAS_NUM_THREADS=4 
 os.environ["MKL_NUM_THREADS"] = f'{n_threads}' # export MKL_NUM_THREADS=6
 os.environ["VECLIB_MAXIMUM_THREADS"] = f'{n_threads}' # export VECLIB_MAXIMUM_THREADS=4
-from mpi4py import MPI
-from mpi4py.futures import MPIPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import shared_memory
+
+mask_aggregation_bash_script = '''#!/bin/bash
+    if [ -z "$1" ]; then
+        echo "Usage: $0 <input_tif_file>"
+        exit 1
+    fi
+    tif_file="$1"
+    basename_tif=$(basename "$tif_file" .tif)
+    output_file="comp_${basename_tif}.tif"
+
+    if [ -f "$output_file" ]; then
+        rm "$output_file"
+    fi
+    xmin=$(gdalinfo $tif_file | grep "Upper Left" | awk -F'[(), ]+' '{print $3}')
+    ymax=$(gdalinfo $tif_file | grep "Upper Left" | awk -F'[(), ]+' '{print $4}')
+    xmax=$(gdalinfo $tif_file | grep "Lower Right" | awk -F'[(), ]+' '{print $3}')
+    ymin=$(gdalinfo $tif_file | grep "Lower Right" | awk -F'[(), ]+' '{print $4}')
+    tmp_out=$(gdalinfo "$tif_file" | grep "Pixel Size" | awk -F'[(),]' '{print $2, $3}')
+    read -r pixel_size_x pixel_size_y <<< "$tmp_out"
+    pixel_size_y=$(awk "BEGIN {print -1 * $pixel_size_y}")
+    pixel_size_x_new=$(awk "BEGIN {print $pixel_size_x * 8}")
+    pixel_size_y_new=$(awk "BEGIN {print $pixel_size_y * 8}")
+    xmin_new=$(awk "BEGIN {print $xmin + 2 * $pixel_size_x}")
+    ymin_new=$(awk "BEGIN {print $ymin + 2 * $pixel_size_y}")
+    xmax_new=$(awk "BEGIN {print $xmax - 2 * $pixel_size_x}")
+    ymax_new=$(awk "BEGIN {print $ymax - 2 * $pixel_size_y}")
+    gdalwarp -te "$xmin_new" "$ymin_new" "$xmax_new" "$ymax_new" -tr "$pixel_size_x_new" "$pixel_size_y_new" -r max "$tif_file" "$output_file"
+    '''
 
 def get_whale_dependencies(whale, key, main_catalog):
     func_name, params = parse_template_whale(whale)
@@ -169,14 +197,14 @@ def _create_image_template(base_img_path, tiles, tile_id, x_size, y_size, dtype,
             dst.write(np.zeros((1, x_size * y_size), dtype=dtype), 1)
     return template_tif
 #
-def s3_setup(have_to_register_s3, access_key, secret_key):
+def s3_setup(have_to_register_s3, access_key, secret_key, n_gaia):
     s3_aliases = []
     if not have_to_register_s3:
         return s3_aliases
-    s3_aliases = [f'g{i}' for i in range(1, 14)]
+    s3_aliases = [f'g{i}' for i in range(1, n_gaia+1)]
     commands = [
         f'mc alias set  g{i} http://192.168.49.{i+29}:8333 {access_key} {secret_key} --api S3v4'
-        for i in range(1, 14)
+        for i in range(1, n_gaia+1)
     ]
     for cmd in commands:
         subprocess.run(cmd, shell=True, capture_output=False, text=True, check=True)
@@ -339,6 +367,159 @@ def print_catalog_statistics(catalog:DataCatalog):
         print(f'- otf list: {otf_list}')
     print('')
 #
+
+def warp_tile(rank, tile_file, mosaic_paths, n_threads, n_pix, resample, gdal_opts):
+    os.environ['USE_PYGEOS'] = '0'
+    os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
+    warp_data = np.empty((n_pix,), dtype=np.float32)
+    try:
+        sb.warpTile(warp_data, n_threads, gdal_opts, tile_file, mosaic_paths, resample)
+    except:
+        sb.fillArray(warp_data, n_threads, 0.0)
+        print(f"Mosaic {mosaic_paths} has no data in {tile_file}, filling with 0.0")
+    return warp_data
+
+class DataLoaderTiled():
+    def __init__(self, catalog:DataCatalog, mask_template_path, gdal_opts, num_gaia, resampling_strategy, threads = os.cpu_count() * 2) -> None:
+        self.catalog = catalog
+        self.years = self.catalog.years
+        self.num_years = len(self.years)
+        self.mask_template_path = mask_template_path
+        self.otf_const_idx = {}
+        self.otf_indicator_params = []
+        self.gdal_opts = gdal_opts
+        self.cache = None
+        self.tile_id = None
+        self.x_off = None
+        self.y_off = None
+        self.x_size = None
+        self.y_size = None
+        self.num_pixels = None
+        self.mask = None
+        self.resampling_strategy = resampling_strategy
+        self._pixels_valid_idx = None
+        self.num_pixels_valid = None
+        self.threads = threads
+        self.num_gaia = num_gaia
+        self.executor = ProcessPoolExecutor(max_workers=self.threads)
+       
+    def load_tile_data(self, tile_id, convert_nan_to_num, spatial_aggregation = False):
+        self.tile_id = tile_id
+        self.mask_path = self.mask_template_path.format(tile_id=tile_id)
+        # @FIXME: this only work with our setting of Landsat data
+        if spatial_aggregation:
+            with open('mask_aggregation_bash_script.sh', 'w') as file:
+                file.write(mask_aggregation_bash_script)
+            subprocess.run(['chmod', '+x', 'mask_aggregation_bash_script.sh'])
+            input_file = self.mask_path
+            subprocess.run(['./mask_aggregation_bash_script.sh', input_file])
+            self.mask_path = f"comp_{input_file.split('/')[-1].split('.')[0]}.tif"
+            self.x_off, self.y_off, self.x_size, self.y_size = (0, 0, 500, 500)
+        else:
+            gdal_img = gdal.Open(self.mask_path)
+            self.x_size = gdal_img.RasterXSize
+            self.y_size = gdal_img.RasterYSize
+            self.x_off, self.y_off = (0, 0)
+
+        with TimeTracker(f"Tile {tile_id}/catalog {self.catalog.catalog_name} - load tile", True):
+            self.num_pixels = self.x_size * self.y_size
+            # prepare mask
+            with TimeTracker(f"Tile {self.tile_id} - prepare mask"):
+                self.mask = np.zeros((1, self.num_pixels), dtype=np.float32)
+                sb.readData(self.mask, 1, [self.mask_path], [0], self.x_off, self.y_off, self.x_size, self.y_size, [1], self.gdal_opts)
+                self._pixels_valid_idx = np.arange(0, self.num_pixels)[self.mask[0, :].astype(int).astype(bool)]
+                self.num_pixels_valid = int(np.sum(self.mask))
+                if self.num_pixels_valid == 0:
+                    return
+                    
+            # read rasters
+            self.cache = np.empty((self.catalog.num_features, self.num_pixels), dtype=np.float32)
+            with TimeTracker(f"Tile {self.tile_id} - read images"):
+                paths, paths_idx = self.catalog.get_paths()
+                tile_paths, tile_idxs = zip(*[(path, idx) for path, idx in zip(paths, paths_idx) if '{tile_id}' in path])
+                mosaic_paths, mosaic_idxs = zip(*[(path, idx) for path, idx in zip(paths, paths_idx) if '{tile_id}' not in path])
+                tile_paths = [p.format(tile_id=self.tile_id) for p in tile_paths]
+                
+                # Reading resampled data
+                # @FIXME we could copy locally the mask and then delete to reduce number of requests
+                tile_template_paths = [self.mask_path for i in range(len(mosaic_paths))]
+                futures = [self.executor.submit(warp_tile, i, tile_template_paths[i], mosaic_paths[i], self.threads, 
+                    self.num_pixels, self.resampling_strategy, self.gdal_opts)
+                    for i in range(len(mosaic_paths))]
+                for i, future in enumerate(futures):
+                    self.cache[mosaic_idxs[i], :] = future.result()
+
+                # Reading tiled data
+                if spatial_aggregation:
+                    N = len(tile_paths)
+                    tmp_data = np.empty((N,4000*4000), dtype=np.float32)
+                    sb.readData(tmp_data, self.threads, tile_paths, range(N), 2, 2, 4000, 4000, [1], self.gdal_opts, 255, 0)
+                    arr_reshaped = tmp_data.reshape(N, 4000, 4000)
+                    arr_aggregated = arr_reshaped.reshape(N, 500, 8, 500, 8).mean(axis=(2, 4))
+                    arr_final = arr_aggregated.reshape(N, 500*500)
+                    self.cache[tile_idxs,:] = arr_final[:,:]
+                else:
+                    sb.readData(self.cache, self.threads, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, self.y_size, [1], self.gdal_opts)
+                
+                # Computing on the fly coovariates
+                whale_paths, whale_idxs, whale_keys = self.catalog.get_whales()        
+                max_exec_order = 0
+                for i, whale in enumerate(whale_paths):
+                    _, params = parse_template_whale(whale)
+                    max_exec_order = max(max_exec_order, int(params['exec_order']))
+                
+                for exec_order in range(max_exec_order + 1):
+                    for i, whale in enumerate(whale_paths):
+                        func_name, params = parse_template_whale(whale)
+                        if exec_order != int(params['exec_order']):
+                            continue
+                        else:
+                            # @FIXME currently it is assued that only tags are used and not paths
+                            if func_name == 'percentileAggregation':                                
+                                tag = params['entry_template'][1:]
+                                in_idxs = []
+                                for dt in params['dt']:
+                                    in_idxs += [self.catalog.data[whale_keys[i]][tag.format(dt=dt)]['idx']]
+                                # @FIXME with this setting we do the sorting for percentiles N times for each used percentile
+                                # @FIXME implement the percentiles without the need of transposition
+                                array_sb = np.empty((len(in_idxs),self.cache.shape[1]), dtype=np.float32)
+                                array_sb_t = np.empty((array_sb.shape[1],array_sb.shape[0]), dtype=np.float32)
+                                array_pct_t = np.empty((array_sb.shape[1],1), dtype=np.float32)                               
+                                sb.extractArrayRows(self.cache, self.threads, array_sb, in_idxs)
+                                sb.transposeArray(array_sb, self.threads, array_sb_t)
+                                sb.computePercentiles(array_sb_t, self.threads, range(len(in_idxs)),
+                                        array_pct_t, [0], [float(params['percentile'])])
+                                self.cache[whale_idxs[i], :] = array_pct_t[:,0]
+                            elif func_name == 'computeNormalizedDifference':
+                                sb.computeNormalizedDifference(self.cache, self.threads,
+                                    [self.catalog.data[whale_keys[i]][params['idx_plus'][1:]]['idx']],
+                                    [self.catalog.data[whale_keys[i]][params['idx_minus'][1:]]['idx']],
+                                    [whale_idxs[i]], float(params['scale_plus']), float(params['scale_minus']),
+                                    float(params['scale_result']), float(params['offset_result']),
+                                    [float(params['clip'][0]), float(params['clip'][1])])
+                            elif func_name == 'computeSavi':                                
+                                sb.computeSavi(self.cache, self.threads,
+                                    [self.catalog.data[whale_keys[i]][params['idx_red'][1:]]['idx']],
+                                    [self.catalog.data[whale_keys[i]][params['idx_nir'][1:]]['idx']],
+                                    [whale_idxs[i]], float(params['scale_plus']), float(params['scale_minus']),
+                                    float(params['scale_result']), float(params['offset_result']),
+                                    [float(params['clip'][0]), float(params['clip'][1])])
+                            else:
+                                sys.exit(f"The whale function {func_name} is not available")
+                if convert_nan_to_num:
+                    sb.maskNan(self.cache, self.threads, range(self.cache.shape[0]), 0.0)
+    def get_pixels_valid_idx(self, num_years):
+        return np.concatenate([self._pixels_valid_idx + self.num_pixels * i for i in range(num_years)]).tolist()
+    def create_image_template(self, dtype, nodata, out_dir):
+        return _create_image_template(self.mask_path, self.tiles, self.tile_id, self.x_size, self.y_size, dtype, nodata, out_dir)
+    def fill_otf_constant(self, otf_name, otf_const):
+        otf_idx = self.catalog.get_otf_idx()
+        assert(otf_name in otf_idx)
+        otf_name_idx = otf_idx[otf_name]
+        self.cache[otf_name_idx] = otf_const
+#
+
+
 class DataLoader():
     def __init__(self, catalog:DataCatalog, tiles, mask_path, valid_mask_value) -> None:
         self.catalog = catalog
@@ -424,157 +605,4 @@ class DataLoader():
         otf_name_idx = otf_idx[otf_name]
         self.cache[otf_name_idx] = otf_const
 #
-def warp_tile(rank, tile_file, mosaic_paths, n_threads, n_pix, resample):
-    os.environ['USE_PYGEOS'] = '0'
-    os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
-    os.environ['NUMEXPR_MAX_THREADS'] = f'{n_threads}'
-    os.environ['NUMEXPR_NUM_THREADS'] = f'{n_threads}'
-    os.environ['OMP_THREAD_LIMIT'] = f'{n_threads}'
-    os.environ["OMP_NUM_THREADS"] = f'{n_threads}'
-    os.environ["OPENBLAS_NUM_THREADS"] = f'{n_threads}'
-    os.environ["MKL_NUM_THREADS"] = f'{n_threads}'
-    os.environ["VECLIB_MAXIMUM_THREADS"] = f'{n_threads}'    
-    import skmap_bindings as sb
-    gdal_opts = {
-        'GDAL_HTTP_VERSION': '1.0',
-        'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif',
-    }
-    warp_data = np.empty((n_pix,), dtype=np.float32)
-    sb.warpTile(warp_data, n_threads, gdal_opts, tile_file, mosaic_paths, resample)
-    
-    return warp_data
 
-class DataLoaderTiled():
-    def __init__(self, catalog:DataCatalog, mask_template_path, gdal_opts, num_gaia, resampling_strategy) -> None:
-        self.catalog = catalog
-        self.years = self.catalog.years
-        self.num_years = len(self.years)
-        self.mask_template_path = mask_template_path
-        self.otf_const_idx = {}
-        self.otf_indicator_params = []
-        self.gdal_opts = gdal_opts
-        self.cache = None
-        self.tile_id = None
-        self.x_off = None
-        self.y_off = None
-        self.x_size = None
-        self.y_size = None
-        self.num_pixels = None
-        self.mask = None
-        self.resampling_strategy = resampling_strategy
-        self._pixels_valid_idx = None
-        self.num_pixels_valid = None
-        self.threads = os.cpu_count() * 2
-        self.num_gaia = num_gaia
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        if size != 1:
-            print("This execution requires exactly one parent process.")
-            comm.Abort(1)
-    def free(self):
-        self.cache = None
-    def load_tile_data(self, tile_id):
-        self.tile_id = tile_id
-        self.mask_path = self.mask_template_path.format(tile=tile_id)
-        gdal_img = gdal.Open(self.mask_path)
-        self.x_size = gdal_img.RasterXSize
-        self.y_size = gdal_img.RasterYSize
-        self.x_off, self.y_off = (0, 0)
-        gt = gdal_img.GetGeoTransform()
-        gti = gdal.InvGeoTransform(gt)        
-        with TimeTracker(f"Tile {tile_id}/catalog {self.catalog.catalog_name} - load tile", True):
-            self.num_pixels = self.x_size * self.y_size
-            # prepare mask
-            with TimeTracker(f"Tile {self.tile_id} - prepare mask"):
-                self.mask = np.zeros((1, self.num_pixels), dtype=np.float32)
-                sb.readData(self.mask, 1, [self.mask_path], [0], self.x_off, self.y_off, self.x_size, self.y_size, [1], self.gdal_opts)
-                self._pixels_valid_idx = np.arange(0, self.num_pixels)[self.mask[0, :].astype(int).astype(bool)]
-                self.num_pixels_valid = int(np.sum(self.mask))
-            # read rasters
-            self.cache = np.empty((self.catalog.num_features, self.num_pixels), dtype=np.float32)
-            with TimeTracker(f"Tile {self.tile_id} - read images"):
-                paths, paths_idx = self.catalog.get_paths()
-                tile_paths, tile_idxs = zip(*[(path, idx) for path, idx in zip(paths, paths_idx) if '{tile}' in path])
-                mosaic_paths, mosaic_idxs = zip(*[(path, idx) for path, idx in zip(paths, paths_idx) if '{tile}' not in path])
-                tile_paths = [p.format(tile=self.tile_id) for p in tile_paths]
-                
-                # @FIXME this is not elegand and also not really working
-                tile_template_paths = [self.mask_path.replace("192.168.49.30", f"192.168.1.{str(random.randint(30, 30 + self.num_gaia - 1))}", 1)  for i in range(len(mosaic_paths))]
-                n_proc = len(tile_template_paths)
-                with MPIPoolExecutor(max_workers=n_proc) as executor:
-                    futures = [
-                        executor.submit(warp_tile, i, tile_paths[i], mosaic_paths[i], self.threads, self.num_pixels, self.resampling_strategy)
-                        for i in range(n_proc)
-                    ]
-                    for i, future in enumerate(futures):
-                        received_array = future.result()
-                        self.cache[mosaic_idxs[i], :] = received_array
-            
-                sb.readData(self.cache, self.threads, tile_paths, tile_idxs, self.x_off, self.y_off, 
-                                        self.x_size, self.y_size, [1], self.gdal_opts)
-                
-                whale_paths, whale_idxs, whale_keys = self.catalog.get_whales()        
-                max_exec_order = 0
-                for i, whale in enumerate(whale_paths):
-                    _, params = parse_template_whale(whale)
-                    max_exec_order = max(max_exec_order, int(params['exec_order']))
-                
-                for exec_order in range(max_exec_order + 1):
-                    for i, whale in enumerate(whale_paths):
-                        func_name, params = parse_template_whale(whale)
-                        if exec_order != int(params['exec_order']):
-                            continue
-                        else:
-                            # @FIXME currently it is assued that only tags are used and not paths
-                            if func_name == 'percentileAggregation':                                
-                                tag = params['entry_template'][1:]
-                                in_idxs = []
-                                for dt in params['dt']:
-                                    in_idxs += [self.catalog.data[whale_keys[i]][tag.format(dt=dt)]['idx']]
-                                # @FIXME with this setting we do the sorting for percentiles N times for each used percentile
-                                # @FIXME implement the percentiles without the need of transposition
-                                array_sb = np.empty((len(in_idxs),self.cache.shape[1]), dtype=np.float32)
-                                array_sb_t = np.empty((array_sb.shape[1],array_sb.shape[0]), dtype=np.float32)
-                                array_pct_t = np.empty((array_sb.shape[1],1), dtype=np.float32)                               
-                                sb.extractArrayRows(self.cache, self.threads, array_sb, in_idxs)
-                                sb.transposeArray(array_sb, self.threads, array_sb_t)
-                                sb.computePercentiles(array_sb_t, self.threads, range(len(in_idxs)),
-                                        array_pct_t, [0], [float(params['percentile'])])
-                                self.cache[whale_idxs[i], :] = array_pct_t[:,0]
-                            elif func_name == 'computeNormalizedDifference':
-                                sb.computeNormalizedDifference(self.cache, self.threads,
-                                    [self.catalog.data[whale_keys[i]][params['idx_plus'][1:]]['idx']],
-                                    [self.catalog.data[whale_keys[i]][params['idx_minus'][1:]]['idx']],
-                                    [whale_idxs[i]], float(params['scale_plus']), float(params['scale_minus']),
-                                    float(params['scale_result']), float(params['offset_result']),
-                                    [float(params['clip'][0]), float(params['clip'][1])])
-                            elif func_name == 'computeSavi':                                
-                                sb.computeSavi(self.cache, self.threads,
-                                    [self.catalog.data[whale_keys[i]][params['idx_red'][1:]]['idx']],
-                                    [self.catalog.data[whale_keys[i]][params['idx_nir'][1:]]['idx']],
-                                    [whale_idxs[i]], float(params['scale_plus']), float(params['scale_minus']),
-                                    float(params['scale_result']), float(params['offset_result']),
-                                    [float(params['clip'][0]), float(params['clip'][1])])
-                            else:
-                                sys.exit(f"The whale function {func_name} is not available")
-
-    def get_pixels_valid_idx(self, num_years):
-        return np.concatenate([self._pixels_valid_idx + self.num_pixels * i for i in range(num_years)]).tolist()
-    def create_image_template(self, dtype, nodata, out_dir):
-        return _create_image_template(self.mask_path, self.tiles, self.tile_id, self.x_size, self.y_size, dtype, nodata, out_dir)
-    def prep_otf_indicator(self, otf_path, otf_name, otf_code, gdal_opts):
-        self.otf_indicator_params.append({'otf_path':otf_path,'otf_name':otf_name,'otf_code':otf_code,'gdal_opts':gdal_opts})
-    def fill_otf_indicator(self, otf_path, otf_name, otf_code, gdal_opts):
-        otf_idx = self.catalog.get_otf_idx()
-        if not otf_name in otf_idx: return
-        print(f'catalog {self.catalog.catalog_name} - fill otf {otf_name}')
-        otf_name_idx = otf_idx[otf_name]
-        otf_path = [otf_path for _ in otf_name_idx]
-        sb.readData(self.cache, 1, otf_path, otf_name_idx, self.x_off, self.y_off, self.x_size, self.y_size, [1,], gdal_opts)
-        self.cache[otf_name_idx] = (self.cache[otf_name_idx] == otf_code) * 1.0
-    def fill_otf_constant(self, otf_name, otf_const):
-        otf_idx = self.catalog.get_otf_idx()
-        assert(otf_name in otf_idx)
-        otf_name_idx = otf_idx[otf_name]
-        self.cache[otf_name_idx] = otf_const
-#

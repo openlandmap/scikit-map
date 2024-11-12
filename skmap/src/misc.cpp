@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 //#include <cpl_conv.h>
 //#include <ogr_spatialref.h>
 

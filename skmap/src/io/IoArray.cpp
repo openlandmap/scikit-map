@@ -144,7 +144,7 @@ namespace skmap {
                            std::optional<float_t> value_to_mask,
                            std::optional<float_t> value_to_set)
     {
-        skmapAssertIfTrue((uint_t) m_data.cols() < x_size * y_size, "scikit-map ERROR 0: reading region size smaller then the number of columns");
+        skmapAssertIfTrue((uint_t) m_data.cols() < x_size * y_size, "scikit-map ERROR 0A: reading region size smaller then the number of columns");
         auto readTiff = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
         {
             std::string file_loc = file_locs[i];
@@ -159,14 +159,16 @@ namespace skmap {
                            std::vector<uint_t> perm_vec,
                            std::vector<uint_t> x_off_vec,
                            std::vector<uint_t> y_off_vec,
-                           uint_t x_size,
-                           uint_t y_size,
+                           std::vector<uint_t> x_size_vec,
+                           std::vector<uint_t> y_size_vec,
                            GDALDataType read_type,
                            std::vector<int> bands_list,
                            std::optional<std::vector<float_t>> value_to_mask_vec,
                            std::optional<float_t> value_to_set)
     {
-        skmapAssertIfTrue((uint_t) m_data.cols() < x_size * y_size, "scikit-map ERROR 0: reading region size smaller then the number of columns");
+        skmapAssertIfTrue((uint_t) m_data.cols() < 
+            (*std::max_element(x_size_vec.begin(), x_size_vec.end())) * 
+            (*std::max_element(y_size_vec.begin(), y_size_vec.end())), "scikit-map ERROR 0B: reading region size smaller then the number of columns");
         auto readTiffBlock = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
         {
             std::string file_loc = file_locs[i];
@@ -174,7 +176,7 @@ namespace skmap {
                 (value_to_mask_vec.has_value() && value_to_mask_vec->size() > i)
                 ? std::optional<float_t>(value_to_mask_vec.value()[i])
                 : std::nullopt;
-            this->readDataCore(row, file_loc, x_off_vec[i], y_off_vec[i], x_size, y_size, read_type, bands_list, value_to_mask, value_to_set);
+            this->readDataCore(row, file_loc, x_off_vec[i], y_off_vec[i], x_size_vec[i], y_size_vec[i], read_type, bands_list, value_to_mask, value_to_set);
         };
         this->parRowPerm(readTiffBlock, perm_vec);
     }
