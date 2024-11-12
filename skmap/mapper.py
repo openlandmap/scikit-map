@@ -1716,11 +1716,13 @@ class SpaceOverlay():
         for i, key in enumerate(keys):
             key_layer_ids = [int(l) for l in list(layers[layers['group'] == key]['layer_id'])]
             key_query_pixels = query_pixels[key]
-            unique_blocks = key_query_pixels[['block_id', 'block_col_off', 'block_row_off']].drop_duplicates('block_id')
+            unique_blocks = key_query_pixels[['block_id', 'block_col_off', 'block_row_off', 'block_height', 'block_width']].drop_duplicates('block_id')
             unique_blocks_ids = unique_blocks['block_id'].tolist()
             key_layer_ids_comb, unique_blocks_ids_comb = map(list, zip(*product(key_layer_ids, unique_blocks_ids)))
             block_row_off_comb = [unique_blocks.query(f"block_id == @ubid")['block_row_off'].iloc[0] for ubid in unique_blocks_ids_comb]
             block_col_off_comb = [unique_blocks.query(f"block_id == @ubid")['block_col_off'].iloc[0] for ubid in unique_blocks_ids_comb]
+            block_height_comb = [unique_blocks.query(f"block_id == @ubid")['block_height'].iloc[0] for ubid in unique_blocks_ids_comb]
+            block_width_comb = [unique_blocks.query(f"block_id == @ubid")['block_width'].iloc[0] for ubid in unique_blocks_ids_comb]
             key_layer_paths_comb = [f'/vsicurl/{path}' if path.startswith("http") and path.endswith(".tif") else path
                     for path in (str(layers.query(f"layer_id == @ulid")['path'].iloc[0]) for ulid in key_layer_ids_comb)]            
             key_layer_nodatas_comb = [np.nan if layers.query(f"layer_id == @ulid")['nodata'].iloc[0] is None 
@@ -1731,16 +1733,9 @@ class SpaceOverlay():
                 block_tile_id_comb = [key_query_pixels.query(f"block_id == @ubid")['tile_id'].iloc[0] for ubid in unique_blocks_ids_comb]
                 for j in range(n_comb):            
                     key_layer_paths_comb[j] = key_layer_paths_comb[j].format(tile_id=block_tile_id_comb[j])
-            block_height = list(layers[layers['group'] == key]['block_height'])[0]
-            block_width = list(layers[layers['group'] == key]['block_width'])[0]
-            
-            # block_height_comb = []
-            # block_width_comb = []
-            # for j in range(n_comb):
-            #     block_height_comb = 
-            #     block_width_comb = 
-
-            n_block_pix = np.max(block_heights * block_widths)
+            block_height = max(block_height_comb)
+            block_width = max(block_width_comb)
+            n_block_pix = block_height * block_width
             bands_list = [1]
             # Factor 2 is heuristic to keep margin for temporary variables
             max_comb_chunk = int(np.ceil((max_ram_mb - data_overlay.size*4/1024/1024)*1024*1024/4/n_block_pix/2))
@@ -1749,6 +1744,8 @@ class SpaceOverlay():
                 key_layer_paths_chunk = key_layer_paths_comb[chunk_start:chunk_start + max_comb_chunk]
                 block_col_off_chunk = block_col_off_comb[chunk_start:chunk_start + max_comb_chunk]
                 block_row_off_chunk = block_row_off_comb[chunk_start:chunk_start + max_comb_chunk]
+                block_height_chunk = block_height_comb[chunk_start:chunk_start + max_comb_chunk]
+                block_width_chunk = block_width_comb[chunk_start:chunk_start + max_comb_chunk]
                 key_layer_nodatas_chunk = key_layer_nodatas_comb[chunk_start:chunk_start + max_comb_chunk]
                 unique_blocks_ids_chunk = unique_blocks_ids_comb[chunk_start:chunk_start + max_comb_chunk]
                 key_layer_ids_chunk = key_layer_ids_comb[chunk_start:chunk_start + max_comb_chunk]
@@ -1756,9 +1753,12 @@ class SpaceOverlay():
                 data_array = np.empty((chunk_size, n_block_pix), dtype=np.float32)
                 perm_vec = range(chunk_size)
                 sb.readDataBlocks(data_array, self.max_workers, key_layer_paths_chunk, perm_vec, block_col_off_chunk, block_row_off_chunk,
-                                            block_width, block_height, bands_list, gdal_opts, key_layer_nodatas_chunk, np.nan)
-                # pix_inblock_idxs = (key_query_pixels['sample_row'] * block_width + key_query_pixels['sample_col']).tolist()
+                                            block_width_chunk, block_height_chunk, bands_list, gdal_opts, key_layer_nodatas_chunk, np.nan)
                 pix_blok_ids = key_query_pixels['block_id'].tolist()
+                sample_rows = key_query_pixels['sample_row'].tolist()
+                sample_cols = key_query_pixels['sample_col'].tolist()
+                pix_inblock_idxs = [sample_rows[k] * unique_blocks.query(f"block_id == @ubid")['block_width'].iloc[0] + sample_cols[k] \
+                    for k, ubid in enumerate(pix_blok_ids)]
                 sb.extractOverlay(data_array, self.max_workers, pix_blok_ids, pix_inblock_idxs, unique_blocks_ids_chunk, key_layer_ids_chunk, data_overlay)
         return data_overlay
     
