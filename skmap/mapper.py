@@ -1483,7 +1483,7 @@ class _ParallelOverlay:
 
         key = ''.join([
           str(default_tile_id), 
-          str(src.height), str(src.width), 
+          str(src.height), str(src.width),
           str(src.block_shapes[0]), 
           str(src.transform.to_gdal())
         ])
@@ -1574,6 +1574,8 @@ class _ParallelOverlay:
             block['y'] = block.geometry.y
             block['block_col_off'] = window.col_off
             block['block_row_off'] = window.row_off
+            block['block_width'] = window.width
+            block['block_height'] = window.height
 
             block.loc[:,'sample_col'], block.loc[:,'sample_row'] = inv_block_transform * (block['x'], block['y'])
             block['sample_col'] = block['sample_col'].astype('int')
