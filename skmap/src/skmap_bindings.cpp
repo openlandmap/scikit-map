@@ -86,8 +86,8 @@ void readDataBlocks(Eigen::Ref<MatFloat> data,
               const std::vector<uint_t> perm_vec,
               const std::vector<uint_t> x_off_vec,
               const std::vector<uint_t> y_off_vec,
-              const uint_t x_size,
-              const uint_t y_size,
+              const std::vector<uint_t> x_size_vec,
+              const std::vector<uint_t> y_size_vec,
               const std::vector<int> bands_list,
               py::dict conf_GDAL,
               std::optional<std::vector<float_t>> value_to_mask_vec,
@@ -95,7 +95,7 @@ void readDataBlocks(Eigen::Ref<MatFloat> data,
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.readDataBlocks(file_locs, perm_vec, x_off_vec, y_off_vec, x_size, y_size, GDALDataType::GDT_Float32,
+    ioArray.readDataBlocks(file_locs, perm_vec, x_off_vec, y_off_vec, x_size_vec, y_size_vec, GDALDataType::GDT_Float32,
                      bands_list, value_to_mask_vec, value_to_set);
 }
 
