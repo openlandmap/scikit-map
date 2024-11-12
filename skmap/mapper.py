@@ -1570,6 +1570,7 @@ class _ParallelOverlay:
 
         for (ij, block) in gdf_blocks.groupby('block_id'):
             inv_block_transform = block['inv_transform'].iloc[0]
+            window = block['window'].iloc[0]
             block['x'] = block.geometry.x
             block['y'] = block.geometry.y
             block['block_col_off'] = window.col_off
