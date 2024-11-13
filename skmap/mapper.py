@@ -1449,21 +1449,7 @@ class _ParallelOverlay:
         ).apply(_ParallelOverlay._layer_metadata, default_tile_id=self.default_tile_id, axis=1)
 
         self.query_pixels = self._find_blocks(samples)
-        self.out_shape = (samples.shape[0], len(self.raster_files))
 
-        self.fn_array = 'file://' + str(make_tempfile(suffix='_overlay'))
-        #self.result = sa.create(self.fn_array, self.out_shape, dtype=np.float32)
-        #self.result[:] = np.nan
-
-        self.args = []
-
-        for ind_layer, layer in self.layers.iterrows(): #range(0, len(self.raster_files)):
-            blocks = self.query_pixels[layer['group']]
-            for window, block in blocks.groupby('block_id'):
-                (ind_samples, col, row) = block.index, block['sample_col'], block['sample_row']
-                self.args.append(
-                    (self.fn_array, layer['path'], window, ind_layer, ind_samples, col, row, layer['nodata'])
-                )
 
         if self.verbose:
                 ttprint(f"Number of blocks to read: {len(self.args )}")
@@ -1678,7 +1664,6 @@ class SpaceOverlay():
             points = gpd.read_file(points)
 
         self.pts = points
-        #self.pts['overlay_id'] = range(1,len(self.pts)+1)
         self.max_workers = max_workers
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
@@ -1705,13 +1690,6 @@ class SpaceOverlay():
         df = pd.DataFrame(data_overlay.T, columns=self.feat_names)
 
         self.pts_out = pd.concat([self.pts.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
-
-        # result = self.parallelOverlay.run()
-        # for col in result:
-        #     new_col = col
-        #     for newname in dict_newnames.keys():
-        #         new_col = re.sub(dict_newnames[newname], newname, new_col)
-        #     self.pts.loc[:,new_col] = result[col]
 
         return self.pts_out
     
