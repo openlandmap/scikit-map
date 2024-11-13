@@ -41,6 +41,7 @@ from shapely import box
 from skmap import parallel
 from skmap.misc import ttprint, find_files
 from skmap.io import read_rasters
+from skmap.catalog import DataCatalog
 import skmap_bindings as sb
 
 #import SharedArray as sa
@@ -1658,7 +1659,7 @@ class SpaceOverlay():
 
     def __init__(self,
         points,
-        fn_layers:List[str] = [],
+        catalog:DataCatalog = [],
         dir_layers:List[str] = [],
         regex_layers = '*.tif',
         raster_tiles:Union[gpd.GeoDataFrame, str] = None,
@@ -1667,10 +1668,11 @@ class SpaceOverlay():
         verbose:bool = True
     ):
 
-        if len(fn_layers) == 0:
-            fn_layers = find_files(dir_layers, regex_layers)
 
-        self.fn_layers = [ l for l in fn_layers ]
+        self.catalog = catalog
+
+        self.fn_layers, self.layer_idxs = self.catalog.get_paths()
+        self.feat_names = [self.catalog.features[self.layer_idxs[i]] for i in range(len(self.layer_idxs))]
 
         if not isinstance(points, gpd.GeoDataFrame):
             points = gpd.read_file(points)
@@ -1680,31 +1682,38 @@ class SpaceOverlay():
         self.max_workers = max_workers
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
-            fn_layers, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
+            self.fn_layers, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
             max_workers=self.max_workers, verbose=verbose)
 
     def run(self,
-        dict_newnames:set = {}
+        max_ram_mb:int,
+        gdal_opts = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'},
     ):
         """
         Execute the space overlay.
 
-        :param dict_newnames: A dictionary used to update the column names after the overlay.
-            The ``key`` is the new name and the ``value`` is the raster file name (without extension).
+        :param gdal_opts: Options for GDAL in a dictionary.
+
+        :param max_ram_mb: Maximum RAM that can be used for the overlay expressed in MB.
 
         :returns: Data frame with the original columns plus the overlay result (one new
             column per raster).
         :rtype: geopandas.GeoDataFrame
         """
-        result = self.parallelOverlay.run()
 
-        for col in result:
-            new_col = col
-            for newname in dict_newnames.keys():
-                new_col = re.sub(dict_newnames[newname], newname, new_col)
-            self.pts.loc[:,new_col] = result[col]
+        data_overlay = self.read_data(gdal_opts, max_ram_mb)
+        df = pd.DataFrame(data_overlay.T, columns=self.feat_names)
 
-        return self.pts
+        self.pts_out = pd.concat([self.pts.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
+
+        # result = self.parallelOverlay.run()
+        # for col in result:
+        #     new_col = col
+        #     for newname in dict_newnames.keys():
+        #         new_col = re.sub(dict_newnames[newname], newname, new_col)
+        #     self.pts.loc[:,new_col] = result[col]
+
+        return self.pts_out
     
     def read_data(self, gdal_opts, max_ram_mb):
         layers = self.parallelOverlay.layers
@@ -1795,7 +1804,7 @@ class SpaceTimeOverlay():
     def __init__(self,
         points,
         col_date:str,
-        fn_layers:List[str] = [],
+        catalog:DataCatalog = [],
         raster_tiles:Union[gpd.GeoDataFrame, str] = None,
         tile_id_col:Union[str] = 'tile_id',
         max_workers:int = parallel.CPU_COUNT,
@@ -1808,41 +1817,29 @@ class SpaceTimeOverlay():
         self.pts = points
         self.col_date = col_date
         self.overlay_objs = {}
+        self.year_catalogs = {}
         self.verbose = verbose
-        self.year_placeholder = '{year}'
+        self.catalog = catalog
 
         self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
         self.uniq_years = self.pts[self.col_date].dt.year.unique()
 
-        self.fn_layers = [ l for l in fn_layers ]
 
         for year in self.uniq_years:
 
             year = int(year)
             year_points = self.pts[self.pts[self.col_date].dt.year == year]
 
-            fn_layers_year = []
-            for fn_layer in self.fn_layers:
-                fn_layers_year.append(self._replace_year(fn_layer, year))
+            self.year_catalogs[str(year)] = catalog.query_all_features(f'catalog_{str(year)}', [str(year)])
+            fn_layers_year, _ = self.year_catalogs[str(year)].get_paths()
 
             if self.verbose:
                 ttprint(f'Overlay {len(year_points)} points from {year} in {len(fn_layers_year)} raster layers')
 
-            self.overlay_objs[year] = SpaceOverlay(points=year_points, fn_layers=fn_layers_year,
-                raster_tiles=raster_tiles, tile_id_col=tile_id_col, max_workers=max_workers, verbose=verbose)
+            # self.overlay_objs[str(year)] = SpaceOverlay(points=year_points, fn_layers=fn_layers_year,
+            #     raster_tiles=raster_tiles, tile_id_col=tile_id_col, max_workers=max_workers, verbose=verbose)
 
-    def _replace_year(self, fn_layer, year = None):
-        y, y_m1, y_p1 = ('', '', '')
-        if year != None:
-            y, y_m1, y_p1 = str(year), str((year - 1)), str((year + 1))
-
-        fn_layer = str(fn_layer)
-
-        return fn_layer \
-                .replace('{year}', y) \
-                .replace('{year_minus_1}', y_m1) \
-                .replace('{year_plus_1}', y_p1) \
-
+    
     def run(self):
         """
         Execute the spacetime overlay. It removes the year part from the column names.
@@ -1855,24 +1852,26 @@ class SpaceTimeOverlay():
         """
         self.result = None
 
-        for year in self.uniq_years:
+        # for year in self.uniq_years:
+        #     fn_layers_year, paths_idx = self.year_catalogs[str(year)].get_paths()
+        #     year = int(year)
 
-            year_newnames = {}
-            for fn_layer in self.fn_layers:
+        #     year_newnames = {}
+        #     for fn_layer in self.fn_layers:
 
-                name = str(fn_layer.stem)
-                curname = self._replace_year(name, year)
-                newname = self._replace_year(name)
+        #         name = str(fn_layer.stem)
+        #         curname = self._replace_year(name, year)
+        #         newname = self._replace_year(name)
 
-                year_newnames[newname] = curname
+        #         year_newnames[newname] = curname
 
-            if self.verbose:
-                ttprint(f'Running the overlay for {year}')
-            year_result = self.overlay_objs[year].run(year_newnames)
+        #     if self.verbose:
+        #         ttprint(f'Running the overlay for {year}')
+        #     year_result = self.overlay_objs[year].run(year_newnames)
 
-            if self.result is None:
-                self.result = year_result
-            else:
-                self.result = pd.concat([self.result, year_result], ignore_index=True)
+        #     if self.result is None:
+        #         self.result = year_result
+        #     else:
+        #         self.result = pd.concat([self.result, year_result], ignore_index=True)
 
         return self.result

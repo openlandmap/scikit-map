@@ -238,11 +238,18 @@ class DataCatalog():
         self.features = features
         self.num_features = num_features
     @staticmethod
-    def _get_years(json_data):
-        return list({k for k in json_data.keys() if k != 'static'})
+    def _get_years(data):
+        return list({k for k in data.keys() if k != 'static'})
     @staticmethod
-    def _get_features(json_data):
-        return list({k for v in json_data.values() for k in v.keys()})
+    def _get_ordered_features(data):
+        sorted_keys = []
+        for key, inner_dict in data.items():
+            key_l2_with_idx = [(key_l2, inner_dict[key_l2]['idx']) for key_l2 in inner_dict]
+            sorted_key_l2 = sorted(key_l2_with_idx, key=lambda x: x[1])
+            sorted_keys.extend([key for key, _ in sorted_key_l2])
+        return sorted_keys
+    def _get_features(data):
+        return list({k for v in data.values() for k in v.keys()})
     @classmethod
     def read_catalog(cls, catalog_name, path, additional_otf_names = None):
         json_data = read_json(path)
@@ -262,9 +269,12 @@ class DataCatalog():
                 num_features += 1
         if additional_otf_names is not None:
             for k in additional_otf_names:
+                if k not in data:
+                    data[k] = {}
                 for otf in additional_otf_names[k]:
                     data[k][otf] = {'path': additional_otf_names[k][otf], 'idx': num_features}
                     num_features += 1
+        features = cls._get_ordered_features(data)
         return DataCatalog(catalog_name, data, years, features, num_features)
     def get_paths(self):
         # prepare temporal and static paths and indexes
@@ -330,6 +340,20 @@ class DataCatalog():
         # recurisvely get the dependencies here and create a new catalog that includes them
         data, num_features = tmp_catalog.expand_whales_dependencies(self.data, data, num_features)
         return DataCatalog(catalog_name, data, years, features, num_features)
+    def query_all_features(self, catalog_name, entries):
+        data = {}
+        num_features = 0
+        # features - populate static and temporal entries
+        for k in entries:
+            for f in self.data[k]:
+                if k not in data:
+                    data[k] = {}
+                data[k][f] = {'path': self.data[k][f]['path'], 'idx': num_features}
+                num_features += 1
+        tmp_catalog = DataCatalog(catalog_name, data, years, self._get_features(data), num_features)
+        # recurisvely get the dependencies here and create a new catalog that includes them
+        data, num_features = tmp_catalog.expand_whales_dependencies(self.data, data, num_features)
+        return DataCatalog(catalog_name, data, years, self._get_features(data), num_features)
     def expand_whales_dependencies(self, main_catalog, data, num_features):
         whales_paths, _, keys = self.get_whales()
         for i, whale in enumerate(whales_paths):
