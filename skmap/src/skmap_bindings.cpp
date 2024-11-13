@@ -301,6 +301,16 @@ void offsetAndScale(Eigen::Ref<MatFloat> data,
 }
 
 
+void offsetsAndScales(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    std::vector<uint_t> row_select,
+                    Eigen::Ref<VecFloat> offsets,
+                    Eigen::Ref<VecFloat> scalings)
+{
+    TransArray transArray(data, n_threads);
+    transArray.offsetsAndScales(row_select, offsets, scalings);
+}
+
 void nanMean(Eigen::Ref<MatFloat> data,
              const uint_t n_threads,
              Eigen::Ref<VecFloat> out_data)
@@ -629,6 +639,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("extractArrayCols", &extractArrayCols, "Extract array cols");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
     m.def("reorderArray", &reorderArray, "Reorder an array into a new one");
+    m.def("offsetsAndScales", &offsetsAndScales, "Add offsets and muplitply by scalings each array row selected");
     m.def("offsetAndScale", &offsetAndScale, "Add an offset and muplitply by a scaling each array element");
     m.def("inverseReorderArray", &inverseReorderArray, "Reorder and transpose an array into a new one");
     m.def("writeByteData", &writeByteData, 

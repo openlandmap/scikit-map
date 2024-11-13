@@ -557,6 +557,20 @@ namespace skmap {
 
 
 
+    void TransArray::offsetsAndScales(std::vector<uint_t> row_select,
+                                    Eigen::Ref<VecFloat> offsets,
+                                    Eigen::Ref<VecFloat> scalings)
+    {
+        auto offsetsAndScalesRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
+        {            
+            row = (row.array() * + offsets(row_select[i])) * scalings(row_select[i]);
+        };
+        this->parRowPerm(offsetsAndScalesRow, row_select);
+    }
+
+
+
+
     void TransArray::maskDifference(float_t diff_th,
                                     uint_t count_th,
                                     Eigen::Ref<MatFloat> ref_data,
