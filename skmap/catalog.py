@@ -25,9 +25,9 @@ os.environ['NUMEXPR_MAX_THREADS'] = f'{n_threads}'
 os.environ['NUMEXPR_NUM_THREADS'] = f'{n_threads}'
 os.environ['OMP_THREAD_LIMIT'] = f'{n_threads}'
 os.environ["OMP_NUM_THREADS"] = f'{n_threads}'
-os.environ["OPENBLAS_NUM_THREADS"] = f'{n_threads}' # export OPENBLAS_NUM_THREADS=4 
-os.environ["MKL_NUM_THREADS"] = f'{n_threads}' # export MKL_NUM_THREADS=6
-os.environ["VECLIB_MAXIMUM_THREADS"] = f'{n_threads}' # export VECLIB_MAXIMUM_THREADS=4
+os.environ["OPENBLAS_NUM_THREADS"] = f'{n_threads}' 
+os.environ["MKL_NUM_THREADS"] = f'{n_threads}'
+os.environ["VECLIB_MAXIMUM_THREADS"] = f'{n_threads}'
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import shared_memory
 

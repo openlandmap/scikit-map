@@ -16,6 +16,17 @@ import gc
 import re
 import os
 from itertools import product
+n_threads = os.cpu_count() * 2
+os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
+os.environ['USE_PYGEOS'] = '0'
+os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
+os.environ['NUMEXPR_MAX_THREADS'] = f'{n_threads}'
+os.environ['NUMEXPR_NUM_THREADS'] = f'{n_threads}'
+os.environ['OMP_THREAD_LIMIT'] = f'{n_threads}'
+os.environ["OMP_NUM_THREADS"] = f'{n_threads}'
+os.environ["OPENBLAS_NUM_THREADS"] = f'{n_threads}' 
+os.environ["MKL_NUM_THREADS"] = f'{n_threads}'
+os.environ["VECLIB_MAXIMUM_THREADS"] = f'{n_threads}'
 
 from sklearn.model_selection import cross_val_predict, GridSearchCV, KFold, BaseCrossValidator
 from sklearn.utils.validation import has_fit_parameter
@@ -35,7 +46,7 @@ import geopandas as gpd
 import pandas as pd
 import numpy as np
 import rasterio
-
+from shapely.geometry import Point
 from shapely import box
 
 from skmap import parallel
@@ -1450,9 +1461,6 @@ class _ParallelOverlay:
 
         self.query_pixels = self._find_blocks(samples)
 
-
-        if self.verbose:
-                ttprint(f"Number of blocks to read: {len(self.args )}")
     
     @staticmethod
     def _layer_metadata(row, default_tile_id):
@@ -1521,7 +1529,6 @@ class _ParallelOverlay:
 
         if _ParallelOverlay._is_tiled(path):
           
-          args = []
 
           samp_tiles = self.raster_tiles.sjoin(samples.to_crs(self.raster_tiles.crs), how='inner')[self.tile_id_col].unique()
           raster_tiles = self.raster_tiles[self.raster_tiles[self.tile_id_col].isin(samp_tiles)]
@@ -1595,22 +1602,7 @@ class _ParallelOverlay:
         
         return query_pixels
 
-    def run(self):
-        
-        if self.verbose:
-            ttprint(f'Running overlay in parallel.')
-        
-        for r in parallel.ProcessGeneratorLazy2(_ParallelOverlay._sample, self.args):
-            continue
-        
-        result = {}
-        for layer_name, i in zip(self.layer_names, range(0,self.result.shape[1])):
-                result[layer_name] = self.result[:,i]
-        
-        if self.verbose:
-            ttprint(f'End')
-        
-        return result
+
 
 class SpaceOverlay():
     """
@@ -1644,7 +1636,7 @@ class SpaceOverlay():
 
 
     def __init__(self,
-        points,
+        points:Union[gpd.GeoDataFrame, str],
         catalog:DataCatalog = [],
         dir_layers:List[str] = [],
         regex_layers = '*.tif',
@@ -1661,8 +1653,9 @@ class SpaceOverlay():
         self.feat_names = [self.catalog.features[self.layer_idxs[i]] for i in range(len(self.layer_idxs))]
 
         if not isinstance(points, gpd.GeoDataFrame):
-            points = gpd.read_file(points)
-
+            pq_points = pd.read_parquet(points)
+            pq_points['geometry'] = pq_points.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
+            points = gpd.GeoDataFrame(pq_points, geometry='geometry')
         self.pts = points
         self.max_workers = max_workers
 
@@ -1672,6 +1665,7 @@ class SpaceOverlay():
 
     def run(self,
         max_ram_mb:int,
+        out_file_name:str,
         gdal_opts = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'},
     ):
         """
@@ -1685,11 +1679,16 @@ class SpaceOverlay():
             column per raster).
         :rtype: geopandas.GeoDataFrame
         """
-
         data_overlay = self.read_data(gdal_opts, max_ram_mb)
         df = pd.DataFrame(data_overlay.T, columns=self.feat_names)
 
         self.pts_out = pd.concat([self.pts.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
+
+        self.pts_out['lon'] = self.pts_out['geometry'].x
+        self.pts_out['lat'] = self.pts_out['geometry'].y
+        self.pts_out = self.pts_out.drop(columns=['geometry'])
+        if out_file_name is not None:
+            self.pts_out.to_parquet(out_file_name)
 
         return self.pts_out
     
