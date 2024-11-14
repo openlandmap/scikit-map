@@ -563,7 +563,7 @@ namespace skmap {
     {
         auto offsetsAndScalesRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
         {            
-            row = (row.array() * + offsets(row_select[i])) * scalings(row_select[i]);
+            row = (row.array() + offsets(row_select[i])) * scalings(row_select[i]);
         };
         this->parRowPerm(offsetsAndScalesRow, row_select);
     }
