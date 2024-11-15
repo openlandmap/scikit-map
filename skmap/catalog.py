@@ -15,6 +15,7 @@ import subprocess
 import shutil
 import sys
 import re
+import pandas as pd
 import skmap.misc
 from skmap.misc import TimeTracker
 n_threads = os.cpu_count() * 2
@@ -109,6 +110,46 @@ def read_json(path):
         items = json.load(file)
     return items
 #
+
+
+def catalog_from_csv(
+        csv_in_path:str,
+        json_out_path:str,
+        years,
+    ):
+    covar = pd.read_csv(
+        csv_in_path, 
+        dtype={
+            'tile': int, 
+            'start_{year}': int, 
+            'end_{year}': int, 
+            'exec_order': int
+        }
+    )
+
+    # Static part
+    covar_static = covar[covar['type'] == 'common']
+    url_static = covar_static.set_index('layer_name')['path'].to_dict()
+    static = {'common': {layer_name: path for layer_name, path in url_static.items()}}
+
+    # Temporal part
+    covar_temp = covar[covar['type'] == 'temporal']
+    url_temp = covar_temp.set_index('layer_name')['path'].to_dict()
+    assert len(covar_temp) == len(url_temp), "The catalog could contain duplicated layer names. This is not allowed, fix this and retry."
+
+    temporal = {
+        str(year): {
+            layer_name: path.format(year=str(min(max(year, covar_temp.loc[i, 'start_year']), covar_temp.loc[i, 'end_year'])))
+            for i, (layer_name, path) in enumerate(url_temp.items())
+        }
+        for year in years
+    }
+    # Combine static and temporal dictionaries into catalog
+    catalog = {**static, **temporal}
+
+    with open(json_out_path, "w") as f:
+        json.dump(catalog, f, indent=4)
+
 
 
 
@@ -239,7 +280,7 @@ class DataCatalog():
         self.num_features = num_features
     @staticmethod
     def _get_years(data):
-        return list({k for k in data.keys() if k != 'static'})
+        return list({k for k in data.keys() if k != 'common'})
     @staticmethod
     def _get_ordered_features(data):
         sorted_keys = []
@@ -248,8 +289,9 @@ class DataCatalog():
             sorted_key_l2 = sorted(key_l2_with_idx, key=lambda x: x[1])
             sorted_keys.extend([key for key, _ in sorted_key_l2])
         return sorted_keys
-    def _get_features(data):
-        return list({k for v in data.values() for k in v.keys()})
+    @staticmethod
+    def _get_features(json_data):
+        return list({k for v in json_data.values() for k in v.keys()})
     @classmethod
     def read_catalog(cls, catalog_name, path, additional_otf_names = None):
         json_data = read_json(path)
@@ -257,7 +299,7 @@ class DataCatalog():
         features = cls._get_features(json_data)
         # features - populate static and temporal entries
         data = {}
-        entries = ['static'] + years
+        entries = ['common'] + years
         num_features = 0
         for k in entries:
             for f in features:
@@ -316,7 +358,7 @@ class DataCatalog():
         return otf_idx
     def query(self, catalog_name, years, features):
         data = {}
-        entries = ['static'] + years
+        entries = ['common'] + years
         num_features = 0
         # features - populate static and temporal entries
         for k in entries:
@@ -369,8 +411,8 @@ class DataCatalog():
             k = self.years[j]
             for i in range(len(covs_lst)):
                 c = covs_lst[i]
-                if c in self.data['static']:
-                    covs_idx[i, j] = self.data['static'][c]['idx']
+                if c in self.data['common']:
+                    covs_idx[i, j] = self.data['common'][c]['idx']
                 elif c in self.data[k]:
                     covs_idx[i, j] = self.data[k][c]['idx']
                 else:
