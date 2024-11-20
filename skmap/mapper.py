@@ -1649,7 +1649,8 @@ class SpaceOverlay():
         self.catalog = catalog
 
         self.fn_layers, self.layer_idxs = self.catalog.get_paths()
-        self.feat_names = [self.catalog.features[self.layer_idxs[i]] for i in range(len(self.layer_idxs))]
+        features = self.catalog.get_features()
+        self.feat_names = [features[self.layer_idxs[i]] for i in range(len(self.layer_idxs))]
 
         if not isinstance(points, gpd.GeoDataFrame):
             pq_points = pd.read_parquet(points)
@@ -1804,13 +1805,13 @@ class SpaceTimeOverlay():
         self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
         self.uniq_years = self.pts[self.col_date].dt.year.unique()
 
-
         for year in self.uniq_years:
 
             year = int(year)
             self.year_points[str(year)] = self.pts[self.pts[self.col_date].dt.year == year]
-
-            self.year_catalogs[str(year)] = catalog.query_all_features(f'catalog_{str(year)}', [str(year)])
+            year_catalog = catalog.copy()
+            year_catalog.query(['common', str(year)], catalog.get_features())
+            self.year_catalogs[str(year)] = year_catalog
 
             if self.verbose:
                 ttprint(f'Overlay {len(self.year_points[str(year)])} points from {year} in {len(fn_layers_year)} raster layers')

@@ -1,3 +1,4 @@
+from typing import List, Union, Callable, Optional
 import os
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
@@ -60,35 +61,40 @@ mask_aggregation_bash_script = '''#!/bin/bash
     gdalwarp -te "$xmin_new" "$ymin_new" "$xmax_new" "$ymax_new" -tr "$pixel_size_x_new" "$pixel_size_y_new" -r max "$tif_file" "$output_file"
     '''
 
-def get_whale_dependencies(whale, key, main_catalog):
+def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
     func_name, params = parse_template_whale(whale)
     dep_tags = []
     dep_names = []
     dep_paths = []
+    dep_exec_orders = []
     if func_name == 'percentileAggregation':
-        if (params['entry_template'].startswith("@")):
-            tag = params['entry_template'][1:]
-            for dt in params['dt']:
-                dep_tags += [tag.format(dt=dt)]
+        tag = params['entry_template']
+        for dt in params['dt']:
+            dep_tags += [tag.format(dt=dt)]
     elif func_name == 'computeNormalizedDifference':
-        if (params['idx_plus'].startswith("@")):
-            dep_tags += [params['idx_plus'][1:]]
-        if (params['idx_minus'].startswith("@")):
-            dep_tags += [params['idx_minus'][1:]]
+        dep_tags += [params['idx_plus']]
+        dep_tags += [params['idx_minus']]
     elif func_name == 'computeSavi':
-        if (params['idx_red'].startswith("@")):
-            dep_tags += [params['idx_red'][1:]]
-        if (params['idx_nir'].startswith("@")):
-            dep_tags += [params['idx_nir'][1:]]
+        dep_tags += [params['idx_red']]
+        dep_tags += [params['idx_nir']]
     for dep_tag in dep_tags:
         dep_path = main_catalog[key][dep_tag]['path']
-        dep_paths += [dep_path]
-        dep_names += [dep_tag]
         if dep_path.startswith("/whale"):
-            rec_dep_names, rec_dep_paths = get_whale_dependencies(dep_path, key, main_catalog)
+            rec_dep_names, rec_dep_paths, rec_dep_exec_orders = get_whale_dependencies(dep_path, key, main_catalog, dep_tag)
             dep_paths += rec_dep_paths
             dep_names += rec_dep_names
-    return dep_names, dep_paths
+            dep_exec_orders += rec_dep_exec_orders
+        else:
+            dep_paths += [dep_path]
+            dep_names += [dep_tag]
+            dep_exec_orders += [0]
+    dep_paths += [whale]
+    dep_names += [whale_layer_name]
+    if dep_exec_orders:
+        dep_exec_orders += [max(dep_exec_orders) + 1]
+    else:
+        dep_exec_orders += [0]
+    return dep_names, dep_paths, dep_exec_orders
 
 def parse_template_whale(whale):
     func_name_match = re.search(r'/whale/([^?]+)', whale)
@@ -112,43 +118,112 @@ def read_json(path):
 #
 
 
-def catalog_from_csv(
-        csv_in_path:str,
-        json_out_path:str,
-        years,
+def _create_dict_catalog(
+        catalog_def:Union[pd.DataFrame, str],
+        years
     ):
-    covar = pd.read_csv(
-        csv_in_path, 
-        dtype={
-            'tile': int, 
-            'start_{year}': int, 
-            'end_{year}': int, 
-            'exec_order': int
+    if not isinstance(catalog_def, pd.DataFrame):
+        covar = pd.read_csv(catalog_def)
+    else:
+        covar = catalog_def
+
+    # Replace placeholders in `layer_name` and `path`
+    def replace_layer_name_placeholders(value):
+        replacements = {
+            "{year}": "YYYY",
+            "{year_plus_one}": "YYPO",
+            "{year_minus_one}": "YYMO",
+            "{start_month}": "{start_month}",
+            "{end_month}": "{end_month}",
+            "{perc}": "{perc}",
+            "{dt}": "{{dt}}",
         }
+        if isinstance(value, str):
+            for old, new in replacements.items():
+                value = value.replace(old, new)
+        return value
+
+    covar['layer_name'] = covar['layer_name'].apply(replace_layer_name_placeholders)
+    covar['path'] = covar['path'].apply(lambda x: replace_layer_name_placeholders(x) if '/whale/' in x else x)
+
+
+    perc_mask = (
+        covar['layer_name'].str.contains(r'\{perc\}') | 
+        covar['path'].str.contains(r'\{perc\}')
     )
+    perc_expanded_rows = []
+    for _, row in covar[perc_mask].iterrows():
+        perc_values = [p.strip() for p in (row['perc'].split(',') if pd.notna(row['perc']) else [None])]
+        for perc in perc_values:
+            new_row = row.copy()
+            if perc:
+                new_row['layer_name'] = new_row['layer_name'].replace('{perc}', perc)
+                new_row['path'] = new_row['path'].replace('{perc}', perc)
+            perc_expanded_rows.append(new_row)
+    perc_expanded_df = pd.DataFrame(perc_expanded_rows)
+    # Combine expanded rows with the rest of the dataframe
+    covar = pd.concat([covar[~perc_mask], perc_expanded_df], ignore_index=True)
 
-    # Static part
-    covar_static = covar[covar['type'] == 'common']
-    url_static = covar_static.set_index('layer_name')['path'].to_dict()
-    static = {'common': {layer_name: path for layer_name, path in url_static.items()}}
+    month_mask = (
+        covar['layer_name'].str.contains(r'\{start_month\}') | 
+        covar['path'].str.contains(r'\{start_month\}') | 
+        covar['layer_name'].str.contains(r'\{end_month\}') | 
+        covar['path'].str.contains(r'\{end_month\}')
+    )
+    month_expanded_rows = []
+    for _, row in covar[month_mask].iterrows():
+        start_month_values = [sm.strip() for sm in (row['start_month'].split(',') if pd.notna(row['start_month']) else [None])]
+        end_month_values = [em.strip() for em in (row['end_month'].split(',') if pd.notna(row['end_month']) else [None])]
+        max_len = max(len(start_month_values), len(end_month_values))
+        start_month_values = start_month_values or [None] * max_len
+        end_month_values = end_month_values or [None] * max_len
+        for start_month, end_month in zip(start_month_values, end_month_values):
+            new_row = row.copy()
+            if start_month:
+                new_row['layer_name'] = new_row['layer_name'].replace('{start_month}', start_month)
+                new_row['path'] = new_row['path'].replace('{start_month}', start_month)
+            if end_month:
+                new_row['layer_name'] = new_row['layer_name'].replace('{end_month}', end_month)
+                new_row['path'] = new_row['path'].replace('{end_month}', end_month)
+            month_expanded_rows.append(new_row)
+    month_expanded_df = pd.DataFrame(month_expanded_rows)
+    covar = pd.concat([covar[~month_mask], month_expanded_df], ignore_index=True)
 
-    # Temporal part
-    covar_temp = covar[covar['type'] == 'temporal']
-    url_temp = covar_temp.set_index('layer_name')['path'].to_dict()
-    assert len(covar_temp) == len(url_temp), "The catalog could contain duplicated layer names. This is not allowed, fix this and retry."
+    # Separate common and temporal data
+    covar_comm = covar[covar['type'] == 'common'].reset_index(drop=True)
+    covar_temp = covar[covar['type'] == 'temporal'].reset_index(drop=True)
+    # Create the comm part of the catalog
+    url_comm = covar_comm.set_index('layer_name')['path'].to_dict()
+    comm = {'common': {layer_name: path for layer_name, path in url_comm.items()}}
 
-    temporal = {
-        str(year): {
-            layer_name: path.format(year=str(min(max(year, covar_temp.loc[i, 'start_year']), covar_temp.loc[i, 'end_year'])))
-            for i, (layer_name, path) in enumerate(url_temp.items())
+    def calculate_year_placeholders(year, start_year, end_year, tmp_layer_name):
+        valid_year = min(max(year, int(start_year)), int(end_year))
+        if year != valid_year:
+            print(f"Year {year} not available for layer {tmp_layer_name}, propagating year {valid_year}")
+        return {
+            "year": str(valid_year),
+            "year_plus_one": str(valid_year + 1),
+            "year_minus_one": str(valid_year - 1),
+            "tile_id": '{tile_id}',
+            "base_path": '{base_path}'
         }
-        for year in years
-    }
-    # Combine static and temporal dictionaries into catalog
-    catalog = {**static, **temporal}
+    # Create the temporal part of the catalog
+    url_temp = covar_temp.set_index('layer_name')['path'].to_dict()
 
-    with open(json_out_path, "w") as f:
-        json.dump(catalog, f, indent=4)
+    temporal = {}
+    for year in years:
+        year_dict = {}
+        for i, (layer_name, path) in enumerate(url_temp.items()):
+            year_placeholders = calculate_year_placeholders(
+                year, 
+                covar_temp.loc[i, 'start_year'], 
+                covar_temp.loc[i, 'end_year'],
+                layer_name
+            )
+            year_dict[layer_name] = path.format(**year_placeholders)
+        temporal[str(year)] = year_dict
+    catalog = {**comm, **temporal}
+    return catalog
 
 
 
@@ -272,54 +347,47 @@ def s3_have_to_compute_tile(models_pool, tile_id, s3_aliases, years):
     return compute_tile
 #
 class DataCatalog():
-    def __init__(self, catalog_name, data, years, features, num_features) -> None:
-        self.catalog_name = catalog_name
+    def __init__(self, data, data_size):
         self.data = data
-        self.years = years
-        self.features = features
-        self.num_features = num_features
-    @staticmethod
-    def _get_years(data):
-        return list({k for k in data.keys() if k != 'common'})
-    @staticmethod
-    def _get_ordered_features(data):
-        sorted_keys = []
-        for key, inner_dict in data.items():
-            key_l2_with_idx = [(key_l2, inner_dict[key_l2]['idx']) for key_l2 in inner_dict]
-            sorted_key_l2 = sorted(key_l2_with_idx, key=lambda x: x[1])
-            sorted_keys.extend([key for key, _ in sorted_key_l2])
-        return sorted_keys
-    @staticmethod
-    def _get_features(json_data):
-        return list({k for v in json_data.values() for k in v.keys()})
+        self.data_size = data_size
     @classmethod
-    def read_catalog(cls, catalog_name, path, additional_otf_names = None):
-        json_data = read_json(path)
-        years = cls._get_years(json_data)
-        features = cls._get_features(json_data)
-        # features - populate static and temporal entries
+    def create_catalog(cls, 
+                    catalog_def:Union[pd.DataFrame, str],
+                    years:List[int]):
+        catalog_dict = _create_dict_catalog(catalog_def, years)
         data = {}
-        entries = ['common'] + years
-        num_features = 0
-        for k in entries:
-            for f in features:
-                if f not in json_data[k]:
+        groups = ['common'] + [str(year) for year in years]
+        features_names = cls.get_features_names(catalog_dict)
+        data_size = 0
+        for k in groups:
+            for f in features_names:
+                if f not in catalog_dict[k]:
                     continue
                 if k not in data:
                     data[k] = {}
-                data[k][f] = {'path': json_data[k][f], 'idx': num_features}
-                num_features += 1
-        if additional_otf_names is not None:
-            for k in additional_otf_names:
-                if k not in data:
-                    data[k] = {}
-                for otf in additional_otf_names[k]:
-                    data[k][otf] = {'path': additional_otf_names[k][otf], 'idx': num_features}
-                    num_features += 1
-        features = cls._get_ordered_features(data)
-        return DataCatalog(catalog_name, data, years, features, num_features)
+                data[k][f] = {'path': catalog_dict[k][f], 'idx': data_size}
+                data_size += 1
+        data, data_size = cls.expand_whales_dependencies(data, data, data_size)
+        return cls(data, data_size)
+    def save_json(self, json_out_path):
+        if json_out_path is not None:
+            with open(json_out_path, "w") as f:
+                json.dump(self.data, f, indent=4)
+    def get_groups(self):
+        return sorted(list({k for k in self.data.keys()}))
+    def copy(self):
+        return DataCatalog(self.data.copy(), int(self.data_size))
+    @staticmethod
+    def get_features_names(catalog_dict):
+        return {layer_name for _,inner_dict in catalog_dict.items() for layer_name,_ in inner_dict.items()}
+    def get_features(self):
+        sorted_keys = []
+        for key, inner_dict in self.data.items():
+            key_l2_with_idx = [(key_l2, inner_dict[key_l2]['idx']) for key_l2 in inner_dict]
+            sorted_key_l2 = sorted(key_l2_with_idx, key=lambda x: x[1])
+            sorted_keys.extend([key for key, _ in sorted_key_l2])
+        return list(set(sorted_keys))
     def get_paths(self):
-        # prepare temporal and static paths and indexes
         paths = []
         idx = []
         for k in self.data:
@@ -330,81 +398,65 @@ class DataCatalog():
                     paths += [self.data[k][f]['path']]
                     idx += [self.data[k][f]['idx']]
         # modify paths of non VRT files
-        paths = [path if path is None or path.endswith('vrt') else f'/vsicurl/{path}' for path in paths]
+        paths = [path if path is None or path.endswith('vrt') or path.startswith('/vsicurl/') \
+        else f'/vsicurl/{path}' for path in paths]
         return paths, idx
-    def get_whales(self):
-        # prepare temporal and static paths and indexes
-        whales = []
-        keys = []
-        idx = []
-        for k in self.data:
-            if k == 'otf':
-                continue
-            for f in self.data[k]:
-                if self.data[k][f]['path'].startswith("/whale"):
-                    whales += [self.data[k][f]['path']]
-                    idx += [self.data[k][f]['idx']]
-                    keys += [k]
-        return whales, idx, keys
+    @staticmethod
+    def get_whales(data):
+        whales, idx, keys, whales_layer_names = zip(*[
+            (data[k][f]['path'], data[k][f]['idx'], k, f)
+            for k in data if k != 'otf'
+            for f in data[k]
+            if data[k][f]['path'].startswith("/whale")
+        ])
+        return list(whales), list(idx), list(keys), list(whales_layer_names)
+    def _get_whales(self):
+        return self.get_whales(self.data)
+    def query(self, groups, query_features_names):
+        old_data = self.data.copy()
+        self.data = {}
+        self.data_size = 0
+        for k in groups:
+            for f in query_features_names:
+                if f in old_data[k]:
+                    if k not in self.data:
+                        self.data[k] = {}
+                    self.data[k][f] = {'path': old_data[k][f]['path'], 'idx': self.data_size}
+                    self.data_size += 1                    
+        self._expand_whales_dependencies(old_data)
+        missing_features_names = [feature for feature in query_features_names if feature not in set(self.get_features())]
+        for missing_feat_feature in missing_features_names:
+            print(f'Feature {missing_feat_feature} is missing in the original catalog, adding is in the otf (on the fly) common group')
+        if missing_features_names:
+            self.add_otf_features(missing_features_names)
+    def add_otf_features(self, otf_features):
+        if 'otf' not in self.data:
+            self.data['otf'] = {}
+        for otf_feature in otf_features:
+            self.data['otf'][otf_feature] = {'path': None, 'idx': self.data_size}
+            self.data_size += 1
+    @classmethod
+    def expand_whales_dependencies(cls, reference_catalog_data, data, data_size):
+        whales_paths, _, groups, whales_layer_names = cls.get_whales(data)
+        for i, (whale_path, whale_layer_name) in enumerate(zip(whales_paths, whales_layer_names)):
+            dep_names, dep_paths, dep_exec_orders = get_whale_dependencies(whale_path, groups[i], reference_catalog_data, whales_layer_names[i])
+            for dep_name, dep_path, dep_exec_order in zip(dep_names, dep_paths, dep_exec_orders):
+                if dep_name not in data[groups[i]]:
+                    data[groups[i]][dep_name] = {'path': dep_path, 'idx': data_size, 'exec_order': dep_exec_order}
+                    data_size += 1
+                elif dep_name == whale_layer_name:
+                    data[groups[i]][dep_name]['exec_order'] = dep_exec_order
+        return data, data_size
+    def _expand_whales_dependencies(self, reference_catalog_data):
+        self.data, self.data_size = self.expand_whales_dependencies(reference_catalog_data, self.data, self.data_size)
     def get_otf_idx(self):
         otf_idx = {}
         if 'otf' in self.data:
-            for y in self.years:
-                for f in self.features:
-                    if f in self.data['otf'][y]:
-                        if f not in otf_idx:
-                            otf_idx[f] = []
-                        otf_idx[f] += [self.data['otf'][y][f]['idx']]
+            for f in self.data['otf']:
+                if f not in otf_idx:
+                    otf_idx[f] = []
+                otf_idx[f] += [self.data['otf'][f]['idx']]
         return otf_idx
-    def query(self, catalog_name, years, features):
-        data = {}
-        entries = ['common'] + years
-        num_features = 0
-        # features - populate static and temporal entries
-        for k in entries:
-            for f in features:
-                if f in self.data[k]:
-                    if k not in data:
-                        data[k] = {}
-                    data[k][f] = {'path': self.data[k][f]['path'], 'idx': num_features}
-                    num_features += 1
-        # features - populate OTF entries
-        for y in years:
-            for f in features:
-                if f not in self.features:
-                    if 'otf' not in data:
-                        data['otf'] = {}
-                    if y not in data['otf']:
-                        data['otf'][y] = {}
-                    data['otf'][y][f] = {'path': None, 'idx': num_features}
-                    num_features += 1
-        tmp_catalog = DataCatalog(catalog_name, data, years, features, num_features)
-        # recurisvely get the dependencies here and create a new catalog that includes them
-        data, num_features = tmp_catalog.expand_whales_dependencies(self.data, data, num_features)
-        return DataCatalog(catalog_name, data, years, features, num_features)
-    def query_all_features(self, catalog_name, entries):
-        data = {}
-        num_features = 0
-        # features - populate static and temporal entries
-        for k in entries:
-            for f in self.data[k]:
-                if k not in data:
-                    data[k] = {}
-                data[k][f] = {'path': self.data[k][f]['path'], 'idx': num_features}
-                num_features += 1
-        tmp_catalog = DataCatalog(catalog_name, data, years, self._get_features(data), num_features)
-        # recurisvely get the dependencies here and create a new catalog that includes them
-        data, num_features = tmp_catalog.expand_whales_dependencies(self.data, data, num_features)
-        return DataCatalog(catalog_name, data, years, self._get_features(data), num_features)
-    def expand_whales_dependencies(self, main_catalog, data, num_features):
-        whales_paths, _, keys = self.get_whales()
-        for i, whale in enumerate(whales_paths):
-            dep_names, dep_paths = get_whale_dependencies(whale, keys[i], main_catalog)
-            for dep_name, dep_path in zip(dep_names, dep_paths):
-                if dep_name not in data[keys[i]]:
-                    data[keys[i]][dep_name] = {'path': dep_path, 'idx': num_features}
-                    num_features += 1
-        return data, num_features
     def _get_covs_idx(self, covs_lst):
         covs_idx = np.zeros((len(covs_lst), len(self.years)), np.int32)
         for j in range(len(self.years)):
@@ -412,20 +464,19 @@ class DataCatalog():
             for i in range(len(covs_lst)):
                 c = covs_lst[i]
                 if c in self.data['common']:
-                    covs_idx[i, j] = self.data['common'][c]['idx']
+                    covs_idx[i,j] = self.data['common'][c]['idx']
                 elif c in self.data[k]:
-                    covs_idx[i, j] = self.data[k][c]['idx']
+                    covs_idx[i,j] = self.data[k][c]['idx']
                 else:
-                    covs_idx[i, j] = self.data['otf'][k][c]['idx']
+                    covs_idx[i,j] = self.data['otf'][k][c]['idx']
         return covs_idx
 #
 def print_catalog_statistics(catalog:DataCatalog):
-    print(f'[{catalog.catalog_name}]')
-    entries = list(catalog.data.keys())
-    entries.sort()
-    print(f'catalog entries: {entries}')
-    print(f'- features: {catalog.num_features}')
+    groups = list(catalog.data.keys())
+    groups.sort()
+    print(f'catalog groups: {groups}')
     print(f'- rasters to read: {len(catalog.get_paths()[0])}')
+    print(f'- whales: {len(catalog._get_whales())}')
     print(f'- on-the-fly features: {len(catalog.get_otf_idx())}')
     if len(catalog.get_otf_idx()) > 0:
         otf_list = list(catalog.get_otf_idx().keys())
@@ -487,7 +538,7 @@ class DataLoaderTiled():
             self.y_size = gdal_img.RasterYSize
             self.x_off, self.y_off = (0, 0)
 
-        with TimeTracker(f"Tile {tile_id}/catalog {self.catalog.catalog_name} - load tile", True):
+        with TimeTracker(f"Tile {tile_id} - load tile", True):
             self.num_pixels = self.x_size * self.y_size
             # prepare mask
             with TimeTracker(f"Tile {self.tile_id} - prepare mask"):
@@ -528,7 +579,7 @@ class DataLoaderTiled():
                     sb.readData(self.cache, self.threads, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, self.y_size, [1], self.gdal_opts)
                 
                 # Computing on the fly coovariates
-                whale_paths, whale_idxs, whale_keys = self.catalog.get_whales()        
+                whale_paths, whale_idxs, whale_keys, _ = self.catalog._get_whales()        
                 max_exec_order = 0
                 for i, whale in enumerate(whale_paths):
                     _, params = parse_template_whale(whale)
@@ -583,92 +634,4 @@ class DataLoaderTiled():
         assert(otf_name in otf_idx)
         otf_name_idx = otf_idx[otf_name]
         self.cache[otf_name_idx] = otf_const
-#
-
-
-class DataLoader():
-    def __init__(self, catalog:DataCatalog, tiles, mask_path, valid_mask_value) -> None:
-        self.catalog = catalog
-        self.years = self.catalog.years
-        self.num_years = len(self.years)
-        self.tiles = tiles
-        assert('id' in tiles.columns)
-        self.mask_path = mask_path
-        gdal_img = gdal.Open(self.mask_path)
-        self.total_x_size = gdal_img.RasterXSize
-        self.total_y_size = gdal_img.RasterYSize
-        self.gt = gdal_img.GetGeoTransform()
-        self.gti = gdal.InvGeoTransform(self.gt)
-        self.valid_mask_value = valid_mask_value
-        self.otf_const_idx = {}
-        self.otf_indicator_params = []
-        self.cache = None
-        self.tile_id = None
-        self.x_off = None
-        self.y_off = None
-        self.x_size = None
-        self.y_size = None
-        self.num_pixels = None
-        self.mask = None
-        self._pixels_valid_idx = None
-        self.num_pixels_valid = None
-        self.threads = None
-    def _get_block(self):
-        tile = self.tiles[self.tiles['id'] == self.tile_id]
-        assert(len(tile) > 0)
-        min_x, min_y, max_x, max_y = tile.iloc[0].geometry.bounds
-        x_off, y_off = gdal.ApplyGeoTransform(self.gti, min_x, max_y)
-        x_off, y_off = int(x_off), int(y_off)
-        x_size, y_size = int(abs(max_x - min_x) / self.gt[1]) , int(abs(max_y - min_y) / self.gt[1])
-        return x_off, y_off, min(x_size, self.total_x_size - x_off), min(y_size, self.total_y_size - y_off)
-    def free(self):
-        self.cache = None
-    def load_tile_data(self, tile_id, threads, gdal_opts, x_size = None, y_size = None):
-        with TimeTracker(f"tile {tile_id}/catalog {self.catalog.catalog_name} - load tile", True):
-            self.tile_id = tile_id
-            self.threads = threads
-            self.x_off, self.y_off, self.x_size, self.y_size = self._get_block()
-            if x_size is not None:
-                self.x_size = x_size
-            if y_size is not None:
-                self.y_size = y_size
-            self.num_pixels = self.x_size * self.y_size
-            # prepare mask
-            with TimeTracker(f"tile {self.tile_id} - prepare mask ({threads} threads)"):
-                self.mask = np.zeros((1, self.num_pixels), dtype=np.float32)
-                sb.readData(self.mask, 1, [self.mask_path], [0], self.x_off, self.y_off, self.x_size, self.y_size, [1], gdal_opts)
-                self.mask = (self.mask == self.valid_mask_value)
-                self._pixels_valid_idx = np.arange(0, self.num_pixels)[self.mask[0, :]]
-                self.num_pixels_valid = np.sum(self.mask)
-            # read rasters
-            self.cache = np.empty((self.catalog.num_features, self.num_pixels), dtype=np.float32)
-            with TimeTracker(f"tile {self.tile_id} - read images ({threads} threads)"):
-                paths, paths_idx = self.catalog.get_paths()
-                sb.readData(self.cache, self.threads, paths, paths_idx, self.x_off, self.y_off, 
-                                        self.x_size, self.y_size, [1], gdal_opts)
-            # fill otf
-            if len(self.otf_indicator_params) > 0:
-                with TimeTracker(f"tile {self.tile_id} - fill otf features"):
-                    for i in range(len(self.otf_indicator_params)):
-                        self.fill_otf_indicator(**self.otf_indicator_params[i])
-    def get_pixels_valid_idx(self, num_years):
-        return np.concatenate([self._pixels_valid_idx + self.num_pixels * i for i in range(num_years)]).tolist()
-    def create_image_template(self, dtype, nodata, out_dir):
-        return _create_image_template(self.mask_path, self.tiles, self.tile_id, self.x_size, self.y_size, dtype, nodata, out_dir)
-    def prep_otf_indicator(self, otf_path, otf_name, otf_code, gdal_opts):
-        self.otf_indicator_params.append({'otf_path':otf_path,'otf_name':otf_name,'otf_code':otf_code,'gdal_opts':gdal_opts})
-    def fill_otf_indicator(self, otf_path, otf_name, otf_code, gdal_opts):
-        otf_idx = self.catalog.get_otf_idx()
-        if not otf_name in otf_idx: return
-        print(f'catalog {self.catalog.catalog_name} - fill otf {otf_name}')
-        otf_name_idx = otf_idx[otf_name]
-        otf_path = [otf_path for _ in otf_name_idx]
-        sb.readData(self.cache, 1, otf_path, otf_name_idx, self.x_off, self.y_off, self.x_size, self.y_size, [1,], gdal_opts)
-        self.cache[otf_name_idx] = (self.cache[otf_name_idx] == otf_code) * 1.0
-    def fill_otf_constant(self, otf_name, otf_const):
-        otf_idx = self.catalog.get_otf_idx()
-        assert(otf_name in otf_idx)
-        otf_name_idx = otf_idx[otf_name]
-        self.cache[otf_name_idx] = otf_const
-#
 

@@ -7,7 +7,7 @@ import threading
 import numpy as np
 import skmap.misc
 import treelite_runtime
-from skmap.catalog import DataLoader
+from skmap.catalog import TiledDataLoader
 import skmap_bindings as sb
 
 def _single_prediction(predict, X, out, i, lock):
@@ -48,7 +48,7 @@ class RFRegressorDepths():
         self.in_covs_t = None
         self.in_covs = None
         self.in_covs_valid = None
-    def predict(self, data:DataLoader):
+    def predict(self, data:TiledDataLoader):
         # prepare input and output arrays
         self.in_covs_t = np.empty((len(self.model_features), len(data.years) * data.num_pixels), dtype=np.float32)
         self.in_covs = np.empty((len(data.years) * data.num_pixels, len(self.model_features)), dtype=np.float32)
@@ -78,7 +78,7 @@ class RFRegressorDepths():
             # self.predicted_trees shape: (num_depths, num_trees, num_years, num_pixels)
             result._out_trees_valid[i,:,:,:] = self.predict_fn(self.model, self.in_covs_valid).reshape(result.num_trees, result.num_years, result._data.num_pixels_valid)
         return result # shape: (n_depths, n_trees, n_samples)
-    def predictDepth(self, data:DataLoader, i):
+    def predictDepth(self, data:TiledDataLoader, i):
         # prepare input and output arrays
         self.in_covs_t = np.empty((len(self.model_features), len(data.years) * data.num_pixels), dtype=np.float32)
         self.in_covs = np.empty((len(data.years) * data.num_pixels, len(self.model_features)), dtype=np.float32)
@@ -132,7 +132,7 @@ class RFClassifierProbs():
         self.in_covs_t = None
         self.in_covs = None
         self.in_covs_valid = None
-    def predict(self, data:DataLoader, round=False):
+    def predict(self, data:TiledDataLoader, round=False):
         with TimeTracker(f"tile {data.tile_id}/model {self.model_name} - predict ({len(self.model_features)} input features)", True):
             # prepare input and output arrays
             self.in_covs_t = np.empty((len(self.model_features), len(data.years) * data.num_pixels), dtype=np.float32)
@@ -157,7 +157,7 @@ class RFClassifierProbs():
                     np.round(result._out_probs_valid, out=result._out_probs_valid)
         return result # shape: (n_samples, n_classes)
 #
-# TODO copy all metadata needed from DataLoader as parameter of constructor
+# TODO copy all metadata needed from TiledDataLoader as parameter of constructor
 class PredictedDepths():
     def __init__(self, 
                  model_name, 
@@ -166,7 +166,7 @@ class PredictedDepths():
                  years,
                  num_years, 
                  num_trees,
-                 data:DataLoader) -> None:
+                 data:TiledDataLoader) -> None:
         self.model_name = model_name
         self.depths = depths
         self.num_depths = num_depths
@@ -316,7 +316,7 @@ class PredictedDepths():
 #
 class PredictedProbs():
     def __init__(self, 
-                 data:DataLoader, 
+                 data:TiledDataLoader, 
                  model_name, 
                  num_class) -> None:
         self._data = data
