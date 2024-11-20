@@ -7,6 +7,36 @@ namespace py = pybind11;
 
 using namespace skmap;
 
+
+GDALDataType GetGDALDataTypeFromString(const std::string& gdal_data_type_str) {
+    if (gdal_data_type_str == "GDT_Byte") {
+        return GDT_Byte;
+    } else if (gdal_data_type_str == "GDT_UInt16") {
+        return GDT_UInt16;
+    } else if (gdal_data_type_str == "GDT_Int16") {
+        return GDT_Int16;
+    } else if (gdal_data_type_str == "GDT_UInt32") {
+        return GDT_UInt32;
+    } else if (gdal_data_type_str == "GDT_Int32") {
+        return GDT_Int32;
+    } else if (gdal_data_type_str == "GDT_Float32") {
+        return GDT_Float32;
+    } else if (gdal_data_type_str == "GDT_Float64") {
+        return GDT_Float64;
+    } else if (gdal_data_type_str == "GDT_CInt16") {
+        return GDT_CInt16;
+    } else if (gdal_data_type_str == "GDT_CInt32") {
+        return GDT_CInt32;
+    } else if (gdal_data_type_str == "GDT_CFloat32") {
+        return GDT_CFloat32;
+    } else if (gdal_data_type_str == "GDT_CFloat64") {
+        return GDT_CFloat64;
+    } else {
+        // Default case if the string does not match any known GDALDataType
+        throw std::invalid_argument("Unknown GDALDataType string: " + gdal_data_type_str);
+    }
+}
+
 dict_t convPyDict(py::dict in_dict)
 {
     dict_t cpp_dict;
@@ -502,6 +532,29 @@ void writeByteData(Eigen::Ref<MatFloat> data,
 
 }
 
+void writeData(Eigen::Ref<MatFloat> data,
+                   const uint_t n_threads,
+                   py::dict conf_GDAL,
+                   std::vector<std::string> base_files,
+                   std::string base_folder,
+                   std::vector<std::string> file_names,
+                   std::vector<uint_t> data_indices,
+                   uint_t x_off,
+                   uint_t y_off,
+                   uint_t x_size,
+                   uint_t y_size,
+                   float_t no_data_value,
+                   std::string gdal_data_type_str,
+                   std::optional<std::string> bash_compression_command,
+                   std::optional<std::vector<std::string>> seaweed_path)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    GDALDataType gdal_data_type = GetGDALDataTypeFromString(gdal_data_type_str);
+    ioArray.writeData(base_files, base_folder, file_names, data_indices,
+        x_off, y_off, x_size, y_size, gdal_data_type, no_data_value, bash_compression_command, seaweed_path);
+}
+
 
 void writeInt16Data(Eigen::Ref<MatFloat> data,
                    const uint_t n_threads,
@@ -655,6 +708,11 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("writeUInt16Data", &writeUInt16Data, 
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg() = std::nullopt, py::arg() = std::nullopt,
+        "Write data in Int16 format");
+    m.def("writeData", &writeData, 
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Write data in Int16 format");
     m.def("getLatLonArray", &getLatLonArray, "Compute latitude and longitude for each pixel of a GeoTIFF");
