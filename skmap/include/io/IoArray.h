@@ -120,6 +120,7 @@ class IoArray: public ParArray
                     x_size, y_size, write_type, 0, 0);
                 skmapAssertIfTrue(out_write2 != CE_None,
                    "scikit-map ERROR 11: issues in writing the file " + layer_name);
+                GDALClose(inputDataset);
                 GDALClose(writeDataset);
                 if (bash_compression_command.has_value())
                 {                    
