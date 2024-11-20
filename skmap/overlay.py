@@ -1,25 +1,21 @@
 '''
 Overlay and spatial prediction fully compatible with ``scikit-learn``.
 '''
+from typing import List, Union
 import os
-from osgeo import gdal
 import numpy as np
 import pandas as pd
 import rasterio
-from rasterio.windows import Window
 import geopandas as gpd
 from shapely.geometry import Point
 from shapely import box
 from pathlib import Path
-from concurrent.futures import as_completed, ThreadPoolExecutor
 from skmap import parallel
-from skmap.misc import ttprint, find_files, make_tempfile
-from skmap.io import read_rasters
+from skmap.misc import ttprint
 from skmap.catalog import DataCatalog
 import skmap_bindings as sb
 import hashlib
-import warnings
-from typing import List, Union, Callable, Optional
+import itertools
 n_threads = os.cpu_count() * 2
 os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
 os.environ['USE_PYGEOS'] = '0'
@@ -112,21 +108,6 @@ class _ParallelOverlay:
         )
 
         return row
-
-    @staticmethod
-    def _sample(fn_array, raster_file, window, ind_layer, ind_samples, col, row, nodata):
-        #result = sa.attach(fn_array)
-        try:
-                with rasterio.Env(CPL_VSIL_CURL_ALLOWED_EXTENSIONS='.tif'):
-                        src = rasterio.open(raster_file)
-                        data = src.read(1, window=window)
-                        sample = data[row,col].astype(np.float32)
-                        sample[sample == nodata] = np.nan
-                        result[ind_samples, ind_layer] = sample
-                        del sample
-        except Exception as exception:
-            #ttprint(f"Error in {raster_file}")
-            pass
 
     @staticmethod
     def _is_tiled(path):
@@ -329,7 +310,7 @@ class SpaceOverlay():
             key_query_pixels = query_pixels[key]
             unique_blocks = key_query_pixels[['block_id', 'block_col_off', 'block_row_off', 'block_height', 'block_width']].drop_duplicates('block_id')
             unique_blocks_ids = unique_blocks['block_id'].tolist()
-            key_layer_ids_comb, unique_blocks_ids_comb = map(list, zip(*product(key_layer_ids, unique_blocks_ids)))
+            key_layer_ids_comb, unique_blocks_ids_comb = map(list, zip(*itertools.product(key_layer_ids, unique_blocks_ids)))
             block_row_off_comb = [unique_blocks.query(f"block_id == @ubid")['block_row_off'].iloc[0] for ubid in unique_blocks_ids_comb]
             block_col_off_comb = [unique_blocks.query(f"block_id == @ubid")['block_col_off'].iloc[0] for ubid in unique_blocks_ids_comb]
             block_height_comb = [unique_blocks.query(f"block_id == @ubid")['block_height'].iloc[0] for ubid in unique_blocks_ids_comb]
@@ -364,7 +345,7 @@ class SpaceOverlay():
                 data_array = np.empty((chunk_size, n_block_pix), dtype=np.float32)
                 perm_vec = range(chunk_size)
                 sb.readDataBlocks(data_array, self.max_workers, key_layer_paths_chunk, perm_vec, block_col_off_chunk, block_row_off_chunk,
-                                            block_width_chunk, block_height_chunk, bands_list, gdal_opts, key_layer_nodatas_chunk, np.nan)
+                                  block_width_chunk, block_height_chunk, bands_list, gdal_opts, key_layer_nodatas_chunk, np.nan)
                 pix_blok_ids = key_query_pixels['block_id'].tolist()
                 sample_rows = key_query_pixels['sample_row'].tolist()
                 sample_cols = key_query_pixels['sample_col'].tolist()
@@ -429,6 +410,7 @@ class SpaceTimeOverlay():
 
         self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
         self.uniq_years = self.pts[self.col_date].dt.year.unique()
+        self.year_points = {}
 
         for year in self.uniq_years:
 
@@ -439,7 +421,7 @@ class SpaceTimeOverlay():
             self.year_catalogs[str(year)] = year_catalog
 
             if self.verbose:
-                ttprint(f'Overlay {len(self.year_points[str(year)])} points from {year} in {len(fn_layers_year)} raster layers')
+                ttprint(f'Overlay {len(self.year_points[str(year)])} points from {year} in {len(year_catalog.get_features())} raster layers')
 
             self.overlay_objs[str(year)] = SpaceOverlay(points=self.year_points[str(year)], catalog=self.year_catalogs[str(year)],
                 raster_tiles=raster_tiles, tile_id_col=tile_id_col, max_workers=max_workers, verbose=verbose)

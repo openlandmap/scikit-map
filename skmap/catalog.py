@@ -1,17 +1,16 @@
+from typing import List, Union
 import os
-from osgeo import gdal
 import numpy as np
 import pandas as pd
 import subprocess
 import re
 import json
 import skmap_bindings as sb
-from skmap.misc import TimeTracker
-from concurrent.futures import ProcessPoolExecutor
-from typing import List, Union, Callable, Optional
+import sys
+import random
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
-
+import rasterio
 
 def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
     func_name, params = parse_template_whale(whale)
@@ -287,7 +286,6 @@ class DataCatalog():
         covar['layer_name'] = covar['layer_name'].apply(replace_layer_name_placeholders)
         covar['path'] = covar['path'].apply(lambda x: replace_base_path(x, base_path))
         covar['path'] = covar['path'].apply(lambda x: replace_layer_name_placeholders(x) if '/whale/' in x else x)
-
 
         perc_mask = (
             covar['layer_name'].str.contains(r'\{perc\}') | 

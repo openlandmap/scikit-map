@@ -4,9 +4,9 @@ import numpy as np
 import subprocess
 import skmap_bindings as sb
 from skmap.misc import TimeTracker
+from skmap.catalog import _create_image_template
 from concurrent.futures import ProcessPoolExecutor
 from skmap.catalog import DataCatalog, run_whales
-from typing import List, Union, Callable, Optional
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
 n_threads = os.cpu_count() * 2

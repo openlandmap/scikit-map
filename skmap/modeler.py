@@ -1,14 +1,15 @@
+import os
+import random
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.utils.validation import check_is_fitted
-import skmap_bindings as skb
 from joblib import Parallel, delayed
 import joblib
 import threading
 import numpy as np
-import skmap.misc
 import treelite_runtime
-from skmap.catalog import TiledDataLoader
+from skmap.loader import TiledDataLoader
 import skmap_bindings as sb
+from skmap.misc import _make_dir, TimeTracker, _rm_dir
 
 def _single_prediction(predict, X, out, i, lock):
     prediction = predict(X, check_input=False)
@@ -19,6 +20,36 @@ def cast_tree_rf(model):
     model.__class__ = TreesRandomForestRegressor
     return model
 
+def _get_out_files_depths(out_files_prefix, out_files_suffix, tile_id, depths, num_depths, years, num_years, num_stats):
+    assert(len(out_files_prefix) == len(out_files_suffix))
+    assert(len(out_files_prefix) == num_stats)
+    assert(len(depths) >= num_depths)
+    assert(len(years) >= num_years)
+    out_files = []
+    for i in range(num_depths):
+        for k in range(num_stats):
+            for j in range(num_years):
+                if num_years < len(years):
+                    y1 = years[j]
+                    y2 = years[j + len(years) - num_years]
+                    if num_depths < len(depths):
+                        d1 = depths[i]
+                        d2 = depths[i + len(depths) - num_depths]
+                        file = f'{out_files_prefix[k]}_b{d1}cm..{d2}cm_{y1}0101_{y2}1231_tile.{tile_id}_{out_files_suffix[k]}'
+                    else:
+                        d1 = depths[i]
+                        file = f'{out_files_prefix[k]}_b{d1}cm_{y1}0101_{y2}1231_tile.{tile_id}_{out_files_suffix[k]}'
+                else:
+                    y1 = years[j]
+                    if num_depths < len(depths):
+                        d1 = depths[i]
+                        d2 = depths[i + len(depths) - num_depths]
+                        file = f'{out_files_prefix[k]}_b{d1}cm..{d2}cm_{y1}0101_{y1}1231_tile.{tile_id}_{out_files_suffix[k]}'
+                    else:
+                        d1 = depths[i]
+                        file = f'{out_files_prefix[k]}_b{d1}cm_{y1}0101_{y1}1231_tile.{tile_id}_{out_files_suffix[k]}'
+                out_files.append(file)
+    return out_files
 
 class RFRegressorDepths():
     def __init__(self, 
@@ -309,7 +340,7 @@ class PredictedDepths():
         if s3_prefix is not None:
             for k in range(self.num_stats):
                 print(f'List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self._data.tile_id}/{out_files_prefix[k]}_`')
-            shutil.rmtree(out_dir)
+            _rm_dir(out_dir)
             os.remove(temp_tif)
             return s3_out
         return [f"{out_dir}/{file}" for file in out_files]
@@ -414,7 +445,7 @@ class PredictedProbs():
                                              write_idx, 0, 0, self._data.x_size, self._data.y_size, int(nodata), compress_cmd, s3_out)
         if s3_prefix is not None:
             print(f'List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self._data.tile_id}/{out_files_prefix[0]}_`')
-            shutil.rmtree(out_dir)
+            _rm_dir(out_dir)
             os.remove(temp_tif)
             return s3_out
         return [f"{out_dir}/{file}" for file in out_files]
@@ -475,7 +506,7 @@ class PredictedProbs():
                                              write_idx, 0, 0, self._data.x_size, self._data.y_size, int(nodata), compress_cmd, s3_out)
         if s3_prefix is not None:
             print(f'List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self._data.tile_id}/{out_files_prefix[0]}_`')
-            shutil.rmtree(out_dir)
+            _rm_dir(out_dir)
             os.remove(temp_tif)
             return s3_out
         return [f"{out_dir}/{file}" for file in out_files]
@@ -537,3 +568,10 @@ def _read_model(model_name, model_path, model_covs_path):
         raise ValueError(f"No feature names was found for model {model_name}")
     return (model, model_covs)
 #
+def _get_out_files(out_files_prefix, out_files_suffix, tile_id, years, num_stats):
+    out_files = []
+    for k in range(num_stats):
+        for year in years:
+            file = f'{out_files_prefix[k]}_s_{year}0101_{year}1231_tile.{tile_id}_{out_files_suffix[k]}'
+            out_files.append(file)
+    return out_files
