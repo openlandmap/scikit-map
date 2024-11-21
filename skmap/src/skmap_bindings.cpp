@@ -198,6 +198,15 @@ void expandArrayRows(Eigen::Ref<MatFloat> data,
     transArray.expandArrayRows(out_data, row_select);
 }
 
+void expandArrayCols(Eigen::Ref<MatFloat> data,
+                     const uint_t n_threads,
+                     Eigen::Ref<MatFloat> out_data,
+                     std::vector<uint_t> col_select)
+{
+    TransArray transArray(data, n_threads);
+    transArray.expandArrayCols(out_data, col_select);
+}
+
 void extractArrayRows(Eigen::Ref<MatFloat> data,
                      const uint_t n_threads,
                      Eigen::Ref<MatFloat> out_data,
