@@ -178,6 +178,17 @@ void selArrayRows(Eigen::Ref<MatFloat> data,
 }
 
 
+
+void selArrayCols(Eigen::Ref<MatFloat> data,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> out_data,
+                  std::vector<uint_t> col_select)
+{
+    TransArray transArray(data, n_threads);
+    transArray.selArrayCols(out_data, col_select);
+}
+
+
 void expandArrayRows(Eigen::Ref<MatFloat> data,
                      const uint_t n_threads,
                      Eigen::Ref<MatFloat> out_data,

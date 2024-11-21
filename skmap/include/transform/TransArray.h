@@ -39,7 +39,10 @@ class TransArray: public ParArray
 
         void selArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select);
-                              
+        
+        void selArrayCols(Eigen::Ref<MatFloat> out_data,
+                              std::vector<uint_t> col_select);
+        
         void fitPercentage(Eigen::Ref<MatFloat> in1,
                            Eigen::Ref<MatFloat> in2);
                            
@@ -52,6 +55,9 @@ class TransArray: public ParArray
         
         void expandArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select);
+
+        void expandArrayCols(Eigen::Ref<MatFloat> out_data,
+                              std::vector<uint_t> col_select);
 
         void extractArrayRows(Eigen::Ref<MatFloat> out_data,
                           std::vector<uint_t> row_select);
