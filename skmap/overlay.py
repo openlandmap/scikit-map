@@ -71,6 +71,7 @@ class _ParallelOverlay:
         
         self.raster_files = raster_files
 
+
         self.layers = pd.DataFrame({
             'name': [ str(Path(raster_file).with_suffix('').name) for raster_file in raster_files ],
             'path': self.raster_files
@@ -87,6 +88,8 @@ class _ParallelOverlay:
         if _ParallelOverlay._is_tiled(path):
           path = path.replace(_ParallelOverlay.TILE_PLACEHOLDER, default_tile_id)
 
+        print(path)
+        
         src = rasterio.open(path)
 
         row['nodata'] = src.nodata
@@ -399,14 +402,13 @@ class SpaceTimeOverlay():
         self.verbose = verbose
         self.catalog = catalog
 
-        self.pts.loc[:,self.col_date] = pd.to_datetime(self.pts[self.col_date])
-        self.uniq_years = self.pts[self.col_date].dt.year.unique()
+        self.pts[self.col_date] = self.pts[self.col_date].astype(int)
+        self.uniq_years = self.pts[self.col_date].unique().tolist()
         self.year_points = {}
 
         for year in self.uniq_years:
 
-            year = int(year)
-            self.year_points[str(year)] = self.pts[self.pts[self.col_date].dt.year == year]
+            self.year_points[str(year)] = self.pts[self.pts[self.col_date] == year]
             year_catalog = catalog.copy()
             year_catalog.query(catalog.get_features(), [str(year)]) # 'common' group is retrieved by default
             self.year_catalogs[str(year)] = year_catalog
