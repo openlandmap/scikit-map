@@ -417,7 +417,7 @@ class SpaceTimeOverlay():
             year = int(year)
             self.year_points[str(year)] = self.pts[self.pts[self.col_date].dt.year == year]
             year_catalog = catalog.copy()
-            year_catalog.query(['common', str(year)], catalog.get_features())
+            year_catalog.query(catalog.get_features(), [str(year)]) # 'common' group is retrieved by default
             self.year_catalogs[str(year)] = year_catalog
 
             if self.verbose:
