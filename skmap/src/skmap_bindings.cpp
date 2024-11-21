@@ -702,12 +702,14 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("copyVecInMatrixRow", &copyVecInMatrixRow, "Copy a vector in a matrix row");
     m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
+    m.def("selArrayCols", &selArrayCols, "Mask array cols");
     m.def("averageAggregate", &averageAggregate, "Average aggregate");
     m.def("maskData", &maskData, "Mask data");
     m.def("maskDataRows", &maskDataRows, "Mask data rows");
     m.def("maskNan", &maskNan, "Mask NaN");
     m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
+    m.def("expandArrayCols", &expandArrayCols, "Expand array cols");
     m.def("extractArrayRows", &extractArrayRows, "Extract array rows");
     m.def("extractArrayCols", &extractArrayCols, "Extract array cols");
     m.def("transposeArray", &transposeArray, "Transpose an array into a new one");
