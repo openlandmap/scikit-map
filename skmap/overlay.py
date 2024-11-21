@@ -1,6 +1,3 @@
-'''
-Overlay and spatial prediction fully compatible with ``scikit-learn``.
-'''
 from typing import List, Union
 import os
 import numpy as np
@@ -12,7 +9,7 @@ from shapely import box
 from pathlib import Path
 from skmap import parallel
 from skmap.misc import ttprint
-from skmap.catalog import DataCatalog
+from skmap.catalog import DataCatalog, run_whales
 import skmap_bindings as sb
 import hashlib
 import itertools
