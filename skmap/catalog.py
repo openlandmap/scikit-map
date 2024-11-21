@@ -14,10 +14,7 @@ import rasterio
 
 def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
     func_name, params = parse_template_whale(whale)
-    dep_tags = []
-    dep_names = []
-    dep_paths = []
-    dep_exec_orders = []
+    dep_tags, dep_names, dep_paths, dep_exec_orders = [], [], [], []
     if func_name == 'percentileAggregation':
         tag = params['entry_template']
         for dt in params['dt']:
@@ -101,7 +98,7 @@ def run_whales(catalog, array, n_threads):
                     sb.computeSavi(array, n_threads,
                         [catalog.data[whale_key][params['idx_red']]['idx']],
                         [catalog.data[whale_key][params['idx_nir']]['idx']],
-                        [catalog.data[whale_key][whale_name]['idx']], float(params['scale_plus']), float(params['scale_minus']),
+                        [catalog.data[whale_key][whale_name]['idx']], float(params['scale_red']), float(params['scale_nir']),
                         float(params['scale_result']), float(params['offset_result']),
                         [float(params['clip'][0]), float(params['clip'][1])])
                 else:
