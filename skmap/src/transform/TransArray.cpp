@@ -103,7 +103,33 @@ namespace skmap {
         this->parForRange(expandArrayRow, row_select.size());
     }
     
+
+    void TransArray::selArrayCols(Eigen::Ref<MatFloat> out_data,
+                                  std::vector<uint_t> col_select)
+    {
+        skmapAssertIfTrue((col_select.size() != (uint_t) out_data.cols()),
+                          "scikit-map ERROR 14: size of the new array does not match the size of selected");
+        auto selArrayCol = [&] (uint_t i)
+        {
+            out_data.col(i) = m_data.col(col_select[i]);
+        };
+        this->parForRange(selArrayCol, out_data.cols());
+    }
+
+
+    void TransArray::expandArrayCols(Eigen::Ref<MatFloat> out_data,
+                                     std::vector<uint_t> col_select)
+    {
+        skmapAssertIfTrue((col_select.size() > (uint_t) m_data.cols()),
+                          "scikit-map ERROR 15: size of the old array does not match the size of selected");
+        auto expandArrayCol = [&] (uint_t i)
+        {
+            out_data.col(col_select[i]) = m_data.col(i);
+        };
+        this->parForRange(expandArrayCol, col_select.size());
+    }
     
+
     void TransArray::blocksAverage(Eigen::Ref<MatFloat> in1,
                                   Eigen::Ref<MatFloat> in2,
                                   uint_t n_pix,
