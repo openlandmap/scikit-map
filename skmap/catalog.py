@@ -383,7 +383,7 @@ class DataCatalog():
             sorted_keys.extend([key for key, _ in sorted_key_l2])
         return list(set(sorted_keys))
     def get_paths(self):
-        paths, idx = [], []
+        paths, idx, names = [], [], []
         for k in self.data:
             if k == 'otf':
                 continue
@@ -391,10 +391,11 @@ class DataCatalog():
                 if not self.data[k][f]['path'].startswith("/whale"):
                     paths += [self.data[k][f]['path']]
                     idx += [self.data[k][f]['idx']]
+                    names += f
         # modify paths of non VRT files
         paths = [path if path is None or path.endswith('vrt') or path.startswith('/vsicurl/') \
         else f'/vsicurl/{path}' for path in paths]
-        return paths, idx
+        return paths, idx, names
     @staticmethod
     def get_whales(data):
         whale_paths, whale_keys, whale_layer_names = [], [], []

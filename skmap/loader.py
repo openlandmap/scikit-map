@@ -115,7 +115,7 @@ class TiledDataLoader():
             # read rasters
             self.array = np.empty((self.catalog.num_features, self.num_pixels), dtype=np.float32)
             with TimeTracker(f"Tile {self.tile_id} - read images"):
-                paths, paths_idx = self.catalog.get_paths()
+                paths, paths_idx, _ = self.catalog.get_paths()
                 tile_paths, tile_idxs = zip(*[(path, idx) for path, idx in zip(paths, paths_idx) if '{tile_id}' in path])
                 mosaic_paths, mosaic_idxs = zip(*[(path, idx) for path, idx in zip(paths, paths_idx) if '{tile_id}' not in path])
                 tile_paths = [p.format(tile_id=self.tile_id) for p in tile_paths]
