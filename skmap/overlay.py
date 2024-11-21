@@ -43,7 +43,7 @@ class _ParallelOverlay:
         points_crs: None,
         raster_tiles:Union[gpd.GeoDataFrame, str] = None,
         tile_id_col:Union[str] = 'tile_id',
-        max_workers:int = parallel.CPU_COUNT,
+        n_threads:int = parallel.CPU_COUNT,
         verbose:bool = True
     ):
 
@@ -218,13 +218,12 @@ class SpaceOverlay():
 
     :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
         the points.
-    :param fn_layers: A list with the raster file paths. If it's not provided
-        the ``dir_layers`` and ``regex_layers`` are used to retrieve the raster files.
+    :param catalog.
     :param dir_layers: A list of folders where the raster files are located. The raster
         are selected according to the pattern specified in ``regex_layers``.
     :param regex_layers: Pattern to select the raster files in ``dir_layers``.
         By default all GeoTIFF files are selected.
-    :param max_workers: Number of CPU cores to be used in parallel. By default all cores
+    :param n_threads: Number of CPU cores to be used in parallel. By default all cores
         are used.
     :param verbose: Use ``True`` to print the overlay progress.
 
@@ -248,26 +247,23 @@ class SpaceOverlay():
         regex_layers = '*.tif',
         raster_tiles:Union[gpd.GeoDataFrame, str] = None,
         tile_id_col:Union[str] = 'tile_id',
-        max_workers:int = parallel.CPU_COUNT,
+        n_threads:int = parallel.CPU_COUNT,
         verbose:bool = True
     ):
 
         self.catalog = catalog
-
-        self.fn_layers, self.layer_idxs = self.catalog.get_paths()
-        features = self.catalog.get_features()
-        self.feat_names = [features[self.layer_idxs[i]] for i in range(len(self.layer_idxs))]
+        layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
 
         if not isinstance(points, gpd.GeoDataFrame):
             pq_points = pd.read_parquet(points)
             pq_points['geometry'] = pq_points.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
             points = gpd.GeoDataFrame(pq_points, geometry='geometry')
         self.pts = points
-        self.max_workers = max_workers
+        self.n_threads = n_threads
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
-            self.fn_layers, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
-            max_workers=self.max_workers, verbose=verbose)
+            layer_paths, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
+            n_threads=self.n_threads, verbose=verbose)
 
     def run(self,
         max_ram_mb:int,
@@ -285,9 +281,14 @@ class SpaceOverlay():
             column per raster).
         :rtype: geopandas.GeoDataFrame
         """
+        assert self.catalog.data_size == len(self.catalog.get_features()), \
+            "Catalog data size should coincide wiht the number of features, something went wrong"
         data_overlay = self.read_data(gdal_opts, max_ram_mb)
-        df = pd.DataFrame(data_overlay.T, columns=self.feat_names)
-
+        data_array = np.empty((len(self.catalog.data_size), data_overlay.shape[1]), dtype=np.float32)
+        data_array[self.layer_idxs,:] = data_overlay[:,:]
+        run_whales(self.catalog, data_array, self.n_threads)
+        # @FIXME check that all the filled flages are True or assert at this point
+        df = pd.DataFrame(data_array.T, columns=self.catalog.get_features())
         self.pts_out = pd.concat([self.pts.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
 
         self.pts_out['lon'] = self.pts_out['geometry'].x
@@ -304,7 +305,7 @@ class SpaceOverlay():
         query_pixels = self.parallelOverlay.query_pixels
         keys = list(query_pixels.keys())
         data_overlay = np.empty((layers.shape[0], query_pixels[keys[0]].shape[0]), dtype=np.float32)
-        sb.fillArray(data_overlay, self.max_workers, np.nan)
+        sb.fillArray(data_overlay, self.n_threads, np.nan)
         for i, key in enumerate(keys):
             key_layer_ids = [int(l) for l in list(layers[layers['group'] == key]['layer_id'])]
             key_query_pixels = query_pixels[key]
@@ -344,14 +345,14 @@ class SpaceOverlay():
                 chunk_size = len(key_layer_paths_chunk)
                 data_array = np.empty((chunk_size, n_block_pix), dtype=np.float32)
                 perm_vec = range(chunk_size)
-                sb.readDataBlocks(data_array, self.max_workers, key_layer_paths_chunk, perm_vec, block_col_off_chunk, block_row_off_chunk,
+                sb.readDataBlocks(data_array, self.n_threads, key_layer_paths_chunk, perm_vec, block_col_off_chunk, block_row_off_chunk,
                                   block_width_chunk, block_height_chunk, bands_list, gdal_opts, key_layer_nodatas_chunk, np.nan)
                 pix_blok_ids = key_query_pixels['block_id'].tolist()
                 sample_rows = key_query_pixels['sample_row'].tolist()
                 sample_cols = key_query_pixels['sample_col'].tolist()
                 pix_inblock_idxs = [sample_rows[k] * unique_blocks.query(f"block_id == @ubid")['block_width'].iloc[0] + sample_cols[k] \
                     for k, ubid in enumerate(pix_blok_ids)]
-                sb.extractOverlay(data_array, self.max_workers, pix_blok_ids, pix_inblock_idxs, unique_blocks_ids_chunk, key_layer_ids_chunk, data_overlay)
+                sb.extractOverlay(data_array, self.n_threads, pix_blok_ids, pix_inblock_idxs, unique_blocks_ids_chunk, key_layer_ids_chunk, data_overlay)
         return data_overlay
     
     
@@ -364,10 +365,8 @@ class SpaceTimeOverlay():
     :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
         the points.
     :param col_date: Date column to retrieve the year information.
-    :param fn_layers: A list with the raster file paths. The file path placeholders
-        ``{year}``, ``{year_minus_1}``, ``{year_plus_1}`` are replaced considering the
-        year information of each point.
-    :param max_workers: Number of CPU cores to be used in parallel. By default all cores
+    :param  catalog.
+    :param n_threads: Number of CPU cores to be used in parallel. By default all cores
         are used.
     :param verbose: Use ``True`` to print the overlay progress.
 
@@ -376,11 +375,6 @@ class SpaceTimeOverlay():
 
     >>> from skmap.mapper import SpaceTimeOverlay
     >>>
-    >>> fn_layers = [ 'raster_{year_minus_1}1202..{year}0320.tif' ] # raster_20101202..20110320.tif, ...
-    >>> spt_overlay = SpaceTimeOverlay('./my_points.gpkg', 'survey_date' fn_layers)
-    >>> result = spt_overlay.run()
-    >>>
-    >>> print(result.shape)
 
     """
 
@@ -390,7 +384,7 @@ class SpaceTimeOverlay():
         catalog:DataCatalog = [],
         raster_tiles:Union[gpd.GeoDataFrame, str] = None,
         tile_id_col:Union[str] = 'tile_id',
-        max_workers:int = parallel.CPU_COUNT,
+        n_threads:int = parallel.CPU_COUNT,
         verbose:bool = False
     ):
 
@@ -400,7 +394,7 @@ class SpaceTimeOverlay():
             pq_points['geometry'] = pq_points.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
             points = gpd.GeoDataFrame(pq_points, geometry='geometry')
         self.pts = points
-        self.max_workers = max_workers
+        self.n_threads = n_threads
 
         self.col_date = col_date
         self.overlay_objs = {}
@@ -424,7 +418,7 @@ class SpaceTimeOverlay():
                 ttprint(f'Overlay {len(self.year_points[str(year)])} points from {year} in {len(year_catalog.get_features())} raster layers')
 
             self.overlay_objs[str(year)] = SpaceOverlay(points=self.year_points[str(year)], catalog=self.year_catalogs[str(year)],
-                raster_tiles=raster_tiles, tile_id_col=tile_id_col, max_workers=max_workers, verbose=verbose)
+                raster_tiles=raster_tiles, tile_id_col=tile_id_col, n_threads=n_threads, verbose=verbose)
 
     
 

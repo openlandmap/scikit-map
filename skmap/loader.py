@@ -77,6 +77,7 @@ class TiledDataLoader():
         self.executor = ProcessPoolExecutor(max_workers=self.n_threads)
         self.mask_path = None
         self.array = None
+        self.array_valid = None
         self.tile_id = None
         self.x_off = None
         self.y_off = None
@@ -86,12 +87,15 @@ class TiledDataLoader():
         self.mask = None
         self.pixels_valid_idx = None
         self.n_pixels_valid = None
+    
     def __enter__(self):
         return self
+    
     def __exit__(self, exc_type, exc_val, exc_tb):
         if os.path.exists(self.mask_path) & self.spatial_aggregation:
             os.remove(self.mask_path)
             print(f"Temporary mask data {self.mask_path} has been deleted.")
+    
     def load_tile_data(self, tile_id):
         with TimeTracker(f"Tile {tile_id} - load tile", True):
             self.tile_id = tile_id
@@ -104,12 +108,12 @@ class TiledDataLoader():
                 input_file = self.mask_path
                 subprocess.run(['./mask_aggregation_bash_script.sh', input_file])
                 self.mask_path = f"comp_{input_file.split('/')[-1].split('.')[0]}.tif"
-                self.x_off, self.y_off, self.x_size, self.y_size = (0, 0, 500, 500)
             
             # check for valid pixels
             gdal_img = gdal.Open(self.mask_path)
             self.x_size = gdal_img.RasterXSize
             self.y_size = gdal_img.RasterYSize
+            gdal_img = None
             self.x_off, self.y_off = (0, 0)
             self.n_pixels = self.x_size * self.y_size
             # prepare mask
@@ -124,8 +128,7 @@ class TiledDataLoader():
             # read rasters
             self.array = np.empty((self.catalog.data_size, self.n_pixels), dtype=np.float32)
             with TimeTracker(f"Tile {self.tile_id} - read images"):
-                paths, paths_idx = self.catalog.get_paths()
-                    
+                paths, paths_idx, _ = self.catalog.get_paths()
                 tile_paths, tile_idxs, mosaic_paths, mosaic_idxs = [], [], [], []
                 for path, idx in zip(paths, paths_idx):
                     if '{tile_id}' in path:
@@ -134,7 +137,6 @@ class TiledDataLoader():
                     else:
                         mosaic_paths += [path]
                         mosaic_idxs += [idx]
-                        
                 # Reading resampled data
                 if mosaic_paths:
                     # @FIXME we could copy locally the mask and then delete to reduce number of requests
@@ -147,7 +149,6 @@ class TiledDataLoader():
 
                 # Reading tiled data
                 if tile_paths:
-                    # @FIXME: why not use gdal to do resampling?
                     if self.spatial_aggregation:
                         N = len(tile_paths)
                         tmp_data = np.empty((N, 4000 * 4000), dtype=np.float32)
@@ -161,12 +162,14 @@ class TiledDataLoader():
                 
                 # Go whales, go!!
                 run_whales(self.catalog, self.array, self.n_threads)
+        return self
                     
     def convert_nan(self, value):
         sb.maskNan(self.array, self.n_threads, range(self.array.shape[0]), value)
     
-    def get_pixels_valid_idx(self, n_years):
-        return np.concatenate([self.pixels_valid_idx + self.n_pixels * i for i in range(n_years)]).tolist()
+    def filter_valid_pixels(self):
+        self.array_valid = np.empty((self.catalog.data_size, self.n_pixels_valid), dtype=np.float32)
+        sb.selArrayCols(self.array, self.n_threads, self.array_valid, self.pixels_valid_idx)
     
     def fill_otf_constant(self, otf_name, otf_const):
         otf_idx = self.catalog.get_otf_idx()
