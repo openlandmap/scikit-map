@@ -86,10 +86,7 @@ class _ParallelOverlay:
         
         path = row['path']
         if _ParallelOverlay._is_tiled(path):
-          path = path.replace(_ParallelOverlay.TILE_PLACEHOLDER, default_tile_id)
-
-        print(path)
-        
+          path = path.replace(_ParallelOverlay.TILE_PLACEHOLDER, default_tile_id)        
         src = rasterio.open(path)
 
         row['nodata'] = src.nodata
@@ -164,6 +161,7 @@ class _ParallelOverlay:
               })
 
         gdf_blocks = gpd.GeoDataFrame(gdf_blocks, crs=src.crs).reset_index(drop=True)
+        assert gdf_blocks.crs is not None, f'The layer {path} has not crs, need fix'
         gdf_blocks = samples.to_crs(gdf_blocks.crs).sjoin(gdf_blocks, how='inner').rename(columns={ 'index_right': 'block_id' })
 
         query_pixels = [] 
@@ -184,7 +182,7 @@ class _ParallelOverlay:
             block = block.drop(columns='geometry')
 
             query_pixels.append(block)
-
+        
         return pd.concat(query_pixels).drop(columns=['window', 'inv_transform'])
 
     def _find_blocks(self, samples):
@@ -403,22 +401,23 @@ class SpaceTimeOverlay():
         self.catalog = catalog
 
         self.pts[self.col_date] = self.pts[self.col_date].astype(int)
-        self.uniq_years = self.pts[self.col_date].unique().tolist()
         self.year_points = {}
 
-        for year in self.uniq_years:
+        for year in self.catalog.get_groups():
+            
+            self.year_points[year] = self.pts[self.pts[self.col_date] == int(year)]
+            if len(self.year_points[year]) > 0:
+                year_catalog = catalog.copy()
+                year_catalog.query(catalog.get_features(), [year]) # 'common' group is retrieved by default
+                self.year_catalogs[year] = year_catalog
 
-            self.year_points[str(year)] = self.pts[self.pts[self.col_date] == year]
-            year_catalog = catalog.copy()
-            year_catalog.query(catalog.get_features(), [str(year)]) # 'common' group is retrieved by default
-            self.year_catalogs[str(year)] = year_catalog
+                if self.verbose:
+                    ttprint(f'Overlay {len(self.year_points[year])} points from {year} in {len(year_catalog.get_features())} raster layers')
 
-            if self.verbose:
-                ttprint(f'Overlay {len(self.year_points[str(year)])} points from {year} in {len(year_catalog.get_features())} raster layers')
-
-            self.overlay_objs[str(year)] = SpaceOverlay(points=self.year_points[str(year)], catalog=self.year_catalogs[str(year)],
-                raster_tiles=raster_tiles, tile_id_col=tile_id_col, n_threads=n_threads, verbose=verbose)
-
+                self.overlay_objs[year] = SpaceOverlay(points=self.year_points[year], catalog=self.year_catalogs[year],
+                    raster_tiles=raster_tiles, tile_id_col=tile_id_col, n_threads=n_threads, verbose=verbose)
+            else:
+                print(f"No points to overlay for year {year}")
     
 
     
@@ -438,11 +437,11 @@ class SpaceTimeOverlay():
         """
         self.result = None
 
-        for year in self.uniq_years:
+        for year in self.catalog.get_groups():
 
             if self.verbose:
                 ttprint(f'Running the overlay for {year}')
-            year_result = self.overlay_objs[str(year)].run(max_ram_mb, out_file_name, gdal_opts)
+            year_result = self.overlay_objs[year].run(max_ram_mb, out_file_name, gdal_opts)
 
             if self.result is None:
                 self.result = year_result
