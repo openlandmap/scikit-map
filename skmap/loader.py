@@ -123,7 +123,7 @@ class TiledDataLoader():
                 self.pixels_valid_idx = np.arange(0, self.n_pixels)[self.mask[0, :].astype(int).astype(bool)]
                 self.n_pixels_valid = int(np.sum(self.mask))
                 if self.n_pixels_valid == 0:
-                    return
+                    return self
             
             # read rasters
             self.array = np.empty((self.catalog.data_size, self.n_pixels), dtype=np.float32)
@@ -158,7 +158,8 @@ class TiledDataLoader():
                         arr_final = arr_aggregated.reshape(N, 500 * 500)
                         self.array[tile_idxs,:] = arr_final[:,:]
                     else:
-                        sb.readData(self.array, self.n_threads, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, self.y_size, [1], self.gdal_opts)
+                        sb.readData(self.array, self.n_threads, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, 
+                                    self.y_size, [1], self.gdal_opts)
                 
                 # Go whales, go!!
                 run_whales(self.catalog, self.array, self.n_threads)
@@ -170,6 +171,12 @@ class TiledDataLoader():
     def filter_valid_pixels(self):
         self.array_valid = np.empty((self.catalog.data_size, self.n_pixels_valid), dtype=np.float32)
         sb.selArrayCols(self.array, self.n_threads, self.array_valid, self.pixels_valid_idx)
+    
+    def expand_valid_pixels(self, array_valid, array_expanded):
+        sb.expandArrayCols(array_valid, self.n_threads, array_expanded, self.pixels_valid_idx)
+    
+    def get_pixels_valid_idx(self, n_groups):
+        return np.concatenate([self.pixels_valid_idx + self.n_pixels * i for i in range(n_groups)]).tolist()
     
     def fill_otf_constant(self, otf_name, otf_const):
         otf_idx = self.catalog.get_otf_idx()

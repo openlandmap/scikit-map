@@ -401,14 +401,14 @@ def _s3_computed_files(out_s3):
     assert (error == ''), f"Error in checking if the tile in S3 `{out_s3}` was already computed. \nError: {error}"
     return len(output.splitlines())
 #
-def s3_list_files(s3_aliases, s3_prefix, tile_id, file_prefix):
+def s3_list_files(s3_aliases, s3_prefix, tile_id):
     if len(s3_aliases) == 0: return []
-    bash_cmd = f"mc ls {s3_aliases[0]}{s3_prefix}/{tile_id}/{file_prefix}"
+    bash_cmd = f"mc ls {s3_aliases[0]}{s3_prefix}/{tile_id}"
     print(f'Checking `{bash_cmd}`...')
     process = subprocess.Popen(bash_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = process.communicate()
     stderr = stderr.decode('utf-8')
-    assert stderr == '', f"Error listing S3 `{s3_aliases[0]}{s3_prefix}/{tile_id}/{file_prefix}`. \nError: {stderr}"
+    assert stderr == '', f"Error listing S3 `{s3_aliases[0]}{s3_prefix}/{tile_id}`. \nError: {stderr}"
     stdout = stdout.decode('utf-8')
     return stdout.splitlines()
 #
@@ -416,7 +416,7 @@ def s3_setup(have_to_register_s3, access_key, secret_key, gaia_addrs):
     s3_aliases = []
     if not have_to_register_s3:
         return s3_aliases
-    s3_aliases = [f'g{i}' for i in range(1, len(gaia_addrs+1))]
+    s3_aliases = [f'g{i}' for i, _ in enumerate(gaia_addrs)]
     commands = [
         f'mc alias set  g{i} {addr} {access_key} {secret_key} --api S3v4'
         for i, addr in enumerate(gaia_addrs)
