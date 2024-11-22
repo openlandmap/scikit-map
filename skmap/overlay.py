@@ -182,6 +182,9 @@ class _ParallelOverlay:
             block = block.drop(columns='geometry')
 
             query_pixels.append(block)
+            
+        assert query_pixels, f"query_pixels is empty for path: {path}"
+            
         
         return pd.concat(query_pixels).drop(columns=['window', 'inv_transform'])
 
@@ -282,7 +285,7 @@ class SpaceOverlay():
         assert self.catalog.data_size == len(self.catalog.get_features()), \
             "Catalog data size should coincide wiht the number of features, something went wrong"
         data_overlay = self.read_data(gdal_opts, max_ram_mb)
-        data_array = np.empty((len(self.catalog.data_size), data_overlay.shape[1]), dtype=np.float32)
+        data_array = np.empty((self.catalog.data_size, data_overlay.shape[1]), dtype=np.float32)
         data_array[self.layer_idxs,:] = data_overlay[:,:]
         run_whales(self.catalog, data_array, self.n_threads)
         # @FIXME check that all the filled flages are True or assert at this point
@@ -417,7 +420,8 @@ class SpaceTimeOverlay():
                 self.overlay_objs[year] = SpaceOverlay(points=self.year_points[year], catalog=self.year_catalogs[year],
                     raster_tiles=raster_tiles, tile_id_col=tile_id_col, n_threads=n_threads, verbose=verbose)
             else:
-                print(f"No points to overlay for year {year}")
+                print(f"No points to overlay for year {year}, removing it from the catalog")
+                del catalog.data[year]
     
 
     
