@@ -317,8 +317,7 @@ class SpaceOverlay():
             block_col_off_comb = [unique_blocks.query(f"block_id == @ubid")['block_col_off'].iloc[0] for ubid in unique_blocks_ids_comb]
             block_height_comb = [unique_blocks.query(f"block_id == @ubid")['block_height'].iloc[0] for ubid in unique_blocks_ids_comb]
             block_width_comb = [unique_blocks.query(f"block_id == @ubid")['block_width'].iloc[0] for ubid in unique_blocks_ids_comb]
-            key_layer_paths_comb = [f'/vsicurl/{path}' if path.startswith("http") and path.endswith(".tif") else path
-                    for path in (str(layers.query(f"layer_id == @ulid")['path'].iloc[0]) for ulid in key_layer_ids_comb)]            
+            key_layer_paths_comb = [path for path in (str(layers.query(f"layer_id == @ulid")['path'].iloc[0]) for ulid in key_layer_ids_comb)]
             key_layer_nodatas_comb = [np.nan if layers.query(f"layer_id == @ulid")['nodata'].iloc[0] is None 
                                         else layers.query(f"layer_id == @ulid")['nodata'].iloc[0] 
                                         for ulid in key_layer_ids_comb]
