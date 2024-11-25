@@ -170,13 +170,9 @@ class DataCatalog():
     def _get_feature_names(catalog_dict: Dict):
         return {layer_name for _,inner_dict in catalog_dict.items() for layer_name,_ in inner_dict.items()}
     
-    def get_features(self):
-        sorted_keys = []
-        for _, inner_dict in self.data.items():
-            key_l2_with_idx = [(key_l2, inner_dict[key_l2]['idx']) for key_l2 in inner_dict]
-            sorted_key_l2 = sorted(key_l2_with_idx, key=lambda x: x[1])
-            sorted_keys.extend([key for key, _ in sorted_key_l2])
-        return list(set(sorted_keys))
+    
+    def get_feature_names(self):
+        return self._get_feature_names(self.data)
     
     def get_paths(self):
         paths, idx, names = [], [], []
@@ -187,11 +183,21 @@ class DataCatalog():
                 if not self.data[k][f]['path'].startswith("/whale"):
                     paths += [self.data[k][f]['path']]
                     idx += [self.data[k][f]['idx']]
-                    names += f
+                    names += [f]
         # modify paths of non VRT files
         paths = [path if path is None or path.endswith('vrt') or path.startswith('/vsicurl/') \
         else f'/vsicurl/{path}' for path in paths]
         return paths, idx, names
+    
+        
+    def get_unrolled_catalog(self):
+        names, paths, idx = [], [], []
+        for k in self.data:
+            for f in self.data[k]:
+                paths += [self.data[k][f]['path']]
+                idx += [self.data[k][f]['idx']]
+                names += [f]
+        return names, paths, idx
     
     @staticmethod
     def get_whales(data):
@@ -230,7 +236,7 @@ class DataCatalog():
             else:
                 print(f'Group {k} is missing from original catalog, skipping it')
         self._expand_whales_dependencies(old_data)
-        missing_features_names = [feature for feature in feature_names if feature not in set(self.get_features())]
+        missing_features_names = [feature for feature in feature_names if feature not in set(self.get_feature_names())]
         for missing_feat_feature in missing_features_names:
             print(f'Feature {missing_feat_feature} is missing in the original catalog, adding is in the otf (on the fly) common group')
         if missing_features_names:

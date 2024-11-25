@@ -253,7 +253,7 @@ class SpaceOverlay():
     ):
 
         self.catalog = catalog
-        layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
+        self.layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
 
         if not isinstance(points, gpd.GeoDataFrame):
             pq_points = pd.read_parquet(points)
@@ -263,7 +263,7 @@ class SpaceOverlay():
         self.n_threads = n_threads
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
-            layer_paths, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
+            self.layer_paths, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
             n_threads=self.n_threads, verbose=verbose)
 
     def run(self,
@@ -282,14 +282,17 @@ class SpaceOverlay():
             column per raster).
         :rtype: geopandas.GeoDataFrame
         """
-        assert self.catalog.data_size == len(self.catalog.get_features()), \
+        feats_names, _, feats_idx = self.catalog.get_unrolled_catalog()
+        assert (self.catalog.data_size == len(self.catalog.get_feature_names())) & (self.catalog.data_size == len(feats_names)), \
             "Catalog data size should coincide wiht the number of features, something went wrong"
+        self.ordered_feats_names = [s for _, s in sorted(zip(feats_idx, feats_names))]
+    
         data_overlay = self.read_data(gdal_opts, max_ram_mb)
         data_array = np.empty((self.catalog.data_size, data_overlay.shape[1]), dtype=np.float32)
         data_array[self.layer_idxs,:] = data_overlay[:,:]
         run_whales(self.catalog, data_array, self.n_threads)
         # @FIXME check that all the filled flages are True or assert at this point
-        df = pd.DataFrame(data_array.T, columns=self.catalog.get_features())
+        df = pd.DataFrame(data_array.T, columns=self.ordered_feats_names)
         self.pts_out = pd.concat([self.pts.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
 
         self.pts_out['lon'] = self.pts_out['geometry'].x
@@ -410,11 +413,11 @@ class SpaceTimeOverlay():
             self.year_points[year] = self.pts[self.pts[self.col_date] == int(year)]
             if len(self.year_points[year]) > 0:
                 year_catalog = catalog.copy()
-                year_catalog.query(catalog.get_features(), [year]) # 'common' group is retrieved by default
+                year_catalog.query(catalog.get_feature_names(), [year]) # 'common' group is retrieved by default
                 self.year_catalogs[year] = year_catalog
 
                 if self.verbose:
-                    ttprint(f'Overlay {len(self.year_points[year])} points from {year} in {len(year_catalog.get_features())} raster layers')
+                    ttprint(f'Overlay {len(self.year_points[year])} points from {year} in {year_catalog.data_size} raster layers')
 
                 self.overlay_objs[year] = SpaceOverlay(points=self.year_points[year], catalog=self.year_catalogs[year],
                     raster_tiles=raster_tiles, tile_id_col=tile_id_col, n_threads=n_threads, verbose=verbose)
