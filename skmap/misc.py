@@ -31,87 +31,87 @@ def _warn_deps(e, module_name):
                 '\tpip install skmap[full]\n'
         )
 
-# def new_memmap(dtype, shape): 
-#     filename = str(make_tempfile(prefix='memmap', suffix='.npy', make_subdir=False))
-#     ttprint(f"Creating {filename}")
-#     return np.memmap(filename, dtype=dtype, shape=shape, mode='w+')
+def new_memmap(dtype, shape): 
+    filename = str(make_tempfile(prefix='memmap', suffix='.npy', make_subdir=False))
+    ttprint(f"Creating {filename}")
+    return np.memmap(filename, dtype=dtype, shape=shape, mode='w+')
 
-# def load_memmap(filename, dtype, shape):
-#     return np.memmap(filename, dtype=dtype, mode='r+', shape=shape)
-#     #return np.lib.format.open_memmap(filename, dtype=dtype, mode='w+', shape=shape)
+def load_memmap(filename, dtype, shape):
+    return np.memmap(filename, dtype=dtype, mode='r+', shape=shape)
+    #return np.lib.format.open_memmap(filename, dtype=dtype, mode='w+', shape=shape)
 
-# def is_memmap(array_mm):
-#     return hasattr(array_mm, 'filename')
+def is_memmap(array_mm):
+    return hasattr(array_mm, 'filename')
 
-# def del_memmap(array_mm, return_array=False):
+def del_memmap(array_mm, return_array=False):
     
-#     result = None
+    result = None
 
-#     if is_memmap(array_mm):
-#         if return_array:
-#             result = np.array(array_mm) # test np.ascontiguousarray
+    if is_memmap(array_mm):
+        if return_array:
+            result = np.array(array_mm) # test np.ascontiguousarray
         
-#         os.remove(array_mm.filename)
-#         #temp_folder = Path(array_mm.filename).parent
-#         #try:
-#         #    shutil.rmtree(temp_folder)
-#         #except:
-#         #    pass
+        os.remove(array_mm.filename)
+        #temp_folder = Path(array_mm.filename).parent
+        #try:
+        #    shutil.rmtree(temp_folder)
+        #except:
+        #    pass
         
-#         if return_array:
-#             return result
-#     else:
-#         del array_mm
+        if return_array:
+            return result
+    else:
+        del array_mm
 
-# def ref_memmap(array):
-#     array.flush()
-#     return {
-#         'filename': array.filename,
-#         'dtype': array.dtype,
-#         'shape': array.shape
-#     }
+def ref_memmap(array):
+    array.flush()
+    return {
+        'filename': array.filename,
+        'dtype': array.dtype,
+        'shape': array.shape
+    }
 
-# def concat_memmap(arrs, axis = 0): 
+def concat_memmap(arrs, axis = 0): 
     
-#     from skmap import parallel
+    from skmap import parallel
 
-#     ttprint("Begin concat")
-#     shapes = np.stack([ a.shape for a in arrs ], axis=0)
-#     noaxis = [ i for i in range(0, len(shapes[0])) if i != axis ]
-#     all_noaxis = np.all(np.all(shapes == shapes[0], axis=0)[noaxis])
+    ttprint("Begin concat")
+    shapes = np.stack([ a.shape for a in arrs ], axis=0)
+    noaxis = [ i for i in range(0, len(shapes[0])) if i != axis ]
+    all_noaxis = np.all(np.all(shapes == shapes[0], axis=0)[noaxis])
     
-#     if not all_noaxis:
-#         raise Exception(f"All arrays must have same shape in all dimensions excepet in {axis}")
+    if not all_noaxis:
+        raise Exception(f"All arrays must have same shape in all dimensions excepet in {axis}")
     
-#     newshape = list(shapes[0])
-#     newshape[axis] = np.sum(shapes[:,axis])
-#     newshape = tuple(newshape)
-#     out_memmap = new_memmap(arrs[0].dtype, newshape)
-#     ref_out_memmap = ref_memmap(out_memmap)
+    newshape = list(shapes[0])
+    newshape[axis] = np.sum(shapes[:,axis])
+    newshape = tuple(newshape)
+    out_memmap = new_memmap(arrs[0].dtype, newshape)
+    ref_out_memmap = ref_memmap(out_memmap)
 
-#     inds = [0] + list(np.cumsum(shapes[:,axis]))
+    inds = [0] + list(np.cumsum(shapes[:,axis]))
     
-#     args = []
-#     for arr, i1, i2 in zip(arrs, inds[:-1], np.roll(inds, -1)[:-1]):
-#         ref_arr = ref_memmap(arr)
-#         args.append((ref_out_memmap, ref_arr, i1, i2))
+    args = []
+    for arr, i1, i2 in zip(arrs, inds[:-1], np.roll(inds, -1)[:-1]):
+        ref_arr = ref_memmap(arr)
+        args.append((ref_out_memmap, ref_arr, i1, i2))
     
-#     n_jobs = parallel.CPU_COUNT
-#     if len(args) < n_jobs:
-#         n_jobs = len(args)
+    n_jobs = parallel.CPU_COUNT
+    if len(args) < n_jobs:
+        n_jobs = len(args)
 
-#     for r in parallel.job(_concat_memmap, args, joblib_args={
-#             'backend': 'threading', 
-#             'pre_dispatch': math.ceil(n_jobs / 3), 
-#             'batch_size': math.floor(len(args) / n_jobs),
-#             'return_as': 'generator'
-#         }):
-#         continue
-#     #out_memmap[:,:,i1:i2] = arr
-#     #del_memmap(arr)
-#     ttprint("End concat")
+    for r in parallel.job(_concat_memmap, args, joblib_args={
+            'backend': 'threading', 
+            'pre_dispatch': math.ceil(n_jobs / 3), 
+            'batch_size': math.floor(len(args) / n_jobs),
+            'return_as': 'generator'
+        }):
+        continue
+    #out_memmap[:,:,i1:i2] = arr
+    #del_memmap(arr)
+    ttprint("End concat")
 
-#     return out_memmap
+    return out_memmap
 
 def make_tempdir(basedir='skmap', make_subdir = True):
     tempdir = Path(TMP_DIR).joinpath(basedir)
