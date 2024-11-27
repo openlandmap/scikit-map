@@ -27,9 +27,7 @@ os.environ["VECLIB_MAXIMUM_THREADS"] = f'{n_threads}'
 
 
 class _ParallelOverlay:
-        # optimized for up to 200 points and about 50 layers
-        # sampling only first band in every layer
-        # assumption is that all layers have same blocks
+    # sampling only first band in every layer
 
     TILE_PLACEHOLDER = '{tile_id}'
 
@@ -164,7 +162,7 @@ class _ParallelOverlay:
         assert gdf_blocks.crs is not None, f'The layer {path} has not crs, need fix'
         gdf_blocks = samples.to_crs(gdf_blocks.crs).sjoin(gdf_blocks, how='inner').rename(columns={ 'index_right': 'block_id' })
 
-        query_pixels = [] 
+        query_pixels = []
 
         for (ij, block) in gdf_blocks.groupby('block_id'):
             inv_block_transform = block['inv_transform'].iloc[0]
@@ -182,11 +180,14 @@ class _ParallelOverlay:
             block = block.drop(columns='geometry')
 
             query_pixels.append(block)
-            
-        assert query_pixels, f"query_pixels is empty for path: {path}"
-            
         
-        return pd.concat(query_pixels).drop(columns=['window', 'inv_transform'])
+        
+        assert query_pixels, f"query_pixels is empty for path: {path}"
+        res = pd.concat(query_pixels).drop(columns=['window', 'inv_transform'])
+        if len(set(res.index)) < int(samples.shape[0] * 0.5):
+            print(f"Less then 50% of points queryed for path: {path}, this is suspicious")
+        
+        return res
 
     def _find_blocks(self, samples):
 
@@ -219,24 +220,11 @@ class SpaceOverlay():
 
     :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
         the points.
-    :param catalog.
-    :param dir_layers: A list of folders where the raster files are located. The raster
-        are selected according to the pattern specified in ``regex_layers``.
-    :param regex_layers: Pattern to select the raster files in ``dir_layers``.
-        By default all GeoTIFF files are selected.
+    :param catalog: scikit-map data catalog.
     :param n_threads: Number of CPU cores to be used in parallel. By default all cores
         are used.
     :param verbose: Use ``True`` to print the overlay progress.
 
-    Examples
-    ========
-
-    >>> from skmap.mapper import SpaceOverlay
-    >>>
-    >>> spc_overlay = SpaceOverlay('./my_points.gpkg', ['./raster_dir_1', './raster_dir_2'])
-    >>> result = spc_overlay.run()
-    >>>
-    >>> print(result.shape)
 
     """
 
@@ -244,8 +232,6 @@ class SpaceOverlay():
     def __init__(self,
         points:Union[gpd.GeoDataFrame, str, pd.DataFrame],
         catalog:DataCatalog = [],
-        dir_layers:List[str] = [],
-        regex_layers = '*.tif',
         raster_tiles:Union[gpd.GeoDataFrame, str] = None,
         tile_id_col:Union[str] = 'tile_id',
         n_threads:int = parallel.CPU_COUNT,
@@ -260,12 +246,30 @@ class SpaceOverlay():
                 points = pd.read_parquet(points)                
             points['geometry'] = points.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
             points = gpd.GeoDataFrame(points, geometry='geometry')
-        self.pts = points
+        self.pts = points.reset_index(drop=True)
         self.n_threads = n_threads
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
             self.layer_paths, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
             n_threads=self.n_threads, verbose=verbose)
+        
+        # Drop duplicates (from overlapping tiles), find union of missing points (out of extent) to drop them and sorting the dataframes
+        keys = list(self.parallelOverlay.query_pixels.keys())
+        missing_indices = []
+        for key in keys:
+            self.parallelOverlay.query_pixels[key] = \
+                self.parallelOverlay.query_pixels[key][~self.parallelOverlay.query_pixels[key].index.duplicated(keep='first')]
+            missing_indices_key_set = set(self.pts.index) - set(self.parallelOverlay.query_pixels[key].index)
+            missing_indices += list(missing_indices_key_set)
+        for key in keys:
+            key_indices_to_drop = set(missing_indices) & set(self.parallelOverlay.query_pixels[key].index)
+            self.parallelOverlay.query_pixels[key] = self.parallelOverlay.query_pixels[key].drop(index=key_indices_to_drop)
+            self.parallelOverlay.query_pixels[key] = self.parallelOverlay.query_pixels[key].sort_index(axis=0, ascending=True)
+            
+        print(f"Dropping {len(list(set(missing_indices)))} points out of {self.pts.shape[0]} because out of extent")
+        self.pts = self.pts.drop(index=set(missing_indices)).sort_index(axis=0, ascending=True)
+        
+        
 
     def run(self,
         max_ram_mb:int,
@@ -291,9 +295,7 @@ class SpaceOverlay():
     
         self.data_overlay = self.read_data(gdal_opts, max_ram_mb)
         self.data_array = np.empty((self.catalog.data_size, self.data_overlay.shape[1]), dtype=np.float32)
-        # assert self.pts.shape[0] == self.data_overlay.shape[1], "Not matching size between input points and the overalied data"
-        if self.pts.shape[0] != self.data_overlay.shape[1]:
-            print("Not matching size between input points and the overalied data")
+        assert self.pts.shape[0] == self.data_overlay.shape[1], "Not matching size between input points and the overalied data"
         
         self.data_array[self.layer_idxs,:] = self.data_overlay[:,:]
         run_whales(self.catalog, self.data_array, self.n_threads)
@@ -319,26 +321,28 @@ class SpaceOverlay():
         for i, key in enumerate(keys):
             key_layer_ids = [int(l) for l in list(layers[layers['group'] == key]['layer_id'])]
             key_query_pixels = query_pixels[key]
+            assert key_query_pixels.shape[0] == query_pixels[keys[0]].shape[0], "Query pixel size is inconsisten between keys, something went wrong"
             unique_blocks = key_query_pixels[['block_id', 'block_col_off', 'block_row_off', 'block_height', 'block_width']].drop_duplicates('block_id')
             unique_blocks_ids = unique_blocks['block_id'].tolist()
+            unique_blocks_dict = unique_blocks.set_index('block_id')[['block_row_off', 'block_col_off', 'block_height', 'block_width']].to_dict('index')
+            layer_path_dict = layers.set_index('layer_id')['path'].to_dict()
+            layer_nodata_dict = layers.set_index('layer_id')['nodata'].to_dict()
             key_layer_ids_comb, unique_blocks_ids_comb = map(list, zip(*itertools.product(key_layer_ids, unique_blocks_ids)))
-            block_row_off_comb = [unique_blocks.query(f"block_id == @ubid")['block_row_off'].iloc[0] for ubid in unique_blocks_ids_comb]
-            block_col_off_comb = [unique_blocks.query(f"block_id == @ubid")['block_col_off'].iloc[0] for ubid in unique_blocks_ids_comb]
-            block_height_comb = [unique_blocks.query(f"block_id == @ubid")['block_height'].iloc[0] for ubid in unique_blocks_ids_comb]
-            block_width_comb = [unique_blocks.query(f"block_id == @ubid")['block_width'].iloc[0] for ubid in unique_blocks_ids_comb]
-            key_layer_paths_comb = [path for path in (str(layers.query(f"layer_id == @ulid")['path'].iloc[0]) for ulid in key_layer_ids_comb)]
-            key_layer_nodatas_comb = [np.nan if layers.query(f"layer_id == @ulid")['nodata'].iloc[0] is None 
-                                        else layers.query(f"layer_id == @ulid")['nodata'].iloc[0] 
-                                        for ulid in key_layer_ids_comb]
+            block_row_off_comb = [unique_blocks_dict[ubid]['block_row_off'] for ubid in unique_blocks_ids_comb]
+            block_col_off_comb = [unique_blocks_dict[ubid]['block_col_off'] for ubid in unique_blocks_ids_comb]
+            block_height_comb = [unique_blocks_dict[ubid]['block_height'] for ubid in unique_blocks_ids_comb]
+            block_width_comb = [unique_blocks_dict[ubid]['block_width'] for ubid in unique_blocks_ids_comb]
+            key_layer_paths_comb = [layer_path_dict[ulid] for ulid in key_layer_ids_comb]
+            key_layer_nodatas_comb = [np.nan if layer_nodata_dict[ulid] is None else layer_nodata_dict[ulid] for ulid in key_layer_ids_comb]
             n_comb = len(key_layer_paths_comb)
-            if 'tile_id' in query_pixels[key].columns:
-                block_tile_id_comb = [key_query_pixels.query(f"block_id == @ubid")['tile_id'].iloc[0] for ubid in unique_blocks_ids_comb]
-                for j in range(n_comb):            
-                    key_layer_paths_comb[j] = key_layer_paths_comb[j].format(tile_id=block_tile_id_comb[j])
-            block_height = max(block_height_comb)
-            block_width = max(block_width_comb)
-            n_block_pix = block_height * block_width
             bands_list = [1]
+            if 'tile_id' in query_pixels[key].columns:
+                block_tile_id_dict = key_query_pixels.set_index('block_id')['tile_id'].to_dict()
+                key_layer_paths_comb = [key_layer_paths_comb[j].format(tile_id=block_tile_id_dict[unique_blocks_ids_comb[j]])
+                    for j in range(len(key_layer_paths_comb))]
+            block_height = np.max(block_height_comb)
+            block_width = np.max(block_width_comb)
+            n_block_pix = block_height * block_width            
             # Factor 2 is heuristic to keep margin for temporary variables
             max_comb_chunk = int(np.ceil((max_ram_mb - data_overlay.size*4/1024/1024)*1024*1024/4/n_block_pix/2))
             assert max_comb_chunk > 1, "skmap-error 42: max_ram_mb too small, can not chunk"
@@ -359,7 +363,8 @@ class SpaceOverlay():
                 pix_blok_ids = key_query_pixels['block_id'].tolist()
                 sample_rows = key_query_pixels['sample_row'].tolist()
                 sample_cols = key_query_pixels['sample_col'].tolist()
-                pix_inblock_idxs = [sample_rows[k] * unique_blocks.query(f"block_id == @ubid")['block_width'].iloc[0] + sample_cols[k] \
+                block_width_dict = unique_blocks.set_index('block_id')['block_width'].to_dict()
+                pix_inblock_idxs = [sample_rows[k] * block_width_dict[ubid] + sample_cols[k]
                     for k, ubid in enumerate(pix_blok_ids)]
                 sb.extractOverlay(data_array, self.n_threads, pix_blok_ids, pix_inblock_idxs, unique_blocks_ids_chunk, key_layer_ids_chunk, data_overlay)
         return data_overlay
@@ -388,7 +393,7 @@ class SpaceTimeOverlay():
     """
 
     def __init__(self,
-        points:Union[gpd.GeoDataFrame, str],
+        points:Union[gpd.GeoDataFrame, str, pd.DataFrame],
         col_date:str,
         catalog:DataCatalog = [],
         raster_tiles:Union[gpd.GeoDataFrame, str] = None,
@@ -396,13 +401,13 @@ class SpaceTimeOverlay():
         n_threads:int = parallel.CPU_COUNT,
         verbose:bool = False
     ):
-
-
+        
         if not isinstance(points, gpd.GeoDataFrame):
-            pq_points = pd.read_parquet(points)
-            pq_points['geometry'] = pq_points.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
-            points = gpd.GeoDataFrame(pq_points, geometry='geometry')
-        self.pts = points
+            if not isinstance(points, pd.DataFrame):
+                points = pd.read_parquet(points)                
+            points['geometry'] = points.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
+            points = gpd.GeoDataFrame(points, geometry='geometry')
+        self.pts = points.reset_index(drop=True)
         self.n_threads = n_threads
 
         self.col_date = col_date
@@ -430,7 +435,7 @@ class SpaceTimeOverlay():
             else:
                 print(f"No points to overlay for year {year}, removing it from the catalog")
                 del catalog.data[year]
-    
+        # @FIXME check if different years has the same number of points here to avoid mismatch
 
     
     def run(self,
