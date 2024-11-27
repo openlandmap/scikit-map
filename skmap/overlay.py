@@ -242,7 +242,7 @@ class SpaceOverlay():
 
 
     def __init__(self,
-        points:Union[gpd.GeoDataFrame, str],
+        points:Union[gpd.GeoDataFrame, str, pd.DataFrame],
         catalog:DataCatalog = [],
         dir_layers:List[str] = [],
         regex_layers = '*.tif',
@@ -256,9 +256,10 @@ class SpaceOverlay():
         self.layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
 
         if not isinstance(points, gpd.GeoDataFrame):
-            pq_points = pd.read_parquet(points)
-            pq_points['geometry'] = pq_points.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
-            points = gpd.GeoDataFrame(pq_points, geometry='geometry')
+            if not isinstance(points, pd.DataFrame):
+                points = pd.read_parquet(points)                
+            points['geometry'] = points.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
+            points = gpd.GeoDataFrame(points, geometry='geometry')
         self.pts = points
         self.n_threads = n_threads
 
@@ -285,14 +286,19 @@ class SpaceOverlay():
         feats_names, _, feats_idx = self.catalog.get_unrolled_catalog()
         assert (self.catalog.data_size == len(self.catalog.get_feature_names())) & (self.catalog.data_size == len(feats_names)), \
             "Catalog data size should coincide wiht the number of features, something went wrong"
+        
         self.ordered_feats_names = [s for _, s in sorted(zip(feats_idx, feats_names))]
     
-        data_overlay = self.read_data(gdal_opts, max_ram_mb)
-        data_array = np.empty((self.catalog.data_size, data_overlay.shape[1]), dtype=np.float32)
-        data_array[self.layer_idxs,:] = data_overlay[:,:]
-        run_whales(self.catalog, data_array, self.n_threads)
+        self.data_overlay = self.read_data(gdal_opts, max_ram_mb)
+        self.data_array = np.empty((self.catalog.data_size, self.data_overlay.shape[1]), dtype=np.float32)
+        # assert self.pts.shape[0] == self.data_overlay.shape[1], "Not matching size between input points and the overalied data"
+        if self.pts.shape[0] != self.data_overlay.shape[1]:
+            print("Not matching size between input points and the overalied data")
+        
+        self.data_array[self.layer_idxs,:] = self.data_overlay[:,:]
+        run_whales(self.catalog, self.data_array, self.n_threads)
         # @FIXME check that all the filled flages are True or assert at this point
-        df = pd.DataFrame(data_array.T, columns=self.ordered_feats_names)
+        df = pd.DataFrame(self.data_array.T, columns=self.ordered_feats_names)
         self.pts_out = pd.concat([self.pts.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
 
         self.pts_out['lon'] = self.pts_out['geometry'].x

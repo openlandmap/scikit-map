@@ -90,6 +90,43 @@ namespace skmap {
 
 
 
+    void TransArray::slidingWindowClassMode(Eigen::Ref<MatFloat> out_data,
+                                  size_t window_size)
+    {
+        auto slidingWindowClassModeCol = [&] (uint_t j)
+        {
+            VecUint col_data = m_data.col(j).cast<uint_t>();
+            uint_t half_window = std::floor(window_size / 2);
+            for (uint_t i = 0; i < (uint_t) m_data.rows(); ++i) 
+            {
+                uint_t start = (uint_t) std::max(0, (int) i - (int) half_window);
+                uint_t end = (uint_t) std::min((int)  m_data.rows(), (int)  i +  (int) half_window + 1);
+                std::vector<uint_t> window(col_data.data() + start, col_data.data() + end);
+                std::unordered_map<uint_t, uint_t> class_counts;
+                for (uint_t val : window) 
+                    class_counts[val]++;
+                
+                uint_t max_count = 0;
+                for (const auto& pair : class_counts)
+                    max_count = std::max(max_count, pair.second);
+                
+                std::vector<uint_t> dominant_classes;
+                for (const auto& pair : class_counts) {
+                    if (pair.second == max_count) 
+                        dominant_classes.push_back(pair.first);
+                }
+                if (dominant_classes.size() == 1) {  // Single dominant class
+                    out_data(i,j) = float_t (dominant_classes[0]);
+                } else {  // Multiple dominant classes
+                    out_data(i,j) = float_t (*std::min_element(dominant_classes.begin(), dominant_classes.end()));
+                }
+            }
+
+        };
+        this->parForRange(slidingWindowClassModeCol, m_data.cols());
+    }
+
+
 
     void TransArray::expandArrayRows(Eigen::Ref<MatFloat> out_data,
                                      std::vector<uint_t> row_select)
@@ -505,7 +542,7 @@ namespace skmap {
         auto extractIndicatorsChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
         {
             for (uint_t k = 0; k < classes.size(); ++k) {
-                data_out.block(row_start, col_out_select[k], row_end - row_start, 1) = (chunk.col(col_in_select).array() == classes[k]).cast<float>();
+                data_out.block(row_start, col_out_select[k], row_end - row_start, 1) = (chunk.col(col_in_select).array() == classes[k]).cast<float_t>();
             }
         };
         this->parChunk(extractIndicatorsChunk);

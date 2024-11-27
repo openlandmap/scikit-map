@@ -77,6 +77,10 @@ class TransArray: public ParArray
 
         void transposeArray(Eigen::Ref<MatFloat> out_data);
 
+        void slidingWindowClassMode(Eigen::Ref<MatFloat> out_data,
+                                  size_t window_size);
+
+
         void computeNormalizedDifference(std::vector<uint_t> positive_indices,
                                          std::vector<uint_t> negative_indices,
                                          std::vector<uint_t> result_indices,

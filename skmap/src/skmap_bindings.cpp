@@ -685,6 +685,15 @@ void convolveRows(Eigen::Ref<MatFloat> data,
 }
 
 
+void slidingWindowClassMode(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    Eigen::Ref<MatFloat> out_data,
+                    size_t window_size)
+{
+    TransArray transArray(data, n_threads);
+    transArray.slidingWindowClassMode(out_data, window_size);
+}
+
 PYBIND11_MODULE(skmap_bindings, m)
 {
     m.def("readDataCore", &readDataCore,
@@ -760,6 +769,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
     m.def("blocksAverage", &blocksAverage, "Vecorized average of 4 neighbor elemnts");
     m.def("extractOverlay", &extractOverlay, "Extract overlay data");
+    m.def("slidingWindowClassMode", &slidingWindowClassMode, "A weird stuff");
 
 }
 
