@@ -326,6 +326,8 @@ class SpaceOverlay():
             unique_blocks_ids = unique_blocks['block_id'].tolist()
             unique_blocks_dict = unique_blocks.set_index('block_id')[['block_row_off', 'block_col_off', 'block_height', 'block_width']].to_dict('index')
             layer_path_dict = layers.set_index('layer_id')['path'].to_dict()
+            if self.verbose:
+                ttprint(f'Loading and sampling {len(layer_path_dict)} raster layers for group {key}')
             layer_nodata_dict = layers.set_index('layer_id')['nodata'].to_dict()
             key_layer_ids_comb, unique_blocks_ids_comb = map(list, zip(*itertools.product(key_layer_ids, unique_blocks_ids)))
             block_row_off_comb = [unique_blocks_dict[ubid]['block_row_off'] for ubid in unique_blocks_ids_comb]
@@ -435,7 +437,6 @@ class SpaceTimeOverlay():
             else:
                 print(f"No points to overlay for year {year}, removing it from the catalog")
                 del catalog.data[year]
-        # @FIXME check if different years has the same number of points here to avoid mismatch
 
     
     def run(self,
