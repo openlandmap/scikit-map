@@ -668,7 +668,6 @@ namespace skmap {
                                  const std::string& version,
                                  const std::string& backend)
     {
-
         auto applyTsirfChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
         {
             uint_t n_s = chunk.cols();
@@ -678,8 +677,6 @@ namespace skmap {
             w_e.segment(1, w_f.size()) = w_f;
             w_e.segment(n_e-w_p.size(), w_p.size()) = w_p;
             auto out_block = out_data.block(out_index_offset + row_start, 0, row_end - row_start, n_s);
-
-
             MatFloat W(n_s, n_s);
             for (uint_t i = 0; i < n_s; ++i)
             {
@@ -699,7 +696,6 @@ namespace skmap {
             out_block = valid_mask.select(chunk_masked, out_block);
         };
         this->parChunk(applyTsirfChunk);
-
     }
 
     void TransArray::convolveRows(Eigen::Ref<MatFloat> out_data,
@@ -752,6 +748,33 @@ namespace skmap {
         this->parChunk(averageAggregateChunk);
 
     }
+
+   
+    
+    void TransArray::nanMeanAggregatePattern(Eigen::Ref<MatFloat> out_data,
+                                             std::vector<std::vector<uint_t>>& agg_pattern)
+    {
+        auto nanMeanAggregatePatternChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            skmapAssertIfTrue((uint_t) out_data.cols() != agg_pattern.size(),
+                              "scikit-map ERROR 43: wrong number of columns of the output matrix");
+            for (uint_t i = 0; i < agg_pattern.size(); ++i)
+            {
+                MatFloat chunk_col_sel(chunk.rows(), agg_pattern[i].size());
+                for (uint_t j = 0; j < agg_pattern[i].size(); ++j)
+                    chunk_col_sel.col(j) = chunk.col(agg_pattern[i][j]);
+                auto res = out_data.block(row_start, i, row_end - row_start, 1);
+                VecFloat count = (float_t) chunk_col_sel.cols() - chunk_col_sel.array().isNaN().cast<float_t>().rowwise().sum().array();
+                MatFloat data_no_nan = chunk_col_sel;
+                data_no_nan = data_no_nan.array().isNaN().select(0., data_no_nan);
+                VecFloat sum = data_no_nan.rowwise().sum();
+                res = sum.array() / count.array();
+                res = (count.array() == 0.).select(nan_v, res);
+            }
+        };
+        this->parChunk(nanMeanAggregatePatternChunk);
+    }
+
 
     void TransArray::nanMean(Eigen::Ref<VecFloat> out_data)
     {

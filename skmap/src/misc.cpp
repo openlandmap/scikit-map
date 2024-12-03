@@ -3,6 +3,7 @@
 
 #define _USE_MATH_DEFINES
 #include <iostream>
+#define EIGEN_VECTORIZE_AVX512
 #include <Eigen/Dense>
 #include <gdal/gdal.h>
 #include <gdal/gdalwarper.h>
@@ -18,6 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#include <opencv2/opencv.hpp>
+
 //#include <cpl_conv.h>
 //#include <ogr_spatialref.h>
 
@@ -73,6 +76,7 @@ using map_t = std::map<std::string, std::vector<uint_t>>;
 // C order is default in Numpy and Eigen pybind11 require it to get this input
 using MatFloat = Eigen::Matrix<float_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using MatBool = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using MatByte = Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic>;
 using VecFloat = Eigen::Vector<float_t, Eigen::Dynamic>;
 using VecUint = Eigen::Vector<uint_t, Eigen::Dynamic>;
 using VecBool = Eigen::Vector<bool, Eigen::Dynamic>;

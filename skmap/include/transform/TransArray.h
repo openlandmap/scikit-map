@@ -200,6 +200,9 @@ class TransArray: public ParArray
                                std::vector<uint_t> col_out_select,
                                std::vector<uint_t> classes);
 
+        void nanMeanAggregatePattern(Eigen::Ref<MatFloat> out_data,
+                                     std::vector<std::vector<uint_t>>& agg_pattern);
+
 
 
 

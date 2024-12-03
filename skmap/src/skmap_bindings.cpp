@@ -297,6 +297,9 @@ void maskDataRows(Eigen::Ref<MatFloat> data,
     transArray.maskDataRows(row_select, mask, value_of_mask_to_mask, new_value_in_data);
 }
 
+
+
+
 void fillArray(Eigen::Ref<MatFloat> data,
                const uint_t n_threads,
                float_t val)
@@ -672,13 +675,21 @@ void scaleAndOffset(Eigen::Ref<MatFloat> data,
     transArray.scaleAndOffset(offset, scaling);
 }
 
+void nanMeanAggregatePattern(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    Eigen::Ref<MatFloat> out_data,
+                    std::vector<std::vector<uint_t>>& agg_pattern)
+{
+    TransArray transArray(data, n_threads);
+    transArray.nanMeanAggregatePattern(out_data, agg_pattern);
+}
+
 void convolveRows(Eigen::Ref<MatFloat> data,
                  const uint_t n_threads,
                  Eigen::Ref<MatFloat> out_data,
                  float_t w_0,
                  Eigen::Ref<VecFloat> w_p,
                  Eigen::Ref<VecFloat> w_f)
-
 {
     TransArray transArray(data, n_threads);
     transArray.convolveRows(out_data, w_0, w_p, w_f);
@@ -692,6 +703,25 @@ void slidingWindowClassMode(Eigen::Ref<MatFloat> data,
 {
     TransArray transArray(data, n_threads);
     transArray.slidingWindowClassMode(out_data, window_size);
+}
+
+void inpaintTelea(Eigen::Ref<MatFloat> input_chunk,
+                  Eigen::Ref<MatByte> mask_chunk,
+                  uint_t inpaint_radius) 
+{
+    cv::Mat inputMat(input_chunk.rows(), input_chunk.cols(), CV_32FC1, input_chunk.data());
+    cv::Mat maskMat(mask_chunk.rows(), mask_chunk.cols(), CV_8UC1, mask_chunk.data());
+    cv::Mat inpaintedMat;
+    cv::inpaint(inputMat, maskMat, inpaintedMat, static_cast<double>(inpaint_radius), cv::INPAINT_TELEA);
+    Eigen::Map<MatFloat> inpaintedEigen(inpaintedMat.ptr<float>(), inpaintedMat.rows, inpaintedMat.cols);
+    input_chunk = inpaintedEigen;
+}
+
+void checkSimdInstructionSetsInUse()
+{
+    auto simd_instructions = Eigen::SimdInstructionSetsInUse();
+    std::cout << "SimdInstructionSetsInUse: " << simd_instructions << std::endl;
+    return;
 }
 
 PYBIND11_MODULE(skmap_bindings, m)
@@ -709,6 +739,7 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("copyVecInMatrixRow", &copyVecInMatrixRow, "Copy a vector in a matrix row");
+    m.def("inpaintTelea", &inpaintTelea, "Inpaint Telea");
     m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
     m.def("selArrayCols", &selArrayCols, "Mask array cols");
@@ -753,6 +784,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeNirv", &computeNirv, "Compute NIRv");
     m.def("scaleAndOffset", &scaleAndOffset, "Muplitply by a scaling and add an offset each array element");
     m.def("computeFapar", &computeFapar, "Compute FAPAR");
+    m.def("nanMeanAggregatePattern", &nanMeanAggregatePattern, "Nan mean agg pattern");
     m.def("computeSavi", &computeSavi, "Compute SAVI");
     m.def("nanMean", &nanMean, "Compute average between available values");
     m.def("computeMannKendallPValues", &computeMannKendallPValues, "Compute Mann-Kendall p-values");
@@ -770,6 +802,6 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("blocksAverage", &blocksAverage, "Vecorized average of 4 neighbor elemnts");
     m.def("extractOverlay", &extractOverlay, "Extract overlay data");
     m.def("slidingWindowClassMode", &slidingWindowClassMode, "A weird stuff");
-
+    m.def("checkSimdInstructionSetsInUse", checkSimdInstructionSetsInUse);
 }
 
