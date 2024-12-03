@@ -705,17 +705,6 @@ void slidingWindowClassMode(Eigen::Ref<MatFloat> data,
     transArray.slidingWindowClassMode(out_data, window_size);
 }
 
-void inpaintTelea(Eigen::Ref<MatFloat> input_chunk,
-                  Eigen::Ref<MatByte> mask_chunk,
-                  uint_t inpaint_radius) 
-{
-    cv::Mat inputMat(input_chunk.rows(), input_chunk.cols(), CV_32FC1, input_chunk.data());
-    cv::Mat maskMat(mask_chunk.rows(), mask_chunk.cols(), CV_8UC1, mask_chunk.data());
-    cv::Mat inpaintedMat;
-    cv::inpaint(inputMat, maskMat, inpaintedMat, static_cast<double>(inpaint_radius), cv::INPAINT_TELEA);
-    Eigen::Map<MatFloat> inpaintedEigen(inpaintedMat.ptr<float>(), inpaintedMat.rows, inpaintedMat.cols);
-    input_chunk = inpaintedEigen;
-}
 
 void checkSimdInstructionSetsInUse()
 {
@@ -739,7 +728,6 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("copyVecInMatrixRow", &copyVecInMatrixRow, "Copy a vector in a matrix row");
-    m.def("inpaintTelea", &inpaintTelea, "Inpaint Telea");
     m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
     m.def("selArrayCols", &selArrayCols, "Mask array cols");
