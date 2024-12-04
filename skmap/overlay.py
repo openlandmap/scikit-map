@@ -248,6 +248,7 @@ class SpaceOverlay():
             points = gpd.GeoDataFrame(points, geometry='geometry')
         self.pts = points.reset_index(drop=True)
         self.n_threads = n_threads
+        self.verbose = verbose
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
             self.layer_paths, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
