@@ -637,7 +637,7 @@ class TreesRandomForestRegressor(RandomForestRegressor):
         assert(self.n_outputs_ == 1)
         pred_t = np.empty((len(self.estimators_), X.shape[0]), dtype=np.float32)
         # Assign chunk of trees to jobs
-        n_jobs = min(self.n_estimators, self.n_jobs)
+        n_jobs = min(self.n_estimators, os.cpu_count() * 2)
         # Parallel loop prediction
         lock = threading.Lock()
         Parallel(n_jobs=n_jobs, verbose=self.verbose, require="sharedmem")(
