@@ -158,7 +158,7 @@ class DataCatalog():
                 json.dump(self.data, f, indent=4)
     
     def get_groups(self):
-        groups = sorted(list(set(self.data.keys()).difference(['common']))) # by default don't return 'common' group
+        groups = sorted(list(set(self.data.keys()).difference(['common']).difference(['otf']))) # by default don't return 'common' nor 'otf' group
         if not len(groups): # but, if there is only group 'common', return it.
             groups = ['common']
         return groups
@@ -286,7 +286,7 @@ class DataCatalog():
                 elif c in self.data[k]:
                     covs_idx[i,j] = self.data[k][c]['idx']
                 else:
-                    covs_idx[i,j] = self.data['otf'][k][c]['idx']
+                    covs_idx[i,j] = self.data['otf'][c]['idx']
         return covs_idx
 #
 def print_catalog_statistics(catalog:DataCatalog):
