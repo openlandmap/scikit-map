@@ -52,6 +52,55 @@ def _get_out_files_depths(out_files_prefix, out_files_suffix, tile_id, depths, n
                 out_files.append(file)
     return out_files
 
+class Regressor():
+    def __init__(self, 
+                 model_name, 
+                 model_path, 
+                 model_covs_path, 
+                 predict_fn) -> None:
+        self.model_name = model_name
+        self.model_path = model_path
+        self.model_covs_path = model_covs_path
+        model, features = _read_model(self.model_name, self.model_path, self.model_covs_path)
+        assert(hasattr(model, 'estimators_'))
+        self.model = model
+        self.n_trees = len(self.model.estimators_)
+        self.model_features = features
+        self.predict_fn = predict_fn
+        self.in_covs_t = None
+        self.in_covs = None
+        self.in_covs_valid = None
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.in_covs_t = None
+        self.in_covs = None
+        self.in_covs_valid = None
+    def predict(self, data:TiledDataLoader):
+        # prepare input and output arrays
+        self.in_covs_t = np.empty((len(self.model_features), len(data.catalog.get_groups()) * data.n_pixels), dtype=np.float32)
+        self.in_covs = np.empty((len(data.catalog.get_groups()) * data.n_pixels, len(self.model_features)), dtype=np.float32)
+        self.in_covs_valid = np.empty((len(data.catalog.get_groups()) * data.n_pixels_valid, len(self.model_features)), dtype=np.float32)
+        # create output result
+        result = Predicted(
+            data=data,
+            model_name=self.model_name,
+            depths=self.depths,
+            n_depths=len(self.depths)
+        )
+        # traverse depths
+        matrix_idx = data.catalog._get_covs_idx(self.model_features)
+        i=0
+        # transpose data
+        # TODO create a class for skmap matrix with threads in constructor
+        sb.reorderArray(data.array, data.n_threads, self.in_covs_t, matrix_idx)
+        sb.transposeArray(self.in_covs_t, data.n_threads, self.in_covs)
+        sb.selArrayRows(self.in_covs, data.n_threads, self.in_covs_valid, data.get_pixels_valid_idx(data.n_years))
+        # predict
+        # self.predicted_trees shape: (n_years, n_pixels)
+        result._out_valid[:,:] = self.predict_fn(self.model, self.in_covs_valid).reshape(result.n_groups, result.data.n_pixels_valid)
+        return result # shape: (n_samples)
+
 class RFRegressorDepths():
     def __init__(self, 
                  model_name, 
@@ -219,6 +268,157 @@ class RFClassifier(Classifier):
                 if round:
                     np.round(result._out_probs_valid, out=result._out_probs_valid)
         return result # shape: (n_samples, n_classes)
+#
+class Predicted():
+    def __init__(self,
+                 data:TiledDataLoader, 
+                 model_name, 
+                 depths) -> None:
+        self.data = data
+        assert(self.data is not None)
+        self.model_name = model_name
+        self.depths = depths
+        self.groups = self.data.catalog.get_groups()
+        self.n_groups = len(self.groups)
+        # TODO optimize shape of self.out_trees
+        self._out_valid = np.empty((self.n_groups, self.data.n_pixels_valid), dtype=np.float32)
+        self._out_stats_valid = None
+        self._out_stats = None
+        self._out_stats_t = None
+        self._out_stats_gdal = None
+        self.n_stats = None
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._out_valid = None
+        self._out_stats_valid = None
+        self._out_stats = None
+        self._out_stats_t = None
+        self._out_stats_gdal = None
+    @property
+    def predicted_trees(self):
+        # self.predicted_trees shape: (n_depths, n_trees, n_years, n_pixels_valid)
+        return self._out_valid[:self.n_depths, :, :self.n_groups, :]
+    @property
+    def predicted_stats(self):
+        # self.predicted_stats shape: (n_years, n_pixels_valid, n_depths, n_stats) 
+        if self._out_stats_valid is not None:
+            return self._out_stats_valid.reshape((self.n_groups, self.data.n_pixels_valid, self.n_depths, self.n_stats))
+    def create_empty_copy(self, model_name):
+        pred = PredictedDepths(
+            model_name=model_name, 
+            depths=self.depths,
+            n_depths=self.n_depths,
+            years=self.groups,
+            n_years=self.n_groups,
+            n_trees=self.n_trees,
+            data=self.data
+        )
+        return pred
+    def average_trees_depth_ranges(self):
+        assert(self.n_depths > 1)
+        self.n_depths -= 1
+        for i in range(self.n_depths):
+            # self.predicted_trees shape: (n_depths, n_trees, n_years, n_pixels_valid)
+            self._out_valid[i,:,:self.n_groups,:] += self._out_valid[i + 1,:,:self.n_groups,:]
+            self._out_valid[i,:,:self.n_groups,:] /= 2
+    def average_trees_year_ranges(self):
+        assert(self.n_groups > 1)
+        self.n_groups -= 1
+        for j in range(self.n_groups):
+            # self.predicted_trees shape: (n_depths, n_trees, n_years, n_pixels_valid)
+            self._out_valid[:self.n_depths,:,j,:] += self._out_valid[:self.n_depths,:,j + 1,:]
+            self._out_valid[:self.n_depths,:,j,:] /= 2
+    def compute_stats(self, mean=True, quantiles=[0.025, 0.975], expm1=False, scale=1):
+        quantile_idx = 1 if mean else 0
+        self.n_stats = quantile_idx + len(quantiles)
+        assert(self.n_stats > 0)
+        self._out_stats_valid = np.empty((self.n_groups * self.data.n_pixels_valid, self.n_depths * self.n_stats), dtype=np.float32)
+        # compute stats
+        for i in range(self.n_depths):
+            if mean:
+                # self.predicted_stats shape: (n_years, n_pixels_valid, n_depths, n_stats) 
+                # self.predicted_trees shape: (n_depths, n_trees, n_years, n_pixels_valid)
+                self.predicted_stats[:,:,i,0] = np.mean(self._out_valid[i,:,:self.n_groups,:], axis=0)
+            if len(quantiles) > 0:
+                q = np.quantile(self._out_valid[i,:,:self.n_groups,:], quantiles, axis=0)
+                self.predicted_stats[:,:,i,quantile_idx:] = q.transpose((1, 2, 0))
+
+        # compute inverse log1p
+        if expm1:
+            np.expm1(self._out_stats_valid, out=self._out_stats_valid)
+        # compute scale
+        if scale != 1:
+            self._out_stats_valid[:] = self._out_stats_valid * scale
+    def save_stats_layers(self, 
+                          base_dir,
+                          nodata,
+                          dtype,
+                          out_files_prefix,
+                          out_files_suffix, 
+                          s3_prefix, 
+                          s3_aliases, 
+                          gdal_opts,
+                          threads):
+        assert(self._out_stats_valid is not None)
+        assert(dtype == 'int16' or dtype == 'uint8')
+        assert(len(out_files_prefix) == len(out_files_suffix))
+        assert(len(out_files_prefix) == self.n_stats)
+        assert(s3_prefix is None or len(s3_aliases) > 0)
+        # create and transpose output
+        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - transpose data for final output ({threads} threads)"):
+            # expand to original number of pixels
+            self._out_stats = np.empty((self.n_groups * self.data.n_pixels, self.n_depths * self.n_stats), dtype=np.float32)
+            sb.fillArray(self._out_stats, threads, nodata)
+            sb.expandArrayRows(self._out_stats_valid, threads, self._out_stats, self.data.get_pixels_valid_idx(self.n_groups))
+            # transpose expanded array
+            self._out_stats_t = np.empty((self.n_depths * self.n_stats, self.n_groups * self.data.n_pixels), dtype=np.float32)
+            sb.transposeArray(self._out_stats, threads, self._out_stats_t)
+            # rearrange years and stats
+            # TODO ? could this be replaced by just self._out_stats_t.reshape((self.n_depths * self.n_stats * self.n_years, self.model._data.n_pixels))?
+            self._out_stats_gdal = np.empty((self.n_depths * self.n_stats * self.n_groups, self.data.n_pixels), dtype=np.float32)
+            sb.fillArray(self._out_stats_gdal, threads, nodata)
+            inverse_idx = np.empty((self.n_depths * self.n_stats * self.n_groups, 2), dtype=np.uintc)
+            subrows_grid, rows_grid = np.meshgrid(np.arange(self.n_groups), list(range(self.n_depths * self.n_stats)))
+            inverse_idx[:,0] = rows_grid.flatten()
+            inverse_idx[:,1] = subrows_grid.flatten()
+            sb.inverseReorderArray(self._out_stats_t, threads, self._out_stats_gdal, inverse_idx)
+        # write outputs
+        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - write output ({threads} threads)"):
+            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.model_name}")
+            # TODO implement filenames function as an class function
+            out_files = _get_out_files_depths(
+                out_files_prefix=out_files_prefix, 
+                out_files_suffix=out_files_suffix, 
+                tile_id=self.data.tile_id, 
+                depths=self.depths, 
+                n_depths=self.n_depths, 
+                years=self.groups, 
+                n_years=self.n_groups,
+                n_stats=self.n_stats
+            )
+            # TODO change the need for base image in sb.writeByteData and sb.writeInt16Data
+            temp_dir = f"{base_dir}/.skmap"
+            temp_tif = self.data.create_image_template(dtype, nodata, temp_dir)
+            write_idx = range(self.n_depths * self.n_stats * self.n_groups)
+            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
+            s3_out = None
+            if s3_prefix is not None:
+                s3_out = [f'{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}' for _ in range(len(out_files))]
+            if dtype == 'int16':
+                sb.writeInt16Data(self._out_stats_gdal, threads, gdal_opts, [temp_tif for _ in range(len(out_files))], out_dir, out_files, 
+                                              write_idx, 0, 0, self.data.x_size, self.data.y_size, int(nodata), compress_cmd, s3_out)
+            elif dtype == 'uint8':
+                sb.writeByteData(self._out_stats_gdal, threads, gdal_opts, [temp_tif for _ in range(len(out_files))], out_dir, out_files, 
+                                             write_idx, 0, 0, self.data.x_size, self.data.y_size, int(nodata), compress_cmd, s3_out)
+        # show final message and remove local files after sent to s3 backend
+        if s3_prefix is not None:
+            for k in range(self.n_stats):
+                print(f'List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self.data.tile_id}/{out_files_prefix[k]}_`')
+            _rm_dir(out_dir)
+            os.remove(temp_tif)
+            return s3_out
+        return [f"{out_dir}/{file}" for file in out_files]
 #
 # TODO copy all metadata needed from TiledDataLoader as parameter of constructor
 class PredictedDepths():
