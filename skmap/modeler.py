@@ -84,9 +84,7 @@ class Regressor():
         # create output result
         result = Predicted(
             data=data,
-            model_name=self.model_name,
-            depths=self.depths,
-            n_depths=len(self.depths)
+            model_name=self.model_name
         )
         # traverse depths
         matrix_idx = data.catalog._get_covs_idx(self.model_features)
@@ -727,87 +725,6 @@ class PredictedProbs():
             return s3_out
         return [f"{out_dir}/{file}" for file in out_files]
 #
-class ReducedValues():
-    def __init__(self, 
-                 data:TiledDataLoader, 
-                 reducer_name) -> None:
-        self.data = data
-        assert(self.data is not None)
-        self.reducer_name = reducer_name
-        self.groups = self.data.catalog.get_groups()
-        self.n_groups = len(self.groups)
-        self._out_reduced_valid = np.empty((self.n_groups * self.data.n_pixels_valid, 1), dtype=np.float32)
-        self._out_reduced = None
-        self._out_reduced_t = None
-        self._out_reduced_gdal = None
-    
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        self._out_reduced_valid = None
-        self._out_reduced = None
-        self._out_reduced_t = None
-        self._out_reduced_gdal = None
-    
-    @property
-    def reduced_values(self):
-        return self._out_reduced_valid.reshape((self.n_groups, self.data.n_pixels_valid, 1))
-    
-    def save_reduced_layer(self, 
-                           base_dir, 
-                           nodata, 
-                           dtype, 
-                           out_files_prefix, 
-                           out_files_suffix, 
-                           s3_prefix, 
-                           s3_aliases, 
-                           gdal_opts, 
-                           n_threads):
-        assert(self._out_reduced_valid is not None)
-        assert(dtype == 'int16' or dtype == 'uint8')
-        assert(len(out_files_prefix) == len(out_files_suffix))
-        assert(len(out_files_prefix) == 1)
-        assert(s3_prefix is None or len(s3_aliases) > 0)
-        # create and transpose output
-        with TimeTracker(f"tile {self.data.tile_id}/{self.reducer_name} - transpose data for final output ({n_threads} threads)"):
-            # expand to original number of pixels
-            self._out_reduced = np.empty((self.n_groups * self.data.n_pixels, 1), dtype=np.float32)
-            sb.fillArray(self._out_reduced, n_threads, nodata)
-            sb.expandArrayRows(self._out_reduced_valid, n_threads, self._out_reduced, self.data.get_pixels_valid_idx(self.n_groups))
-            # transpose expanded array
-            self._out_reduced_t = np.empty((1, self.n_groups * self.data.n_pixels), dtype=np.float32)
-            sb.transposeArray(self._out_reduced, n_threads, self._out_reduced_t)
-            # rearrange years and stats
-            self._out_reduced_gdal = np.empty((1 * self.n_groups, self.data.n_pixels), dtype=np.float32)
-            sb.fillArray(self._out_reduced_gdal, n_threads, nodata)
-            inverse_idx = np.empty((self._out_reduced_gdal.shape[0], 2), dtype=np.uintc)
-            subrows_grid, rows_grid = np.meshgrid(np.arange(self.n_groups), list(range(1)))
-            inverse_idx[:,0] = rows_grid.flatten()
-            inverse_idx[:,1] = subrows_grid.flatten()
-            sb.inverseReorderArray(self._out_reduced_t, n_threads, self._out_reduced_gdal, inverse_idx)
-        # write outputs
-        with TimeTracker(f"tile {self.data.tile_id}/{self.reducer_name} - write probs images ({n_threads} threads)"):
-            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.reducer_name}")
-            out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
-            temp_tif = [self.data.mask_path for _ in range(len(out_files))]
-            write_idx = range(self._out_reduced_gdal.shape[0])
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
-            s3_out = None
-            if s3_prefix is not None:
-                s3_out = [f'{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}' for _ in range(len(out_files))]
-            if dtype == 'int16':
-                sb.writeInt16Data(self._out_reduced_gdal, n_threads, gdal_opts, [temp_tif for _ in range(len(out_files))], out_dir, out_files, 
-                                  write_idx, 0, 0, self.data.x_size, self.data.y_size, int(nodata), compress_cmd, s3_out)
-            elif dtype == 'uint8':
-                sb.writeByteData(self._out_reduced_gdal, n_threads, gdal_opts, [temp_tif for _ in range(len(out_files))], out_dir, out_files, 
-                                 write_idx, 0, 0, self.data.x_size, self.data.y_size, int(nodata), compress_cmd, s3_out)
-        if s3_prefix is not None:
-            print(f'List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self.data.tile_id}/{out_files_prefix[0]}_`')
-            _rm_dir(out_dir)
-            return s3_out
-        return [f"{out_dir}/{file}" for file in out_files]
-#
 class TreesRandomForestRegressor(RandomForestRegressor):
     def predict(self, X):
         """
@@ -845,7 +762,117 @@ class TreesRandomForestRegressor(RandomForestRegressor):
             for i in range(len(self.estimators_))
         )
         return pred_t
-
+#
+class Reducer():
+    def __init__(self, reducer_name:str, reducer_fn:Callable) -> None:
+        self.reducer_name = reducer_name
+        self.reducer_fn = reducer_fn
+        self.in_covs_t = None
+        self.in_covs = None
+        self.in_covs_valid = None
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.in_covs_t = None
+        self.in_covs = None
+        self.in_covs_valid = None
+    def compute(self, data:TiledDataLoader):
+        n_groups = len(data.catalog.get_groups())
+        features = list(data.catalog.get_feature_names())
+        n_features = len(features)
+        with TimeTracker(f"tile {data.tile_id} - predict ({n_features} input features)", True):
+            # prepare input and output arrays
+            self.in_covs_t = np.empty((n_features, n_groups * data.n_pixels), dtype=np.float32)
+            self.in_covs = np.empty((n_groups * data.n_pixels, n_features), dtype=np.float32)
+            self.in_covs_valid = np.empty((n_groups * data.n_pixels_valid, n_features), dtype=np.float32)
+            # create output result
+            result = ReducedValues(data=data, reducer_name=self.reducer_name)
+            # transpose data
+            matrix_idx = data.catalog._get_covs_idx(features)
+            with TimeTracker(f"tile {data.tile_id} - transpose data ({data.n_threads} threads)"):
+                sb.reorderArray(data.array, data.n_threads, self.in_covs_t, matrix_idx)
+                sb.transposeArray(self.in_covs_t, data.n_threads, self.in_covs)
+                sb.selArrayRows(self.in_covs, data.n_threads, self.in_covs_valid, data.get_pixels_valid_idx(n_groups))
+            # compute
+            with TimeTracker(f"tile {data.tile_id} - model prediction ({data.n_threads} threads)"):
+                result._out_reduc_valid[:] = self.reducer_fn(self.in_covs_valid)
+        return result # shape: (n_samples, 1)
+#
+class ReducedValues():
+    def __init__(self, data:TiledDataLoader, reducer_name:str) -> None:
+        self.data = data
+        assert(self.data is not None)
+        self.reducer_name = reducer_name
+        self.groups = self.data.catalog.get_groups()
+        self.n_groups = len(self.groups)
+        self._out_reduc_valid = np.empty((self.n_groups * self.data.n_pixels_valid), dtype=np.float32)
+        self._out_reduc = None
+        self._out_reduc_t = None
+        self._out_reduc_gdal = None
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._out_reduc_valid = None
+        self._out_reduc = None
+        self._out_reduc_t = None
+        self._out_reduc_gdal = None
+    @property
+    def reduced_values(self):
+        return self._out_reduc_valid.reshape((self.n_groups, self.data.n_pixels_valid))
+    def save_reduced_layer(self, 
+                           base_dir, 
+                           nodata, 
+                           dtype, 
+                           out_files_prefix, 
+                           out_files_suffix, 
+                           s3_prefix, 
+                           s3_aliases, 
+                           gdal_opts,
+                           threads):
+        assert(self._out_reduc_valid is not None)
+        assert(dtype == 'int16' or dtype == 'uint8')
+        assert(len(out_files_prefix) == len(out_files_suffix))
+        assert(len(out_files_prefix) == 1)
+        assert(s3_prefix is None or len(s3_aliases) > 0)
+        # create and transpose output
+        with TimeTracker(f"tile {self.data.tile_id} - transpose data for final output ({threads} threads)"):
+            # expand to original number of pixels
+            self._out_reduc = np.empty((self.n_groups * self.data.n_pixels, 1), dtype=np.float32)
+            sb.fillArray(self._out_reduc, threads, nodata)
+            sb.expandArrayRows(self._out_reduc_valid, threads, self._out_reduc, self.data.get_pixels_valid_idx(self.n_groups))
+            # transpose expanded array
+            self._out_reduc_t = np.empty((1, self.n_groups * self.data.n_pixels), dtype=np.float32)
+            sb.transposeArray(self._out_reduc, threads, self._out_reduc_t)
+            # rearrange groups
+            self._out_reduc_gdal = np.empty((1 * self.n_groups, self.data.n_pixels), dtype=np.float32)
+            sb.fillArray(self._out_reduc_gdal, threads, nodata)
+            inverse_idx = np.empty((self._out_reduc_gdal.shape[0], 2), dtype=np.uintc)
+            subrows_grid, rows_grid = np.meshgrid(np.arange(self.n_groups), list(range(1)))
+            inverse_idx[:,0] = rows_grid.flatten()
+            inverse_idx[:,1] = subrows_grid.flatten()
+            sb.inverseReorderArray(self._out_reduc_t, threads, self._out_reduc_gdal, inverse_idx)
+        # write outputs
+        with TimeTracker(f"tile {self.data.tile_id} - write probs images ({threads} threads)"):
+            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.reducer_name}")
+            out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
+            temp_tif = [self.data.mask_path for _ in range(len(out_files))]
+            write_idx = range(self._out_reduc_gdal.shape[0])
+            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
+            s3_out = None
+            if s3_prefix is not None:
+                s3_out = [f'{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}' for _ in range(len(out_files))]
+            if dtype == 'int16':
+                sb.writeInt16Data(self._out_reduc_gdal, threads, gdal_opts, temp_tif, out_dir, out_files, 
+                                  write_idx, 0, 0, self.data.x_size, self.data.y_size, int(nodata), compress_cmd, s3_out)
+            elif dtype == 'uint8':
+                sb.writeByteData(self._out_reduc_gdal, threads, gdal_opts, temp_tif, out_dir, out_files, 
+                                 write_idx, 0, 0, self.data.x_size, self.data.y_size, int(nodata), compress_cmd, s3_out)
+        if s3_prefix is not None:
+            print(f'List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self.data.tile_id}/{out_files_prefix[0]}_`')
+            _rm_dir(out_dir)
+            return s3_out
+        return [f"{out_dir}/{file}" for file in out_files]
+#
 def _read_model(model_name:str, model_path:str, model_covs_path:str):
     if model_path.endswith('.joblib'):
         model = joblib.load(model_path)
