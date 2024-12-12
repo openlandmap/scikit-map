@@ -54,6 +54,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
 from copy import deepcopy
 
+import skmap_bindings
+
 _INT_DTYPE = (
   'uint8', 'uint8',
   'int16', 'uint16',
@@ -274,6 +276,52 @@ def _save_raster(
     on_each_outfile(raster_file)
 
   return raster_file
+
+def read_rasters_cpp(
+  raster_files:Union[List,str] = [],
+  band: Union[List,int] = 1,
+  window:Window = None,
+  n_jobs:int = 8,
+  out_data:numpy.array = None,
+  out_idx:List = None,
+  dtype:str = 'float32',
+  gdal_opts:dict = {},
+  verbose = False
+):
+
+  if isinstance(raster_files, str):
+    raster_files = [ raster_files ]
+  if isinstance(band, int):
+    band = [ band ]
+  if isinstance(raster_files[0], Path):
+    raster_files = [ str(r) for r in raster_files]
+  if len(raster_files) < n_jobs:
+    n_jobs = len(raster_files)
+  
+  n_layers = len(raster_files)
+
+  if window is None:
+    ds = rasterio.open(raster_files[0])
+    shape = (ds.width, ds.height)
+    window = rasterio.windows.Window(0, 0, ds.width, ds.height)
+  if out_data is None:
+    out_data = np.empty((n_layers, window.width * window.height), dtype=dtype)
+  if out_idx is None:
+    out_idx = range(0, n_layers)
+
+  if verbose:
+    ttprint(f"Reading {n_layers} layers using window={window} and array={out_data.shape}")
+
+  skmap_bindings.readData(
+    out_data, n_jobs, raster_files, out_idx,
+    window.col_off, window.row_off, window.width, window.height,
+    band, gdal_opts
+  )
+
+  if verbose:
+    ttprint(f"End")
+
+  return out_data
 
 def read_rasters(
   raster_files:Union[List,str] = [],
