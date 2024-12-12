@@ -1,8 +1,11 @@
 import pytest
 
 from rasterio.windows import Window
+from pathlib import Path
+import rasterio
 import numpy as np
 
+from skmap.misc import make_tempdir
 from skmap.data import toy
 from skmap import io
 
@@ -34,3 +37,16 @@ class TestReadRaster:
     out_data = np.empty((4, 784), dtype='float32')
     out_data = io.read_rasters_cpp(toy._static_raster(), out_data=out_data, out_idx=[2,3], window=Window(100,100,28,28))
     assert(np.max(out_data[2:3,:]) == 106.0)
+
+class TestSaveRaster:
+
+  def test_001(self):
+    out_data = io.read_rasters_cpp(toy._static_raster())
+    base_raster = str(toy._static_raster()[0])
+    out_files = io.save_rasters_cpp(base_raster, out_data, 'test', str(make_tempdir()))
+
+    ds = rasterio.open(out_files[0])
+    dtype = ds.dtypes[0]
+    Path(out_files[0]).unlink()
+
+    assert (dtype == 'int16')

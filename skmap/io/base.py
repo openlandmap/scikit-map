@@ -55,6 +55,7 @@ from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLA
 from copy import deepcopy
 
 import skmap_bindings
+from skmap.misc import make_tempdir
 
 _INT_DTYPE = (
   'uint8', 'uint8',
@@ -277,6 +278,75 @@ def _save_raster(
 
   return raster_file
 
+def save_rasters_cpp(
+  base_raster: Union[List,str],
+  out_data: np.array,
+  out_files: Union[List,str],
+  out_dir:str = '.',
+  out_idx:List = None,
+  out_s3: Union[List,str] = None,
+  window:Window = None,
+  nodata:int = None,
+  dtype:type = np.int16,
+  n_jobs:int = 8,
+  gdal_opts:dict = {},
+  gdal_co:str = { 'COMPRESS':'deflate', 'ZLEVEL': '9', 'TILED': 'TRUE',  'BLOCKXSIZE': '1024', 'BLOCKYSIZE':'1024' },
+  verbose = False
+):
+
+  if isinstance(out_files, str):
+    out_files = [ out_files ]
+  if len(out_files) < n_jobs:
+    n_jobs = len(out_files)
+
+  n_layers = len(out_files)
+
+  if window is None:
+    ds = rasterio.open(base_raster)
+    shape = (ds.width, ds.height)
+    window = rasterio.windows.Window(0, 0, ds.width, ds.height)
+  if out_idx is None:
+    out_idx = list(range(0, n_layers))
+  if out_s3 is not None:
+    out_dir = str(make_tempdir())
+  if nodata is None:
+    ds = rasterio.open(base_raster)
+    nodata = int(ds.nodatavals[0])
+
+  gdal_co = '-co ' + ' -co '.join([ 
+    f'{k}={v}' 
+    for k,v in zip(gdal_co.keys(),gdal_co.values()) 
+  ])
+  gdal_cmd = f"gdal_translate -a_nodata {nodata} {gdal_co}"
+
+  if isinstance(base_raster, str):
+    base_raster = [ base_raster for i in out_files ]
+
+  write_fn = skmap_bindings.writeInt16Data
+  if dtype == np.uint8:
+    write_fn = skmap_bindings.writeByteData
+  elif dtype == np.uint16:
+    write_fn = skmap_bindings.writeUInt16Data
+  elif dtype == np.float32:
+    write_fn = skmap_bindings.writeData
+
+  if verbose:
+    ttprint(f"Saving {n_layers} layers using window={window} to ")
+
+  write_fn(
+    out_data, n_jobs, gdal_opts, base_raster, out_dir, out_files, 
+    out_idx, window.col_off, window.row_off, window.width, window.height,
+    nodata, gdal_cmd, out_s3
+  )
+
+  if verbose:
+    ttprint(f"End")
+
+  if out_s3 is not None:
+    return out_s3
+  else:
+    return [ str(Path(out_dir).joinpath(f'{o}.tif')) for o in out_files ]
+
 def read_rasters_cpp(
   raster_files:Union[List,str] = [],
   band: Union[List,int] = 1,
@@ -284,7 +354,7 @@ def read_rasters_cpp(
   n_jobs:int = 8,
   out_data:numpy.array = None,
   out_idx:List = None,
-  dtype:str = 'float32',
+  dtype:type = np.float32,
   gdal_opts:dict = {},
   verbose = False
 ):
@@ -307,7 +377,7 @@ def read_rasters_cpp(
   if out_data is None:
     out_data = np.empty((n_layers, window.width * window.height), dtype=dtype)
   if out_idx is None:
-    out_idx = range(0, n_layers)
+    out_idx = list(range(0, n_layers))
 
   if verbose:
     ttprint(f"Reading {n_layers} layers using window={window} and array={out_data.shape}")
