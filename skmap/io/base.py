@@ -379,13 +379,15 @@ def read_rasters_cpp(
   if out_idx is None:
     out_idx = list(range(0, n_layers))
 
+  nodata_out = np.nan
+
   if verbose:
     ttprint(f"Reading {n_layers} layers using window={window} and array={out_data.shape}")
 
   skmap_bindings.readData(
     out_data, n_jobs, raster_files, out_idx,
     window.col_off, window.row_off, window.width, window.height,
-    band, gdal_opts
+    band, gdal_opts, None, nodata_out
   )
 
   if verbose:
