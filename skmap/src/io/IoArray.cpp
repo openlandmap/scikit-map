@@ -125,6 +125,10 @@ namespace skmap {
             CPLErr outRead = readDataset->RasterIO(GF_Read, x_off, y_off, x_size, y_size, row.data(),
                            x_size, y_size, read_type, bands_list.size(), &bands_list[0], 0, 0, 0);
             skmapAssertIfTrue(outRead != CE_None, "Error 2: issues in reading the file with URL " + file_loc);
+            if (!(value_to_mask.has_value()) && value_to_set.has_value()) {
+                GDALRasterBand *rasterBand = (GDALRasterBand*)readDataset->GetRasterBand(1); // First band
+                value_to_mask = rasterBand->GetNoDataValue();
+            }
             GDALClose(readDataset);
             if (value_to_mask.has_value() && value_to_set.has_value())
                 if (value_to_mask.value() != value_to_set.value())
