@@ -8,10 +8,8 @@ import json
 import skmap_bindings as sb
 import sys
 import random
-from skmap.misc import _make_dir
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
-import rasterio
 
 class DataCatalog():
     def __init__(self, data, data_size):
@@ -274,7 +272,7 @@ class DataCatalog():
                 otf_idx[f] += [self.data['otf'][f]['idx']]
         return otf_idx
     
-    def _get_covs_idx(self, covs_lst):
+    def _get_covs_idx(self, covs_lst:List[str]):
         groups = self.get_groups()
         covs_idx = np.zeros((len(covs_lst), len(groups)), np.int32)
         for j in range(len(groups)):
