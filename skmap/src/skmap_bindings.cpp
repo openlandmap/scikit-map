@@ -257,6 +257,17 @@ void maskNan(Eigen::Ref<MatFloat> data,
     transArray.maskNan(row_select, new_value_in_data);
 }
 
+
+void maskNanRows(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    std::vector<uint_t> row_select,
+                    Eigen::Ref<VecFloat> new_value_vec)
+{
+    TransArray transArray(data, n_threads);
+    transArray.maskNanRows(row_select, new_value_vec);
+}
+
+
 void maskData(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     std::vector<uint_t> row_select,
@@ -735,6 +746,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("maskData", &maskData, "Mask data");
     m.def("maskDataRows", &maskDataRows, "Mask data rows");
     m.def("maskNan", &maskNan, "Mask NaN");
+    m.def("maskNanRows", &maskNanRows, "Mask NaN Rows");
     m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
     m.def("expandArrayCols", &expandArrayCols, "Expand array cols");

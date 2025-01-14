@@ -168,7 +168,13 @@ class DataCatalog():
     def _get_feature_names(catalog_dict: Dict):
         return {layer_name for _,inner_dict in catalog_dict.items() for layer_name,_ in inner_dict.items()}
     
-    
+    def find_group_and_feature_by_index(self, target_idx):
+        for group_name, features in self.data.items():
+            for feature_name, feature_info in features.items():
+                if feature_info.get('idx') == target_idx:
+                    return group_name, feature_name
+        return None, None
+
     def get_feature_names(self):
         return self._get_feature_names(self.data)
     
