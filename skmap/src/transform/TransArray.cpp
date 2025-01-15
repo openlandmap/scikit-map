@@ -223,8 +223,6 @@ namespace skmap {
     }
 
 
-
-
     void TransArray::maskNan(std::vector<uint_t> row_select,
                              float_t new_value)
     {
@@ -236,9 +234,18 @@ namespace skmap {
         this->parForRange(swapRowValues, row_select.size());
     }
 
-
-
-
+    void TransArray::maskNanRows(std::vector<uint_t> row_select,
+                             Eigen::Ref<VecFloat> new_value_vec)
+    {
+        skmapAssertIfTrue((row_select.size() != (uint_t) new_value_vec.size()),
+                          "scikit-map ERROR 48: row_select and new_value_vec must be of the same size");
+        auto swapRowValues = [&] (uint_t i)
+        {
+            auto tmp_row = m_data.row(row_select[i]);
+            tmp_row = tmp_row.array().isNaN().select(new_value_vec(i), tmp_row);
+        };
+        this->parForRange(swapRowValues, row_select.size());
+    }
 
     void TransArray::maskData(std::vector<uint_t> row_select,
                               Eigen::Ref<MatFloat> mask,

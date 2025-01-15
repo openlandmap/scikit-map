@@ -766,8 +766,12 @@ class TreesRandomForestRegressor(RandomForestRegressor):
         return pred_t
 #
 class Reducer():
-    def __init__(self, reducer_name:str, reducer_fn:Callable) -> None:
+    def __init__(self, 
+                 reducer_name:str, 
+                 reducer_features:List[str],
+                 reducer_fn:Callable) -> None:
         self.reducer_name = reducer_name
+        self.reducer_features = reducer_features
         self.reducer_fn = reducer_fn
         self.in_covs_t = None
         self.in_covs = None
@@ -778,23 +782,23 @@ class Reducer():
         self.in_covs_t = None
         self.in_covs = None
         self.in_covs_valid = None
-    def compute(self, data:TiledDataLoader):
-        n_groups = len(data.catalog.get_groups())
-        features = list(data.catalog.get_feature_names())
-        n_features = len(features)
-        with TimeTracker(f"tile {data.tile_id} - predict ({n_features} input features)", True):
+    def reduce(self, data:TiledDataLoader):
+        with TimeTracker(f"tile {data.tile_id} - predict ({len(self.reducer_features)} input features)", True):
             # prepare input and output arrays
-            self.in_covs_t = np.empty((n_features, n_groups * data.n_pixels), dtype=np.float32)
-            self.in_covs = np.empty((n_groups * data.n_pixels, n_features), dtype=np.float32)
-            self.in_covs_valid = np.empty((n_groups * data.n_pixels_valid, n_features), dtype=np.float32)
-            # create output result
-            result = ReducedValues(data=data, reducer_name=self.reducer_name)
+            n_groups = len(data.catalog.get_groups())
+            n_samples = n_groups * data.n_pixels
+            n_samples_valid = n_groups * data.n_pixels_valid
+            self.in_covs_t = np.empty((len(self.reducer_features), n_samples), dtype=np.float32)
+            self.in_covs = np.empty((n_samples, len(self.reducer_features)), dtype=np.float32)
+            self.in_covs_valid = np.empty((n_samples_valid, len(self.reducer_features)), dtype=np.float32)
             # transpose data
-            matrix_idx = data.catalog._get_covs_idx(features)
+            matrix_idx = data.catalog._get_covs_idx(self.reducer_features)
             with TimeTracker(f"tile {data.tile_id} - transpose data ({data.n_threads} threads)"):
                 sb.reorderArray(data.array, data.n_threads, self.in_covs_t, matrix_idx)
                 sb.transposeArray(self.in_covs_t, data.n_threads, self.in_covs)
                 sb.selArrayRows(self.in_covs, data.n_threads, self.in_covs_valid, data.get_pixels_valid_idx(n_groups))
+            # create output result
+            result = ReducedValues(data=data, reducer_name=self.reducer_name)
             # compute
             with TimeTracker(f"tile {data.tile_id} - model prediction ({data.n_threads} threads)"):
                 result._out_reduc_valid[:] = self.reducer_fn(self.in_covs_valid)

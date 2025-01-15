@@ -159,14 +159,25 @@ class TiledDataLoader():
                         self.array[tile_idxs,:] = arr_final[:,:]
                     else:
                         sb.readData(self.array, self.n_threads, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, 
-                                    self.y_size, [1], self.gdal_opts)
+                                    self.y_size, [1], self.gdal_opts, None, np.nan)
                 
                 # Go whales, go!!
                 run_whales(self.catalog, self.array, self.n_threads)
         return self
                     
-    def convert_nan(self, value):
+    def convert_nan_to_value(self, value):
         sb.maskNan(self.array, self.n_threads, range(self.array.shape[0]), value)
+                        
+    def convert_nan_to_median(self):
+        medians = np.empty((self.array.shape[0],1), dtype=np.float32)
+        sb.computePercentiles(self.array, self.n_threads, range(self.array.shape[1]), medians, [0], [50.])
+        nan_indices = np.argwhere(np.isnan(medians[:,0])).flatten()
+        if len(nan_indices) > 0:
+            for nan_idx in nan_indices:
+                group_name, feature_name = self.catalog.find_group_and_feature_by_index(nan_idx)
+                print(f"scikit-map ERROR 101: index {nan_idx} corresponding to group {group_name} and feature {feature_name} has all NaN for tile {self.tile_id}")
+            # raise Exception("scikit-map ERROR 101")
+        sb.maskNanRows(self.array, self.n_threads, range(self.array.shape[0]), medians)
     
     def filter_valid_pixels(self):
         self.array_valid = np.empty((self.catalog.data_size, self.n_pixels_valid), dtype=np.float32)

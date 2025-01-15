@@ -8,10 +8,8 @@ import json
 import skmap_bindings as sb
 import sys
 import random
-from skmap.misc import _make_dir
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
-import rasterio
 
 class DataCatalog():
     def __init__(self, data, data_size):
@@ -170,7 +168,13 @@ class DataCatalog():
     def _get_feature_names(catalog_dict: Dict):
         return {layer_name for _,inner_dict in catalog_dict.items() for layer_name,_ in inner_dict.items()}
     
-    
+    def find_group_and_feature_by_index(self, target_idx):
+        for group_name, features in self.data.items():
+            for feature_name, feature_info in features.items():
+                if feature_info.get('idx') == target_idx:
+                    return group_name, feature_name
+        return None, None
+
     def get_feature_names(self):
         return self._get_feature_names(self.data)
     
@@ -274,7 +278,7 @@ class DataCatalog():
                 otf_idx[f] += [self.data['otf'][f]['idx']]
         return otf_idx
     
-    def _get_covs_idx(self, covs_lst):
+    def _get_covs_idx(self, covs_lst:List[str]):
         groups = self.get_groups()
         covs_idx = np.zeros((len(covs_lst), len(groups)), np.int32)
         for j in range(len(groups)):

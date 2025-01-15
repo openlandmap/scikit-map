@@ -164,6 +164,9 @@ class TransArray: public ParArray
         void maskNan(std::vector<uint_t> row_select,
                      float_t new_value_in_data);
 
+        void maskNanRows(std::vector<uint_t> row_select,
+                         Eigen::Ref<VecFloat> new_value_vec);
+
         void maskData(std::vector<uint_t> row_select,
                       Eigen::Ref<MatFloat> mask,
                       float_t value_of_mask_to_mask,
