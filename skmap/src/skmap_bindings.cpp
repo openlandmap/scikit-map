@@ -157,6 +157,16 @@ void blocksAverage(Eigen::Ref<MatFloat> out,
 }
 
 
+void elementwiseAverage(Eigen::Ref<MatFloat> out,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> in1,
+                  Eigen::Ref<MatFloat> in2)
+{
+    TransArray transArray(out, n_threads);
+    transArray.elementwiseAverage(in1, in2);
+}
+
+
 void reorderArray(Eigen::Ref<MatFloat> data,
                   const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
@@ -800,6 +810,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
     m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
     m.def("blocksAverage", &blocksAverage, "Vecorized average of 4 neighbor elemnts");
+    m.def("elementwiseAverage", &elementwiseAverage, "Vecorized average between two arrays elements");
     m.def("extractOverlay", &extractOverlay, "Extract overlay data");
     m.def("slidingWindowClassMode", &slidingWindowClassMode, "A weird stuff");
     m.def("checkSimdInstructionSetsInUse", checkSimdInstructionSetsInUse);
