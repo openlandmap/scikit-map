@@ -212,7 +212,7 @@ class Classifier:
         self.model_covs = None
     
     def _load_model(self):
-        if self.model_path.endswith('.joblib'):
+        if self.model_path.endswith(('.joblib', '.lz4')):
             model = joblib.load(self.model_path)
         elif self.model_path.endswith('.so'):
             model = tl2cgen.Predictor(self.model_path)
