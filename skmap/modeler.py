@@ -212,7 +212,7 @@ class Classifier:
         self.model_covs = None
     
     def _load_model(self):
-        if self.model_path.endswith('.joblib'):
+        if self.model_path.endswith(('.joblib', '.lz4')):
             model = joblib.load(self.model_path)
         elif self.model_path.endswith('.so'):
             model = tl2cgen.Predictor(self.model_path)
@@ -225,6 +225,8 @@ class Classifier:
             model_covs = list(model.feature_names_in_)
         elif hasattr(model, 'feature_names_'):
             model_covs = model.feature_names_
+        elif hasattr(model, 'feature_name'):
+            model_covs = model.feature_name()
         else:
             raise ValueError(f"No feature names was found for model {self.model_name}")
         self.model = model
