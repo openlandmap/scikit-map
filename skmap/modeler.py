@@ -245,7 +245,7 @@ class RFClassifier(Classifier):
         super().__init__(model_name, model_path, model_covs_path, n_class, predict_fn)
         self._load_model()
     
-    def predict(self, data:TiledDataLoader, scale:float=100.0, round=False):
+    def predict(self, data:TiledDataLoader):
         with TimeTracker(f"tile {data.tile_id}/model {self.model_name} - predict ({len(self.model_covs)} input features)", True):
             # prepare input and output arrays
             n_groups = len(data.catalog.get_groups())
@@ -264,9 +264,14 @@ class RFClassifier(Classifier):
             result = PredictedProbs(data=data, model_name=self.model_name, n_class=self.n_class)
             # predict
             with TimeTracker(f"tile {data.tile_id}/model {self.model_name} - model prediction ({data.n_threads} threads)"):
-                result._out_probs_valid[:,:] = self.predict_fn(self.model, self.in_covs_valid) * scale
-                if round:
-                    np.round(result._out_probs_valid, out=result._out_probs_valid)
+                tmp_res = self.predict_fn(self.model, self.in_covs_valid)
+                if tmp_res.dtype == np.float64:
+                    sb.castFloat64ToFloat32(tmp_res, data.n_threads, result._out_probs_valid)
+                elif tmp_res.dtype == np.float32:
+                    result._out_probs_valid = tmp_res
+                else:
+                    print("Result prediction are not in float32 nor float64, converting with python (can be slow)")
+                    result._out_probs_valid = tmp_res.astype(np.float32)
         return result # shape: (n_samples, n_classes)
 #
 class Predicted():
@@ -401,7 +406,7 @@ class Predicted():
             temp_dir = f"{base_dir}/.skmap"
             temp_tif = self.data.create_image_template(dtype, nodata, temp_dir)
             write_idx = range(self.n_depths * self.n_stats * self.n_groups)
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
+            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
             s3_out = None
             if s3_prefix is not None:
                 s3_out = [f'{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}' for _ in range(len(out_files))]
@@ -557,7 +562,7 @@ class PredictedDepths():
             temp_dir = f"{base_dir}/.skmap"
             temp_tif = self.data.create_image_template(dtype, nodata, temp_dir)
             write_idx = range(self.n_depths * self.n_stats * self.n_groups)
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
+            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
             s3_out = None
             if s3_prefix is not None:
                 s3_out = [f'{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}' for _ in range(len(out_files))]
@@ -657,7 +662,7 @@ class PredictedProbs():
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
             write_idx = range(self._out_cls_gdal.shape[0])
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
+            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
             s3_out = None
             if s3_prefix is not None:
                 s3_out = [f'{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}' for _ in range(len(out_files))]
@@ -711,7 +716,7 @@ class PredictedProbs():
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups, self.n_class)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
             write_idx = range(self._out_probs_gdal.shape[0])
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
+            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
             s3_out = None
             if s3_prefix is not None:
                 s3_out = [f'{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}' for _ in range(len(out_files))]
@@ -863,7 +868,7 @@ class ReducedValues():
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
             write_idx = range(self._out_reduc_gdal.shape[0])
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co ZLEVEL=9 -co TILED=TRUE -co BLOCKXSIZE=1024 -co BLOCKYSIZE=1024"
+            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
             s3_out = None
             if s3_prefix is not None:
                 s3_out = [f'{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}' for _ in range(len(out_files))]
