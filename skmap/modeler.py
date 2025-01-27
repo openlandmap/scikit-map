@@ -1,3 +1,4 @@
+import treelite_runtime 
 from typing import List, Callable, Optional
 import os
 import random
@@ -11,6 +12,24 @@ import tl2cgen
 from skmap.loader import TiledDataLoader
 import skmap_bindings as sb
 from skmap.misc import _make_dir, TimeTracker, _rm_dir
+os.environ['USE_PYGEOS'] = '0'
+os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
+n_threads = os.cpu_count() * 2
+os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
+os.environ['USE_PYGEOS'] = '0'
+os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
+os.environ['NUMEXPR_MAX_THREADS'] = f'{n_threads}'
+os.environ['NUMEXPR_NUM_THREADS'] = f'{n_threads}'
+os.environ['OMP_THREAD_LIMIT'] = f'{n_threads}'
+os.environ["OMP_NUM_THREADS"] = f'{n_threads}'
+os.environ["OPENBLAS_NUM_THREADS"] = f'{n_threads}' 
+os.environ["MKL_NUM_THREADS"] = f'{n_threads}'
+os.environ["VECLIB_MAXIMUM_THREADS"] = f'{n_threads}'
+os.environ["OMP_DYNAMIC"] = f'TRUE'
+os.environ['TREELITE_BIND_THREADS'] = '0'
+
+
+from time import time
 
 def _single_prediction(predict, X, out, i, lock):
     prediction = predict(X, check_input=False)
@@ -215,7 +234,8 @@ class Classifier:
         if self.model_path.endswith(('.joblib', '.lz4')):
             model = joblib.load(self.model_path)
         elif self.model_path.endswith('.so'):
-            model = tl2cgen.Predictor(self.model_path)
+            model = treelite_runtime.Predictor(self.model_path, nthread=96)
+            os.environ['TREELITE_BIND_THREADS'] = '0'
         else:
             raise ValueError(f"Invalid model path extension '{self.model_path}'")
         if self.model_covs_path is not None:

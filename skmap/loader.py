@@ -20,6 +20,10 @@ os.environ["OMP_NUM_THREADS"] = f'{n_threads}'
 os.environ["OPENBLAS_NUM_THREADS"] = f'{n_threads}' 
 os.environ["MKL_NUM_THREADS"] = f'{n_threads}'
 os.environ["VECLIB_MAXIMUM_THREADS"] = f'{n_threads}'
+os.environ["OMP_DYNAMIC"] = f'TRUE'
+
+
+
 mask_aggregation_bash_script = '''#!/bin/bash
     if [ -z "$1" ]; then
         echo "Usage: $0 <input_tif_file>"
