@@ -14,7 +14,8 @@ import skmap_bindings as sb
 from skmap.misc import _make_dir, TimeTracker, _rm_dir
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
-n_threads = os.cpu_count() * 2
+n_cpus = os.cpu_count()
+n_threads = n_cpus * 2
 os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
@@ -234,7 +235,7 @@ class Classifier:
         if self.model_path.endswith(('.joblib', '.lz4')):
             model = joblib.load(self.model_path)
         elif self.model_path.endswith('.so'):
-            model = treelite_runtime.Predictor(self.model_path, nthread=n_threads)
+            model = treelite_runtime.Predictor(self.model_path, nthread=n_cpus)
             os.environ['TREELITE_BIND_THREADS'] = '0'
         else:
             raise ValueError(f"Invalid model path extension '{self.model_path}'")
