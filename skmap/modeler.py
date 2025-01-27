@@ -234,7 +234,7 @@ class Classifier:
         if self.model_path.endswith(('.joblib', '.lz4')):
             model = joblib.load(self.model_path)
         elif self.model_path.endswith('.so'):
-            model = treelite_runtime.Predictor(self.model_path, nthread=96)
+            model = treelite_runtime.Predictor(self.model_path, nthread=n_threads)
             os.environ['TREELITE_BIND_THREADS'] = '0'
         else:
             raise ValueError(f"Invalid model path extension '{self.model_path}'")
