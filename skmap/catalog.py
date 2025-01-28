@@ -410,7 +410,7 @@ def _s3_computed_files(out_s3):
 #
 def s3_list_files(s3_aliases, s3_prefix, tile_id, file_pattern=None):
     if len(s3_aliases) == 0: return []
-    bash_cmd = f"mc find {s3_aliases[0]}{s3_prefix}/{tile_id}"
+    bash_cmd = f"mc ls {s3_aliases[0]}{s3_prefix}/{tile_id}"
     print(f'Checking `{bash_cmd}`...')
     process = subprocess.Popen(bash_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = process.communicate()
