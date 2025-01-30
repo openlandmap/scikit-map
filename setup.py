@@ -15,8 +15,7 @@ module_skmap_bindings = setuptools.Extension(
         np.get_include(),
         'pybind11/include',
         'skmap/include',
-        'skmap/src',
-        '/usr/include/opencv4'
+        'skmap/src'
     ],
     extra_compile_args=[
         '-fopenmp',
@@ -30,8 +29,7 @@ module_skmap_bindings = setuptools.Extension(
     ],
     extra_link_args=['-lgomp'],
     libraries=[
-        'm', 'gomp', 'gdal', 'opencv_core', 'opencv_imgproc', 
-        'opencv_imgcodecs', 'opencv_photo'
+        'm', 'gomp', 'gdal'
     ]
 )
 

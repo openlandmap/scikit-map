@@ -70,7 +70,11 @@ class TransArray: public ParArray
         void blocksAverage(Eigen::Ref<MatFloat> in1,
                           Eigen::Ref<MatFloat> in2,
                           uint_t n_pix,
-                          uint_t y);
+                          uint_t y);   
+
+        void elementwiseAverage(Eigen::Ref<MatFloat> in1,
+                          Eigen::Ref<MatFloat> in2);
+
 
         void inverseReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> indices_matrix);
@@ -163,6 +167,9 @@ class TransArray: public ParArray
 
         void maskNan(std::vector<uint_t> row_select,
                      float_t new_value_in_data);
+
+        void maskNanRows(std::vector<uint_t> row_select,
+                         Eigen::Ref<VecFloat> new_value_vec);
 
         void maskData(std::vector<uint_t> row_select,
                       Eigen::Ref<MatFloat> mask,

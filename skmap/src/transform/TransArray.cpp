@@ -182,6 +182,21 @@ namespace skmap {
         this->parChunk(blocksAverageChunk);
     }
 
+
+    void TransArray::elementwiseAverage(Eigen::Ref<MatFloat> in1,
+                                  Eigen::Ref<MatFloat> in2)
+    {
+        skmapAssertIfTrue(((uint_t) in1.cols() != (uint_t) in2.cols()),
+                          "scikit-map ERROR 52: the two input arrays must have the same number of columns");
+        auto elementwiseAverageChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            chunk.array() = 0.5 * (in1.block(row_start, 0, row_end - row_start, in1.cols()).array() + 
+                                   in2.block(row_start, 0, row_end - row_start, in2.cols()).array());
+        };
+        this->parChunk(elementwiseAverageChunk);
+    }
+
+
     void TransArray::extractArrayRows(Eigen::Ref<MatFloat> out_data,
                                       std::vector<uint_t> row_select)
     {
@@ -223,8 +238,6 @@ namespace skmap {
     }
 
 
-
-
     void TransArray::maskNan(std::vector<uint_t> row_select,
                              float_t new_value)
     {
@@ -236,9 +249,18 @@ namespace skmap {
         this->parForRange(swapRowValues, row_select.size());
     }
 
-
-
-
+    void TransArray::maskNanRows(std::vector<uint_t> row_select,
+                             Eigen::Ref<VecFloat> new_value_vec)
+    {
+        skmapAssertIfTrue((row_select.size() != (uint_t) new_value_vec.size()),
+                          "scikit-map ERROR 48: row_select and new_value_vec must be of the same size");
+        auto swapRowValues = [&] (uint_t i)
+        {
+            auto tmp_row = m_data.row(row_select[i]);
+            tmp_row = tmp_row.array().isNaN().select(new_value_vec(i), tmp_row);
+        };
+        this->parForRange(swapRowValues, row_select.size());
+    }
 
     void TransArray::maskData(std::vector<uint_t> row_select,
                               Eigen::Ref<MatFloat> mask,
