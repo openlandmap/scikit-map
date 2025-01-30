@@ -19,7 +19,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
-#include <opencv2/opencv.hpp>
 
 //#include <cpl_conv.h>
 //#include <ogr_spatialref.h>

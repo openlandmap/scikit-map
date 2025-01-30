@@ -157,6 +157,16 @@ void blocksAverage(Eigen::Ref<MatFloat> out,
 }
 
 
+void elementwiseAverage(Eigen::Ref<MatFloat> out,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> in1,
+                  Eigen::Ref<MatFloat> in2)
+{
+    TransArray transArray(out, n_threads);
+    transArray.elementwiseAverage(in1, in2);
+}
+
+
 void reorderArray(Eigen::Ref<MatFloat> data,
                   const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
@@ -256,6 +266,17 @@ void maskNan(Eigen::Ref<MatFloat> data,
     TransArray transArray(data, n_threads);
     transArray.maskNan(row_select, new_value_in_data);
 }
+
+
+void maskNanRows(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    std::vector<uint_t> row_select,
+                    Eigen::Ref<VecFloat> new_value_vec)
+{
+    TransArray transArray(data, n_threads);
+    transArray.maskNanRows(row_select, new_value_vec);
+}
+
 
 void maskData(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
@@ -398,6 +419,26 @@ void averageAggregate(Eigen::Ref<MatFloat> data,
 {
     TransArray transArray(data, n_threads);
     transArray.averageAggregate(out_data, agg_factor);
+}
+
+
+void castFloat64ToFloat32(Eigen::Ref<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> data,
+                          const uint_t n_threads,
+                          Eigen::Ref<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> out_data)
+{
+    skmapAssertIfTrue(((uint_t) data.rows() != (uint_t) out_data.rows()),
+                          "scikit-map ERROR 52: rows of the new array does not match the size of selected");
+    skmapAssertIfTrue(((uint_t) data.cols() != (uint_t) out_data.cols()),
+                      "scikit-map ERROR 53: cols of the new array does not match the size of selected");
+    
+    omp_set_num_threads(n_threads);
+    Eigen::initParallel();
+    Eigen::setNbThreads(n_threads);
+    #pragma omp parallel for
+    for (uint_t i = 0; i < (uint_t) data.rows(); ++i)
+    {
+        out_data.row(i) = data.row(i).cast<float>();
+    }
 }
 
 void maskDifference(Eigen::Ref<MatFloat> data,
@@ -705,17 +746,6 @@ void slidingWindowClassMode(Eigen::Ref<MatFloat> data,
     transArray.slidingWindowClassMode(out_data, window_size);
 }
 
-void inpaintTelea(Eigen::Ref<MatFloat> input_chunk,
-                  Eigen::Ref<MatByte> mask_chunk,
-                  uint_t inpaint_radius) 
-{
-    cv::Mat inputMat(input_chunk.rows(), input_chunk.cols(), CV_32FC1, input_chunk.data());
-    cv::Mat maskMat(mask_chunk.rows(), mask_chunk.cols(), CV_8UC1, mask_chunk.data());
-    cv::Mat inpaintedMat;
-    cv::inpaint(inputMat, maskMat, inpaintedMat, static_cast<double>(inpaint_radius), cv::INPAINT_TELEA);
-    Eigen::Map<MatFloat> inpaintedEigen(inpaintedMat.ptr<float>(), inpaintedMat.rows, inpaintedMat.cols);
-    input_chunk = inpaintedEigen;
-}
 
 void checkSimdInstructionSetsInUse()
 {
@@ -739,7 +769,6 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
     m.def("copyVecInMatrixRow", &copyVecInMatrixRow, "Copy a vector in a matrix row");
-    m.def("inpaintTelea", &inpaintTelea, "Inpaint Telea");
     m.def("fillArray", &fillArray, "Fill array");
     m.def("selArrayRows", &selArrayRows, "Mask array rows");
     m.def("selArrayCols", &selArrayCols, "Mask array cols");
@@ -747,6 +776,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("maskData", &maskData, "Mask data");
     m.def("maskDataRows", &maskDataRows, "Mask data rows");
     m.def("maskNan", &maskNan, "Mask NaN");
+    m.def("maskNanRows", &maskNanRows, "Mask NaN Rows");
     m.def("swapRowsValues", &swapRowsValues, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
     m.def("expandArrayCols", &expandArrayCols, "Expand array cols");
@@ -800,8 +830,10 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
     m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
     m.def("blocksAverage", &blocksAverage, "Vecorized average of 4 neighbor elemnts");
+    m.def("elementwiseAverage", &elementwiseAverage, "Vecorized average between two arrays elements");
     m.def("extractOverlay", &extractOverlay, "Extract overlay data");
     m.def("slidingWindowClassMode", &slidingWindowClassMode, "A weird stuff");
     m.def("checkSimdInstructionSetsInUse", checkSimdInstructionSetsInUse);
+    m.def("castFloat64ToFloat32", castFloat64ToFloat32);
 }
 

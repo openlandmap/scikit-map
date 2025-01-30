@@ -30,6 +30,7 @@ namespace skmap {
         // Extracting reference metadata
         GDALDataset *refTileDataset = (GDALDataset *)GDALOpen(ref_tile_path.c_str(), GA_ReadOnly);
         skmapAssertIfTrue(refTileDataset == nullptr, "scikit-map ERROR 24: issues in opening ref_tile_path with path " + ref_tile_path);
+        
         double ref_geotransform[6];
         double min_x, max_y, pixel_width, pixel_height, max_x, min_y;
         refTileDataset->GetGeoTransform(ref_geotransform);
@@ -37,13 +38,15 @@ namespace skmap {
         max_y = ref_geotransform[3];
         pixel_width = ref_geotransform[1];
         pixel_height = ref_geotransform[5];
+
+        // Determine the size of the output raster
+        // Forcing rounding because rounding strategy for float to int is always truncation in C++
         max_x = min_x + (refTileDataset->GetRasterXSize() * pixel_width);
         min_y = max_y + (refTileDataset->GetRasterYSize() * pixel_height);
         double target_geotransform[6] = { min_x, pixel_width, 0, max_y, 0, pixel_height };
-        // Determine the size of the output raster
-        // Forcing rounding because rounding strategy for float to int is always truncation in C++
         uint_t target_x_size = (uint_t)std::abs(std::round(((max_x - min_x) / pixel_width)));
         uint_t target_y_size = (uint_t)std::abs(std::round(((max_y - min_y) / pixel_height)));
+
 //            skmapAssertIfTrue((uint_t) row.cols() != target_x_size * target_y_size,
 //                              "scikit-map ERROR 26: array data columns are " + std::to_string(row.cols()) +
 //                              " while target_x_size is " + std::to_string(target_x_size) + " and target_y_size is " + std::to_string(target_y_size) );
@@ -59,6 +62,13 @@ namespace skmap {
         // Setting source warp options
         GDALDataset *mosaicDataset = (GDALDataset *)GDALOpen(mosaic_path.c_str(), GA_ReadOnly);
         skmapAssertIfTrue(mosaicDataset == nullptr, "scikit-map ERROR 30: issues in opening mosaic_path with path " + mosaic_path);
+
+        // Retrieve NoData value from the mosaic
+        GDALRasterBandH band = GDALGetRasterBand(mosaicDataset, 1);
+        int bSuccess = FALSE;
+        double nodata_val = GDALGetRasterNoDataValue(band, &bSuccess);
+
+
         GDALWarpOptions *psWarpOptions = GDALCreateWarpOptions();
         psWarpOptions->hSrcDS = mosaicDataset;
         psWarpOptions->nBandCount = 1;
@@ -67,6 +77,14 @@ namespace skmap {
         psWarpOptions->panDstBands = (int *) CPLMalloc(sizeof(int));
         psWarpOptions->panSrcBands[0] = 1;
         psWarpOptions->panDstBands[0] = 1;
+
+        // Set NoData value in warp options
+        if (bSuccess)
+        {
+            GDALSetRasterNoDataValue(band, nodata_val);
+            psWarpOptions->padfSrcNoDataReal = (double *)CPLMalloc(sizeof(double));
+            psWarpOptions->padfSrcNoDataReal[0] = nodata_val;
+        }
 
         // Setting target warp options
         // @FIXME: this currently work only for float32, specialize the function with a template based on the type of float_t
@@ -84,6 +102,12 @@ namespace skmap {
         operation.ChunkAndWarpImage(0, 0, dstDataset->GetRasterXSize(), dstDataset->GetRasterYSize());
         CPLErr outRead = poBand->RasterIO(GF_Read, 0, 0, target_x_size, target_y_size, m_data.data(), target_x_size, target_y_size, GDT_Float32, 0, 0);
         skmapAssertIfTrue(outRead != CE_None, "scikit-map ERROR 31: failed to read raster data into Eigen matrix");
+
+        // Mask NoData values
+        if (bSuccess)
+        {
+            m_data = (m_data.array() == static_cast<float_t>(nodata_val)).select(nan_v, m_data);
+        }
 
         // Cleanup
         GDALDestroyWarpOptions(psWarpOptions);
@@ -122,9 +146,21 @@ namespace skmap {
             GDALDataset *readDataset = (GDALDataset*)GDALOpen(file_loc.c_str(), GA_ReadOnly);
             skmapAssertIfTrue(readDataset == nullptr, "scikit-map ERROR 1: issues in opening the file with path " + file_loc);
             // It is assumed that the X/Y buffers size is equevalent to the portion of data to read
+            if (!(value_to_mask.has_value()) && value_to_set.has_value()) {
+                //GDALRasterBand *rasterBand = (GDALRasterBand*) readDataset->GetRasterBand(1); // First band
+                int bSuccess = FALSE;
+                GDALRasterBandH band = GDALGetRasterBand(readDataset, 1);
+                const double nodata_val = GDALGetRasterNoDataValue(band, &bSuccess);
+                //const double nodata_val = (float_t) readDataset->GetRasterBand(1)->GetNoDataValue(&bSuccess);
+                //std::cout << "value_to_mask: " << nodata_val << " " << bSuccess << " " << std::endl;
+                if (bSuccess == TRUE)
+                  value_to_mask = nodata_val;
+            }
+      
             CPLErr outRead = readDataset->RasterIO(GF_Read, x_off, y_off, x_size, y_size, row.data(),
                            x_size, y_size, read_type, bands_list.size(), &bands_list[0], 0, 0, 0);
             skmapAssertIfTrue(outRead != CE_None, "Error 2: issues in reading the file with URL " + file_loc);
+            
             GDALClose(readDataset);
             if (value_to_mask.has_value() && value_to_set.has_value())
                 if (value_to_mask.value() != value_to_set.value())

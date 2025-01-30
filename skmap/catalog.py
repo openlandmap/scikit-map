@@ -8,10 +8,8 @@ import json
 import skmap_bindings as sb
 import sys
 import random
-from skmap.misc import _make_dir
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
-import rasterio
 
 class DataCatalog():
     def __init__(self, data, data_size):
@@ -158,7 +156,7 @@ class DataCatalog():
                 json.dump(self.data, f, indent=4)
     
     def get_groups(self):
-        groups = sorted(list(set(self.data.keys()).difference(['common']))) # by default don't return 'common' group
+        groups = sorted(list(set(self.data.keys()).difference(['common']).difference(['otf']))) # by default don't return 'common' nor 'otf' group
         if not len(groups): # but, if there is only group 'common', return it.
             groups = ['common']
         return groups
@@ -170,7 +168,13 @@ class DataCatalog():
     def _get_feature_names(catalog_dict: Dict):
         return {layer_name for _,inner_dict in catalog_dict.items() for layer_name,_ in inner_dict.items()}
     
-    
+    def find_group_and_feature_by_index(self, target_idx):
+        for group_name, features in self.data.items():
+            for feature_name, feature_info in features.items():
+                if feature_info.get('idx') == target_idx:
+                    return group_name, feature_name
+        return None, None
+
     def get_feature_names(self):
         return self._get_feature_names(self.data)
     
@@ -274,7 +278,7 @@ class DataCatalog():
                 otf_idx[f] += [self.data['otf'][f]['idx']]
         return otf_idx
     
-    def _get_covs_idx(self, covs_lst):
+    def _get_covs_idx(self, covs_lst:List[str]):
         groups = self.get_groups()
         covs_idx = np.zeros((len(covs_lst), len(groups)), np.int32)
         for j in range(len(groups)):
@@ -286,7 +290,7 @@ class DataCatalog():
                 elif c in self.data[k]:
                     covs_idx[i,j] = self.data[k][c]['idx']
                 else:
-                    covs_idx[i,j] = self.data['otf'][k][c]['idx']
+                    covs_idx[i,j] = self.data['otf'][c]['idx']
         return covs_idx
 #
 def print_catalog_statistics(catalog:DataCatalog):
@@ -404,7 +408,7 @@ def _s3_computed_files(out_s3):
     assert (error == ''), f"Error in checking if the tile in S3 `{out_s3}` was already computed. \nError: {error}"
     return len(output.splitlines())
 #
-def s3_list_files(s3_aliases, s3_prefix, tile_id):
+def s3_list_files(s3_aliases, s3_prefix, tile_id, file_pattern=None):
     if len(s3_aliases) == 0: return []
     bash_cmd = f"mc ls {s3_aliases[0]}{s3_prefix}/{tile_id}"
     print(f'Checking `{bash_cmd}`...')
@@ -413,7 +417,11 @@ def s3_list_files(s3_aliases, s3_prefix, tile_id):
     stderr = stderr.decode('utf-8')
     assert stderr == '', f"Error listing S3 `{s3_aliases[0]}{s3_prefix}/{tile_id}`. \nError: {stderr}"
     stdout = stdout.decode('utf-8')
-    return stdout.splitlines()
+    lines = stdout.splitlines()
+    if file_pattern is not None:
+        pattern = re.compile(file_pattern)
+        lines = [line for line in lines if pattern.search(line)]
+    return lines
 #
 def s3_setup(have_to_register_s3, access_key, secret_key, gaia_addrs):
     s3_aliases = []
