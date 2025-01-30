@@ -422,6 +422,25 @@ void averageAggregate(Eigen::Ref<MatFloat> data,
 }
 
 
+void castFloat32ToFloat64(Eigen::Ref<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> data,
+                          const uint_t n_threads,
+                          Eigen::Ref<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> out_data)
+{
+    skmapAssertIfTrue(((uint_t) data.rows() != (uint_t) out_data.rows()),
+                          "scikit-map ERROR 52: rows of the new array does not match the size of selected");
+    skmapAssertIfTrue(((uint_t) data.cols() != (uint_t) out_data.cols()),
+                      "scikit-map ERROR 53: cols of the new array does not match the size of selected");
+    
+    omp_set_num_threads(n_threads);
+    Eigen::initParallel();
+    Eigen::setNbThreads(n_threads);
+    #pragma omp parallel for
+    for (uint_t i = 0; i < (uint_t) data.rows(); ++i)
+    {
+        out_data.row(i) = data.row(i).cast<double>();
+    }
+}
+
 void castFloat64ToFloat32(Eigen::Ref<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> data,
                           const uint_t n_threads,
                           Eigen::Ref<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> out_data)
@@ -835,5 +854,6 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("slidingWindowClassMode", &slidingWindowClassMode, "A weird stuff");
     m.def("checkSimdInstructionSetsInUse", checkSimdInstructionSetsInUse);
     m.def("castFloat64ToFloat32", castFloat64ToFloat32);
+    m.def("castFloat32ToFloat64", castFloat32ToFloat64);
 }
 
