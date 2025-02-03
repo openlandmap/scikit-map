@@ -122,7 +122,7 @@ class TiledDataLoader():
             self.n_pixels = self.x_size * self.y_size
             # prepare mask
             with TimeTracker(f"Tile {self.tile_id} - prepare mask"):
-                self.mask = np.zeros((1, self.n_pixels), dtype=np.float32)
+                self.mask = np.empty((1, self.n_pixels), dtype=np.float32)
                 sb.readData(self.mask, 1, [self.mask_path], [0], self.x_off, self.y_off, self.x_size, self.y_size, [1], self.gdal_opts)
                 self.pixels_valid_idx = np.arange(0, self.n_pixels)[self.mask[0, :].astype(int).astype(bool)]
                 self.n_pixels_valid = int(np.sum(self.mask))
@@ -182,13 +182,6 @@ class TiledDataLoader():
                 print(f"scikit-map ERROR 101: index {nan_idx} corresponding to group {group_name} and feature {feature_name} has all NaN for tile {self.tile_id}")
             # raise Exception("scikit-map ERROR 101")
         sb.maskNanRows(self.array, self.n_threads, range(self.array.shape[0]), medians)
-    
-    def filter_valid_pixels(self):
-        self.array_valid = np.empty((self.catalog.data_size, self.n_pixels_valid), dtype=np.float32)
-        sb.selArrayCols(self.array, self.n_threads, self.array_valid, self.pixels_valid_idx)
-    
-    def expand_valid_pixels(self, array_valid, array_expanded):
-        sb.expandArrayCols(array_valid, self.n_threads, array_expanded, self.pixels_valid_idx)
     
     def get_pixels_valid_idx(self, n_groups):
         return np.concatenate([self.pixels_valid_idx + self.n_pixels * i for i in range(n_groups)]).tolist()
