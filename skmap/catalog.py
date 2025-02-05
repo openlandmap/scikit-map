@@ -20,8 +20,9 @@ class DataCatalog():
     def create_catalog(cls,
                        catalog_def:Union[pd.DataFrame, str],
                        years:List[int],
-                       base_path:Union[List[str], str]):
-        catalog_dict = cls._create_dict_catalog(catalog_def, years, base_path)
+                       base_path:Union[List[str], str],
+                       replace_group_feat_name:bool = False):
+        catalog_dict = cls._create_dict_catalog(catalog_def, years, base_path, replace_group_feat_name)
         data = {}
         years = [str(year) for year in years]
         if not 'common' in years:  # common is default
@@ -40,17 +41,26 @@ class DataCatalog():
         return cls(data, data_size)
     
     @staticmethod
-    def _create_dict_catalog(catalog_def:Union[pd.DataFrame, str], years:List[int], base_path:Union[List[str], str]):
+    def _create_dict_catalog(catalog_def:Union[pd.DataFrame, str], years:List[int], base_path:Union[List[str], str], replace_group_feat_name:bool):
         if not isinstance(catalog_def, pd.DataFrame):
             covar = pd.read_csv(catalog_def)
         else:
             covar = catalog_def
         # Replace placeholders in `layer_name` and `path`
+        if replace_group_feat_name:
+            year_repl = "{year}"
+            year_plus_one_repl = "{year_plus_one}"
+            year_minus_one_repl = "{year_minus_one}"
+        else:
+            year_repl = "YYYY"
+            year_plus_one_repl = "YYPO"
+            year_minus_one_repl = "YYMO"
+            
         def replace_layer_name_placeholders(value):
             replacements = {
-                "{year}": "YYYY",
-                "{year_plus_one}": "YYPO",
-                "{year_minus_one}": "YYMO",
+                "{year}": year_repl,
+                "{year_plus_one}": year_plus_one_repl,
+                "{year_minus_one}": year_minus_one_repl,
                 "{start_month}": "{start_month}",
                 "{end_month}": "{end_month}",
                 "{perc}": "{perc}",
@@ -124,6 +134,15 @@ class DataCatalog():
                 "tile_id": '{tile_id}',
                 "base_path": '{base_path}'                
             }
+        
+        def calculate_year_feat_name_placeholders(year):
+            return {
+                "year": str(year),
+                "year_plus_one": str(year + 1),
+                "year_minus_one": str(year - 1),
+                "tile_id": '{tile_id}',
+                "base_path": '{base_path}'                
+            }
         # Create the temporal part of the catalog
         url_temp = covar_temp.set_index('layer_name')['path'].to_dict()
 
@@ -132,11 +151,10 @@ class DataCatalog():
             year_dict = {}
             for i, (layer_name, path) in enumerate(url_temp.items()):
                 year_placeholders = calculate_year_placeholders(
-                    year, 
-                    covar_temp.loc[i, 'start_year'], 
-                    covar_temp.loc[i, 'end_year'],
-                    layer_name
-                )
+                    year, covar_temp.loc[i, 'start_year'], covar_temp.loc[i, 'end_year'], layer_name)
+                if replace_group_feat_name:
+                    year_feat_name_placeholders = calculate_year_feat_name_placeholders(year)
+                    layer_name = layer_name.format(**year_feat_name_placeholders)
                 year_dict[layer_name] = path.format(**year_placeholders)
             temporal[str(year)] = year_dict
         catalog_dict = {**comm, **temporal}
