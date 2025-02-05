@@ -61,7 +61,7 @@ def _get_out_files_depths(out_files_prefix, out_files_suffix, tile_id, depths, n
     return out_files
 
 def _tree_based_load_model(model_path):
-    if model_path.endswith(('.joblib', '.lz4')):
+    if model_path.endswith(('.joblib', '.lz4', '.pkl')):
         model = joblib.load(model_path)
         predict_fn = lambda predictor, data: predictor.predict(data)
     elif model_path.endswith('.so'):
@@ -105,7 +105,7 @@ class Modeler():
         self.model_covs = None
     
     def _load_model(self):
-        if self.model_path.endswith(('.joblib', '.lz4')):
+        if self.model_path.endswith(('.joblib', '.lz4', '.pkl')):
             model = joblib.load(self.model_path)
         else:
             raise ValueError(f"Invalid model path extension '{self.model_path}'")
@@ -396,12 +396,16 @@ class PredictedProbs():
         self.n_groups = len(self.groups)
         self._out_probs_valid = np.empty((self.n_groups * self.data.n_pixels_valid, self.n_class), dtype=np.float32)
         self._out_cls_valid = np.empty((self.n_groups * self.data.n_pixels_valid, 1), dtype=np.float32)
+        self._out_kld_valid = np.empty((self.n_groups * self.data.n_pixels_valid, 1), dtype=np.float32)
         self._out_probs = None
         self._out_probs_t = None
         self._out_probs_gdal = None
         self._out_cls = None
         self._out_cls_t = None
         self._out_cls_gdal = None
+        self._out_kld = None
+        self._out_kld_t = None
+        self._out_kld_gdal = None
     
     def __enter__(self):
         return self
@@ -413,6 +417,9 @@ class PredictedProbs():
         self._out_cls = None
         self._out_cls_t = None
         self._out_cls_gdal = None
+        self._out_kld = None
+        self._out_kld_t = None
+        self._out_kld_gdal = None
     
     @property
     def predicted_probs(self):
@@ -423,7 +430,12 @@ class PredictedProbs():
         return self._out_cls_valid.reshape((self.n_groups, self.data.n_pixels_valid))
     
     def compute_class(self):
+        # @FIXME: preserve model class codes! 
         self._out_cls_valid[:, 0] = np.argmax(self._out_probs_valid[:,:], axis=-1)
+    
+    def compute_kl_divergence(self):
+        adjusted_data = np.where(self._out_probs_valid[:,:] > 0, self._out_probs_valid[:,:], 1 / self.n_class)
+        self._out_kld_valid[:, 0] = np.sum(adjusted_data * np.log2(adjusted_data * self.n_class), axis=-1)
     
     def save_class_layer(self,
                          base_dir, 
@@ -480,10 +492,68 @@ class PredictedProbs():
             return s3_out
         return [f"{out_dir}/{file}" for file in out_files]
     
+    def save_kl_divergence_layer(self,
+                                 base_dir, 
+                                 nodata, 
+                                 dtype, 
+                                 scale,
+                                 out_files_prefix, 
+                                 out_files_suffix, 
+                                 s3_prefix, 
+                                 s3_aliases, 
+                                 gdal_opts,
+                                 n_threads):
+        self.compute_kl_divergence()
+        assert(self._out_kld_valid is not None)
+        assert(dtype == 'int16' or dtype == 'uint8')
+        assert(len(out_files_prefix) == len(out_files_suffix))
+        assert(len(out_files_prefix) == 1)
+        assert(s3_prefix is None or len(s3_aliases) > 0)
+        # create and transpose output
+        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - transpose data for final output ({n_threads} threads)"):
+            sb.offsetAndScale(self._out_kld_valid, n_threads, 0.5 / scale, scale)
+            # expand to original number of pixels
+            self._out_kld = np.empty((self.n_groups * self.data.n_pixels, self._out_kld_valid.shape[1]), dtype=np.float32)
+            sb.fillArray(self._out_kld, n_threads, nodata)
+            sb.expandArrayRows(self._out_kld_valid, n_threads, self._out_kld, self.data.get_pixels_valid_idx(self.n_groups))
+            # transpose expanded array
+            self._out_kld_t = np.empty((self._out_kld.shape[1], self._out_kld.shape[0]), dtype=np.float32)
+            sb.transposeArray(self._out_kld, n_threads, self._out_kld_t)
+            # rearrange groups
+            self._out_kld_gdal = np.empty((self._out_kld_t.shape[0] * self.n_groups, self.data.n_pixels), dtype=np.float32)
+            sb.fillArray(self._out_kld_gdal, n_threads, nodata)
+            inverse_idx = np.empty((self._out_kld_gdal.shape[0], 2), dtype=np.uintc)
+            subrows_grid, rows_grid = np.meshgrid(np.arange(self.n_groups), list(range(self._out_kld_valid.shape[1])))
+            inverse_idx[:,0] = rows_grid.flatten()
+            inverse_idx[:,1] = subrows_grid.flatten()
+            sb.inverseReorderArray(self._out_kld_t, n_threads, self._out_kld_gdal, inverse_idx)
+        # write outputs
+        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - write Kullback-Leibler divergence image ({n_threads} threads)"):
+            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.model_name}")
+            out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
+            temp_tif = [self.data.mask_path for _ in range(len(out_files))]
+            write_idx = range(self._out_kld_gdal.shape[0])
+            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
+            s3_out = None
+            if s3_prefix is not None:
+                s3_out = [f'{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}' for _ in range(len(out_files))]
+            if dtype == 'int16':
+                sb.writeInt16Data(self._out_kld_gdal, n_threads, gdal_opts, temp_tif, out_dir, out_files,
+                                  write_idx, 0, 0, self.data.x_size, self.data.y_size, int(nodata), compress_cmd, s3_out)
+            elif dtype == 'uint8':
+                sb.writeByteData(self._out_kld_gdal, n_threads, gdal_opts, temp_tif, out_dir, out_files,
+                                 write_idx, 0, 0, self.data.x_size, self.data.y_size, int(nodata), compress_cmd, s3_out)
+        if s3_prefix is not None:
+            print(f'List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self.data.tile_id}/{out_files_prefix[0]}_`')
+            _rm_dir(out_dir)
+            return s3_out
+        return [f"{out_dir}/{file}" for file in out_files]
+    
     def save_probs_layers(self, 
                           base_dir, 
                           nodata, 
                           dtype, 
+                          scale,
                           out_files_prefix, 
                           out_files_suffix, 
                           s3_prefix, 
@@ -497,6 +567,7 @@ class PredictedProbs():
         assert(s3_prefix is None or len(s3_aliases) > 0)
         # create and transpose output
         with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - transpose data for final output ({n_threads} threads)"):
+            sb.offsetAndScale(self._out_probs_valid, n_threads, 0.5 / scale, scale)
             # expand to original number of pixels
             self._out_probs = np.empty((self.n_groups * self.data.n_pixels, self.n_class), dtype=np.float32)
             sb.fillArray(self._out_probs, n_threads, nodata)

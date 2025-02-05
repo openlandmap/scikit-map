@@ -73,7 +73,6 @@ class DataCatalog():
     
         covar['layer_name'] = covar['layer_name'].apply(replace_layer_name_placeholders)
         covar['path'] = covar['path'].apply(lambda x: replace_layer_name_placeholders(x) if '/whale/' in x else x)
-
         perc_mask = (
             covar['layer_name'].str.contains(r'\{perc\}') | 
             covar['path'].str.contains(r'\{perc\}')
@@ -90,7 +89,6 @@ class DataCatalog():
         perc_expanded_df = pd.DataFrame(perc_expanded_rows)
         # Combine expanded rows with the rest of the dataframe
         covar = pd.concat([covar[~perc_mask], perc_expanded_df], ignore_index=True)
-
         month_mask = (
             covar['layer_name'].str.contains(r'\{start_month\}') | 
             covar['path'].str.contains(r'\{start_month\}') | 
@@ -115,10 +113,11 @@ class DataCatalog():
                 month_expanded_rows.append(new_row)
         month_expanded_df = pd.DataFrame(month_expanded_rows)
         covar = pd.concat([covar[~month_mask], month_expanded_df], ignore_index=True)
-
+        
         # Separate common and temporal data
         covar_comm = covar[covar['type'] == 'common'].reset_index(drop=True)
         covar_temp = covar[covar['type'] == 'temporal'].reset_index(drop=True)
+        
         # Create the comm part of the catalog
         url_comm = covar_comm.set_index('layer_name')['path'].to_dict()
         comm = {'common': {layer_name: path for layer_name, path in url_comm.items()}}
@@ -303,7 +302,7 @@ class DataCatalog():
             k = groups[j]
             for i in range(len(covs_lst)):
                 c = covs_lst[i]
-                if c in self.data['common']:
+                if 'common' in self.data and c in self.data['common']:
                     covs_idx[i,j] = self.data['common'][c]['idx']
                 elif c in self.data[k]:
                     covs_idx[i,j] = self.data[k][c]['idx']
@@ -339,6 +338,8 @@ def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
     elif func_name == 'computeSavi':
         dep_tags += [params['idx_red']]
         dep_tags += [params['idx_nir']]
+    elif func_name == 'extractIndicator':
+        dep_tags += [params['idx_layer']]
     for dep_tag in dep_tags:
         dep_path = main_catalog[key][dep_tag]['path']
         if dep_path.startswith("/whale"):
@@ -374,8 +375,8 @@ def parse_template_whale(whale):
     return func_name, params
 
 def run_whales(catalog:DataCatalog, array, n_threads):
-    # Computing on the fly coovariates
-    whale_paths, whale_keys, whale_names = catalog._get_whales()        
+    # Computing on the fly covariates
+    whale_paths, whale_keys, whale_names = catalog._get_whales()
     max_exec_order = 0
     for whale_key, whale_name in zip(whale_keys, whale_names):
         max_exec_order = max(max_exec_order, int(catalog.data[whale_key][whale_name]['exec_order']))
@@ -414,6 +415,9 @@ def run_whales(catalog:DataCatalog, array, n_threads):
                         [catalog.data[whale_key][whale_name]['idx']], float(params['scale_red']), float(params['scale_nir']),
                         float(params['scale_result']), float(params['offset_result']),
                         [float(params['clip'][0]), float(params['clip'][1])])
+                elif func_name == 'extractIndicator':
+                    array[catalog.data[whale_key][whale_name]['idx'], :] = \
+                        (array[catalog.data[whale_key][params['idx_layer']]['idx'], :] == float(params['code'])).astype(np.float32)
                 else:
                     sys.exit(f"The whale function {func_name} is not available")
 
