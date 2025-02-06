@@ -2,7 +2,6 @@ from typing import List, Dict, Union, Optional
 import os
 import numpy as np
 import pandas as pd
-import subprocess
 import re
 import json
 import skmap_bindings as sb
@@ -21,8 +20,9 @@ class DataCatalog():
                        catalog_def:Union[pd.DataFrame, str],
                        years:List[int],
                        base_path:Union[List[str], str],
+                       verbose: bool = True,
                        replace_group_feat_name:bool = False):
-        catalog_dict = cls._create_dict_catalog(catalog_def, years, base_path, replace_group_feat_name)
+        catalog_dict = cls._create_dict_catalog(catalog_def, years, base_path, verbose, replace_group_feat_name)
         data = {}
         years = [str(year) for year in years]
         if not 'common' in years:  # common is default
@@ -41,7 +41,7 @@ class DataCatalog():
         return cls(data, data_size)
     
     @staticmethod
-    def _create_dict_catalog(catalog_def:Union[pd.DataFrame, str], years:List[int], base_path:Union[List[str], str], replace_group_feat_name:bool):
+    def _create_dict_catalog(catalog_def:Union[pd.DataFrame, str], years:List[int], base_path:Union[List[str], str], verbose:bool, replace_group_feat_name:bool):
         if not isinstance(catalog_def, pd.DataFrame):
             covar = pd.read_csv(catalog_def)
         else:
@@ -124,7 +124,7 @@ class DataCatalog():
 
         def calculate_year_placeholders(year, start_year, end_year, tmp_layer_name):
             valid_year = min(max(year, int(start_year)), int(end_year))
-            if year != valid_year:
+            if (year != valid_year) & verbose:
                 print(f"Year {year} not available for layer {tmp_layer_name}, propagating year {valid_year}")
             return {
                 "year": str(valid_year),
@@ -421,60 +421,3 @@ def run_whales(catalog:DataCatalog, array, n_threads):
                 else:
                     sys.exit(f"The whale function {func_name} is not available")
 
-def _s3_computed_files(out_s3):
-    bash_command = f"mc ls {out_s3}"
-    process = subprocess.Popen(bash_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    output, error = process.communicate()
-    output = output.decode('utf-8')
-    error = error.decode('utf-8')
-    assert (error == ''), f"Error in checking if the tile in S3 `{out_s3}` was already computed. \nError: {error}"
-    return len(output.splitlines())
-#
-def s3_list_files(s3_aliases, s3_prefix, tile_id, file_pattern=None):
-    if len(s3_aliases) == 0: return []
-    bash_cmd = f"mc ls {s3_aliases[0]}{s3_prefix}/{tile_id}"
-    print(f'Checking `{bash_cmd}`...')
-    process = subprocess.Popen(bash_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = process.communicate()
-    stderr = stderr.decode('utf-8')
-    assert stderr == '', f"Error listing S3 `{s3_aliases[0]}{s3_prefix}/{tile_id}`. \nError: {stderr}"
-    stdout = stdout.decode('utf-8')
-    lines = stdout.splitlines()
-    if file_pattern is not None:
-        pattern = re.compile(file_pattern)
-        lines = [line for line in lines if pattern.search(line)]
-    return lines
-#
-def s3_setup(have_to_register_s3, access_key, secret_key, gaia_addrs):
-    s3_aliases = []
-    if not have_to_register_s3:
-        return s3_aliases
-    s3_aliases = [f'g{i}' for i, _ in enumerate(gaia_addrs)]
-    commands = [
-        f'mc alias set  g{i} {addr} {access_key} {secret_key} --api S3v4'
-        for i, addr in enumerate(gaia_addrs)
-    ]
-    for cmd in commands:
-        subprocess.run(cmd, shell=True, capture_output=False, text=True, check=True)
-    return s3_aliases
-#
-def s3_have_to_compute_tile(models_pool, tile_id, s3_aliases, years):
-    compute_tile = False
-    if len(s3_aliases) == 0:
-        return True
-    for model in models_pool:
-        if model['s3_prefix'] is None:
-            compute_tile = True
-            break
-        # check if files were already produced
-        n_out_files = model.n_out_layers * years
-        # generate file output names
-        for k in range(model.n_out_stats):
-            print(f'Checking `mc ls {s3_aliases[0]}{model.s3_prefix}/{tile_id}/{model.out_files_prefix[k]}_`')
-            if _s3_computed_files(f'{s3_aliases[0]}{model.s3_prefix}/{tile_id}/{model.out_files_prefix[k]}_') < n_out_files:
-                compute_tile = True
-                break
-        if compute_tile:
-            break
-    return compute_tile
-#

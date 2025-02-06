@@ -2,19 +2,18 @@ from typing import List, Callable, Optional
 import os
 import random
 from sklearn.ensemble import RandomForestRegressor
-from joblib import Parallel, delayed
 import joblib
-import threading
 import tl2cgen
+import threading
 import numpy as np
-import treelite
+from joblib import Parallel, delayed
 from skmap.tiled_data import TiledData, TiledDataLoader
 import skmap_bindings as sb
 from skmap.misc import _make_dir, TimeTracker, _rm_dir
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
 n_cpus = os.cpu_count()
-n_threads = n_cpus * 2
+n_threads = n_cpus
 os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
@@ -85,6 +84,7 @@ class Modeler():
              model_path: str, 
              model_covs_path: str = None, 
              predict_fn:Callable=lambda predictor, data: predictor.predict(data)) -> None:
+        assert os.path.exists(model_path), f"Model path {model_path} do not exist"
         self.model_path = model_path
         self.model_covs_path = model_covs_path
         self.predict_fn = predict_fn
@@ -126,7 +126,6 @@ class Modeler():
             covs_path = base + '.covs'
             if os.path.exists(covs_path):
                 with open(covs_path, 'r') as file:
-                    print(covs_path)
                     model_covs = [line.strip() for line in file]
             else:
                 raise ValueError(f"No feature names was found")
@@ -175,15 +174,48 @@ class RFRegressor(Regressor):
         self._load_covs()
 
     def predict(self, data:TiledData):
-        with TimeTracker(f"    Predict ({len(self.model_covs)} input features)", True):
-            # prepare input and output arrays
-            with TimeTracker(f"        Transpose data ({data.n_threads} threads)"):
-                self._prepare_covariates(data)
-            # predict
-            with TimeTracker(f"        Model prediction ({data.n_threads} threads)"):
-                result = TiledData(self.n_responses, self.in_covs_valid.shape[0])
-                assert self.n_responses == 1, "Do not yet manage the case for multiple respounces"
-                result.array[0,:] = self.predict_fn(self.model, self.in_covs_valid).astype(np.float32)
+        # prepare input and output arrays
+        with TimeTracker(f"          Transpose data ({data.n_threads} threads)", False):
+            self._prepare_covariates(data)
+        # predict
+        with TimeTracker(f"          Model prediction ({data.n_threads} threads)", False):
+            result = TiledData(self.n_responses, self.in_covs_valid.shape[0], data.tile_id)
+            assert self.n_responses == 1, "Do not yet manage the case for multiple respounces"
+            result.array[0,:] = self.predict_fn(self.model, self.in_covs_valid).astype(np.float32)
+        return result # shape: (n_responses, n_samples)
+#
+class RFRegressorTrees(Regressor):
+    def __init__(self, 
+             model_path: str, 
+             model_covs_path: str = None,
+             n_responses: int = 1,
+             predict_fn:Callable = None) -> None:
+        super().__init__(model_path, model_covs_path, n_responses, predict_fn)
+        self._load_model()
+        assert isinstance(self.model, RandomForestRegressor), "The model must be of type sklearn.ensemble.RandomForestRegressor"
+        self.n_trees = self.model.n_estimators
+        self._load_covs()
+
+    def predict(self, data:TiledData):
+        # prepare input and output arrays
+        with TimeTracker(f"          Transpose data ({data.n_threads} threads)", False):
+            self._prepare_covariates(data)
+        # predict
+        with TimeTracker(f"          Model prediction ({data.n_threads} threads)", False):
+            def _single_prediction(predict, X, out, i, lock):
+                prediction = predict(X, check_input=False)
+                with lock:
+                    out[i, :] = prediction
+            self.in_covs_valid = self.model._validate_X_predict(self.in_covs_valid)
+            assert(self.model.n_outputs_ == 1)
+            result = TiledData(self.n_trees, self.in_covs_valid.shape[0], data.tile_id)
+            # Assign chunk of trees to jobs
+            n_jobs = min(self.n_trees, data.n_threads)
+            # Parallel loop prediction
+            lock = threading.Lock()
+            Parallel(n_jobs=n_jobs, verbose=self.model.verbose, require="sharedmem")(
+                delayed(_single_prediction)(self.model.estimators_[i].predict, self.in_covs_valid, result.array, i, lock)
+                for i in range(self.n_trees))
         return result # shape: (n_responses, n_samples)
     
 #################################################################################################################################
@@ -267,17 +299,6 @@ class Predicted():
         # self.predicted_stats shape: (n_years, n_pixels_valid, n_depths, n_stats) 
         if self._out_stats_valid is not None:
             return self._out_stats_valid.reshape((self.n_groups, self.data.n_pixels_valid, self.n_depths, self.n_stats))
-    def create_empty_copy(self, model_name):
-        pred = PredictedDepths(
-            model_name=model_name, 
-            depths=self.depths,
-            n_depths=self.n_depths,
-            years=self.groups,
-            n_years=self.n_groups,
-            n_trees=self.n_trees,
-            data=self.data
-        )
-        return pred
     def average_trees_depth_ranges(self):
         assert(self.n_depths > 1)
         self.n_depths -= 1
