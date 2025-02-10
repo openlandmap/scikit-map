@@ -205,9 +205,9 @@ class DataCatalog():
                     paths += [self.data[k][f]['path']]
                     idx += [self.data[k][f]['idx']]
                     names += [f]
-        # modify paths of non VRT files
-        paths = [path if path is None or path.endswith('vrt') or path.startswith('/vsicurl/') \
-        else f'/vsicurl/{path}' for path in paths]
+        # modify paths of non VRT files\
+        paths = [f'/vsicurl/{p}' if p and p.startswith('http') and not p.endswith('vrt') and not p.startswith('/vsicurl/')
+            else p for p in paths]
         return paths, idx, names
     
         
