@@ -362,7 +362,7 @@ class SpaceOverlay():
                 data_array = np.empty((chunk_size, n_block_pix), dtype=np.float32)
                 perm_vec = range(chunk_size)
                 sb.readDataBlocks(data_array, self.n_threads, key_layer_paths_chunk, perm_vec, block_col_off_chunk, block_row_off_chunk,
-                                  block_width_chunk, block_height_chunk, bands_list, gdal_opts)
+                                  block_width_chunk, block_height_chunk, bands_list, gdal_opts, None, np.nan)
                 pix_blok_ids = key_query_pixels['block_id'].tolist()
                 sample_rows = key_query_pixels['sample_row'].tolist()
                 sample_cols = key_query_pixels['sample_col'].tolist()
