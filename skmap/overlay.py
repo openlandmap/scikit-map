@@ -13,7 +13,7 @@ from skmap.catalog import DataCatalog, run_whales
 import skmap_bindings as sb
 import hashlib
 import itertools
-n_threads = os.cpu_count() * 2
+n_threads = os.cpu_count()
 os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
@@ -362,7 +362,7 @@ class SpaceOverlay():
                 data_array = np.empty((chunk_size, n_block_pix), dtype=np.float32)
                 perm_vec = range(chunk_size)
                 sb.readDataBlocks(data_array, self.n_threads, key_layer_paths_chunk, perm_vec, block_col_off_chunk, block_row_off_chunk,
-                                  block_width_chunk, block_height_chunk, bands_list, gdal_opts, key_layer_nodatas_chunk, np.nan)
+                                  block_width_chunk, block_height_chunk, bands_list, gdal_opts)
                 pix_blok_ids = key_query_pixels['block_id'].tolist()
                 sample_rows = key_query_pixels['sample_row'].tolist()
                 sample_cols = key_query_pixels['sample_col'].tolist()
