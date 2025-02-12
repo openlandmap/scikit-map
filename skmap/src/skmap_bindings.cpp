@@ -4,38 +4,69 @@
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 namespace py = pybind11;
-
 using namespace skmap;
+#include <variant>
 
+using NodataVariant = std::variant<
+    byte_t, uint16_t, int16_t, uint32_t, int32_t,
+    float32_t, float64_t>;
 
 GDALDataType GetGDALDataTypeFromString(const std::string& gdal_data_type_str) {
-    if (gdal_data_type_str == "GDT_Byte") {
+    if (gdal_data_type_str == "byte") {
         return GDT_Byte;
-    } else if (gdal_data_type_str == "GDT_UInt16") {
+    } else if (gdal_data_type_str == "uint16") {
         return GDT_UInt16;
-    } else if (gdal_data_type_str == "GDT_Int16") {
+    } else if (gdal_data_type_str == "int16") {
         return GDT_Int16;
-    } else if (gdal_data_type_str == "GDT_UInt32") {
+    } else if (gdal_data_type_str == "uint32") {
         return GDT_UInt32;
-    } else if (gdal_data_type_str == "GDT_Int32") {
+    } else if (gdal_data_type_str == "int32") {
         return GDT_Int32;
-    } else if (gdal_data_type_str == "GDT_Float32") {
+    } else if (gdal_data_type_str == "float32") {
         return GDT_Float32;
-    } else if (gdal_data_type_str == "GDT_Float64") {
+    } else if (gdal_data_type_str == "float64") {
         return GDT_Float64;
-    } else if (gdal_data_type_str == "GDT_CInt16") {
-        return GDT_CInt16;
-    } else if (gdal_data_type_str == "GDT_CInt32") {
-        return GDT_CInt32;
-    } else if (gdal_data_type_str == "GDT_CFloat32") {
-        return GDT_CFloat32;
-    } else if (gdal_data_type_str == "GDT_CFloat64") {
-        return GDT_CFloat64;
+    // } else if (gdal_data_type_str == "GDT_CInt16") {
+    //     return GDT_CInt16;
+    // } else if (gdal_data_type_str == "GDT_CInt32") {
+    //     return GDT_CInt32;
+    // } else if (gdal_data_type_str == "GDT_CFloat32") {
+    //     return GDT_CFloat32;
+    // } else if (gdal_data_type_str == "GDT_CFloat64") {
+    //     return GDT_CFloat64;
     } else {
         // Default case if the string does not match any known GDALDataType
         throw std::invalid_argument("Unknown GDALDataType string: " + gdal_data_type_str);
     }
 }
+
+std::optional<NodataVariant> getNodataVariant(const std::string& gdal_data_type_str, float_t no_data_value) {
+    if (gdal_data_type_str == "byte") {
+        return static_cast<byte_t>(no_data_value);
+    } else if (gdal_data_type_str == "uint16") {
+        return static_cast<uint16_t>(no_data_value);
+    } else if (gdal_data_type_str == "int16") {
+        return static_cast<int16_t>(no_data_value);
+    } else if (gdal_data_type_str == "uint32") {
+        return static_cast<uint32_t>(no_data_value);
+    } else if (gdal_data_type_str == "int32") {
+        return static_cast<int32_t>(no_data_value);
+    } else if (gdal_data_type_str == "float32") {
+        return static_cast<float32_t>(no_data_value);
+    } else if (gdal_data_type_str == "float64") {
+        return static_cast<float64_t>(no_data_value);
+    // } else if (gdal_data_type_str == "GDT_CInt16") {
+    //     return static_cast<cint16_t>(no_data_value);
+    // } else if (gdal_data_type_str == "GDT_CInt32") {
+    //     return static_cast<cint32_t>(no_data_value);
+    // } else if (gdal_data_type_str == "GDT_CFloat32") {
+    //     return static_cast<cfloat32_t>(no_data_value);
+    // } else if (gdal_data_type_str == "GDT_CFloat64") {
+    //     return static_cast<cfloat64_t>(no_data_value);
+    }
+    return std::nullopt;  // Unknown type
+}
+
 
 dict_t convPyDict(py::dict in_dict)
 {
@@ -67,15 +98,13 @@ void readDataCore(Eigen::Ref<MatFloat> data,
               const std::vector<int> bands_list,
               py::dict conf_GDAL,
               std::optional<float_t> value_to_mask,
-              std::optional<float_t> value_to_set) 
+              std::optional<float_t> value_to_set)
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
     ioArray.readDataCore(data.row(0), file_loc, x_off, y_off, x_size, y_size, GDALDataType::GDT_Float32,
                      bands_list, value_to_mask, value_to_set);
 }
-
-
 
 void extractOverlay(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
@@ -101,7 +130,7 @@ void readData(Eigen::Ref<MatFloat> data,
               const std::vector<int> bands_list,
               py::dict conf_GDAL,
               std::optional<float_t> value_to_mask,
-              std::optional<float_t> value_to_set) 
+              std::optional<float_t> value_to_set)
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
@@ -121,7 +150,7 @@ void readDataBlocks(Eigen::Ref<MatFloat> data,
               const std::vector<int> bands_list,
               py::dict conf_GDAL,
               std::optional<std::vector<float_t>> value_to_mask_vec,
-              std::optional<float_t> value_to_set) 
+              std::optional<float_t> value_to_set)
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
@@ -155,6 +184,19 @@ void blocksAverage(Eigen::Ref<MatFloat> out,
     TransArray transArray(out, n_threads);
     transArray.blocksAverage(in1, in2, n_pix, y);
 }
+
+void blocksAverageVecs(Eigen::Ref<MatFloat> out,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> in1,
+                  Eigen::Ref<MatFloat> in2,
+                  uint_t n_pix,
+                  uint_t y,
+                  uint_t row_offset)
+{
+    TransArray transArray(out, n_threads);
+    transArray.blocksAverageVecs(in1, in2, n_pix, y, row_offset);
+}
+
 
 
 void elementwiseAverage(Eigen::Ref<MatFloat> out,
@@ -430,7 +472,7 @@ void castFloat32ToFloat64(Eigen::Ref<Eigen::Matrix<float, Eigen::Dynamic, Eigen:
                           "scikit-map ERROR 52: rows of the new array does not match the size of selected");
     skmapAssertIfTrue(((uint_t) data.cols() != (uint_t) out_data.cols()),
                       "scikit-map ERROR 53: cols of the new array does not match the size of selected");
-    
+
     omp_set_num_threads(n_threads);
     Eigen::initParallel();
     Eigen::setNbThreads(n_threads);
@@ -449,7 +491,7 @@ void castFloat64ToFloat32(Eigen::Ref<Eigen::Matrix<double, Eigen::Dynamic, Eigen
                           "scikit-map ERROR 52: rows of the new array does not match the size of selected");
     skmapAssertIfTrue(((uint_t) data.cols() != (uint_t) out_data.cols()),
                       "scikit-map ERROR 53: cols of the new array does not match the size of selected");
-    
+
     omp_set_num_threads(n_threads);
     Eigen::initParallel();
     Eigen::setNbThreads(n_threads);
@@ -616,28 +658,33 @@ void writeByteData(Eigen::Ref<MatFloat> data,
 }
 
 void writeData(Eigen::Ref<MatFloat> data,
-                   const uint_t n_threads,
-                   py::dict conf_GDAL,
-                   std::vector<std::string> base_files,
-                   std::string base_folder,
-                   std::vector<std::string> file_names,
-                   std::vector<uint_t> data_indices,
-                   uint_t x_off,
-                   uint_t y_off,
-                   uint_t x_size,
-                   uint_t y_size,
-                   float_t no_data_value,
-                   std::string gdal_data_type_str,
-                   std::optional<std::string> bash_compression_command,
-                   std::optional<std::vector<std::string>> seaweed_path)
+               const uint_t n_threads,
+               py::dict conf_GDAL,
+               std::vector<std::string> base_files,
+               std::string base_folder,
+               std::vector<std::string> file_names,
+               std::vector<uint_t> data_indices,
+               uint_t x_off,
+               uint_t y_off,
+               uint_t x_size,
+               uint_t y_size,
+               float_t no_data_value,
+               std::string gdal_data_type_str,
+               std::optional<std::string> bash_compression_command,
+               std::optional<std::vector<std::string>> seaweed_path) 
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
     GDALDataType gdal_data_type = GetGDALDataTypeFromString(gdal_data_type_str);
-    ioArray.writeData(base_files, base_folder, file_names, data_indices,
-        x_off, y_off, x_size, y_size, gdal_data_type, no_data_value, bash_compression_command, seaweed_path);
+    auto no_data_variant = getNodataVariant(gdal_data_type_str, no_data_value);
+    if (!no_data_variant)
+        throw std::invalid_argument("scikit-map ERROR 61: Unknown data type for no_data_value: " + gdal_data_type_str);
+    std::visit([&](auto&& casted_nodata) {
+        ioArray.writeData(base_files, base_folder, file_names, data_indices,
+                          x_off, y_off, x_size, y_size, gdal_data_type,
+                          casted_nodata, bash_compression_command, seaweed_path);
+    }, *no_data_variant);
 }
-
 
 void writeInt16Data(Eigen::Ref<MatFloat> data,
                    const uint_t n_threads,
@@ -806,22 +853,22 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("offsetsAndScales", &offsetsAndScales, "Add offsets and muplitply by scalings each array row selected");
     m.def("offsetAndScale", &offsetAndScale, "Add an offset and muplitply by a scaling each array element");
     m.def("inverseReorderArray", &inverseReorderArray, "Reorder and transpose an array into a new one");
-    m.def("writeByteData", &writeByteData, 
+    m.def("writeByteData", &writeByteData,
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Write data in Byte format");
-    m.def("writeInt16Data", &writeInt16Data, 
+    m.def("writeInt16Data", &writeInt16Data,
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Write data in Int16 format");
-    m.def("writeUInt16Data", &writeUInt16Data, 
+    m.def("writeUInt16Data", &writeUInt16Data,
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Write data in Int16 format");
-    m.def("writeData", &writeData, 
+    m.def("writeData", &writeData,
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
@@ -849,6 +896,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
     m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
     m.def("blocksAverage", &blocksAverage, "Vecorized average of 4 neighbor elemnts");
+    m.def("blocksAverageVecs", &blocksAverageVecs, "Vecorized average of 4 neighbor elemnts");
     m.def("elementwiseAverage", &elementwiseAverage, "Vecorized average between two arrays elements");
     m.def("extractOverlay", &extractOverlay, "Extract overlay data");
     m.def("slidingWindowClassMode", &slidingWindowClassMode, "A weird stuff");

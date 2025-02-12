@@ -97,9 +97,12 @@ class IoArray: public ParArray
                     ending = "_tmp.tif";
                 else 
                     ending = ".tif";
-                    
                 std::string layer_name = file_names[i];
+                const std::string suffix = ".tif";
+                if (layer_name.size() >= suffix.size() && layer_name.compare(layer_name.size() - suffix.size(), suffix.size(), suffix) == 0)
+                    layer_name = layer_name.substr(0, layer_name.size() - suffix.size());
                 GDALDriver *driver = GetGDALDriverManager()->GetDriverByName("GTiff");
+                row = row.array().isNaN().select(static_cast<float_t>(no_data_value),row);
                 Eigen::RowVectorX<T> casted_row = row.cast<T>();
                 GDALDataset *writeDataset = driver->Create((base_folder + "/" + layer_name + ending).c_str(),
                     inputDataset->GetRasterXSize(), inputDataset->GetRasterYSize(), 1, write_type, nullptr);
@@ -107,7 +110,7 @@ class IoArray: public ParArray
                 writeDataset->SetSpatialRef(spatial_ref);
                 writeDataset->SetProjection(projection);
                 GDALRasterBand *writeBand = writeDataset->GetRasterBand(1);
-                writeBand->SetNoDataValue((double) no_data_value);
+                writeBand->SetNoDataValue(static_cast<double>(no_data_value));
                 using MatType = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
                 MatType init_raster = MatType::Constant(1, x_size_in * y_size_in, no_data_value);
                 auto out_write1 = writeBand->RasterIO(
