@@ -460,11 +460,14 @@ class SpaceTimeOverlay():
 
             if self.verbose:
                 ttprint(f'Running the overlay for {year}')
-            year_result = self.overlay_objs[year].run(max_ram_mb, out_file_name, gdal_opts)
+            year_result = self.overlay_objs[year].run(max_ram_mb, None, gdal_opts)
 
             if self.result is None:
                 self.result = year_result
             else:
                 self.result = pd.concat([self.result, year_result], ignore_index=True)
+                
+            if out_file_name is not None:
+                self.result.to_parquet(out_file_name)
 
         return self.result
