@@ -4,6 +4,10 @@ import random
 from sklearn.ensemble import RandomForestRegressor
 import joblib
 import tl2cgen
+try:
+    tl2cgen.util.check_if_fast()
+except:
+    print("The current installation of tl2cgen is not the one with parallel DMatrix and can be slow")
 import threading
 import numpy as np
 from joblib import Parallel, delayed

@@ -3,10 +3,10 @@ from osgeo import gdal
 import numpy as np
 import subprocess, os, re
 import skmap_bindings as sb
-from skmap.misc import TimeTracker, ttprint
+from skmap.misc import TimeTracker, ttprint, sb_arr
 from concurrent.futures import ProcessPoolExecutor
 from skmap.catalog import DataCatalog, run_whales
-import warnings
+import warnings, random
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
 n_threads = os.cpu_count()
@@ -62,11 +62,11 @@ def warp_tile(tile_file, mosaic_paths, n_pix, resample):
 
 def s3_list_files(s3_aliases, s3_prefix, tile_id, file_pattern=None):
     if len(s3_aliases) == 0: return []
-    bash_cmd = f"mc find {s3_aliases[0]}{s3_prefix}/{tile_id}"
+    bash_cmd = f"mc find {s3_aliases[0]}/{s3_prefix}/{tile_id}"
     process = subprocess.Popen(bash_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = process.communicate()
-    stderr = stderr.decode('utf-8')
-    assert stderr == '', f"Error listing S3 `{s3_aliases[0]}{s3_prefix}/{tile_id}`. \nError: {stderr}"
+    # stderr = stderr.decode('utf-8')
+    # assert stderr == '', f"Error listing S3 `{s3_aliases[0]}{s3_prefix}/{tile_id}`. \nError: {stderr}"
     stdout = stdout.decode('utf-8')
     lines = stdout.splitlines()
     if file_pattern is not None:
@@ -346,7 +346,7 @@ class TiledDataExporter(TiledData):
         return flag
 
         
-    def derive_statistics(self, depths_trees_pred, expm1):
+    def derive_block_quantiles_and_mean(self, depths_trees_pred, expm1):
         assert self.mode == 'depths_years_quantiles', "Mode must be 'depths_years_quantiles'"
         self.n_pixels = int(depths_trees_pred[0].array.shape[1]/len(self.years))
         self.array = np.empty((self.n_layers, self.n_pixels), dtype=np.float32)
@@ -370,6 +370,47 @@ class TiledDataExporter(TiledData):
                                       range(offset_prop+1,offset_prop+1+len(percentiles)), percentiles)
                 array_t[:,offset_prop] = prop_mean
         sb.transposeArray(array_t, self.n_threads, self.array)
+            
+    def derive_block_mean(self, depths_pred, expm1):
+        assert self.mode == 'depths_years', "Mode must be 'depths_years'"
+        self.n_pixels = int(depths_pred[0].array.shape[1]/len(self.years))
+        self.array = np.empty((self.n_layers, self.n_pixels), dtype=np.float32)
+        for d in range(len(self.depths) - 1):
+            for y in range(len(self.years) - 1):
+                offset_prop = d * (len(self.years) - 1)  + y
+                sb.blocksAverageVecs(self.array, self.n_threads,
+                                 depths_pred[d].array, depths_pred[d+1].array, self.n_pixels, y, offset_prop)
+        if expm1:
+            np.expm1(self.array, out=self.array)
         
-    # def export_locally(self, prefix, sufix, write_folder):
+    def export_files(self, prefix, sufix, nodata, 
+                     template_file, save_type, valid_idx,
+                     write_folder='.',
+                     scaling = 1,
+                     gdal_opts:Dict[str,str] = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'},):
+        out_files = self._get_out_names(prefix, sufix)
+        n_files = len(out_files)
+        gdal_img = gdal.Open(template_file)
+        x_size = gdal_img.RasterXSize
+        y_size = gdal_img.RasterYSize
+        n_pixels = x_size * y_size
+        write_data = sb_arr(n_files, n_pixels)
+        write_data_t = sb_arr(n_pixels, n_files)
+        out_data_t = sb_arr(self.array.shape[1], self.array.shape[0])
+        sb.transposeArray(self.array, self.n_threads, out_data_t)
+        offset = 0.5 if save_type in {'byte', 'uint16', 'int16', 'uint32', 'int32'} else 0.0
+        sb.scaleAndOffset(out_data_t, self.n_threads, offset, scaling)
+        sb.fillArray(write_data_t, self.n_threads, nodata)
+        sb.expandArrayRows(out_data_t, self.n_threads, write_data_t, valid_idx)
+        sb.transposeArray(write_data_t, self.n_threads, write_data)
+        tile_dir = write_folder + f'/{self.tile_id}'
+        os.makedirs(write_folder, exist_ok=True)
+        os.makedirs(tile_dir, exist_ok=True)
+        compress_cmd = f"gdal_translate -a_nodata {nodata} -a_scale {1./scaling} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
+        s3_out = ([f'{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}' for _ in range(len(out_files))])
+        sb.writeData(write_data, n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
+               range(n_files), 0, 0, x_size, y_size, nodata,
+               save_type, compress_cmd, s3_out)
+        if s3_out:
+            ttprint(f'Export complete, check mc ls {s3_out[0]}/{out_files[0]}')
         
