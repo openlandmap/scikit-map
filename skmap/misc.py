@@ -23,6 +23,9 @@ from dateutil.relativedelta import relativedelta
 
 TMP_DIR = tempfile.gettempdir()
 
+def sb_arr(rows, cols):
+    return np.empty((rows, cols), np.float32)
+
 def _warn_deps(e, module_name):
         import warnings
         warnings.warn(

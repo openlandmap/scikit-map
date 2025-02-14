@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#include <cstdint>
+#include <any>
 
 //#include <cpl_conv.h>
 //#include <ogr_spatialref.h>
@@ -62,11 +64,21 @@ inline float_t standardNormalCdf(float_t x) {
     return 0.5 * (1. + erf(x / sqrt(2.)));
 }
 
-using uint_t = long unsigned int;
-using float_t = float;
-using byte_t = unsigned char;
-using int16_t = short;
+using byte_t = std::uint8_t;
 using uint16_t = std::uint16_t;
+using int16_t = std::int16_t;
+using uint32_t = std::uint32_t;
+using int32_t = std::int32_t;
+using float32_t = float;
+using float64_t = double;
+using cint16_t = std::complex<int16_t>;
+using cint32_t = std::complex<int32_t>;
+using cfloat32_t = std::complex<float32_t>;
+using cfloat64_t = std::complex<float64_t>;
+
+using uint_t = long unsigned int;
+using float_t = float32_t;
+
 inline float_t nan_v = std::numeric_limits<float_t>::quiet_NaN();
 inline float_t inf_v = std::numeric_limits<float_t>::infinity();
 using dict_t = std::unordered_map<std::string, std::string>;

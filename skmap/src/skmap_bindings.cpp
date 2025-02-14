@@ -3,9 +3,9 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
+#include <variant>
 namespace py = pybind11;
 using namespace skmap;
-#include <variant>
 
 using NodataVariant = std::variant<
     byte_t, uint16_t, int16_t, uint32_t, int32_t,
