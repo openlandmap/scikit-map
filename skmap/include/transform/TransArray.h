@@ -70,7 +70,13 @@ class TransArray: public ParArray
         void blocksAverage(Eigen::Ref<MatFloat> in1,
                           Eigen::Ref<MatFloat> in2,
                           uint_t n_pix,
-                          uint_t y);   
+                          uint_t y);
+
+        void blocksAverageVecs(Eigen::Ref<MatFloat> in1,
+                                  Eigen::Ref<MatFloat> in2,
+                                  uint_t n_pix,
+                                  uint_t y,
+                                  uint_t row_offset);
 
         void elementwiseAverage(Eigen::Ref<MatFloat> in1,
                           Eigen::Ref<MatFloat> in2);
