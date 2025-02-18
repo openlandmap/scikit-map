@@ -322,19 +322,62 @@ namespace skmap {
         this->parForRange(fillArrayRow, m_data.rows());
     }
 
+    void TransArray::texturesBwTransform(Eigen::Ref<MatFloat> texture_2,
+                                        float_t k,
+                                        float_t a,
+                                        Eigen::Ref<MatFloat> sand,
+                                        Eigen::Ref<MatFloat> silt,
+                                        Eigen::Ref<MatFloat> clay)
+    {
+        auto texturesBwTransformChunk = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end) 
+        {
+            // Extract the relevant block from texture_1 and texture_2
+            MatFloat x1 = Eigen::pow(2., chunk.array());
+            MatFloat x2 = Eigen::pow(2., texture_2.block(row_start, 0, row_end - row_start, texture_2.cols()).array());
+
+            // Compute the inverse transformation
+            MatFloat C = ((1. - (x1.array() + x2.array() - 2.) * k).array() / (x1.array() + x2.array() + 1.).array()).cwiseMax(0.);
+            MatFloat S = (x1.array() * C.array() + x1.array() * k - k).cwiseMax(0);
+            MatFloat L = (x2.array() * C.array() + x2.array() * k - k).cwiseMax(0);
+            
+            // Compute total sum for normalization
+            MatFloat total = S.array() + L.array() + C.array();
+
+            // Avoid division by zero: Compute scale factor
+            MatFloat scale_factor = (total.array() > 0).select(a / total.array(), 0.);  // If total > 0, scale; else, set to 0
+
+            // Store results in the respective blocks
+            sand.block(row_start, 0, row_end - row_start, sand.cols()) = S.array() * scale_factor.array();
+            silt.block(row_start, 0, row_end - row_start, silt.cols()) = L.array() * scale_factor.array();
+            clay.block(row_start, 0, row_end - row_start, clay.cols()) = C.array() * scale_factor.array();
+
+            
+            // Apply NaN mask where necessary (assuming NaN handling is required)
+            MatBool mask = (chunk.array().isNaN() || texture_2.block(row_start, 0, row_end - row_start, texture_2.cols()).array().isNaN());
+
+            sand.block(row_start, 0, row_end - row_start, sand.cols()) = mask.select(nan_v, sand.block(row_start, 0, row_end - row_start, sand.cols()).array());
+            clay.block(row_start, 0, row_end - row_start, clay.cols()) = mask.select(nan_v, clay.block(row_start, 0, row_end - row_start, clay.cols()).array());
+            silt.block(row_start, 0, row_end - row_start, silt.cols()) = mask.select(nan_v, silt.block(row_start, 0, row_end - row_start, silt.cols()).array());
+        };
+
+        // Apply parallel execution
+        this->parChunk(texturesBwTransformChunk);
+    }
+
+    
     void TransArray::fitPercentage(Eigen::Ref<MatFloat> in1,
                                    Eigen::Ref<MatFloat> in2)
     {
-        auto fitPercentageChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
-        {
-            chunk.array() = 100. / (in1.block(row_start, 0, row_end - row_start, in1.cols()).array() + 
-                                    in2.block(row_start, 0, row_end - row_start, in2.cols()).array() +
-                                    1.);
-        };
-        this->parChunk(fitPercentageChunk);
+    auto fitPercentageChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+    {
+    chunk.array() = 100. / (in1.block(row_start, 0, row_end - row_start, in1.cols()).array() + 
+            in2.block(row_start, 0, row_end - row_start, in2.cols()).array() +
+            1.);
+    };
+    this->parChunk(fitPercentageChunk);
     }
-    
-    
+
+
     void TransArray::hadamardProduct(Eigen::Ref<MatFloat> in1,
                                      Eigen::Ref<MatFloat> in2)
     {

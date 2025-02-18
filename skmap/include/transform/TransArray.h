@@ -81,6 +81,12 @@ class TransArray: public ParArray
         void elementwiseAverage(Eigen::Ref<MatFloat> in1,
                           Eigen::Ref<MatFloat> in2);
 
+        void texturesBwTransform(Eigen::Ref<MatFloat> texture_2,
+                            float_t k,
+                            float_t a,
+                            Eigen::Ref<MatFloat> sand,
+                            Eigen::Ref<MatFloat> silt,
+                            Eigen::Ref<MatFloat> clay);
 
         void inverseReorderArray(Eigen::Ref<MatFloat> out_data,
                                    std::vector<std::vector<uint_t>> indices_matrix);

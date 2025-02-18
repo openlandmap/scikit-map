@@ -332,13 +332,27 @@ void maskData(Eigen::Ref<MatFloat> data,
 }
 
 void fitPercentage(Eigen::Ref<MatFloat> out,
-                   const uint_t n_threads,
-                   Eigen::Ref<MatFloat> in1,
-                   Eigen::Ref<MatFloat> in2)
+    const uint_t n_threads,
+    Eigen::Ref<MatFloat> in1,
+    Eigen::Ref<MatFloat> in2)
 {
     TransArray transArray(out, n_threads);
     transArray.fitPercentage(in1, in2);
 }
+
+void texturesBwTransform(Eigen::Ref<MatFloat> texture_1,
+                        const uint_t n_threads,
+                        Eigen::Ref<MatFloat> texture_2,
+                        float_t k,
+                        float_t a,
+                        Eigen::Ref<MatFloat> sand,
+                        Eigen::Ref<MatFloat> silt,
+                        Eigen::Ref<MatFloat> clay)
+{
+    TransArray transArray(texture_1, n_threads);
+    transArray.texturesBwTransform(texture_2, k, a, sand, silt, clay);
+}
+
 
 void hadamardProduct(Eigen::Ref<MatFloat> out,
                      const uint_t n_threads,
@@ -896,6 +910,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("maskDifference", &maskDifference, "Mask outliers by difference from a reference");
     m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
     m.def("blocksAverage", &blocksAverage, "Vecorized average of 4 neighbor elemnts");
+    m.def("texturesBwTransform", &texturesBwTransform, "Texture transformation");
     m.def("blocksAverageVecs", &blocksAverageVecs, "Vecorized average of 4 neighbor elemnts");
     m.def("elementwiseAverage", &elementwiseAverage, "Vecorized average between two arrays elements");
     m.def("extractOverlay", &extractOverlay, "Extract overlay data");
