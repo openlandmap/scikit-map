@@ -377,7 +377,7 @@ class TiledDataExporter(TiledData):
                 sb.blocksAverage(trees_avg, self.n_threads,
                                  depths_trees_pred[d].array, depths_trees_pred[d+1].array, self.n_pixels, y)
                 trees_avg_t = sb_arr(self.n_pixels, n_trees)
-                prop_mean = sb_arr(self.n_pixels,)
+                prop_mean = sb_vec(self.n_pixels)
                 sb.transposeArray(trees_avg, self.n_threads, trees_avg_t)
                 sb.nanMean(trees_avg_t, self.n_threads, prop_mean)
                 if expm1:
