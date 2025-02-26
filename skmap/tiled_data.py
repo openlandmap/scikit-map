@@ -249,7 +249,14 @@ class TiledDataLoader(TiledData):
         otf_name_idx = otf_idx[otf_name]
         self.array[otf_name_idx] = otf_const
 
-        
+def get_percentiele_string(q):
+    if int(q/0.1) == float(q/0.1):
+        formatted_p = 'p0' if (q == 0) else ('p100' if (q == 1) else f"p{int(q/0.1)}0")
+    else:
+        formatted_p = 'p0' if (q == 0) else ('p100' if (q == 1) else str(q).replace('0.','p'))
+    return formatted_p
+
+
 class TiledDataExporter(TiledData):
     def __init__(self,
                  n_pixels:int = None,
@@ -314,6 +321,12 @@ class TiledDataExporter(TiledData):
             return self._get_out_names_depths_years_quantiles(prefix, sufix)
         elif self.mode == 'depths_years':
             return self._get_out_names_depths_years(prefix, sufix)
+        elif self.mode == 'static_depths_quantiles':
+            return self._get_out_names_static_depths_quantiles(prefix, sufix, time_frame)
+        elif self.mode == 'static_quantiles':
+            return self._get_out_names_static_quantiles(prefix, sufix, time_frame)
+        elif self.mode == 'static':
+            return self._get_out_names_static(prefix, sufix, time_frame)
         elif self.mode == 'years':
             return self._get_out_names_years(prefix, sufix)
         else:
@@ -333,7 +346,7 @@ class TiledDataExporter(TiledData):
         out_files = []
         out_files.append(f"{prefix}_m_{self.spatial_res}_s_{time_frame}_{sufix}")
         for q in self.quantiles:
-            formatted_p = 'p0' if (q == 0) else ('p100' if (q == 1) else str(q).replace('0.','p'))
+            formatted_p = get_percentiele_string(q) 
             out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{time_frame}_{sufix}")
         return out_files
     
@@ -349,7 +362,7 @@ class TiledDataExporter(TiledData):
         for d in range(len(self.depths) - 1):
             out_files.append(f"{prefix}_m_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{time_frame}_{sufix}")
             for q in self.quantiles:
-                formatted_p = 'p0' if (q == 0) else ('p100' if (q == 1) else str(q).replace('0.','p'))
+                formatted_p = get_percentiele_string(q)
                 out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{time_frame}_{sufix}")
         return out_files
     
@@ -359,7 +372,7 @@ class TiledDataExporter(TiledData):
             for y in range(len(self.years) - 1):
                 out_files.append(f"{prefix}_m_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{self.years[y]}0101_{self.years[y+1]}1231_{sufix}")
                 for q in self.quantiles:
-                    formatted_p = 'p0' if (q == 0) else ('p100' if (q == 1) else str(q).replace('0.','p'))
+                    formatted_p = get_percentiele_string(q)
                     out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{self.years[y]}0101_{self.years[y+1]}1231_{sufix}")
         return out_files
     
@@ -373,14 +386,14 @@ class TiledDataExporter(TiledData):
                 for prefix in prefixes :
                     out_files.append(f"{prefix}_m_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{self.years[y]}0101_{self.years[y+1]}1231_{sufix}")
                     for q in self.quantiles:
-                        formatted_p = 'p0' if (q == 0) else ('p100' if (q == 1) else str(q).replace('0.','p'))
+                        formatted_p = get_percentiele_string(q)
                         out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{self.years[y]}0101_{self.years[y+1]}1231_{sufix}")
         return out_files
                   
     
-    def check_all_exported(self, prefix, sufix):
+    def check_all_exported(self, prefix, sufix, timeframe = None):
         assert (self.s3_aliases != None) & (self.s3_prefix != None), "The check requires that S3 is properly set"
-        out_files = self._get_out_names(prefix, sufix)
+        out_files = self._get_out_names(prefix, sufix, timeframe)
         files_in_s3 = s3_list_files(self.s3_aliases, self.s3_prefix, self.tile_id)
         basename_files_in_s3 = [os.path.basename(f) for f in files_in_s3]
         flag = True
@@ -507,8 +520,9 @@ class TiledDataExporter(TiledData):
                      template_file, save_type, valid_idx,
                      write_folder='.',
                      scaling = 1,
-                     gdal_opts:Dict[str,str] = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'},):
-        out_files = self._get_out_names(prefix, sufix)
+                     gdal_opts:Dict[str,str] = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'},
+                     timeframe = None):
+        out_files = self._get_out_names(prefix, sufix, timeframe)
         n_files = len(out_files)
         gdal_img = gdal.Open(template_file)
         x_size = gdal_img.RasterXSize
