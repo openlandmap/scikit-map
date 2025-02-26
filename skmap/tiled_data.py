@@ -283,12 +283,18 @@ class TiledDataExporter(TiledData):
             assert (years != None) & (depths != None) & (quantiles != None), "Need to provide years, depths, quantiles"
         elif self.mode == 'depths_years_quantiles':
             assert (years != None) & (depths != None) & (quantiles != None), "Need to provide years, depths, quantiles"
+        elif self.mode == 'static_depths_quantiles':
+            assert (depths != None) & (quantiles != None), "Need to provide depths, quantiles"
+        elif self.mode == 'static_quantiles':
+            assert (quantiles != None), "Need to provide quantiles"
         elif self.mode == 'depths_years':
             assert (years != None) & (depths != None), "Need to provide years, depths"
         elif self.mode == 'years':
             assert (years != None), "Need to provide years"
+        elif self.mode == 'static':
+            pass
         else:
-            raise Exception("Available modes: depths_years_quantiles, depths_years, years")
+            raise Exception("Available modes: depths_years_quantiles_textures, depths_years_quantiles, depths_years, years, static_depths_quantiles, static_quantiles, static")
         self.n_layers = len(self._get_out_names("",""))
         if (self.n_layers != None) & (self.n_pixels != None):
             self.array = sb_arr(self.n_layers, n_pixels)
@@ -301,7 +307,7 @@ class TiledDataExporter(TiledData):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.array = None
     
-    def _get_out_names(self, prefix, sufix):
+    def _get_out_names(self, prefix, sufix, time_frame = None):
         if self.mode == 'depths_years_quantiles_textures':
             return self._get_out_names_depths_years_quantiles_textures(prefix, sufix)
         if self.mode == 'depths_years_quantiles':
@@ -319,11 +325,32 @@ class TiledDataExporter(TiledData):
             out_files.append(f"{prefix}_m_{self.spatial_res}_s_{y}0101_{y}1231_{sufix}")
         return out_files
     
+    def _get_out_names_static(self, prefix, sufix, time_frame):
+        out_files = [out_files.append(f"{prefix}_m_{self.spatial_res}_s_{time_frame}_{sufix}")]
+        return out_files
+    
+    def _get_out_names_static_quantiles(self, prefix, sufix, time_frame):
+        out_files = []
+        out_files.append(f"{prefix}_m_{self.spatial_res}_s_{time_frame}_{sufix}")
+        for q in self.quantiles:
+            formatted_p = 'p0' if (q == 0) else ('p100' if (q == 1) else str(q).replace('0.','p'))
+            out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{time_frame}_{sufix}")
+        return out_files
+    
     def _get_out_names_depths_years(self, prefix, sufix):
         out_files = []
         for d in range(len(self.depths) - 1):
             for y in range(len(self.years) - 1):
                 out_files.append(f"{prefix}_m_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{self.years[y]}0101_{self.years[y+1]}1231_{sufix}")
+        return out_files
+    
+    def _get_out_names_static_depths_quantiles(self, prefix, sufix, time_frame):
+        out_files = []
+        for d in range(len(self.depths) - 1):
+            out_files.append(f"{prefix}_m_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{time_frame}_{sufix}")
+            for q in self.quantiles:
+                formatted_p = 'p0' if (q == 0) else ('p100' if (q == 1) else str(q).replace('0.','p'))
+                out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{time_frame}_{sufix}")
         return out_files
     
     def _get_out_names_depths_years_quantiles(self, prefix, sufix):
@@ -390,7 +417,31 @@ class TiledDataExporter(TiledData):
                 array_t[:,offset_prop] = prop_mean
         sb.transposeArray(array_t, self.n_threads, self.array)
             
-    
+      
+    def derive_static_depths_quantiles_and_mean(self, depths_trees_pred, expm1):
+        assert self.mode == 'static_depths_quantiles', "Mode must be static_depths_quantiles"
+        self.n_pixels = int(depths_trees_pred[0].array.shape[1])
+        self.array = sb_arr(self.n_layers, self.n_pixels)
+        array_t = sb_arr(self.n_pixels, self.n_layers)
+        n_trees = depths_trees_pred[0].array.shape[0]
+        for d in range(len(self.depths) - 1):
+            trees_avg = sb_arr(n_trees, self.n_pixels)
+            sb.elementwiseAverage(trees_avg, self.n_threads,
+                                  depths_trees_pred[d].array, depths_trees_pred[d+1].array)
+            trees_avg_t = sb_arr(self.n_pixels, n_trees)
+            prop_mean = sb_vec(self.n_pixels)
+            sb.transposeArray(trees_avg, self.n_threads, trees_avg_t)
+            sb.nanMean(trees_avg_t, self.n_threads, prop_mean)
+            if expm1:
+                np.expm1(prop_mean, out=prop_mean)
+                np.expm1(trees_avg_t, out=trees_avg_t)
+            percentiles = [q*100. for q in self.quantiles]
+            offset_prop = d * ((len(self.quantiles) + 1))
+            sb.computePercentiles(trees_avg_t, self.n_threads, range(trees_avg_t.shape[1]), array_t,
+                                  range(offset_prop+1,offset_prop+1+len(percentiles)), percentiles)
+            array_t[:,offset_prop] = prop_mean
+        sb.transposeArray(array_t, self.n_threads, self.array)
+            
         
     def derive_block_quantiles_and_mean_textures(self, pred_depths_texture1, pred_depths_texture2, k=1., a=100.):
         assert self.mode == 'depths_years_quantiles_textures', "Mode must be 'depths_years_quantiles'"
