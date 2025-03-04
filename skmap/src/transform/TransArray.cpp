@@ -2,6 +2,69 @@
 
 namespace skmap {
 
+    void argsortMatrixAscending(Eigen::Ref<MatFloat> in_matrix, Eigen::Ref<MatUint> perm_matrix, bool sort_each_row_true_sort_each_col_false) 
+    {
+        if (sort_each_row_true_sort_each_col_false) 
+        {
+            #pragma omp parallel for
+            for (int i = 0; i < in_matrix.rows(); ++i) 
+            {
+                std::vector<uint_t> indices(in_matrix.cols());
+                std::iota(indices.begin(), indices.end(), 0);
+                std::sort(indices.begin(), indices.end(), [&](uint_t a, uint_t b)
+                {return in_matrix(i, a) < in_matrix(i, b);});
+
+                MatFloat sorted_row(1, in_matrix.cols());
+                for (int j = 0; j < in_matrix.cols(); ++j) 
+                {
+                    sorted_row(0, j) = in_matrix(i, indices[j]);
+                    perm_matrix(i, j) = indices[j];
+                }
+                in_matrix.row(i) = sorted_row;
+            }
+        } else {
+            #pragma omp parallel for
+            for (int j = 0; j < in_matrix.cols(); ++j) 
+            {
+                std::vector<uint_t> indices(in_matrix.rows());
+                std::iota(indices.begin(), indices.end(), 0);
+                std::sort(indices.begin(), indices.end(), [&](uint_t a, uint_t b)
+                {return in_matrix(a, j) < in_matrix(b, j);});
+
+                MatFloat sorted_col(in_matrix.rows(), 1);
+                for (int i = 0; i < in_matrix.rows(); ++i) 
+                {
+                    sorted_col(i, 0) = in_matrix(indices[i], j);
+                    perm_matrix(i, j) = indices[i];
+                }
+                in_matrix.col(j) = sorted_col;
+            }
+        }
+    }
+
+    void applyPermutation(Eigen::Ref<MatFloat> sorted_matrix, Eigen::Ref<MatUint> perm_matrix, bool sort_each_row_true_sort_each_col_false) 
+    {
+        MatFloat original_matrix = sorted_matrix;
+        if (sort_each_row_true_sort_each_col_false) {
+            #pragma omp parallel for
+            for (int i = 0; i < sorted_matrix.rows(); ++i) {
+                for (int j = 0; j < sorted_matrix.cols(); ++j) {
+                    original_matrix(i, perm_matrix(i, j)) = sorted_matrix(i, j);
+                }
+            }
+        } else {
+            #pragma omp parallel for
+            for (int j = 0; j < sorted_matrix.cols(); ++j) {
+                for (int i = 0; i < sorted_matrix.rows(); ++i) {
+                    original_matrix(perm_matrix(i, j), j) = sorted_matrix(i, j);
+                }
+            }
+        }
+        sorted_matrix = original_matrix;
+    }
+    
+
+
     TransArray::TransArray(Eigen::Ref<MatFloat> data, const uint_t n_threads)
             : ParArray(data, n_threads)
     {
@@ -653,7 +716,8 @@ namespace skmap {
             float_t max_float = std::numeric_limits<float_t>::max();
             sorted_chunk = sorted_chunk.array().isNaN().select(max_float, sorted_chunk);
             Eigen::VectorXi not_nan_count(chunk.rows());
-            for (uint_t i = 0; i < (uint_t) sorted_chunk.rows(); ++i) {
+            for (uint_t i = 0; i < (uint_t) sorted_chunk.rows(); ++i) 
+            {
                 std::vector<float_t> sorted_row(sorted_chunk.row(i).data(), sorted_chunk.row(i).data() + sorted_chunk.row(i).size());
                 std::sort(sorted_row.begin(), sorted_row.end());
                 for (uint_t j = 0; j < (uint_t) sorted_chunk.cols(); ++j) {
@@ -687,6 +751,94 @@ namespace skmap {
             }
         };
         this->parChunk(computePercentilesChunk);
+    }
+
+
+    void TransArray::fitProibabilites(Eigen::Ref<MatFloat> out_data,
+                                      float_t input_scaling,
+                                      uint_t target_scaling)
+    {
+        skmapAssertIfTrue(out_data.cols() != m_data.cols(),
+                          "scikit-map ERROR 56: in and out data should have the same number of columns");
+
+        uint_t n_classes = m_data.cols();
+        int_t power_of_two_start = 1;
+        while (std::pow(2, power_of_two_start + 1) < n_classes)
+            power_of_two_start++;
+        
+        auto fitProibabilitesChunk = [&] (Eigen::Ref<MatFloat> in_chunk, uint_t row_start, uint_t row_end)
+        {
+            uint_t n_pix = row_end - row_start;
+            auto out_chunk = out_data.block(row_start, 0, n_pix, n_classes);
+            out_chunk = in_chunk;
+            MatUint perm_matrix(n_pix, n_classes);
+            out_chunk = out_chunk.array() / input_scaling * (float_t) target_scaling;
+
+            argsortMatrixAscending(out_chunk, perm_matrix, true);
+
+            MatFloat out_chunk_floor = out_chunk.array().floor();
+            MatFloat out_chunk_ceil = out_chunk.array().ceil();
+            VecFloat sum_floor = out_chunk_floor.rowwise().sum();
+            VecFloat sum_ceil = out_chunk_ceil.rowwise().sum();
+
+            #pragma omp parallel for
+            for (uint_t i = 0; i < n_pix; ++i)
+            {
+                if (std::isnan(sum_floor(i)) || std::isnan(sum_ceil(i)))
+                {
+                    out_chunk.row(i).array() = nan_v;
+                    continue;
+                }
+
+                // Adjust floor sum
+                uint_t last_modified_floor = 0;
+                while (sum_floor(i) > target_scaling)
+                {
+                    while (out_chunk_floor(i, last_modified_floor) == 0)
+                        last_modified_floor = (last_modified_floor + 1) % n_classes;
+                    out_chunk_floor(i, last_modified_floor) -= 1;
+                    sum_floor(i) -= 1;
+                }
+    
+                // Adjust ceil sum
+                uint_t last_modified_ceil = n_classes - 1;
+                while (sum_ceil(i) < target_scaling)
+                {
+                    out_chunk_ceil(i, last_modified_ceil) += 1;
+                    sum_ceil(i) += 1;
+                    last_modified_ceil = (last_modified_ceil - 1) % n_classes;
+                }
+    
+                // Apply binary search-based for mid selection
+                uint_t tmp_sum = target_scaling + 1;
+                int_t power_of_two = power_of_two_start;
+                uint_t mid = 1 << power_of_two; // mid = 2^power_of_two
+                VecFloat mix_vec(n_classes);
+                while (tmp_sum != target_scaling)
+                {
+                    power_of_two--;
+                    mix_vec.head(mid) = out_chunk_floor.row(i).head(mid);
+                    mix_vec.tail(n_classes - mid) = out_chunk_ceil.row(i).tail(n_classes - mid);
+                    tmp_sum = (uint_t) mix_vec.sum();
+                    if (tmp_sum == target_scaling || power_of_two < 0)
+                        break;
+                    else if (tmp_sum < target_scaling)
+                    {
+                        mid = mid - (1 << power_of_two);
+                        skmapAssertIfTrue(mid < 0, "Mid should not get inferior to 0, something went wrong");
+                    }
+                    else
+                    {
+                        mid = std::min(mid + (1 << power_of_two), n_classes);
+                    }
+                }
+                out_chunk.row(i) = mix_vec.transpose();
+            }
+
+            applyPermutation(out_chunk, perm_matrix, true);
+
+        };
+        this->parChunk(fitProibabilitesChunk);
 
     }
 
@@ -829,10 +981,8 @@ namespace skmap {
             }
         };
         this->parChunk(averageAggregateChunk);
-
     }
 
-   
     
     void TransArray::nanMeanAggregatePattern(Eigen::Ref<MatFloat> out_data,
                                              std::vector<std::vector<uint_t>>& agg_pattern)

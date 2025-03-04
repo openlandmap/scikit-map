@@ -12,6 +12,9 @@
 #include <functional>
 #include <cassert>
 #include <unordered_map>
+#include <map>
+#include <vector>
+#include <iostream>
 #include <cmath>
 #include <optional>
 #include <math.h>
@@ -21,6 +24,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <any>
+#include <numeric>
 
 //#include <cpl_conv.h>
 //#include <ogr_spatialref.h>
@@ -77,6 +81,7 @@ using cfloat32_t = std::complex<float32_t>;
 using cfloat64_t = std::complex<float64_t>;
 
 using uint_t = long unsigned int;
+using int_t = long int;
 using float_t = float32_t;
 
 inline float_t nan_v = std::numeric_limits<float_t>::quiet_NaN();
@@ -87,10 +92,13 @@ using map_t = std::map<std::string, std::vector<uint_t>>;
 // C order is default in Numpy and Eigen pybind11 require it to get this input
 using MatFloat = Eigen::Matrix<float_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using MatBool = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-using MatByte = Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic>;
+using MatUint = Eigen::Matrix<uint_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using MatByte = Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using VecFloat = Eigen::Vector<float_t, Eigen::Dynamic>;
 using VecUint = Eigen::Vector<uint_t, Eigen::Dynamic>;
 using VecBool = Eigen::Vector<bool, Eigen::Dynamic>;
+
+
 
 
 }
