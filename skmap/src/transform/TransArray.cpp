@@ -756,10 +756,14 @@ namespace skmap {
 
     void TransArray::fitProibabilites(Eigen::Ref<MatFloat> out_data,
                                       float_t input_scaling,
-                                      uint_t target_scaling)
+                                      uint_t target_scaling,
+                                      Eigen::Ref<MatFloat> best_classes_data,
+                                      uint_t n_best_classes)
     {
         skmapAssertIfTrue(out_data.cols() != m_data.cols(),
                           "scikit-map ERROR 56: in and out data should have the same number of columns");
+        skmapAssertIfTrue((uint_t) best_classes_data.cols() != n_best_classes,
+                                  "scikit-map ERROR 57: best_classes_data must have n_best_classes columns");
 
         uint_t n_classes = m_data.cols();
         int_t power_of_two_start = 1;
@@ -775,18 +779,21 @@ namespace skmap {
             out_chunk = out_chunk.array() / input_scaling * (float_t) target_scaling;
 
             argsortMatrixAscending(out_chunk, perm_matrix, true);
-
+            
+            best_classes_data.block(row_start, 0, n_pix, n_best_classes) = perm_matrix.block(0, n_classes-n_best_classes, n_pix, n_best_classes).cast<float_t>();
+            
             MatFloat out_chunk_floor = out_chunk.array().floor();
             MatFloat out_chunk_ceil = out_chunk.array().ceil();
             VecFloat sum_floor = out_chunk_floor.rowwise().sum();
             VecFloat sum_ceil = out_chunk_ceil.rowwise().sum();
-
+    
             #pragma omp parallel for
             for (uint_t i = 0; i < n_pix; ++i)
             {
                 if (std::isnan(sum_floor(i)) || std::isnan(sum_ceil(i)))
                 {
                     out_chunk.row(i).array() = nan_v;
+                    best_classes_data.row(row_start+i).array() = nan_v;
                     continue;
                 }
 

@@ -178,8 +178,10 @@ class TransArray: public ParArray
                                 std::vector<float_t> percentiles);
 
         void fitProibabilites(Eigen::Ref<MatFloat> out_data,
-                                float_t input_scaling,
-                                uint_t target_scaling);
+                              float_t input_scaling,
+                              uint_t target_scaling,
+                              Eigen::Ref<MatFloat> best_classes_data,
+                              uint_t n_best_classes);
                                 
         void maskNan(std::vector<uint_t> row_select,
                      float_t new_value_in_data);
