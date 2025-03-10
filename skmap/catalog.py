@@ -123,16 +123,43 @@ class DataCatalog():
         comm = {'common': {layer_name: path for layer_name, path in url_comm.items()}}
 
         def calculate_year_placeholders(year, start_year, end_year, tmp_layer_name):
-            valid_year = min(max(year, int(start_year)), int(end_year))
-            if (year != valid_year) & verbose:
-                print(f"Year {year} not available for layer {tmp_layer_name}, propagating year {valid_year}")
-            return {
-                "year": str(valid_year),
-                "year_plus_one": str(valid_year + 1),
-                "year_minus_one": str(valid_year - 1),
-                "tile_id": '{tile_id}',
-                "base_path": '{base_path}'                
-            }
+            if (end_year == ''):
+                years = start_year.split(',') # years is a list of strings. Ex. 1996,2006,2007,2008,2009,2010,2015,2016,2017,2018,2019,2020
+                if str(year) in years:
+                    return {
+                        "year": str(year),
+                        "year_plus_one": str(year + 1),
+                        "year_minus_one": str(year - 1),
+                        "tile_id": '{tile_id}',
+                        "base_path": '{base_path}'
+                    }
+                # if year is not in the list of years, we propagate the closest year that is available before the given year
+                valid_year = int(years[0])
+                for y in years:
+                    if int(y) < year:
+                        valid_year = int(y)
+                    else:
+                        break
+                if (year != valid_year) & verbose:
+                    print(f"Year {year} not available for layer {tmp_layer_name}, propagating year {valid_year}")
+                return {
+                    "year": str(valid_year),
+                    "year_plus_one": str(valid_year + 1),
+                    "year_minus_one": str(valid_year - 1),
+                    "tile_id": '{tile_id}',
+                    "base_path": '{base_path}'
+                }
+            else:
+                valid_year = min(max(year, int(start_year)), int(end_year))
+                if (year != valid_year) & verbose:
+                    print(f"Year {year} not available for layer {tmp_layer_name}, propagating year {valid_year}")
+                return {
+                    "year": str(valid_year),
+                    "year_plus_one": str(valid_year + 1),
+                    "year_minus_one": str(valid_year - 1),
+                    "tile_id": '{tile_id}',
+                    "base_path": '{base_path}'                
+                }
         
         def calculate_year_feat_name_placeholders(year):
             return {
