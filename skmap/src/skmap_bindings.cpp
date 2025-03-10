@@ -770,6 +770,19 @@ void computePercentiles(Eigen::Ref<MatFloat> data,
     transArray.computePercentiles(col_in_select, out_data, col_out_select, percentiles);
 }
 
+void fitProibabilites(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<MatFloat> out_data,
+                      float_t input_scaling,
+                      uint_t target_scaling)
+{
+    TransArray transArray(data, n_threads);
+    transArray.fitProibabilites(out_data, input_scaling, target_scaling);
+}
+
+
+
+
 void applyTsirf(Eigen::Ref<MatFloat> data,
                  const uint_t n_threads,
                  Eigen::Ref<MatFloat> out_data,
@@ -918,5 +931,6 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("checkSimdInstructionSetsInUse", checkSimdInstructionSetsInUse);
     m.def("castFloat64ToFloat32", castFloat64ToFloat32);
     m.def("castFloat32ToFloat64", castFloat32ToFloat64);
+    m.def("fitProibabilites", fitProibabilites);
 }
 

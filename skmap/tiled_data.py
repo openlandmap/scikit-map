@@ -457,7 +457,7 @@ class TiledDataExporter(TiledData):
             
         
     def derive_block_quantiles_and_mean_textures(self, pred_depths_texture1, pred_depths_texture2, k=1., a=100.):
-        assert self.mode == 'depths_years_quantiles_textures', "Mode must be 'depths_years_quantiles'"
+        assert self.mode == 'depths_years_quantiles_textures', "Mode must be 'depths_years_quantiles_textures'"
         self.n_pixels = int(pred_depths_texture1[0].array.shape[1]/len(self.years))
         n_quant = len(self.quantiles)
         self.array = sb_arr(self.n_layers, self.n_pixels)
