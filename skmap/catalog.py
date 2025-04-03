@@ -286,7 +286,7 @@ class DataCatalog():
         self._expand_whales_dependencies(old_data)
         missing_features_names = [feature for feature in feature_names if feature not in set(self.get_feature_names())]
         for missing_feat_feature in missing_features_names:
-            print(f'Feature {missing_feat_feature} is missing in the original catalog, adding is in the otf (on the fly) common group')
+            print(f'WARNING: Feature {missing_feat_feature} is missing in the original catalog, adding is in the otf (on the fly) common group')
         if missing_features_names:
             self.add_otf_features(missing_features_names)
     

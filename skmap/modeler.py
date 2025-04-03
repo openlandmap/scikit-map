@@ -13,7 +13,7 @@ import numpy as np
 from joblib import Parallel, delayed
 from skmap.tiled_data import TiledData, TiledDataLoader
 import skmap_bindings as sb
-from skmap.misc import _make_dir, TimeTracker, _rm_dir
+from skmap.misc import _make_dir, TimeTracker, _rm_dir, sb_arr
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
 n_cpus = os.cpu_count()
@@ -72,10 +72,14 @@ def _tree_based_load_model(model_path):
         def predict_tl2cgen(predictor, data):
             dmat = tl2cgen.DMatrix(data, dtype='float32')
             res = predictor.predict(dmat)
-            if res.shape[-1] == 1:
-                res = np.squeeze(res, axis=-1)
-            if res.shape[-1] == 1:
-                res = np.squeeze(res, axis=-1)
+            for a in range(len(res.shape)):
+                if res.shape[a] == 1:
+                    res = np.squeeze(res, axis=a)
+                    break
+            for a in range(len(res.shape)):
+                if res.shape[a] == 1:
+                    res = np.squeeze(res, axis=a)
+                    break
             return res
         predict_fn = predict_tl2cgen
         os.environ['TREELITE_BIND_THREADS'] = '0'
@@ -140,9 +144,9 @@ class Modeler():
         n_groups = len(data.catalog.get_groups())
         n_samples = n_groups * data.n_pixels
         n_samples_valid = n_groups * data.n_pixels_valid
-        self.in_covs_t = np.empty((len(self.model_covs), n_samples), dtype=np.float32)
-        self.in_covs = np.empty((n_samples, len(self.model_covs)), dtype=np.float32)
-        self.in_covs_valid = np.empty((n_samples_valid, len(self.model_covs)), dtype=np.float32)
+        self.in_covs_t = sb_arr(len(self.model_covs), n_samples)
+        self.in_covs = sb_arr(n_samples, len(self.model_covs))
+        self.in_covs_valid = sb_arr(n_samples_valid, len(self.model_covs))
         # transpose data
         matrix_idx = data.catalog._get_covs_idx(self.model_covs)
         sb.reorderArray(data.array, data.n_threads, self.in_covs_t, matrix_idx)
@@ -179,10 +183,10 @@ class RFRegressor(Regressor):
 
     def predict(self, data:TiledData):
         # prepare input and output arrays
-        with TimeTracker(f"          Transpose data ({data.n_threads} threads)", False):
+        with TimeTracker(f"          Transpose data", False):
             self._prepare_covariates(data)
         # predict
-        with TimeTracker(f"          Model prediction ({data.n_threads} threads)", False):
+        with TimeTracker(f"          Model prediction", False):
             result = TiledData(self.n_responses, self.in_covs_valid.shape[0], data.tile_id)
             assert self.n_responses == 1, "Do not yet manage the case for multiple respounces"
             result.array[0,:] = self.predict_fn(self.model, self.in_covs_valid).astype(np.float32)
@@ -202,10 +206,10 @@ class RFRegressorTrees(Regressor):
 
     def predict(self, data:TiledData):
         # prepare input and output arrays
-        with TimeTracker(f"          Transpose data ({data.n_threads} threads)", False):
+        with TimeTracker(f"          Transpose data", False):
             self._prepare_covariates(data)
         # predict
-        with TimeTracker(f"          Model prediction ({data.n_threads} threads)", False):
+        with TimeTracker(f"          Model prediction", False):
             def _single_prediction(predict, X, out, i, lock):
                 prediction = predict(X, check_input=False)
                 with lock:
@@ -242,28 +246,36 @@ class RFClassifier(Classifier):
              n_class: int = 1,
              predict_fn:Callable = None) -> None:
         super().__init__(model_path, model_covs_path, n_class, predict_fn)
-        self.model, _ = _tree_based_load_model(model_covs_path)
+        self.model, self.predict_fn = _tree_based_load_model(model_path)
         if predict_fn:
             self.predict_fn = predict_fn
         self._load_covs()
         
     def predict(self, data:TiledData):
-        with TimeTracker(f"    Predict ({len(self.model_covs)} input features)", True):
-            # prepare input and output arrays
+        # prepare input and output arrays
+        with TimeTracker(f"          Transpose data", False):
             self._prepare_covariates(data)
-            # create output result
-            result = PredictedProbs(data=data, n_class=self.n_class)
-            # predict
-            with TimeTracker(f"        Model prediction ({data.n_threads} threads)"):
-                tmp_res = self.predict_fn(self.model, self.in_covs_valid)
-                if tmp_res.dtype == np.float64:
-                    sb.castFloat64ToFloat32(tmp_res, data.n_threads, result._out_probs_valid)
-                elif tmp_res.dtype == np.float32:
-                    result._out_probs_valid = tmp_res
-                else:
-                    print("Result prediction are not in float32 nor float64, converting with python (can be slow)")
-                    result._out_probs_valid = tmp_res.astype(np.float32)
-        return result # shape: (n_samples, n_classes)
+        # predict
+        with TimeTracker(f"          Model prediction", False):
+            result = TiledData(self.n_class, self.in_covs_valid.shape[0], data.tile_id)
+            if self.n_class == 1:
+                result.array[0,:] = self.predict_fn(self.model, self.in_covs_valid).astype(np.float32)
+            else:
+                tmp_res_t = self.predict_fn(self.model, self.in_covs_valid)
+                with TimeTracker(f"          Convert data", False):
+                    if tmp_res_t.dtype == np.float64:
+                        tmp_res_cast_t = sb_arr(tmp_res_t.shape[0], tmp_res_t.shape[1])
+                        sb.castFloat64ToFloat32(tmp_res_t, data.n_threads, tmp_res_cast_t)
+                        sb.transposeArray(tmp_res_cast_t, data.n_threads, result.array)
+                    elif tmp_res_t.dtype == np.float32:
+                        sb.transposeArray(tmp_res_t, data.n_threads, result.array)
+                    else:
+                        print("Result prediction are not in float32 nor float64, converting with python (can be slow)")
+                        tmp_res_t = tmp_res_t.astype(np.float32)
+                        sb.transposeArray(tmp_res_t, data.n_threads, result.array)
+                    
+        return result # shape: (n_class, n_samples)
+        
 
     
 #################################################################################################################################
@@ -479,7 +491,7 @@ class PredictedProbs():
         assert(len(out_files_prefix) == 1)
         assert(s3_prefix is None or len(s3_aliases) > 0)
         # create and transpose output
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - transpose data for final output ({n_threads} threads)"):
+        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - transpose data for final output"):
             # expand to original number of pixels
             self._out_cls = np.empty((self.n_groups * self.data.n_pixels, self._out_cls_valid.shape[1]), dtype=np.float32)
             sb.fillArray(self._out_cls, n_threads, nodata)
@@ -496,7 +508,7 @@ class PredictedProbs():
             inverse_idx[:,1] = subrows_grid.flatten()
             sb.inverseReorderArray(self._out_cls_t, n_threads, self._out_cls_gdal, inverse_idx)
         # write outputs
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - write class images ({n_threads} threads)"):
+        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - write class images"):
             out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.model_name}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
@@ -535,7 +547,7 @@ class PredictedProbs():
         assert(len(out_files_prefix) == 1)
         assert(s3_prefix is None or len(s3_aliases) > 0)
         # create and transpose output
-        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - transpose data for final output ({n_threads} threads)"):
+        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - transpose data for final output"):
             sb.offsetAndScale(self._out_kld_valid, n_threads, 0.5 / scale, scale)
             # expand to original number of pixels
             self._out_kld = np.empty((self.n_groups * self.data.n_pixels, self._out_kld_valid.shape[1]), dtype=np.float32)
@@ -553,7 +565,7 @@ class PredictedProbs():
             inverse_idx[:,1] = subrows_grid.flatten()
             sb.inverseReorderArray(self._out_kld_t, n_threads, self._out_kld_gdal, inverse_idx)
         # write outputs
-        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - write Kullback-Leibler divergence image ({n_threads} threads)"):
+        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - write Kullback-Leibler divergence image"):
             out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.model_name}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
@@ -591,7 +603,7 @@ class PredictedProbs():
         assert(len(out_files_prefix) == self.n_class)
         assert(s3_prefix is None or len(s3_aliases) > 0)
         # create and transpose output
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - transpose data for final output ({n_threads} threads)"):
+        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - transpose data for final output"):
             sb.offsetAndScale(self._out_probs_valid, n_threads, 0.5 / scale, scale)
             # expand to original number of pixels
             self._out_probs = np.empty((self.n_groups * self.data.n_pixels, self.n_class), dtype=np.float32)
@@ -609,7 +621,7 @@ class PredictedProbs():
             inverse_idx[:,1] = subrows_grid.flatten()
             sb.inverseReorderArray(self._out_probs_t, n_threads, self._out_probs_gdal, inverse_idx)
         # write outputs
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - write probs images ({n_threads} threads)"):
+        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - write probs images"):
             out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.model_name}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups, self.n_class)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
@@ -658,14 +670,14 @@ class Reducer():
             self.in_covs_valid = np.empty((n_samples_valid, len(self.reducer_features)), dtype=np.float32)
             # transpose data
             matrix_idx = data.catalog._get_covs_idx(self.reducer_features)
-            with TimeTracker(f"    Tile {data.tile_id} - transpose data ({data.n_threads} threads)"):
+            with TimeTracker(f"    Tile {data.tile_id} - transpose data"):
                 sb.reorderArray(data.array, data.n_threads, self.in_covs_t, matrix_idx)
                 sb.transposeArray(self.in_covs_t, data.n_threads, self.in_covs)
                 sb.selArrayRows(self.in_covs, data.n_threads, self.in_covs_valid, data.get_pixels_valid_idx(n_groups))
             # create output result
             result = ReducedValues(data=data, reducer_name=self.reducer_name)
             # compute
-            with TimeTracker(f"    Tile {data.tile_id} - model prediction ({data.n_threads} threads)"):
+            with TimeTracker(f"    Tile {data.tile_id} - model prediction"):
                 result._out_reduc_valid[:] = self.reducer_fn(self.in_covs_valid)
         return result # shape: (n_samples, 1)
 #
