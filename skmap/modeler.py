@@ -262,17 +262,18 @@ class RFClassifier(Classifier):
                 result.array[0,:] = self.predict_fn(self.model, self.in_covs_valid).astype(np.float32)
             else:
                 tmp_res_t = self.predict_fn(self.model, self.in_covs_valid)
-                with TimeTracker(f"          Convert data", False):
-                    if tmp_res_t.dtype == np.float64:
-                        tmp_res_cast_t = sb_arr(tmp_res_t.shape[0], tmp_res_t.shape[1])
-                        sb.castFloat64ToFloat32(tmp_res_t, data.n_threads, tmp_res_cast_t)
-                        sb.transposeArray(tmp_res_cast_t, data.n_threads, result.array)
-                    elif tmp_res_t.dtype == np.float32:
-                        sb.transposeArray(tmp_res_t, data.n_threads, result.array)
-                    else:
-                        print("Result prediction are not in float32 nor float64, converting with python (can be slow)")
-                        tmp_res_t = tmp_res_t.astype(np.float32)
-                        sb.transposeArray(tmp_res_t, data.n_threads, result.array)
+        if self.n_class != 1:
+            with TimeTracker(f"          Convert and back transpose data", False):
+                if tmp_res_t.dtype == np.float64:
+                    tmp_res_cast_t = sb_arr(tmp_res_t.shape[0], tmp_res_t.shape[1])
+                    sb.castFloat64ToFloat32(tmp_res_t, data.n_threads, tmp_res_cast_t)
+                    sb.transposeArray(tmp_res_cast_t, data.n_threads, result.array)
+                elif tmp_res_t.dtype == np.float32:
+                    sb.transposeArray(tmp_res_t, data.n_threads, result.array)
+                else:
+                    print("Result prediction are not in float32 nor float64, converting with python (can be slow)")
+                    tmp_res_t = tmp_res_t.astype(np.float32)
+                    sb.transposeArray(tmp_res_t, data.n_threads, result.array)
                     
         return result # shape: (n_class, n_samples)
         
