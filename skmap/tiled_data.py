@@ -536,7 +536,7 @@ class TiledDataExporter(TiledData):
         assert self.mode == 'dominant_class', "Mode must be 'dominant_class'"
         self.array = sb_arr(1, probs.shape[1])
         legend_map = np.array(list(self.legend.keys()), dtype=int)
-        self.array[0,:] = legend_map[np.argmax(probs[:,:], axis=0).astype(np.float32)]
+        self.array[0,:] = legend_map[np.argmax(probs[:,:], axis=0).astype(int)].astype(np.float32)
         
                 
     def fit_probabilities(self, in_probs, input_scaling, target_scaling):
@@ -553,7 +553,7 @@ class TiledDataExporter(TiledData):
         sb.fitProibabilites(in_probs_t, self.n_threads, array_t, input_scaling, target_scaling, best_classes_t, n_best_classes)
         sb.transposeArray(array_t, self.n_threads, self.array)
         legend_map = np.array(list(self.legend.keys()), dtype=int)
-        return legend_map[best_classes_t.T]
+        return legend_map[best_classes_t.T.astype(int)].astype(np.float32)
         
     def export_files(self, prefix, sufix, nodata, 
                      template_file, save_type, valid_idx,
