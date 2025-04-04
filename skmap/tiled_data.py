@@ -300,12 +300,12 @@ class TiledDataExporter(TiledData):
             assert (years != None) & (depths != None), "Need to provide years, depths"
         elif self.mode == 'years':
             assert (years != None), "Need to provide years"
-        elif (self.mode == 'fitted_probabilities') | (self.mode == 'probabilities'):
+        elif (self.mode == 'probabilities'):
             assert (legend != None), "Need to provide legend"
         elif (self.mode == 'static') | (self.mode == 'dominant_class'):
             pass
         else:
-            raise Exception("Available modes: dominant_class, probabilities, fitted_probabilities, depths_years_quantiles_textures, depths_years_quantiles, depths_years, years, static_depths_quantiles, static_quantiles, static")
+            raise Exception("Available modes: dominant_class, probabilities, depths_years_quantiles_textures, depths_years_quantiles, depths_years, years, static_depths_quantiles, static_quantiles, static")
         self.n_layers = len(self._get_out_names("",""))
         if (self.n_layers != None) & (self.n_pixels != None):
             self.array = sb_arr(self.n_layers, n_pixels)
@@ -331,8 +331,6 @@ class TiledDataExporter(TiledData):
             return self._get_out_names_static_quantiles(prefix, sufix, time_frame)
         elif self.mode == 'static':
             return self._get_out_names_static(prefix, sufix, time_frame)
-        elif self.mode == 'fitted_probabilities':
-            return self._get_out_names_fitted_probabilities(prefix, sufix, time_frame)
         elif self.mode == 'probabilities':
             return self._get_out_names_probabilities(prefix, sufix, time_frame)
         elif self.mode == 'dominant_class':
@@ -346,10 +344,6 @@ class TiledDataExporter(TiledData):
         out_files = []
         for y in self.years:
             out_files.append(f"{prefix}_m_{self.spatial_res}_s_{y}0101_{y}1231_{sufix}")
-        return out_files
-    
-    def _get_out_names_fitted_probabilities(self, prefix, sufix, time_frame):
-        out_files = [f"{prefix}_p_{self.spatial_res}_s_{time_frame}_{sufix}".format(CLASS=self.legend[str(i)]) for i in range(len(self.legend))]
         return out_files
     
     def _get_out_names_probabilities(self, prefix, sufix, time_frame):
@@ -526,8 +520,6 @@ class TiledDataExporter(TiledData):
                 array_t[:,offset_silt] = silt_mean[:,0]
         sb.transposeArray(array_t, self.n_threads, self.array)
         
-         
-        
     def derive_block_mean(self, depths_pred, expm1):
         assert self.mode == 'depths_years', "Mode must be 'depths_years'"
         self.n_pixels = int(depths_pred[0].array.shape[1]/len(self.years))
@@ -545,42 +537,64 @@ class TiledDataExporter(TiledData):
         self.array = sb_arr(1, probs.shape[1])
         self.array[0,:] = np.argmax(probs[:,:], axis=0).astype(np.float32)
         
+                
+    def fit_probabilities(self, in_probs, input_scaling, target_scaling):
+        assert self.mode == 'probabilities', "Mode must be 'probabilities'"
+        n_classes = in_probs.shape[0]
+        n_pix = in_probs.shape[1]
+        # @FIXME: for now the best N classes feature is not used
+        n_best_classes = 1
+        self.array = sb_arr(n_classes, n_pix)
+        array_t = sb_arr(n_pix, n_classes)
+        in_probs_t = sb_arr(n_pix, n_classes)
+        best_classes_t = sb_arr(n_pix, n_best_classes)
+        sb.transposeArray(in_probs, self.n_threads, in_probs_t)
+        sb.fitProibabilites(in_probs_t, self.n_threads, array_t, input_scaling, target_scaling, best_classes_t, n_best_classes)
+        sb.transposeArray(array_t, self.n_threads, self.array)
+        
     def export_files(self, prefix, sufix, nodata, 
                      template_file, save_type, valid_idx,
                      write_folder='.',
                      scaling = 1,
+                     scaling_metadata = None,
                      gdal_opts:Dict[str,str] = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'},
                      timeframe = None):
-        if self.tile_id is None: raise ValueError("Argument 'tile_id' cannot be None")
-        out_files = self._get_out_names(prefix, sufix, timeframe)
-        n_files = len(out_files)
-        gdal_img = gdal.Open(template_file)
-        x_size = gdal_img.RasterXSize
-        y_size = gdal_img.RasterYSize
-        n_pixels = x_size * y_size
-        write_data = sb_arr(n_files, n_pixels)
-        write_data_t = sb_arr(n_pixels, n_files)
-        out_data_t = sb_arr(self.array.shape[1], self.array.shape[0])
-        sb.transposeArray(self.array, self.n_threads, out_data_t)
-        offset = 0.5 if save_type in {'byte', 'uint16', 'int16', 'uint32', 'int32'} else 0.0
-        sb.scaleAndOffset(out_data_t, self.n_threads, offset, scaling)
-        sb.fillArray(write_data_t, self.n_threads, nodata)
-        sb.expandArrayRows(out_data_t, self.n_threads, write_data_t, valid_idx)
-        sb.transposeArray(write_data_t, self.n_threads, write_data)
-        tile_dir = write_folder + f'/{self.tile_id}'
-        os.makedirs(write_folder, exist_ok=True)
-        os.makedirs(tile_dir, exist_ok=True)
-        compress_cmd = f"gdal_translate -a_nodata {nodata} -a_scale {1./scaling} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
-        if self.s3_prefix:
-            s3_out = ([f'{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}' for _ in range(len(out_files))])
-            sb.writeData(write_data, n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
-                range(n_files), 0, 0, x_size, y_size, nodata,
-                save_type, compress_cmd, s3_out)
-            ttprint(f'Export complete, check mc ls {s3_out[0]}/{out_files[0]}')
-        else:
-            sb.writeData(write_data, n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
-                range(n_files), 0, 0, x_size, y_size, nodata,
-                save_type, compress_cmd)
-            ttprint(f'Export complete, check mc {tile_dir}')
+        with TimeTracker(f"   Prepare data to export for {self.tile_id}", False):
+        
+            if scaling_metadata == None:
+                scaling_metadata = 1./scaling
+            if self.tile_id is None: raise ValueError("Argument 'tile_id' cannot be None")
+            out_files = self._get_out_names(prefix, sufix, timeframe)
+            n_files = len(out_files)
+            gdal_img = gdal.Open(template_file)
+            x_size = gdal_img.RasterXSize
+            y_size = gdal_img.RasterYSize
+            n_pixels = x_size * y_size
+            write_data = sb_arr(n_files, n_pixels)
+            write_data_t = sb_arr(n_pixels, n_files)
+            out_data_t = sb_arr(self.array.shape[1], self.array.shape[0])
+            sb.transposeArray(self.array, self.n_threads, out_data_t)
+            offset = 0.5 if save_type in {'byte', 'uint16', 'int16', 'uint32', 'int32'} else 0.0
+            if (offset != 0) or (scaling != 1.):
+                sb.scaleAndOffset(out_data_t, self.n_threads, offset, scaling)
+            sb.fillArray(write_data_t, self.n_threads, nodata)
+            sb.expandArrayRows(out_data_t, self.n_threads, write_data_t, valid_idx)
+            sb.transposeArray(write_data_t, self.n_threads, write_data)
+            tile_dir = write_folder + f'/{self.tile_id}'
+            os.makedirs(write_folder, exist_ok=True)
+            os.makedirs(tile_dir, exist_ok=True)
+            compress_cmd = f"gdal_translate -a_nodata {nodata} -a_scale {scaling_metadata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
+        with TimeTracker(f"   Exporting data for {self.tile_id}", False):
+            if self.s3_prefix:
+                s3_out = ([f'{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}' for _ in range(len(out_files))])
+                sb.writeData(write_data, self.n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
+                    range(n_files), 0, 0, x_size, y_size, nodata,
+                    save_type, compress_cmd, s3_out)
+                ttprint(f'Export complete, check mc ls {s3_out[0]}/{out_files[0]}')
+            else:
+                sb.writeData(write_data, self.n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
+                    range(n_files), 0, 0, x_size, y_size, nodata,
+                    save_type, compress_cmd)
+                ttprint(f'Export complete, check mc {tile_dir}')
             
         
