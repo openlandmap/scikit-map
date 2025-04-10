@@ -13,6 +13,8 @@ from skmap.catalog import DataCatalog, run_whales
 import skmap_bindings as sb
 import hashlib
 import itertools
+import requests
+
 n_threads = os.cpu_count()
 os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
 os.environ['USE_PYGEOS'] = '0'
@@ -238,8 +240,38 @@ class SpaceOverlay():
         verbose:bool = True
     ):
 
+        self.verbose = verbose
         self.catalog = catalog
         self.layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
+        
+        
+        if raster_tiles is not None:
+            if not isinstance(raster_tiles, gpd.GeoDataFrame):
+                if self.verbose:
+                    ttprint(f"Reading {raster_tiles}")
+                raster_tiles = gpd.read_file(raster_tiles)
+        
+        processed_urls = []
+        for url in self.layer_paths:
+            url = url.replace("/vsicurl/", "")
+            if "{tile_id}" in url:
+                url = url.replace("{tile_id}", raster_tiles[tile_id_col].iloc[0])
+            processed_urls.append(url)
+            
+        urls_with_404 = []
+        for url in processed_urls:
+            try:
+                response = requests.head(url, timeout=10)
+                if response.status_code == 404:
+                    urls_with_404.append(url)
+            except requests.RequestException as e:
+                print(f"Error checking URL {url}: {e}")
+
+        if self.verbose:
+            ttprint(f"{len(urls_with_404)} out of {len(self.layer_paths)} URLs returning 404")
+        for url in urls_with_404:
+            print(url)
+        assert len(urls_with_404) == 0, "The listed URLs can not be reached"
 
         if not isinstance(points, gpd.GeoDataFrame):
             if not isinstance(points, pd.DataFrame):
@@ -248,7 +280,6 @@ class SpaceOverlay():
             points = gpd.GeoDataFrame(points, geometry='geometry')
         self.pts = points.reset_index(drop=True)
         self.n_threads = n_threads
-        self.verbose = verbose
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
             self.layer_paths, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
