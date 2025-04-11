@@ -605,8 +605,8 @@ class TiledDataExporter(TiledData):
                     if save_type == 'byte':
                         save_type = 'uint8'
                     f.create_dataset(f'{tile_dir}/{out_files[0]}.h5', data=write_data, dtype=save_type, compression='lzf')
-                    subprocess.run(['mc cp', f'{tile_dir}/{out_files[0]}.h5', f'{s3_out}/{out_files[0]}.h5'])
-                    subprocess.run(['rm', f'{tile_dir}/{out_files[0]}.h5'])
+                    subprocess.run(f'mc cp {tile_dir}/{out_files[0]}.h5 {s3_out}/{out_files[0]}.h5' , shell=True, check=True)
+                    subprocess.run(f'rm {tile_dir}/{out_files[0]}.h5' , shell=True, check=True)
                     ttprint(f'Export complete, check mc ls {s3_out}/{out_files[0]}')
             else:
                 if self.s3_prefix:
