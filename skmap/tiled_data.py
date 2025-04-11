@@ -6,6 +6,7 @@ import skmap_bindings as sb
 from skmap.misc import TimeTracker, ttprint, sb_arr, sb_vec
 from concurrent.futures import ProcessPoolExecutor
 from skmap.catalog import DataCatalog, run_whales
+import h5py
 import warnings, random
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
@@ -269,6 +270,7 @@ class TiledDataExporter(TiledData):
                  depths = None,
                  legend = None,
                  quantiles = None,
+                 save_hdf5 = None,
                  n_threads:int = os.cpu_count()) -> None:
         if s3_params:
             self.s3_aliases = s3_setup(s3_params['s3_access_key'],
@@ -288,6 +290,7 @@ class TiledDataExporter(TiledData):
         self.depths = depths
         self.legend = legend
         self.quantiles = quantiles
+        self.save_hdf5 = save_hdf5
         if self.mode == 'depths_years_quantiles_textures':
             assert (years != None) & (depths != None) & (quantiles != None), "Need to provide years, depths, quantiles"
         elif self.mode == 'depths_years_quantiles':
@@ -319,6 +322,8 @@ class TiledDataExporter(TiledData):
         self.array = None
     
     def _get_out_names(self, prefix, sufix, time_frame = None):
+        if self.save_hdf5:
+            return [f'{prefix}_{sufix}']
         if self.mode == 'depths_years_quantiles_textures':
             return self._get_out_names_depths_years_quantiles_textures(prefix, sufix)
         if self.mode == 'depths_years_quantiles':
@@ -414,10 +419,16 @@ class TiledDataExporter(TiledData):
         basename_files_in_s3 = [os.path.basename(f) for f in files_in_s3]
         flag = True
         for s in out_files:
-            if f"{s}.tif" not in basename_files_in_s3:
-                flag = False
-                if self.verbose:
-                    print(f"Missing file {s}")
+            if self.save_hdf5:
+                if f"{s}.h5" not in basename_files_in_s3:
+                    flag = False
+                    if self.verbose:
+                        print(f"Missing file {s}")
+            else:
+                if f"{s}.tif" not in basename_files_in_s3:
+                    flag = False
+                    if self.verbose:
+                        print(f"Missing file {s}")
         return flag
 
         
@@ -588,16 +599,26 @@ class TiledDataExporter(TiledData):
             os.makedirs(tile_dir, exist_ok=True)
             compress_cmd = f"gdal_translate -a_nodata {nodata} -a_scale {scaling_metadata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
         with TimeTracker(f"   Exporting data for {self.tile_id}", False):
-            if self.s3_prefix:
-                s3_out = ([f'{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}' for _ in range(len(out_files))])
-                sb.writeData(write_data, self.n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
-                    range(n_files), 0, 0, x_size, y_size, nodata,
-                    save_type, compress_cmd, s3_out)
-                ttprint(f'Export complete, check mc ls {s3_out[0]}/{out_files[0]}')
+            if self.save_hdf5:
+                s3_out = f'{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}'
+                with h5py.File(f'{out_files[0]}.h5', 'w') as f:
+                    if save_type == 'byte':
+                        save_type = 'uint8'
+                    f.create_dataset(f'{tile_dir}/{out_files[0]}.h5', data=write_data, dtype=save_type, compression='lzf')
+                    subprocess.run(['mc cp', f'{tile_dir}/{out_files[0]}.h5', f'{s3_out}/{out_files[0]}.h5'])
+                    subprocess.run(['rm', f'{tile_dir}/{out_files[0]}.h5'])
+                    ttprint(f'Export complete, check mc ls {s3_out}/{out_files[0]}')
             else:
-                sb.writeData(write_data, self.n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
-                    range(n_files), 0, 0, x_size, y_size, nodata,
-                    save_type, compress_cmd)
-                ttprint(f'Export complete, check mc {tile_dir}')
+                if self.s3_prefix:
+                    s3_out = ([f'{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}' for _ in range(len(out_files))])
+                    sb.writeData(write_data, self.n_threads, gdal_opts, [tile_dirtemplate_file for _ in range(n_files)], tile_dir, out_files,
+                        range(n_files), 0, 0, x_size, y_size, nodata,
+                        save_type, compress_cmd, s3_out)
+                    ttprint(f'Export complete, check mc ls {s3_out[0]}/{out_files[0]}')
+                else:
+                    sb.writeData(write_data, self.n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
+                        range(n_files), 0, 0, x_size, y_size, nodata,
+                        save_type, compress_cmd)
+                    ttprint(f'Export complete, check mc {tile_dir}')
             
         
