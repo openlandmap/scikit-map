@@ -286,7 +286,7 @@ class RFClassifier(Classifier):
 class Predicted():
     def __init__(self,
                  data:TiledDataLoader, 
-                  depths) -> None:
+                 depths) -> None:
         self.data = data
         assert(self.data is not None)
         self.depths = depths
@@ -367,7 +367,7 @@ class Predicted():
         assert(len(out_files_prefix) == self.n_stats)
         assert(s3_prefix is None or len(s3_aliases) > 0)
         # create and transpose output
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - transpose data for final output ({threads} threads)"):
+        with TimeTracker(f"    Tile {self.data.tile_id} - transpose data for final output ({threads} threads)"):
             # expand to original number of pixels
             self._out_stats = np.empty((self.n_groups * self.data.n_pixels, self.n_depths * self.n_stats), dtype=np.float32)
             sb.fillArray(self._out_stats, threads, nodata)
@@ -385,8 +385,8 @@ class Predicted():
             inverse_idx[:,1] = subrows_grid.flatten()
             sb.inverseReorderArray(self._out_stats_t, threads, self._out_stats_gdal, inverse_idx)
         # write outputs
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - write output ({threads} threads)"):
-            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.model_name}")
+        with TimeTracker(f"    Tile {self.data.tile_id} - write output ({threads} threads)"):
+            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}")
             # TODO implement filenames function as an class function
             out_files = _get_out_files_depths(
                 out_files_prefix=out_files_prefix, 
@@ -424,12 +424,16 @@ class Predicted():
 class PredictedProbs():
     def __init__(self, 
                  data:TiledDataLoader, 
-                 model_name, 
-                 n_class) -> None:
+                 legend) -> None:
         self.data = data
         assert(self.data is not None)
-        self.model_name = model_name
-        self.n_class = n_class
+        self.legend = legend
+        assert(isinstance(self.legend, dict))
+        try:
+            self.legend_codes = np.array(list(self.legend.keys()), dtype=np.float32)
+        except ValueError as e:
+            raise ValueError("Legend keys must be convertible to float32") from e
+        self.n_class = len(self.legend)
         self.groups = self.data.catalog.get_groups()
         self.n_groups = len(self.groups)
         self._out_probs_valid = np.empty((self.n_groups * self.data.n_pixels_valid, self.n_class), dtype=np.float32)
@@ -468,8 +472,7 @@ class PredictedProbs():
         return self._out_cls_valid.reshape((self.n_groups, self.data.n_pixels_valid))
     
     def compute_class(self):
-        # @FIXME: preserve model class codes! 
-        self._out_cls_valid[:, 0] = np.argmax(self._out_probs_valid[:,:], axis=-1)
+        self._out_cls_valid[:, 0] = self.legend_codes[np.argmax(self._out_probs_valid[:,:], axis=-1).astype(int)]
     
     def compute_kl_divergence(self):
         adjusted_data = np.where(self._out_probs_valid[:,:] > 0, self._out_probs_valid[:,:], 1 / self.n_class)
@@ -492,7 +495,7 @@ class PredictedProbs():
         assert(len(out_files_prefix) == 1)
         assert(s3_prefix is None or len(s3_aliases) > 0)
         # create and transpose output
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - transpose data for final output"):
+        with TimeTracker(f"    Tile {self.data.tile_id} - transpose data for final output"):
             # expand to original number of pixels
             self._out_cls = np.empty((self.n_groups * self.data.n_pixels, self._out_cls_valid.shape[1]), dtype=np.float32)
             sb.fillArray(self._out_cls, n_threads, nodata)
@@ -509,11 +512,11 @@ class PredictedProbs():
             inverse_idx[:,1] = subrows_grid.flatten()
             sb.inverseReorderArray(self._out_cls_t, n_threads, self._out_cls_gdal, inverse_idx)
         # write outputs
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - write class images"):
-            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.model_name}")
+        with TimeTracker(f"    Tile {self.data.tile_id} - write class images"):
+            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
-            write_idx = range(self._out_cls_gdal.shape[0])
+            write_idx = list(range(self._out_cls_gdal.shape[0]))
             compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
             s3_out = None
             if s3_prefix is not None:
@@ -548,7 +551,7 @@ class PredictedProbs():
         assert(len(out_files_prefix) == 1)
         assert(s3_prefix is None or len(s3_aliases) > 0)
         # create and transpose output
-        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - transpose data for final output"):
+        with TimeTracker(f"tile {self.data.tile_id} - transpose data for final output"):
             sb.offsetAndScale(self._out_kld_valid, n_threads, 0.5 / scale, scale)
             # expand to original number of pixels
             self._out_kld = np.empty((self.n_groups * self.data.n_pixels, self._out_kld_valid.shape[1]), dtype=np.float32)
@@ -566,11 +569,11 @@ class PredictedProbs():
             inverse_idx[:,1] = subrows_grid.flatten()
             sb.inverseReorderArray(self._out_kld_t, n_threads, self._out_kld_gdal, inverse_idx)
         # write outputs
-        with TimeTracker(f"tile {self.data.tile_id}/model {self.model_name} - write Kullback-Leibler divergence image"):
-            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.model_name}")
+        with TimeTracker(f"tile {self.data.tile_id} - write Kullback-Leibler divergence image"):
+            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
-            write_idx = range(self._out_kld_gdal.shape[0])
+            write_idx = list(range(self._out_kld_gdal.shape[0]))
             compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
             s3_out = None
             if s3_prefix is not None:
@@ -604,7 +607,7 @@ class PredictedProbs():
         assert(len(out_files_prefix) == self.n_class)
         assert(s3_prefix is None or len(s3_aliases) > 0)
         # create and transpose output
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - transpose data for final output"):
+        with TimeTracker(f"    Tile {self.data.tile_id} - transpose data for final output"):
             sb.offsetAndScale(self._out_probs_valid, n_threads, 0.5 / scale, scale)
             # expand to original number of pixels
             self._out_probs = np.empty((self.n_groups * self.data.n_pixels, self.n_class), dtype=np.float32)
@@ -622,11 +625,11 @@ class PredictedProbs():
             inverse_idx[:,1] = subrows_grid.flatten()
             sb.inverseReorderArray(self._out_probs_t, n_threads, self._out_probs_gdal, inverse_idx)
         # write outputs
-        with TimeTracker(f"    Tile {self.data.tile_id}/model {self.model_name} - write probs images"):
-            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.model_name}")
+        with TimeTracker(f"    Tile {self.data.tile_id} - write probs images"):
+            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups, self.n_class)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
-            write_idx = range(self._out_probs_gdal.shape[0])
+            write_idx = list(range(self._out_probs_gdal.shape[0]))
             compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
             s3_out = None
             if s3_prefix is not None:
@@ -740,7 +743,7 @@ class ReducedValues():
             out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.reducer_name}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
-            write_idx = range(self._out_reduc_gdal.shape[0])
+            write_idx = list(range(self._out_reduc_gdal.shape[0]))
             compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
             s3_out = None
             if s3_prefix is not None:
