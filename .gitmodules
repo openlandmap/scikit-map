@@ -1,3 +1,8 @@
 [submodule "submodules/pybind11"]
 	path = submodules/pybind11
 	url = https://github.com/pybind/pybind11.git
+	branch = v2.13
+[submodule "submodules/eigen"]
+	path = submodules/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+	branch = 3.4
