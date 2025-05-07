@@ -125,7 +125,6 @@ class CMakeBuild(build_ext):
             ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
         )
 
-
 #module_skmap_bindings = setuptools.Extension(
 #    'skmap_bindings',
 #    sources=[
@@ -176,16 +175,14 @@ setuptools.setup(
     ],
     python_requires='>=3.7',
     install_requires=[
-        'GDAL>=3.1',
         'affine>=2.3',
-        'geopandas>=0.13',
+        'geopandas>=1.0.0',
         'joblib>=1.1.0',
-        'numpy>=1.19',
-        'pyproj>=3.1',
+        'numpy>=1.24',
         'pandas>=2.0',
         'requests>=2.24',
-        'scikit-learn>=1.3',
-        'rasterio>=1.1'
+        'scikit-learn>=1.6',
+        'rasterio>=1.4'
     ],
     #ext_modules=[module_skmap_bindings],
     #cmdclass={'build_ext': build_ext},

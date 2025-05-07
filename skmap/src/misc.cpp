@@ -3,7 +3,11 @@
 
 #define _USE_MATH_DEFINES
 #include <iostream>
-// #define EIGEN_VECTORIZE_AVX512
+
+#ifdef HAVE_AVX512
+#define EIGEN_VECTORIZE_AVX512
+#endif
+
 #include <Eigen/Dense>
 #include <gdal/gdal.h>
 #include <gdal/gdalwarper.h>
