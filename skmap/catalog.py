@@ -123,7 +123,7 @@ class DataCatalog():
         comm = {'common': {layer_name: path for layer_name, path in url_comm.items()}}
 
         def calculate_year_placeholders(year, start_year, end_year, tmp_layer_name):
-            if (end_year == '' or (type(end_year) is np.float and ~np.isfinite(end_year))):
+            if (end_year == '' or (type(end_year) is float and ~np.isfinite(end_year))):
                 years = start_year.split(',') # years is a list of strings. Ex. 1996,2006,2007,2008,2009,2010,2015,2016,2017,2018,2019,2020
                 if str(year) in years:
                     return {
