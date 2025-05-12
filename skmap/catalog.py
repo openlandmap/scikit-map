@@ -7,6 +7,8 @@ import json
 import skmap_bindings as sb
 import sys
 import random
+from skmap.misc import mmdd_to_doy
+
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
 
@@ -301,13 +303,13 @@ class DataCatalog():
     def expand_whales_dependencies(cls, reference_catalog_data, data, data_size):
         whale_paths, groups, whale_layer_names = cls.get_whales(data)
         for i, (whale_path, whale_layer_name) in enumerate(zip(whale_paths, whale_layer_names)):
-            dep_names, dep_paths, dep_exec_orders = get_whale_dependencies(whale_path, groups[i], reference_catalog_data, whale_layer_names[i])
-            for dep_name, dep_path, dep_exec_order in zip(dep_names, dep_paths, dep_exec_orders):
-                if dep_name not in data[groups[i]]:
-                    data[groups[i]][dep_name] = {'path': dep_path, 'idx': data_size, 'exec_order': dep_exec_order}
+            dep_names, dep_paths, dep_exec_orders, dep_keys = get_whale_dependencies(whale_path, groups[i], reference_catalog_data, whale_layer_names[i])
+            for dep_name, dep_path, dep_exec_order, dep_key in zip(dep_names, dep_paths, dep_exec_orders, dep_keys):
+                if dep_name not in data[dep_key]:
+                    data[dep_key][dep_name] = {'path': dep_path, 'idx': data_size, 'exec_order': dep_exec_order}
                     data_size += 1
                 elif dep_name == whale_layer_name:
-                    data[groups[i]][dep_name]['exec_order'] = dep_exec_order
+                    data[dep_key][dep_name]['exec_order'] = dep_exec_order
         return data, data_size
     
     def _expand_whales_dependencies(self, reference_catalog_data):
@@ -354,7 +356,7 @@ def print_catalog_statistics(catalog:DataCatalog):
 
 def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
     func_name, params = parse_template_whale(whale)
-    dep_tags, dep_names, dep_paths, dep_exec_orders = [], [], [], []
+    dep_tags, dep_names, dep_paths, dep_exec_orders, dep_keys = [], [], [], [], []
     if func_name == 'percentileAggregation':
         tag = params['entry_template']
         for dt in params['dt']:
@@ -365,43 +367,55 @@ def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
     elif func_name == 'computeSavi':
         dep_tags += [params['idx_red']]
         dep_tags += [params['idx_nir']]
+    elif func_name == 'computeGeometricTemperature':
+        dep_tags += [params['idx_latitude']]
+        dep_tags += [params['idx_elevation']]
     elif func_name == 'extractIndicator':
         dep_tags += [params['idx_layer']]
     for dep_tag in dep_tags:
-        dep_path = main_catalog[key][dep_tag]['path']
+        if dep_tag in main_catalog[key]:
+            dep_path = main_catalog[key][dep_tag]['path']
+            dep_key = key
+        else:
+            dep_path = main_catalog["common"][dep_tag]['path']
+            dep_key = "common"
         if dep_path.startswith("/whale"):
-            rec_dep_names, rec_dep_paths, rec_dep_exec_orders = get_whale_dependencies(dep_path, key, main_catalog, dep_tag)
+            rec_dep_names, rec_dep_paths, rec_dep_exec_orders, rec_dep_keys = get_whale_dependencies(dep_path, dep_key, main_catalog, dep_tag)
             dep_paths += rec_dep_paths
             dep_names += rec_dep_names
             dep_exec_orders += rec_dep_exec_orders
+            dep_keys += rec_dep_keys
         else:
             dep_paths += [dep_path]
             dep_names += [dep_tag]
             dep_exec_orders += [0]
+            dep_keys += [dep_key]
     dep_paths += [whale]
     dep_names += [whale_layer_name]
     if dep_exec_orders:
         dep_exec_orders += [max(dep_exec_orders) + 1]
     else:
         dep_exec_orders += [0]
-    return dep_names, dep_paths, dep_exec_orders
+    dep_keys += [key]
+    return dep_names, dep_paths, dep_exec_orders, dep_keys
 
 def parse_template_whale(whale):
     func_name_match = re.search(r'/whale/([^?]+)', whale)
     func_name = func_name_match.group(1) if func_name_match else None
     query_params_string = whale.split('?')[1]
     params = {}
-
-    for param in query_params_string.split('&'):
-        key, value = param.split('=')
-        # Split by commas to handle lists
-        if ',' in value:
-            params[key] = value.split(',')
-        else:
-            params[key] = value
+    
+    if query_params_string != '':
+        for param in query_params_string.split('&'):
+            key, value = param.split('=')
+            # Split by commas to handle lists
+            if ',' in value:
+                params[key] = value.split(',')
+            else:
+                params[key] = value
     return func_name, params
 
-def run_whales(catalog:DataCatalog, array, n_threads):
+def run_whales(catalog:DataCatalog, array, n_threads, lat_info = None):
     # Computing on the fly covariates
     whale_paths, whale_keys, whale_names = catalog._get_whales()
     max_exec_order = 0
@@ -413,6 +427,7 @@ def run_whales(catalog:DataCatalog, array, n_threads):
                 continue
             else:
                 func_name, params = parse_template_whale(whale_path)
+                whale_data_idx = catalog.data[whale_key][whale_name]['idx']
                 if func_name == 'percentileAggregation':
                     tag = params['entry_template']
                     in_idxs = []
@@ -427,24 +442,41 @@ def run_whales(catalog:DataCatalog, array, n_threads):
                     sb.transposeArray(array_sb, n_threads, array_sb_t)
                     sb.computePercentiles(array_sb_t, n_threads, range(len(in_idxs)),
                             array_pct_t, [0], [float(params['percentile'])])
-                    array[catalog.data[whale_key][whale_name]['idx'], :] = array_pct_t[:,0]
+                    array[whale_data_idx, :] = array_pct_t[:,0]
                 elif func_name == 'computeNormalizedDifference':
                     sb.computeNormalizedDifference(array, n_threads,
                         [catalog.data[whale_key][params['idx_plus']]['idx']],
                         [catalog.data[whale_key][params['idx_minus']]['idx']],
-                        [catalog.data[whale_key][whale_name]['idx']], float(params['scale_plus']), float(params['scale_minus']),
+                        [whale_data_idx], float(params['scale_plus']), float(params['scale_minus']),
                         float(params['scale_result']), float(params['offset_result']),
                         [float(params['clip'][0]), float(params['clip'][1])])
                 elif func_name == 'computeSavi':                                
                     sb.computeSavi(array, n_threads,
                         [catalog.data[whale_key][params['idx_red']]['idx']],
                         [catalog.data[whale_key][params['idx_nir']]['idx']],
-                        [catalog.data[whale_key][whale_name]['idx']], float(params['scale_red']), float(params['scale_nir']),
+                        [whale_data_idx], float(params['scale_red']), float(params['scale_nir']),
                         float(params['scale_result']), float(params['offset_result']),
                         [float(params['clip'][0]), float(params['clip'][1])])
                 elif func_name == 'extractIndicator':
-                    array[catalog.data[whale_key][whale_name]['idx'], :] = \
+                    array[whale_data_idx, :] = \
                         (array[catalog.data[whale_key][params['idx_layer']]['idx'], :] == float(params['code'])).astype(np.float32)
+                elif func_name == 'getLatitude':
+                    if not isinstance(lat_info, np.ndarray) and len(lat_info.shape) == 1 and lat_info.shape[0] == array.shape[1]:
+                        raise Exception("Information on how to get the latitude needs to be a numpy vector")
+                    elif isinstance(lat_info, np.ndarray) and len(lat_info.shape) == 1 and lat_info.shape[0] == array.shape[1]:
+                        array[whale_data_idx, :] = lat_info
+                elif func_name == 'computeGeometricTemperature':
+                    day_of_year = mmdd_to_doy(str(params['day_of_year_mmdd']))
+                    print(f"{day_of_year} - {params['day_of_year_mmdd']}")
+                    if params['idx_latitude'] in catalog.data[whale_key]:
+                        latitude = array[catalog.data[whale_key][params['idx_latitude']]['idx'],:]
+                    else:
+                        latitude = array[catalog.data["common"][params['idx_latitude']]['idx'],:]
+                    if params['idx_elevation'] in catalog.data[whale_key]:
+                        elevation = array[catalog.data[whale_key][params['idx_elevation']]['idx'],:]
+                    else:
+                        elevation = array[catalog.data["common"][params['idx_elevation']]['idx'],:]
+                    sb.computeGeometricTemperature(array, n_threads, latitude, elevation, float(params['elevation_scaling']), float(params['a']), float(params['b']), float(params['result_scaling']), [whale_data_idx], [day_of_year])
                 else:
                     sys.exit(f"The whale function {func_name} is not available")
 
