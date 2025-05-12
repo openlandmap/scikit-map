@@ -330,13 +330,17 @@ class SpaceOverlay():
         assert self.pts.shape[0] == self.data_overlay.shape[1], "Not matching size between input points and the overalied data"
         
         self.data_array[self.layer_idxs,:] = self.data_overlay[:,:]
-        run_whales(self.catalog, self.data_array, self.n_threads)
+        self.pts = self.pts.reset_index(drop=True)
+        self.pts['lon'] = self.pts['geometry'].x
+        self.pts['lat'] = self.pts['geometry'].y
+        
+        run_whales(self.catalog, self.data_array, self.n_threads, lat_info = self.pts['lat'].to_numpy())
         # @FIXME check that all the filled flages are True or assert at this point
         df = pd.DataFrame(self.data_array.T, columns=self.ordered_feats_names)
-        self.pts_out = pd.concat([self.pts.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
+        if 'lat' in df:
+            self.pts = self.pts.drop(columns=['lat'])
+        self.pts_out = pd.concat([self.pts, df.reset_index(drop=True)], axis=1)
 
-        self.pts_out['lon'] = self.pts_out['geometry'].x
-        self.pts_out['lat'] = self.pts_out['geometry'].y
         self.pts_out = self.pts_out.drop(columns=['geometry'])
         if out_file_name is not None:
             self.pts_out.to_parquet(out_file_name)

@@ -220,7 +220,9 @@ class TiledDataLoader(TiledData):
                     sb.readData(self.array, self.n_threads, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, 
                                 self.y_size, [1], self.gdal_opts, None, np.nan)
             # Go whales, go!!
-            run_whales(self.catalog, self.array, self.n_threads)
+            lon_lat = sb_arr(2, self.n_pixels)
+            sb.getLatLonArray(lon_lat, self.n_threads, self.gdal_opts, self.mask_path, self.x_off, self.y_off, self.x_size, self.y_size)
+            run_whales(self.catalog, self.array, self.n_threads, lon_lat[1,:])
         return self
                     
     def convert_nan_to_median(self):

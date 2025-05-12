@@ -13,6 +13,7 @@ import rasterio
 import geopandas as gp
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 import math
 import time
@@ -22,6 +23,11 @@ from shapely.geometry import box,shape
 from dateutil.relativedelta import relativedelta
 
 TMP_DIR = tempfile.gettempdir()
+
+
+def mmdd_to_doy(mmdd: str) -> int:
+    date = datetime.strptime(mmdd, "%m%d")
+    return date.timetuple().tm_yday
 
 def sb_arr(rows, cols):
     return np.empty((rows, cols), np.float32)
