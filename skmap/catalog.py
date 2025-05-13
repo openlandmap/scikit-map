@@ -467,7 +467,6 @@ def run_whales(catalog:DataCatalog, array, n_threads, lat_info = None):
                         array[whale_data_idx, :] = lat_info
                 elif func_name == 'computeGeometricTemperature':
                     day_of_year = mmdd_to_doy(str(params['day_of_year_mmdd']))
-                    print(f"{day_of_year} - {params['day_of_year_mmdd']}")
                     if params['idx_latitude'] in catalog.data[whale_key]:
                         latitude = array[catalog.data[whale_key][params['idx_latitude']]['idx'],:]
                     else:
