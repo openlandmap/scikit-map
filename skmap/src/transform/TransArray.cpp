@@ -477,20 +477,28 @@ namespace skmap {
     {
         skmapAssertIfTrue((positive_indices.size() != negative_indices.size()) || (positive_indices.size() != result_indices.size()),
                           "scikit-map ERROR 3: positive_i, negative_i, result_i must be of the same size");
-        auto computeNormalizedDifferenceRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
+        for (size_t i = 0; i < result_indices.size(); i++)
         {
             uint_t positive_i = positive_indices[i];
             uint_t negative_i = negative_indices[i];
-            row = (m_data.row(positive_i) * positive_scaling - m_data.row(negative_i) * negative_scaling).array() /
-                  (m_data.row(positive_i) * positive_scaling + m_data.row(negative_i) * negative_scaling).array() *
-                  result_scaling + result_offset;
-            row = (row.array()).round();
-            row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
-            row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
-            row = (row.array() < clip_value[0]).select(clip_value[0], row);
-            row = (row.array() > clip_value[1]).select(clip_value[1], row);
-        };
-        this->parRowPerm(computeNormalizedDifferenceRow, result_indices);
+            auto computeNormalizedDifferenceElement = [&] (uint_t j)
+            {
+                float_t val = (m_data(positive_i, j) * positive_scaling - m_data(negative_i, j) * negative_scaling) /
+                    (m_data(positive_i, j) * positive_scaling + m_data(negative_i, j) * negative_scaling) *
+                    result_scaling + result_offset;
+                val = std::round(val);
+                if (val == -inf_v)
+                    val = -result_scaling + result_offset;
+                else if (val == +inf_v)
+                    val = result_scaling + result_offset;
+                if (val < clip_value[0])
+                    val = clip_value[0];
+                else if (val > clip_value[1])
+                    val = clip_value[1];
+                m_data(result_indices[i], j) = val;
+            };
+            this->parForRange(computeNormalizedDifferenceElement, (uint_t) m_data.cols());
+        }
     }
 
 
@@ -505,20 +513,27 @@ namespace skmap {
     {
         skmapAssertIfTrue((nir_indices.size() != red_indices.size()) || (nir_indices.size() != result_indices.size()),
                           "scikit-map ERROR 3: nir_i, red_i, result_i must be of the same size");
-        auto computeNirvRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
+        for (size_t i = 0; i < result_indices.size(); i++)
         {
             uint_t nir_i = nir_indices[i];
             uint_t red_i = red_indices[i];
-            row = ((((m_data.row(nir_i) * nir_scaling - m_data.row(red_i) * red_scaling).array() /
-                     (m_data.row(nir_i) * nir_scaling + m_data.row(red_i) * red_scaling).array()) - 0.08).array() * (m_data.row(nir_i) * nir_scaling).array()) *
-                  result_scaling + result_offset;
-            row = (row.array()).round();
-            row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
-            row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
-            row = (row.array() < clip_value[0]).select(clip_value[0], row);
-            row = (row.array() > clip_value[1]).select(clip_value[1], row);
-        };
-        this->parRowPerm(computeNirvRow, result_indices);
+            auto computeNirvElement = [&] (uint_t j)
+            {
+                float_t val = ((((m_data(nir_i, j) * nir_scaling - m_data(red_i, j) * red_scaling) /
+                (m_data(nir_i, j) * nir_scaling + m_data(red_i, j) * red_scaling)) - 0.08) * (m_data(nir_i, j) * nir_scaling)) * result_scaling + result_offset;
+                val = std::round(val);
+                if (val == -inf_v)
+                    val = -result_scaling + result_offset;
+                else if (val == +inf_v)
+                    val = result_scaling + result_offset;
+                if (val < clip_value[0])
+                    val = clip_value[0];
+                else if (val > clip_value[1])
+                    val = clip_value[1];
+                m_data(result_indices[i], j) = val;
+            };
+            this->parForRange(computeNirvElement, (uint_t) m_data.cols());
+        }
     }
 
 
@@ -628,22 +643,30 @@ namespace skmap {
                                   float_t result_offset,
                                   std::vector<float_t> clip_value)
     {
-        auto computeSaviRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
+        for (size_t i = 0; i < result_indices.size(); i++)
         {
             uint_t red_i = red_indices[i];
             uint_t nir_i = nir_indices[i];
-            row = (((m_data.row(nir_i) * nir_scaling
-                        - m_data.row(red_i) * red_scaling).array() * 1.5).array() /
-                       ((m_data.row(nir_i) * nir_scaling
-                        + m_data.row(red_i) * red_scaling).array() + 0.5).array()).array() *
-                  result_scaling + result_offset;
-            row = (row.array()).round();
-            row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
-            row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
-            row = (row.array() < clip_value[0]).select(clip_value[0], row);
-            row = (row.array() > clip_value[1]).select(clip_value[1], row);
-        };
-        this->parRowPerm(computeSaviRow, result_indices);
+            auto computeSaviElement = [&] (uint_t j)
+            {
+                float_t val = (((m_data(nir_i, j) * nir_scaling
+                    - m_data(red_i, j) * red_scaling) * 1.5) /
+                    ((m_data(nir_i, j) * nir_scaling
+                    + m_data(red_i, j) * red_scaling) + 0.5)) *
+                    result_scaling + result_offset;
+                val = std::round(val);
+                if (val == -inf_v)
+                    val = -result_scaling + result_offset;
+                else if (val == +inf_v)
+                    val = result_scaling + result_offset;
+                if (val < clip_value[0])
+                    val = clip_value[0];
+                else if (val > clip_value[1])
+                    val = clip_value[1];
+                m_data(result_indices[i], j) = val;
+            };
+            this->parForRange(computeSaviElement, (uint_t) m_data.cols());
+        }
     }
 
 
