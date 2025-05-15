@@ -157,7 +157,7 @@ class CMakeBuild(build_ext):
 
 setuptools.setup(
     name='scikit-map',
-    version='0.7.3',
+    version='0.8.1',
     description='scikit-learn applied to mapping and spatial prediction',
     long_description=(
         "Python module to produce maps using machine learning, "
@@ -176,7 +176,7 @@ setuptools.setup(
     python_requires='>=3.7',
     install_requires=[
         'affine>=2.3',
-        'geopandas>=1.0.0',
+        'geopandas>=0.13',
         'joblib>=1.1.0',
         'numpy>=1.24',
         'pandas>=2.0',
