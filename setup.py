@@ -182,7 +182,7 @@ setuptools.setup(
         'pandas>=2.0',
         'requests>=2.24',
         'scikit-learn>=1.3',
-        'rasterio>=1.4'
+        'rasterio>=1.3'
     ],
     #ext_modules=[module_skmap_bindings],
     #cmdclass={'build_ext': build_ext},
