@@ -181,7 +181,7 @@ setuptools.setup(
         'numpy>=1.24',
         'pandas>=2.0',
         'requests>=2.24',
-        'scikit-learn>=1.6',
+        'scikit-learn>=1.3',
         'rasterio>=1.4'
     ],
     #ext_modules=[module_skmap_bindings],
