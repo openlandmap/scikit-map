@@ -1,5 +1,7 @@
 #include "io/IoArray.h"
 
+#include <fstream>
+
 namespace skmap {
     
     GDALResampleAlg hashResample(std::string const& inString) {
@@ -129,7 +131,16 @@ namespace skmap {
             CPLSetConfigOption(pair.first.c_str(), pair.second.c_str());
         }
         GDALAllRegister(); // Initialize GDAL
-        CPLPushErrorHandler(CPLQuietErrorHandler);
+        
+        // CPLPushErrorHandler(CPLDefaultErrorHandler);        
+        std::ofstream nullStream("/dev/null");
+        if (nullStream.is_open())
+        {
+            CPLSetErrorHandler(CPLLoggingErrorHandler);
+            CPLSetConfigOption("CPL_LOG", "/dev/null");
+        }
+        else
+        {CPLPushErrorHandler(CPLQuietErrorHandler);}
     }
 
     void IoArray::readDataCore(Eigen::Ref<MatFloat::RowXpr> row,
@@ -152,7 +163,6 @@ namespace skmap {
                 GDALRasterBandH band = GDALGetRasterBand(readDataset, 1);
                 const double nodata_val = GDALGetRasterNoDataValue(band, &bSuccess);
                 //const double nodata_val = (float_t) readDataset->GetRasterBand(1)->GetNoDataValue(&bSuccess);
-                //std::cout << "value_to_mask: " << nodata_val << " " << bSuccess << " " << std::endl;
                 if (bSuccess == TRUE)
                   value_to_mask = nodata_val;
             }
