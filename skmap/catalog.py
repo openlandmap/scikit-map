@@ -2,12 +2,13 @@ from typing import List, Dict, Union, Optional
 import os
 import numpy as np
 import pandas as pd
-import subprocess
 import re
 import json
 import skmap_bindings as sb
 import sys
 import random
+from skmap.misc import mmdd_to_doy
+
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
 
@@ -20,8 +21,10 @@ class DataCatalog():
     def create_catalog(cls,
                        catalog_def:Union[pd.DataFrame, str],
                        years:List[int],
-                       base_path:Union[List[str], str]):
-        catalog_dict = cls._create_dict_catalog(catalog_def, years, base_path)
+                       base_path:Union[List[str], str],
+                       verbose: bool = True,
+                       replace_group_feat_name:bool = False):
+        catalog_dict = cls._create_dict_catalog(catalog_def, years, base_path, verbose, replace_group_feat_name)
         data = {}
         years = [str(year) for year in years]
         if not 'common' in years:  # common is default
@@ -40,17 +43,26 @@ class DataCatalog():
         return cls(data, data_size)
     
     @staticmethod
-    def _create_dict_catalog(catalog_def:Union[pd.DataFrame, str], years:List[int], base_path:Union[List[str], str]):
+    def _create_dict_catalog(catalog_def:Union[pd.DataFrame, str], years:List[int], base_path:Union[List[str], str], verbose:bool, replace_group_feat_name:bool):
         if not isinstance(catalog_def, pd.DataFrame):
             covar = pd.read_csv(catalog_def)
         else:
             covar = catalog_def
         # Replace placeholders in `layer_name` and `path`
+        if replace_group_feat_name:
+            year_repl = "{year}"
+            year_plus_one_repl = "{year_plus_one}"
+            year_minus_one_repl = "{year_minus_one}"
+        else:
+            year_repl = "YYYY"
+            year_plus_one_repl = "YYPO"
+            year_minus_one_repl = "YYMO"
+            
         def replace_layer_name_placeholders(value):
             replacements = {
-                "{year}": "YYYY",
-                "{year_plus_one}": "YYPO",
-                "{year_minus_one}": "YYMO",
+                "{year}": year_repl,
+                "{year_plus_one}": year_plus_one_repl,
+                "{year_minus_one}": year_minus_one_repl,
                 "{start_month}": "{start_month}",
                 "{end_month}": "{end_month}",
                 "{perc}": "{perc}",
@@ -63,7 +75,6 @@ class DataCatalog():
     
         covar['layer_name'] = covar['layer_name'].apply(replace_layer_name_placeholders)
         covar['path'] = covar['path'].apply(lambda x: replace_layer_name_placeholders(x) if '/whale/' in x else x)
-
         perc_mask = (
             covar['layer_name'].str.contains(r'\{perc\}') | 
             covar['path'].str.contains(r'\{perc\}')
@@ -80,7 +91,6 @@ class DataCatalog():
         perc_expanded_df = pd.DataFrame(perc_expanded_rows)
         # Combine expanded rows with the rest of the dataframe
         covar = pd.concat([covar[~perc_mask], perc_expanded_df], ignore_index=True)
-
         month_mask = (
             covar['layer_name'].str.contains(r'\{start_month\}') | 
             covar['path'].str.contains(r'\{start_month\}') | 
@@ -105,22 +115,59 @@ class DataCatalog():
                 month_expanded_rows.append(new_row)
         month_expanded_df = pd.DataFrame(month_expanded_rows)
         covar = pd.concat([covar[~month_mask], month_expanded_df], ignore_index=True)
-
+        
         # Separate common and temporal data
         covar_comm = covar[covar['type'] == 'common'].reset_index(drop=True)
         covar_temp = covar[covar['type'] == 'temporal'].reset_index(drop=True)
+        
         # Create the comm part of the catalog
         url_comm = covar_comm.set_index('layer_name')['path'].to_dict()
         comm = {'common': {layer_name: path for layer_name, path in url_comm.items()}}
 
         def calculate_year_placeholders(year, start_year, end_year, tmp_layer_name):
-            valid_year = min(max(year, int(start_year)), int(end_year))
-            if year != valid_year:
-                print(f"Year {year} not available for layer {tmp_layer_name}, propagating year {valid_year}")
+            if (end_year == '' or (type(end_year) is float and ~np.isfinite(end_year))):
+                years = start_year.split(',') # years is a list of strings. Ex. 1996,2006,2007,2008,2009,2010,2015,2016,2017,2018,2019,2020
+                if str(year) in years:
+                    return {
+                        "year": str(year),
+                        "year_plus_one": str(year + 1),
+                        "year_minus_one": str(year - 1),
+                        "tile_id": '{tile_id}',
+                        "base_path": '{base_path}'
+                    }
+                # if year is not in the list of years, we propagate the closest year that is available before the given year
+                valid_year = int(years[0])
+                for y in years:
+                    if int(y) < year:
+                        valid_year = int(y)
+                    else:
+                        break
+                if (year != valid_year) & verbose:
+                    print(f"Year {year} not available for layer {tmp_layer_name}, propagating year {valid_year}")
+                return {
+                    "year": str(valid_year),
+                    "year_plus_one": str(valid_year + 1),
+                    "year_minus_one": str(valid_year - 1),
+                    "tile_id": '{tile_id}',
+                    "base_path": '{base_path}'
+                }
+            else:
+                valid_year = min(max(year, int(start_year)), int(end_year))
+                if (year != valid_year) & verbose:
+                    print(f"Year {year} not available for layer {tmp_layer_name}, propagating year {valid_year}")
+                return {
+                    "year": str(valid_year),
+                    "year_plus_one": str(valid_year + 1),
+                    "year_minus_one": str(valid_year - 1),
+                    "tile_id": '{tile_id}',
+                    "base_path": '{base_path}'                
+                }
+        
+        def calculate_year_feat_name_placeholders(year):
             return {
-                "year": str(valid_year),
-                "year_plus_one": str(valid_year + 1),
-                "year_minus_one": str(valid_year - 1),
+                "year": str(year),
+                "year_plus_one": str(year + 1),
+                "year_minus_one": str(year - 1),
                 "tile_id": '{tile_id}',
                 "base_path": '{base_path}'                
             }
@@ -132,11 +179,10 @@ class DataCatalog():
             year_dict = {}
             for i, (layer_name, path) in enumerate(url_temp.items()):
                 year_placeholders = calculate_year_placeholders(
-                    year, 
-                    covar_temp.loc[i, 'start_year'], 
-                    covar_temp.loc[i, 'end_year'],
-                    layer_name
-                )
+                    year, covar_temp.loc[i, 'start_year'], covar_temp.loc[i, 'end_year'], layer_name)
+                if replace_group_feat_name:
+                    year_feat_name_placeholders = calculate_year_feat_name_placeholders(year)
+                    layer_name = layer_name.format(**year_feat_name_placeholders)
                 year_dict[layer_name] = path.format(**year_placeholders)
             temporal[str(year)] = year_dict
         catalog_dict = {**comm, **temporal}
@@ -188,9 +234,9 @@ class DataCatalog():
                     paths += [self.data[k][f]['path']]
                     idx += [self.data[k][f]['idx']]
                     names += [f]
-        # modify paths of non VRT files
-        paths = [path if path is None or path.endswith('vrt') or path.startswith('/vsicurl/') \
-        else f'/vsicurl/{path}' for path in paths]
+        # modify paths of non VRT files\
+        paths = [f'/vsicurl/{p}' if p and p.startswith('http') and not p.endswith('vrt') and not p.startswith('/vsicurl/')
+            else p for p in paths]
         return paths, idx, names
     
         
@@ -242,7 +288,7 @@ class DataCatalog():
         self._expand_whales_dependencies(old_data)
         missing_features_names = [feature for feature in feature_names if feature not in set(self.get_feature_names())]
         for missing_feat_feature in missing_features_names:
-            print(f'Feature {missing_feat_feature} is missing in the original catalog, adding is in the otf (on the fly) common group')
+            print(f'WARNING: Feature {missing_feat_feature} is missing in the original catalog, adding is in the otf (on the fly) common group')
         if missing_features_names:
             self.add_otf_features(missing_features_names)
     
@@ -257,13 +303,13 @@ class DataCatalog():
     def expand_whales_dependencies(cls, reference_catalog_data, data, data_size):
         whale_paths, groups, whale_layer_names = cls.get_whales(data)
         for i, (whale_path, whale_layer_name) in enumerate(zip(whale_paths, whale_layer_names)):
-            dep_names, dep_paths, dep_exec_orders = get_whale_dependencies(whale_path, groups[i], reference_catalog_data, whale_layer_names[i])
-            for dep_name, dep_path, dep_exec_order in zip(dep_names, dep_paths, dep_exec_orders):
-                if dep_name not in data[groups[i]]:
-                    data[groups[i]][dep_name] = {'path': dep_path, 'idx': data_size, 'exec_order': dep_exec_order}
+            dep_names, dep_paths, dep_exec_orders, dep_keys = get_whale_dependencies(whale_path, groups[i], reference_catalog_data, whale_layer_names[i])
+            for dep_name, dep_path, dep_exec_order, dep_key in zip(dep_names, dep_paths, dep_exec_orders, dep_keys):
+                if dep_name not in data[dep_key]:
+                    data[dep_key][dep_name] = {'path': dep_path, 'idx': data_size, 'exec_order': dep_exec_order}
                     data_size += 1
                 elif dep_name == whale_layer_name:
-                    data[groups[i]][dep_name]['exec_order'] = dep_exec_order
+                    data[dep_key][dep_name]['exec_order'] = dep_exec_order
         return data, data_size
     
     def _expand_whales_dependencies(self, reference_catalog_data):
@@ -285,7 +331,7 @@ class DataCatalog():
             k = groups[j]
             for i in range(len(covs_lst)):
                 c = covs_lst[i]
-                if c in self.data['common']:
+                if 'common' in self.data and c in self.data['common']:
                     covs_idx[i,j] = self.data['common'][c]['idx']
                 elif c in self.data[k]:
                     covs_idx[i,j] = self.data[k][c]['idx']
@@ -310,7 +356,7 @@ def print_catalog_statistics(catalog:DataCatalog):
 
 def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
     func_name, params = parse_template_whale(whale)
-    dep_tags, dep_names, dep_paths, dep_exec_orders = [], [], [], []
+    dep_tags, dep_names, dep_paths, dep_exec_orders, dep_keys = [], [], [], [], []
     if func_name == 'percentileAggregation':
         tag = params['entry_template']
         for dt in params['dt']:
@@ -321,43 +367,57 @@ def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
     elif func_name == 'computeSavi':
         dep_tags += [params['idx_red']]
         dep_tags += [params['idx_nir']]
+    elif func_name == 'computeGeometricTemperature':
+        dep_tags += [params['idx_latitude']]
+        dep_tags += [params['idx_elevation']]
+    elif func_name == 'extractIndicator':
+        dep_tags += [params['idx_layer']]
     for dep_tag in dep_tags:
-        dep_path = main_catalog[key][dep_tag]['path']
+        if dep_tag in main_catalog[key]:
+            dep_path = main_catalog[key][dep_tag]['path']
+            dep_key = key
+        else:
+            dep_path = main_catalog["common"][dep_tag]['path']
+            dep_key = "common"
         if dep_path.startswith("/whale"):
-            rec_dep_names, rec_dep_paths, rec_dep_exec_orders = get_whale_dependencies(dep_path, key, main_catalog, dep_tag)
+            rec_dep_names, rec_dep_paths, rec_dep_exec_orders, rec_dep_keys = get_whale_dependencies(dep_path, dep_key, main_catalog, dep_tag)
             dep_paths += rec_dep_paths
             dep_names += rec_dep_names
             dep_exec_orders += rec_dep_exec_orders
+            dep_keys += rec_dep_keys
         else:
             dep_paths += [dep_path]
             dep_names += [dep_tag]
             dep_exec_orders += [0]
+            dep_keys += [dep_key]
     dep_paths += [whale]
     dep_names += [whale_layer_name]
     if dep_exec_orders:
         dep_exec_orders += [max(dep_exec_orders) + 1]
     else:
         dep_exec_orders += [0]
-    return dep_names, dep_paths, dep_exec_orders
+    dep_keys += [key]
+    return dep_names, dep_paths, dep_exec_orders, dep_keys
 
 def parse_template_whale(whale):
     func_name_match = re.search(r'/whale/([^?]+)', whale)
     func_name = func_name_match.group(1) if func_name_match else None
     query_params_string = whale.split('?')[1]
     params = {}
-
-    for param in query_params_string.split('&'):
-        key, value = param.split('=')
-        # Split by commas to handle lists
-        if ',' in value:
-            params[key] = value.split(',')
-        else:
-            params[key] = value
+    
+    if query_params_string != '':
+        for param in query_params_string.split('&'):
+            key, value = param.split('=')
+            # Split by commas to handle lists
+            if ',' in value:
+                params[key] = value.split(',')
+            else:
+                params[key] = value
     return func_name, params
 
-def run_whales(catalog:DataCatalog, array, n_threads):
-    # Computing on the fly coovariates
-    whale_paths, whale_keys, whale_names = catalog._get_whales()        
+def run_whales(catalog:DataCatalog, array, n_threads, lat_info = None):
+    # Computing on the fly covariates
+    whale_paths, whale_keys, whale_names = catalog._get_whales()
     max_exec_order = 0
     for whale_key, whale_name in zip(whale_keys, whale_names):
         max_exec_order = max(max_exec_order, int(catalog.data[whale_key][whale_name]['exec_order']))
@@ -367,6 +427,7 @@ def run_whales(catalog:DataCatalog, array, n_threads):
                 continue
             else:
                 func_name, params = parse_template_whale(whale_path)
+                whale_data_idx = catalog.data[whale_key][whale_name]['idx']
                 if func_name == 'percentileAggregation':
                     tag = params['entry_template']
                     in_idxs = []
@@ -381,78 +442,40 @@ def run_whales(catalog:DataCatalog, array, n_threads):
                     sb.transposeArray(array_sb, n_threads, array_sb_t)
                     sb.computePercentiles(array_sb_t, n_threads, range(len(in_idxs)),
                             array_pct_t, [0], [float(params['percentile'])])
-                    array[catalog.data[whale_key][whale_name]['idx'], :] = array_pct_t[:,0]
+                    array[whale_data_idx, :] = array_pct_t[:,0]
                 elif func_name == 'computeNormalizedDifference':
                     sb.computeNormalizedDifference(array, n_threads,
                         [catalog.data[whale_key][params['idx_plus']]['idx']],
                         [catalog.data[whale_key][params['idx_minus']]['idx']],
-                        [catalog.data[whale_key][whale_name]['idx']], float(params['scale_plus']), float(params['scale_minus']),
+                        [whale_data_idx], float(params['scale_plus']), float(params['scale_minus']),
                         float(params['scale_result']), float(params['offset_result']),
                         [float(params['clip'][0]), float(params['clip'][1])])
                 elif func_name == 'computeSavi':                                
                     sb.computeSavi(array, n_threads,
                         [catalog.data[whale_key][params['idx_red']]['idx']],
                         [catalog.data[whale_key][params['idx_nir']]['idx']],
-                        [catalog.data[whale_key][whale_name]['idx']], float(params['scale_red']), float(params['scale_nir']),
+                        [whale_data_idx], float(params['scale_red']), float(params['scale_nir']),
                         float(params['scale_result']), float(params['offset_result']),
                         [float(params['clip'][0]), float(params['clip'][1])])
+                elif func_name == 'extractIndicator':
+                    array[whale_data_idx, :] = \
+                        (array[catalog.data[whale_key][params['idx_layer']]['idx'], :] == float(params['code'])).astype(np.float32)
+                elif func_name == 'getLatitude':
+                    if not isinstance(lat_info, np.ndarray) and len(lat_info.shape) == 1 and lat_info.shape[0] == array.shape[1]:
+                        raise Exception("Information on how to get the latitude needs to be a numpy vector")
+                    elif isinstance(lat_info, np.ndarray) and len(lat_info.shape) == 1 and lat_info.shape[0] == array.shape[1]:
+                        array[whale_data_idx, :] = lat_info
+                elif func_name == 'computeGeometricTemperature':
+                    day_of_year = mmdd_to_doy(str(params['day_of_year_mmdd']))
+                    if params['idx_latitude'] in catalog.data[whale_key]:
+                        latitude = array[catalog.data[whale_key][params['idx_latitude']]['idx'],:]
+                    else:
+                        latitude = array[catalog.data["common"][params['idx_latitude']]['idx'],:]
+                    if params['idx_elevation'] in catalog.data[whale_key]:
+                        elevation = array[catalog.data[whale_key][params['idx_elevation']]['idx'],:]
+                    else:
+                        elevation = array[catalog.data["common"][params['idx_elevation']]['idx'],:]
+                    sb.computeGeometricTemperature(array, n_threads, latitude, elevation, float(params['elevation_scaling']), float(params['a']), float(params['b']), float(params['result_scaling']), [whale_data_idx], [day_of_year])
                 else:
                     sys.exit(f"The whale function {func_name} is not available")
 
-def _s3_computed_files(out_s3):
-    bash_command = f"mc ls {out_s3}"
-    process = subprocess.Popen(bash_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    output, error = process.communicate()
-    output = output.decode('utf-8')
-    error = error.decode('utf-8')
-    assert (error == ''), f"Error in checking if the tile in S3 `{out_s3}` was already computed. \nError: {error}"
-    return len(output.splitlines())
-#
-def s3_list_files(s3_aliases, s3_prefix, tile_id, file_pattern=None):
-    if len(s3_aliases) == 0: return []
-    bash_cmd = f"mc ls {s3_aliases[0]}{s3_prefix}/{tile_id}"
-    print(f'Checking `{bash_cmd}`...')
-    process = subprocess.Popen(bash_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = process.communicate()
-    stderr = stderr.decode('utf-8')
-    assert stderr == '', f"Error listing S3 `{s3_aliases[0]}{s3_prefix}/{tile_id}`. \nError: {stderr}"
-    stdout = stdout.decode('utf-8')
-    lines = stdout.splitlines()
-    if file_pattern is not None:
-        pattern = re.compile(file_pattern)
-        lines = [line for line in lines if pattern.search(line)]
-    return lines
-#
-def s3_setup(have_to_register_s3, access_key, secret_key, gaia_addrs):
-    s3_aliases = []
-    if not have_to_register_s3:
-        return s3_aliases
-    s3_aliases = [f'g{i}' for i, _ in enumerate(gaia_addrs)]
-    commands = [
-        f'mc alias set  g{i} {addr} {access_key} {secret_key} --api S3v4'
-        for i, addr in enumerate(gaia_addrs)
-    ]
-    for cmd in commands:
-        subprocess.run(cmd, shell=True, capture_output=False, text=True, check=True)
-    return s3_aliases
-#
-def s3_have_to_compute_tile(models_pool, tile_id, s3_aliases, years):
-    compute_tile = False
-    if len(s3_aliases) == 0:
-        return True
-    for model in models_pool:
-        if model['s3_prefix'] is None:
-            compute_tile = True
-            break
-        # check if files were already produced
-        n_out_files = model.n_out_layers * years
-        # generate file output names
-        for k in range(model.n_out_stats):
-            print(f'Checking `mc ls {s3_aliases[0]}{model.s3_prefix}/{tile_id}/{model.out_files_prefix[k]}_`')
-            if _s3_computed_files(f'{s3_aliases[0]}{model.s3_prefix}/{tile_id}/{model.out_files_prefix[k]}_') < n_out_files:
-                compute_tile = True
-                break
-        if compute_tile:
-            break
-    return compute_tile
-#

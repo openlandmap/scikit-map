@@ -3,7 +3,11 @@
 
 #define _USE_MATH_DEFINES
 #include <iostream>
+
+#ifdef HAVE_AVX512
 #define EIGEN_VECTORIZE_AVX512
+#endif
+
 #include <Eigen/Dense>
 #include <gdal/gdal.h>
 #include <gdal/gdalwarper.h>
@@ -12,6 +16,9 @@
 #include <functional>
 #include <cassert>
 #include <unordered_map>
+#include <map>
+#include <vector>
+#include <iostream>
 #include <cmath>
 #include <optional>
 #include <math.h>
@@ -19,6 +26,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#include <cstdint>
+#include <any>
+#include <numeric>
 
 //#include <cpl_conv.h>
 //#include <ogr_spatialref.h>
@@ -62,11 +72,22 @@ inline float_t standardNormalCdf(float_t x) {
     return 0.5 * (1. + erf(x / sqrt(2.)));
 }
 
-using uint_t = long unsigned int;
-using float_t = float;
-using byte_t = unsigned char;
-using int16_t = short;
+using byte_t = std::uint8_t;
 using uint16_t = std::uint16_t;
+using int16_t = std::int16_t;
+using uint32_t = std::uint32_t;
+using int32_t = std::int32_t;
+using float32_t = float;
+using float64_t = double;
+using cint16_t = std::complex<int16_t>;
+using cint32_t = std::complex<int32_t>;
+using cfloat32_t = std::complex<float32_t>;
+using cfloat64_t = std::complex<float64_t>;
+
+using uint_t = long unsigned int;
+using int_t = long int;
+using float_t = float32_t;
+
 inline float_t nan_v = std::numeric_limits<float_t>::quiet_NaN();
 inline float_t inf_v = std::numeric_limits<float_t>::infinity();
 using dict_t = std::unordered_map<std::string, std::string>;
@@ -75,10 +96,13 @@ using map_t = std::map<std::string, std::vector<uint_t>>;
 // C order is default in Numpy and Eigen pybind11 require it to get this input
 using MatFloat = Eigen::Matrix<float_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using MatBool = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-using MatByte = Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic>;
+using MatUint = Eigen::Matrix<uint_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using MatByte = Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using VecFloat = Eigen::Vector<float_t, Eigen::Dynamic>;
 using VecUint = Eigen::Vector<uint_t, Eigen::Dynamic>;
 using VecBool = Eigen::Vector<bool, Eigen::Dynamic>;
+
+
 
 
 }
