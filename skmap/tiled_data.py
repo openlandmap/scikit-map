@@ -303,6 +303,8 @@ class TiledDataExporter(TiledData):
             assert (quantiles != None), "Need to provide quantiles"
         elif self.mode == 'depths_years':
             assert (years != None) & (depths != None), "Need to provide years, depths"
+        elif self.mode == 'depths_years_textures':
+            assert (years != None) & (depths != None), "Need to provide years, depths"
         elif self.mode == 'years':
             assert (years != None), "Need to provide years"
         elif (self.mode == 'probabilities'):
@@ -310,7 +312,7 @@ class TiledDataExporter(TiledData):
         elif (self.mode == 'static') | (self.mode == 'dominant_class'):
             pass
         else:
-            raise Exception("Available modes: dominant_class, probabilities, depths_years_quantiles_textures, depths_years_quantiles, depths_years, years, static_depths_quantiles, static_quantiles, static")
+            raise Exception("Available modes: dominant_class, probabilities, depths_years_quantiles_textures, depths_years_quantiles, depths_years, depths_years_textures, years, static_depths_quantiles, static_quantiles, static")
         self.n_layers = len(self._get_out_names("",""))
         if (self.n_layers != None) & (self.n_pixels != None):
             self.array = sb_arr(self.n_layers, n_pixels)
@@ -332,6 +334,8 @@ class TiledDataExporter(TiledData):
             return self._get_out_names_depths_years_quantiles(prefix, sufix)
         elif self.mode == 'depths_years':
             return self._get_out_names_depths_years(prefix, sufix)
+        elif self.mode == 'depths_years_textures':
+            return self._get_out_names_depths_years_textures(prefix, sufix)
         elif self.mode == 'static_depths_quantiles':
             return self._get_out_names_static_depths_quantiles(prefix, sufix, time_frame)
         elif self.mode == 'static_quantiles':
@@ -345,7 +349,7 @@ class TiledDataExporter(TiledData):
         elif self.mode == 'years':
             return self._get_out_names_years(prefix, sufix)
         else:
-            raise Exception("Available modes: depths_years_quantiles_textures, depths_years_quantiles, depths_years, years")
+            raise Exception("Available modes: dominant_class, probabilities, depths_years_quantiles_textures, depths_years_quantiles, depths_years, depths_years_textures, years, static_depths_quantiles, static_quantiles, static")
     
     def _get_out_names_years(self, prefix, sufix):
         out_files = []
@@ -411,6 +415,17 @@ class TiledDataExporter(TiledData):
                     for q in self.quantiles:
                         formatted_p = get_percentiele_string(q)
                         out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{self.years[y]}0101_{self.years[y+1]}1231_{sufix}")
+        return out_files
+    
+    def _get_out_names_depths_years_textures(self, prefixes, sufix):
+        if prefixes == "":
+            prefixes = ["","",""]
+        # order: prefixes = [prefix_caly, prefix_sand, prefix_silt]
+        out_files = []
+        for d in range(len(self.depths) - 1):
+            for y in range(len(self.years) - 1):
+                for prefix in prefixes :
+                    out_files.append(f"{prefix}_m_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{self.years[y]}0101_{self.years[y+1]}1231_{sufix}")
         return out_files
                   
     
@@ -528,6 +543,46 @@ class TiledDataExporter(TiledData):
                                       range(offset_sand+1,offset_sand+1+len(percentiles)), percentiles)
                 sb.computePercentiles(silt_trees, self.n_threads, range(silt_trees.shape[1]), array_t,
                                       range(offset_silt+1,offset_silt+1+len(percentiles)), percentiles)
+                array_t[:,offset_caly] = clay_mean[:,0]
+                array_t[:,offset_sand] = sand_mean[:,0]
+                array_t[:,offset_silt] = silt_mean[:,0]
+        sb.transposeArray(array_t, self.n_threads, self.array)            
+        
+    def derive_block_mean_textures(self, pred_depths_texture1, pred_depths_texture2, k=1., a=100.):
+        assert self.mode == 'depths_years_textures', "Mode must be 'depths_years_textures'"
+        self.n_pixels = int(pred_depths_texture1[0].array.shape[1]/len(self.years))
+        self.array = sb_arr(self.n_layers, self.n_pixels)
+        array_t = sb_arr(self.n_pixels, self.n_layers)
+        n_trees = pred_depths_texture1[0].array.shape[0]
+        for d in range(len(self.depths) - 1):
+            for y in range(len(self.years) - 1):
+                offset_caly = d * (len(self.years) - 1) * 3 + y * 3
+                offset_sand = d * (len(self.years) - 1) * 3 + y * 3 + 1
+                offset_silt = d * (len(self.years) - 1) * 3 + y * 3 + 2
+                trees_avg_texture1 = sb_arr(n_trees, self.n_pixels)
+                trees_avg_texture2 = sb_arr(n_trees, self.n_pixels)
+                sb.blocksAverage(trees_avg_texture1, self.n_threads,
+                                 pred_depths_texture1[d].array, pred_depths_texture1[d+1].array, self.n_pixels, y)
+                sb.blocksAverage(trees_avg_texture2, self.n_threads,
+                                 pred_depths_texture2[d].array, pred_depths_texture2[d+1].array, self.n_pixels, y)
+                trees_avg_texture1_t = sb_arr(self.n_pixels, n_trees)
+                trees_avg_texture2_t = sb_arr(self.n_pixels, n_trees)
+                mean_texture1 = sb_arr(self.n_pixels, 1)
+                mean_texture2 = sb_arr(self.n_pixels, 1)
+                sb.transposeArray(trees_avg_texture1, self.n_threads, trees_avg_texture1_t)
+                sb.transposeArray(trees_avg_texture2, self.n_threads, trees_avg_texture2_t)
+                sb.nanMean(trees_avg_texture1_t, self.n_threads, mean_texture1)
+                sb.nanMean(trees_avg_texture2_t, self.n_threads, mean_texture2)
+                clay_trees = sb_arr(self.n_pixels, n_trees)
+                sand_trees = sb_arr(self.n_pixels, n_trees)
+                silt_trees = sb_arr(self.n_pixels, n_trees)
+                clay_mean = sb_arr(self.n_pixels, 1)
+                sand_mean = sb_arr(self.n_pixels, 1)
+                silt_mean = sb_arr(self.n_pixels, 1)
+                
+                sb.texturesBwTransform(trees_avg_texture1_t, self.n_threads, trees_avg_texture2_t, k, a, sand_trees, silt_trees, clay_trees)
+                sb.texturesBwTransform(mean_texture1, self.n_threads, mean_texture2, k, a, sand_mean, silt_mean, clay_mean)
+                
                 array_t[:,offset_caly] = clay_mean[:,0]
                 array_t[:,offset_sand] = sand_mean[:,0]
                 array_t[:,offset_silt] = silt_mean[:,0]
