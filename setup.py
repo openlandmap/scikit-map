@@ -125,6 +125,12 @@ class CMakeBuild(build_ext):
             ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
         )
 
+# The setup() call should only contain what's NOT in pyproject.toml
+setuptools.setup(
+    ext_modules=[CMakeExtension("skmap_bindings", ".")], # Assuming 'src' is your CMake source directory
+    cmdclass={"build_ext": CMakeBuild},
+)
+
 #module_skmap_bindings = setuptools.Extension(
 #    'skmap_bindings',
 #    sources=[
@@ -153,54 +159,4 @@ class CMakeBuild(build_ext):
 #    libraries=[
 #        'm', 'gomp', 'gdal'
 #    ]
-#)
-
-setuptools.setup(
-    name='scikit-map',
-    version='0.8.1',
-    description='scikit-learn applied to mapping and spatial prediction',
-    long_description=(
-        "Python module to produce maps using machine learning, "
-        "reference samples and raster data."
-    ),
-    long_description_content_type='text/markdown',
-    url='https://github.com/scikit-map/scikit-map',
-    packages=setuptools.find_namespace_packages(),
-    package_data={},
-    scripts=[],
-    classifiers=[
-        'Programming Language :: Python :: 3',
-        'License :: OSI Approved :: MIT License',
-        'Operating System :: OS Independent',
-    ],
-    python_requires='>=3.7',
-    install_requires=[
-        'affine>=2.3',
-        'geopandas>=0.13',
-        'joblib>=1.1.0',
-        'numpy>=1.24',
-        'pandas>=2.0',
-        'requests>=2.24',
-        'scikit-learn>=1.3',
-        'rasterio>=1.3'
-    ],
-    #ext_modules=[module_skmap_bindings],
-    #cmdclass={'build_ext': build_ext},
-    ext_modules=[CMakeExtension("skmap_bindings")],
-    cmdclass={"build_ext": CMakeBuild},
-    extras_require={
-        'full': [
-            'Bottleneck>=1.3',
-            'gspread>=5.3.2',
-            'matplotlib>=3.7.3',
-            'minio>=7.1.0',
-            'pqdm>=0.1',
-            'pystac>=1.4.0',
-            'pyts>=0.11',
-            'pyfftw>=0.13',
-            'scikit_image>=0.20',
-            'Shapely>=1.7',
-            'whoosh>=2.7.4'
-        ],
-    },
-)
+#
