@@ -629,7 +629,7 @@ class TiledDataExporter(TiledData):
                      scaling = 1,
                      scaling_metadata = None,
                      gdal_opts:Dict[str,str] = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'},
-                     timeframe = None
+                     timeframe = None,
                      n_threads_write = None):
         with TimeTracker(f"   Prepare data to export for {self.tile_id}", False):
         
