@@ -629,11 +629,14 @@ class TiledDataExporter(TiledData):
                      scaling = 1,
                      scaling_metadata = None,
                      gdal_opts:Dict[str,str] = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'},
-                     timeframe = None):
+                     timeframe = None
+                     n_threads_write = None):
         with TimeTracker(f"   Prepare data to export for {self.tile_id}", False):
         
             if scaling_metadata == None:
                 scaling_metadata = 1./scaling
+            if n_threads_write == None:
+                n_threads_write = self.n_threads
             if self.tile_id is None: raise ValueError("Argument 'tile_id' cannot be None")
             out_files = self._get_out_names(prefix, sufix, timeframe)
             n_files = len(out_files)
@@ -668,12 +671,12 @@ class TiledDataExporter(TiledData):
             else:
                 if self.s3_prefix:
                     s3_out = ([f'{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}' for _ in range(len(out_files))])
-                    sb.writeData(write_data, self.n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
+                    sb.writeData(write_data, n_threads_write, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
                         range(n_files), 0, 0, x_size, y_size, nodata,
                         save_type, compress_cmd, s3_out)
                     ttprint(f'Export complete, check mc ls {s3_out[0]}/{out_files[0]}')
                 else:
-                    sb.writeData(write_data, self.n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
+                    sb.writeData(write_data, n_threads_write, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
                         range(n_files), 0, 0, x_size, y_size, nodata,
                         save_type, compress_cmd)
                     ttprint(f'Export complete, check mc {tile_dir}')
