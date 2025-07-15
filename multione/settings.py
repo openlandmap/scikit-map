@@ -1,4 +1,7 @@
 
+from typing import Tuple
+
+
 n_threads = 96
 
 TMP_DIR = '/mnt/silva/tmp'
@@ -54,3 +57,19 @@ n_imag_per_year_agg = 12
 no_data = 0
 
 landsat_file_ending = '_go_epsg.4326_v20240521.tif'
+
+# Masking parameters
+mask_band_scaling = 1/4e4
+mask_result_scaling = 1e4
+mask_result_offset = 0.
+
+# MODIS NDVI filtering parameters
+# diff_th, count_th = (3000, int(0.3*n_s))
+# diff_th, count_th = (1000, 12*n_years)
+#filter_diff_th, filter_count_th = (2500, 2*n_years)
+def filter_params(n_years: int ) -> Tuple[int, int]:
+    """
+    Returns the filtering parameters based on the number of years.
+    """
+    filter_diff_th, filter_count_th = (2500, 2*n_years)
+    return filter_diff_th, filter_count_th
