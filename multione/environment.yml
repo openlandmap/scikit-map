@@ -1,10 +1,11 @@
-name: arcov2
+name: arcov2_38
 channels:
   - conda-forge
 dependencies:
   - bottleneck
   - gdal
   - geopandas
+  - gspread
   - joblib
   - jupyter
   - matplotlib
@@ -18,4 +19,3 @@ dependencies:
   - scikit-learn
   - shapely
 
-prefix: "/home/opengeohub/.local/share/mamba/envs/arcov2"

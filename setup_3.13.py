@@ -13,7 +13,7 @@ module_skmap_bindings = setuptools.Extension(
     ],
     include_dirs=[
         np.get_include(),
-        'pybind11/include',
+    #    'pybind11/include',
         'skmap/include',
         'skmap/src',
         '/usr/include/opencv4'
@@ -29,12 +29,13 @@ module_skmap_bindings = setuptools.Extension(
         '-mavx512bw'
     ],
     extra_link_args=['-lgomp',"-Wl,-zdefs"],
-    # library_dirs=["/home/opengeohub/.local/share/mamba/envs/arcov2/lib/python3.13/config-3.13-x86_64-linux-gnu"],
+    library_dirs=["/home/opengeohub/.local/share/mamba/envs/arcov2/lib/python3.13/config-3.13-x86_64-linux-gnu"],
     libraries=[
-        "python3.8", "pthread", "dl", "util",
+        "python3.13", "dl","util",
         'm', 'gomp', 'gdal', 'opencv_core', 'opencv_imgproc', 
         'opencv_imgcodecs', 'opencv_photo'
     ]
+    # "pthread",
 )
 
 setuptools.setup(
