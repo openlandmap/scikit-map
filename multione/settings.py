@@ -1,11 +1,12 @@
 
-from typing import Tuple
+from typing import Tuple, List
 
 
 n_threads = 96
 
 TMP_DIR = '/mnt/silva/tmp'
 
+# Gaia S3 parameters
 gaia_addrs = [f'http://192.168.49.{gaia_ip}:8333' for gaia_ip in range(30, 47)]
 gaia_s3_params = {
         's3_addresses':gaia_addrs,
@@ -14,10 +15,41 @@ gaia_s3_params = {
         's3_prefix':'tmp-landsat-arco-v2',
     }
 
+gaia_addrs = [f'http://192.168.49.{gaia_ip}:8333' for gaia_ip in range(30, 47)]
+
+# S3 parameters for MinIO Client (mc)
+s3_params = {
+    's3_addresses':gaia_addrs,
+    's3_access_key':'iwum9G1fEQ920lYV4ol9',
+    's3_secret_key':'GMBME3Wsm8S7mBXw3U4CNWurkzWMqGZ0n2rXHggS0',
+    's3_prefix':'tmp-landsat-arco-v2',
+}
+
+def s3_setup(access_key, secret_key, gaia_addrs) -> List[str]:
+    import subprocess
+
+    s3_aliases = []
+    s3_aliases = [f'g{i+1}' for i, _ in enumerate(gaia_addrs)]
+    commands = [
+        f'sudo mc alias set  g{i+1} {addr} {access_key} {secret_key} --api S3v4'
+        for i, addr in enumerate(gaia_addrs)
+    ]
+    for cmd in commands:
+        subprocess.run(cmd, shell=True, capture_output=False, text=True, check=True)
+    return s3_aliases
+
+s3_aliases = s3_setup(s3_params['s3_access_key'],
+             s3_params['s3_secret_key'],
+             s3_params['s3_addresses'])
+
+# GDAL options for reading and writing
 gdal_opts = {
  'GDAL_HTTP_VERSION': '1.0',
  'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif',
 }
+
+no_data_out = 65000
+
 
 gdal_co = ['TILED=YES', 'BIGTIFF=YES', 'COMPRESS=DEFLATE', 'BLOCKXSIZE=1024', 'BLOCKYSIZE=1024']
 
@@ -30,6 +62,17 @@ bands_prefix = ['red_glad',
                 'thermal_glad',
                 'qa_mask']
 
+bands_prefix_out = ['red_glad',
+                    'nir_glad',
+                    'blue_glad',
+                    'green_glad',
+                    'swir1_glad',
+                    'swir2_glad',
+                    'thermal_glad']
+
+file_ending_out = '_go_epsg.4326_v7'
+
+# Landsat time-series parameters
 doy_start = ['0101', '0117', '0202', '0218', '0305', '0321', '0406', '0422', '0508', '0524', '0609',
              '0625', '0711', '0727', '0812', '0828', '0913', '0929', '1015', '1031', '1116', '1202', '1218']
 

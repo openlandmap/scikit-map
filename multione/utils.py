@@ -20,6 +20,11 @@ from settings import  n_imag_per_year, n_imag_per_year_agg, doy_start, doy_end, 
 from settings import TMP_DIR, gaia_addrs, bands_prefix, landsat_file_ending, n_threads, no_data
 from settings import mask_result_scaling, mask_band_scaling, mask_result_offset
 from settings import resampling_strategy, filter_params
+from settings import att_env, att_seas, future_scaling
+from settings import bands_prefix_out, file_ending_out, no_data_out, month_start, month_end
+from settings import s3_aliases, s3_params
+
+from processing_utils import get_SWA_weights
 
 # Function to set up S3 aliases using MinIO Client (mc)
 # This function takes access key, secret key, and a list of Gaia addresses,
@@ -110,6 +115,7 @@ def get_modis_ndvi_data(landsat_tile, years, resampling_strategy='GRA_Bilinear')
         except Exception as e:
             print(f"Task {i} generated an exception: {e}")
     executor.shutdown()
+    return modis_data
 
 def mask_from_qa(landsat_data: NDArray[np.float32], n_years:int) -> NDArray[np.float32]:
 
@@ -188,3 +194,97 @@ def mask_from_modis(landsat_data: NDArray[np.float32], modis_data:NDArray[np.flo
     gc.collect()
 
     return landsat_data
+
+
+def bands_aggregation(landsat_data: NDArray[np.float32], n_years:int) -> NDArray[np.float32]:
+    """
+    Aggregate Landsat data bands.
+    """
+    n_s = n_years*n_imag_per_year
+    n_s_agg = n_years*n_imag_per_year_agg
+    n_spect_bands = len(bands_prefix) - 1
+
+    landsat_bands = np.empty((n_s*n_spect_bands, n_pix), dtype=np.float32)
+    sb.extractArrayRows(landsat_data, n_threads, landsat_bands, range(0, n_s*n_spect_bands))
+    del landsat_data
+    gc.collect()
+
+    landsat_bands_t = np.empty((n_pix, n_s*n_spect_bands), dtype=np.float32)
+    sb.transposeArray(landsat_bands, n_threads, landsat_bands_t)
+    del landsat_bands
+    gc.collect()
+
+    landsat_bands_agg_t = np.empty((n_pix, n_s_agg*n_spect_bands), dtype=np.float32)
+    agg_pattern = []
+    for i in range(n_spect_bands):
+        for j in range(n_years):
+            base_idx = n_s*i + j*n_imag_per_year
+            agg_pattern.append([base_idx+0,base_idx+1])
+            agg_pattern.append([base_idx+2,base_idx+3])
+            agg_pattern.append([base_idx+4,base_idx+5])
+            agg_pattern.append([base_idx+6,base_idx+7])
+            agg_pattern.append([base_idx+8,base_idx+9])
+            agg_pattern.append([base_idx+10,base_idx+11])
+            agg_pattern.append([base_idx+11,base_idx+12])
+            agg_pattern.append([base_idx+13,base_idx+14])
+            agg_pattern.append([base_idx+15,base_idx+16])
+            agg_pattern.append([base_idx+17,base_idx+18])
+            agg_pattern.append([base_idx+19,base_idx+20])
+            agg_pattern.append([base_idx+21,base_idx+22])
+            
+    sb.nanMeanAggregatePattern(landsat_bands_t, n_threads, landsat_bands_agg_t, agg_pattern)
+    del landsat_bands_t
+    gc.collect()
+
+    return landsat_bands_agg_t
+
+def swa_reconstructing(landsat_bands_agg_t: NDArray[np.float32], n_years:int) -> NDArray[np.float32]:
+    """
+    Reconstruct SWA from aggregated Landsat bands.
+    """
+    w_0_agg = 1.0
+    n_s_agg = n_years*n_imag_per_year_agg
+    n_spect_bands = len(bands_prefix) - 1
+
+    w_p_agg = (get_SWA_weights(att_env, att_seas, n_imag_per_year_agg, n_s_agg)[1:][::-1]).astype(np.float32)
+    w_f_agg = (get_SWA_weights(att_env, att_seas, n_imag_per_year_agg, n_s_agg)[1:]).astype(np.float32)*future_scaling
+    
+    landsat_bands_rec_t = np.empty((n_pix, n_s_agg*n_spect_bands), dtype=np.float32)
+
+    for b in range(n_spect_bands):
+        sb.applyTsirf(landsat_bands_agg_t, n_threads, landsat_bands_rec_t, n_s_agg, b*n_s_agg, b*n_s_agg, w_0_agg, w_p_agg, w_f_agg, True)
+    del landsat_bands_agg_t
+    gc.collect()
+
+    return landsat_bands_rec_t
+
+def save_landsat_bands(landsat_bands_rec_t: NDArray[np.float32], landsat_tile: str, years: List[int], landsat_files: List[str]) -> None:    
+    """
+    Save reconstructed Landsat bands to disk.
+    """
+    n_years = len(years)
+    n_spect_bands = len(bands_prefix) - 1
+    n_s_agg = n_years*n_imag_per_year_agg
+
+    out_data = np.empty((n_s_agg*n_spect_bands, n_pix), dtype=np.float32)
+    sb.transposeArray(landsat_bands_rec_t, n_threads, out_data)
+    del landsat_bands_rec_t
+    gc.collect()
+
+    
+    out_dir = f'data_out/{landsat_tile}'
+    # os.makedirs('data_out', exist_ok = True)
+    # os.makedirs(out_dir, exist_ok = True)
+    
+    compression_command = f"gdal_translate -a_nodata {no_data_out} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
+    out_files = []
+    for band in bands_prefix_out:
+        for year in years:
+            for m in range(n_imag_per_year_agg):
+                out_files.append(f'{band}.ard2_m_30m_s_{year}{month_start[m]}_{year}{month_end[m]}{file_ending_out}')
+
+    s3_out = [f'{random.choice(s3_aliases)}/{s3_params["s3_prefix"]}/{landsat_tile}' for _ in range(len(out_files))]
+    sb.writeUInt16Data(out_data, n_threads, gdal_opts, landsat_files[0:len(out_files)], out_dir, out_files, range(len(out_files)),
+                x_off, y_off, x_size, y_size, no_data_out, compression_command, s3_out)
+
+    

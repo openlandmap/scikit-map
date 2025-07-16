@@ -5,7 +5,8 @@ from typing import Any, Union
 import numpy as np
 
 
-def get_SWA_weights(att_env, att_seas, season_size, n_imag) -> NDArray[np.float64]:
+def get_SWA_weights(att_env, att_seas, season_size, n_imag) -> NDArray:
+    # TODO: float32
     conv_mat_row = np.zeros((n_imag))
     base_func = np.zeros((season_size,))
     period_y = season_size/2.0
@@ -22,7 +23,7 @@ def get_SWA_weights(att_env, att_seas, season_size, n_imag) -> NDArray[np.float6
     for i in np.arange(delta_e):
         env_func[i] = -slope_e*i
         conv_mat_row = 10.0**(np.resize(base_func,n_imag) + env_func)
-    return conv_mat_row 
+    return conv_mat_row
 
 
 def process_image_in_chunks(image, chunk_size, gap_stripes_th, gap_general_th, fft_th):

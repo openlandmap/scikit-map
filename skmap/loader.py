@@ -9,7 +9,7 @@ from concurrent.futures import ProcessPoolExecutor
 from skmap.catalog import DataCatalog, run_whales
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
-n_threads = os.cpu_count() * 2
+n_threads = (os.cpu_count() or 1) * 2
 os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
@@ -67,7 +67,7 @@ class TiledDataLoader():
                  spatial_aggregation:bool,
                  resampling_strategy:str, 
                  gdal_opts:Dict[str,str], 
-                 n_threads:int = os.cpu_count() * 2) -> None:
+                 n_threads:int = (os.cpu_count() or 1) * 2) -> None:
         self.catalog = catalog
         self.mask_template_path = mask_template_path
         self.spatial_aggregation = spatial_aggregation

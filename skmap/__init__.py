@@ -3,6 +3,9 @@ __version__ = '0.7.3'
 from abc import ABC, abstractmethod
 from skmap.misc import ttprint
 
+__all__ = ['loader']
+
+
 class SKMapBase(ABC):
 
   def _verbose(self, *args, **kwargs):
