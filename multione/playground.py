@@ -1,5 +1,6 @@
 # Just playground ...
-
+# eval "$(micromamba shell hook --shell bash)"
+# micromamba activate arcov2
 #%%
 # from pathlib import Path
 # print(Path.cwd())
@@ -18,4 +19,5 @@ landsat_data = utils.get_landsat_data(landsat_tile, years)
 modis_data = utils.get_modis_ndvi_data(landsat_tile, years)
 end = time.time()
 print(f"Time taken to get data: {end - start} seconds")
+# Time taken to get data: 187.68489527702332 seconds
 #%%

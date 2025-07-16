@@ -28,8 +28,10 @@ module_skmap_bindings = setuptools.Extension(
         '-mavx512vl',
         '-mavx512bw'
     ],
-    extra_link_args=['-lgomp'],
+    extra_link_args=['-lgomp',"-Wl,-zdefs"],
+    library_dirs=["/home/opengeohub/.local/share/mamba/envs/arcov2/lib/python3.13/config-3.13-x86_64-linux-gnu"],
     libraries=[
+        "python3.13", "pthread", "dl","util",
         'm', 'gomp', 'gdal', 'opencv_core', 'opencv_imgproc', 
         'opencv_imgcodecs', 'opencv_photo'
     ]

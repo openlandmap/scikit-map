@@ -1,0 +1,21 @@
+name: arcov2
+channels:
+  - conda-forge
+dependencies:
+  - bottleneck
+  - gdal
+  - geopandas
+  - joblib
+  - jupyter
+  - matplotlib
+  - minio
+  - numba
+  - psutil
+  - pybind11
+  - pystac
+  - rasterio
+  - scikit-image
+  - scikit-learn
+  - shapely
+
+prefix: "/home/opengeohub/.local/share/mamba/envs/arcov2"

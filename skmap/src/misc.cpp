@@ -5,9 +5,9 @@
 #include <iostream>
 #define EIGEN_VECTORIZE_AVX512
 #include <Eigen/Dense>
-#include <gdal/gdal.h>
-#include <gdal/gdalwarper.h>
-#include <gdal/gdal_priv.h>
+#include <gdal.h>
+#include <gdalwarper.h>
+#include <gdal_priv.h>
 #include <omp.h>
 #include <functional>
 #include <cassert>
