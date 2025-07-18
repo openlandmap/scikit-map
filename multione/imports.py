@@ -13,5 +13,5 @@ print(f'Importing from local path: {repository_root}')
 sys.path.insert(0,repository_root.as_posix())
 import skmap_bindings
 import skmap
-from skmap.loader import warp_tile
+from skmap.tiled_data import warp_tile
 # print('Imported from local path')

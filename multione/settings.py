@@ -1,8 +1,19 @@
 
 from typing import Tuple, List
-
+import os
 
 n_threads = 96
+
+os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
+os.environ['USE_PYGEOS'] = '0'
+os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
+os.environ['NUMEXPR_MAX_THREADS'] = f'{n_threads}'
+os.environ['NUMEXPR_NUM_THREADS'] = f'{n_threads}'
+os.environ['OMP_THREAD_LIMIT'] = f'{n_threads}'
+os.environ["OMP_NUM_THREADS"] = f'{n_threads}'
+os.environ["OPENBLAS_NUM_THREADS"] = f'{n_threads}' # export OPENBLAS_NUM_THREADS=4 
+os.environ["MKL_NUM_THREADS"] = f'{n_threads}' # export MKL_NUM_THREADS=6
+os.environ["VECLIB_MAXIMUM_THREADS"] = f'{n_threads}'
 
 TMP_DIR = '/mnt/silva/tmp'
 
@@ -25,6 +36,8 @@ s3_params = {
     's3_prefix':'tmp-landsat-arco-v2',
 }
 
+# Function to set up S3 aliases using MinIO Client (mc)
+# This function takes access key, secret key, and a list of Gaia addresses,
 def s3_setup(access_key, secret_key, gaia_addrs) -> List[str]:
     import subprocess
 

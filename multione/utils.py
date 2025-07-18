@@ -16,28 +16,28 @@ import numpy as np
 from imports import skmap_bindings as sb
 from imports import warp_tile
 
-from settings import  n_imag_per_year, n_imag_per_year_agg, doy_start, doy_end, n_pix, x_size, y_size, gdal_opts, x_off, y_off
+from settings import n_imag_per_year, n_imag_per_year_agg, doy_start, doy_end, n_pix, x_size, y_size, gdal_opts, x_off, y_off
 from settings import TMP_DIR, gaia_addrs, bands_prefix, landsat_file_ending, n_threads, no_data
 from settings import mask_result_scaling, mask_band_scaling, mask_result_offset
 from settings import resampling_strategy, filter_params
 from settings import att_env, att_seas, future_scaling
 from settings import bands_prefix_out, file_ending_out, no_data_out, month_start, month_end
-from settings import s3_aliases, s3_params
+from settings import s3_aliases, s3_params, s3_setup
 
 from processing_utils import get_SWA_weights
 
 # Function to set up S3 aliases using MinIO Client (mc)
 # This function takes access key, secret key, and a list of Gaia addresses,
-def s3_setup(access_key, secret_key, gaia_addrs) -> List[str]:
-    s3_aliases = []
-    s3_aliases = [f'g{i+1}' for i, _ in enumerate(gaia_addrs)]
-    commands = [
-        f'sudo mc alias set  g{i+1} {addr} {access_key} {secret_key} --api S3v4'
-        for i, addr in enumerate(gaia_addrs)
-    ]
-    for cmd in commands:
-        subprocess.run(cmd, shell=True, capture_output=False, text=True, check=True)
-    return s3_aliases
+# def s3_setup(access_key, secret_key, gaia_addrs) -> List[str]:
+#     s3_aliases = []
+#     s3_aliases = [f'g{i+1}' for i, _ in enumerate(gaia_addrs)]
+#     commands = [
+#         f'sudo mc alias set  g{i+1} {addr} {access_key} {secret_key} --api S3v4'
+#         for i, addr in enumerate(gaia_addrs)
+#     ]
+#     for cmd in commands:
+#         subprocess.run(cmd, shell=True, capture_output=False, text=True, check=True)
+#     return s3_aliases
 
 def setup_gaia():
     
@@ -96,26 +96,47 @@ def get_landsat_data(landsat_tile, years) -> NDArray[np.float32]:
     return landsat_data
 
 def get_modis_ndvi_data(landsat_tile, years, resampling_strategy='GRA_Bilinear') -> NDArray[np.float32]:
+
+    landsat_files = get_landsat_filenames(landsat_tile, years)
+
     modis_files = []
     for year in years:
         for m in range(n_imag_per_year):
             modis_files.append(f'/vsicurl/{random.choice(gaia_addrs)}/global/veg/ndvi_mod13q1.v061_swa/ndvi_mod13q1.v061_m_250m_s_{year}{doy_start[m]}_{year}{doy_end[m]}_go_sinusoidal_v1.tif')
 
-    landsat_files = get_landsat_filenames(landsat_tile, years)
     n_years = len(years)
     n_s = n_years*n_imag_per_year
     modis_data = np.empty((n_s, n_pix), dtype=np.float32)
     executor = ProcessPoolExecutor(max_workers=n_threads)
-    futures = {executor.submit(warp_tile, i, landsat_files[i], modis_files[i], n_threads, 
-                                n_pix, resampling_strategy, gdal_opts): i for i in range(len(modis_files))}
-    for future in as_completed(futures):
-        i = futures[future]
-        try:
-            modis_data[i, :] = future.result()
-        except Exception as e:
-            print(f"Task {i} generated an exception: {e}")
+    futures = [executor.submit(warp_tile, landsat_files[i], modis_files[i], n_pix, resampling_strategy)
+        for i in range(len(modis_files))]
+    for i, future in enumerate(futures):
+        modis_data[i, :] = future.result()
+
     executor.shutdown()
     return modis_data
+
+
+    # modis_files = []
+    # for year in years:
+    #     for m in range(n_imag_per_year):
+    #         modis_files.append(f'/vsicurl/{random.choice(gaia_addrs)}/global/veg/ndvi_mod13q1.v061_swa/ndvi_mod13q1.v061_m_250m_s_{year}{doy_start[m]}_{year}{doy_end[m]}_go_sinusoidal_v1.tif')
+
+    # landsat_files = get_landsat_filenames(landsat_tile, years)
+    # n_years = len(years)
+    # n_s = n_years*n_imag_per_year
+    # modis_data = np.empty((n_s, n_pix), dtype=np.float32)
+    # executor = ProcessPoolExecutor(max_workers=n_threads)
+    # futures = {executor.submit(warp_tile, i, landsat_files[i], modis_files[i], n_threads, 
+    #                             n_pix, resampling_strategy, gdal_opts): i for i in range(len(modis_files))}
+    # for future in as_completed(futures):
+    #     i = futures[future]
+    #     try:
+    #         modis_data[i, :] = future.result()
+    #     except Exception as e:
+    #         print(f"Task {i} generated an exception: {e}")
+    # executor.shutdown()
+    # return modis_data
 
 def mask_from_qa(landsat_data: NDArray[np.float32], n_years:int) -> NDArray[np.float32]:
 

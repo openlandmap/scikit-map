@@ -22,6 +22,10 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(eigen pybind11)
 
+#GDAL_INCLUDE_DIRS()
+# include_directories("/skmap/lib/python3.12/site-packages/osgeo/")
+# find_library()
+
 find_package(GDAL REQUIRED)
 find_package(OpenMP REQUIRED)
 
