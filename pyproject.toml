@@ -1,22 +1,125 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "numpy", "cmake>=3.15", "ninja; sys_platform != 'win32'"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "scikit-map"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "bottleneck>=1.5.0",
-    "geopandas>=1.1.1",
-    "gspread>=6.2.1",
-    "joblib>=1.5.1",
-    "jupyter>=1.1.1",
-    "matplotlib>=3.10.3",
-    "minio>=7.2.15",
-    "numba>=0.61.2",
-    "psutil>=7.0.0",
-    "pystac>=1.13.0",
-    "rasterio>=1.4.3",
-    "scikit-image>=0.25.2",
-    "scikit-learn>=1.7.1",
-    "shapely>=2.1.1",
+version = "0.8.1"
+description = "scikit-learn applied to mapping and spatial prediction"
+readme = "README.md" # Assuming your long_description content is in a README.md
+requires-python = ">=3.7"
+license = { text = "MIT License" }
+authors = [
+  # You'll need to add authors here, as it's not explicitly in your setup.py
+  # { name = "Your Name", email = "your.email@example.com" },
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "affine>=2.3",
+    "geopandas>=0.13",
+    "joblib>=1.1.0",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "requests>=2.24",
+    "scikit-learn>=1.3",
+    "rasterio>=1.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/scikit-map/scikit-map"
+Repository = "https://github.com/scikit-map/scikit-map" # Often good to include both
+
+[project.optional-dependencies]
+full = [
+    "Bottleneck>=1.3",
+    "gspread>=5.3.2",
+    "matplotlib>=3.7.3",
+    "minio>=7.1.0",
+    "pqdm>=0.1",
+    "pystac>=1.4.0",
+    "pyts>=0.11",
+    "pyfftw>=0.13",
+    "scikit_image>=0.20",
+    "Shapely>=1.7",
+    "whoosh>=2.7.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["."] # Search for packages in the current directory (project root)
+include = ["skmap*"] # Only include packages starting with 'skmap'
+
+# For package discovery, setuptools can still find packages
+# You don't usually need to specify `packages` in pyproject.toml unless you have
+# a very specific layout. `setuptools.find_namespace_packages()` is the default behavior.
+
+# For extensions (ext_modules and cmdclass), you'll need to rely on the build backend.
+# This part is a bit trickier to directly translate as pyproject.toml generally focuses
+# on metadata. For custom build steps like CMake, you typically need to either:
+# 1. Have setuptools handle it via a hook in a build.py or similar (more advanced).
+# 2. Define a custom build step using a dedicated build backend if setuptools' default
+#    extension handling isn't sufficient.
+
+# However, setuptools itself (when used as the build backend) can still process
+# C/C++ extensions and custom build commands if they are defined in a minimal setup.py
+# that is then invoked by the pyproject.toml build system.
+#
+# A common approach for projects with CMake extensions is to keep a minimal `setup.py`
+# that handles the `ext_modules` and `cmdclass` and let `pyproject.toml` define
+# the project metadata. The `build-backend` in `pyproject.toml` still points to `setuptools`.
+
+# So, if you want to keep the CMakeExtension and CMakeBuild parts, you would usually
+# keep a `setup.py` file like this (simplified):
+#
+# # setup.py
+# from setuptools import setup
+# from setuptools.command.build_ext import build_ext as _build_ext
+# import subprocess
+# import sys
+# import os
+#
+# # Assuming CMakeExtension and CMakeBuild are defined elsewhere or simplified here
+# # For demonstration, let's assume they are simple placeholders
+# class CMakeExtension:
+#     def __init__(self, name, sourcedir=""):
+#         self.name = name
+#         self.sourcedir = os.path.abspath(sourcedir)
+#
+# class CMakeBuild(_build_ext):
+#     def run(self):
+#         for ext in self.extensions:
+#             self.build_extension(ext)
+#
+#     def build_extension(self, ext):
+#         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
+#         cmake_args = [
+#             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
+#             f"-DPYTHON_EXECUTABLE={sys.executable}",
+#         ]
+#         build_args = ["--config", "Release"]
+#
+#         if not os.path.exists(self.build_temp):
+#             os.makedirs(self.build_temp)
+#
+#         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=self.build_temp)
+#         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
+#
+# # Define your actual CMakeExtension and CMakeBuild as they are in your current setup.py
+# # Then call setup() with just the extension related parts.
+# setup(
+#     ext_modules=[CMakeExtension("skmap_bindings")],
+#     cmdclass={"build_ext": CMakeBuild},
+# )
+
+# And the pyproject.toml would still be as above, with the `[build-system]` section
+# correctly set up to use setuptools. The `setuptools.build_meta` backend will
+# automatically look for a `setup.py` if present to handle extensions and other build logic
+# that isn't directly expressible in `pyproject.toml`.
+
+# If you were to completely eliminate setup.py and move everything to pyproject.toml,
+# you would need to use a build backend that directly supports custom build steps,
+# like `flit`, `poetry`, or a custom `setuptools` build hook (which is more complex).
+# For projects with compiled extensions, keeping a minimal `setup.py` for `ext_modules`
+# and `cmdclass` is a common and often simpler approach when transitioning to `pyproject.toml`.
