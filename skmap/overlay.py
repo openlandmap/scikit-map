@@ -13,7 +13,9 @@ from skmap.catalog import DataCatalog, run_whales
 import skmap_bindings as sb
 import hashlib
 import itertools
-n_threads = os.cpu_count() * 2
+import requests
+
+n_threads = os.cpu_count()
 os.environ['OMPI_MCA_rmaps_base_oversubscribe'] = '1'
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
@@ -238,8 +240,38 @@ class SpaceOverlay():
         verbose:bool = True
     ):
 
+        self.verbose = verbose
         self.catalog = catalog
         self.layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
+        
+        
+        if raster_tiles is not None:
+            if not isinstance(raster_tiles, gpd.GeoDataFrame):
+                if self.verbose:
+                    ttprint(f"Reading {raster_tiles}")
+                raster_tiles = gpd.read_file(raster_tiles)
+        
+        processed_urls = []
+        for url in self.layer_paths:
+            url = url.replace("/vsicurl/", "")
+            if "{tile_id}" in url:
+                url = url.replace("{tile_id}", raster_tiles[tile_id_col].iloc[0])
+            processed_urls.append(url)
+            
+        urls_with_404 = []
+        for url in processed_urls:
+            try:
+                response = requests.head(url, timeout=10)
+                if response.status_code == 404:
+                    urls_with_404.append(url)
+            except requests.RequestException as e:
+                print(f"Error checking URL {url}: {e}")
+
+        if self.verbose:
+            ttprint(f"{len(urls_with_404)} out of {len(self.layer_paths)} URLs returning 404")
+        for url in urls_with_404:
+            print(url)
+        assert len(urls_with_404) == 0, "The listed URLs can not be reached"
 
         if not isinstance(points, gpd.GeoDataFrame):
             if not isinstance(points, pd.DataFrame):
@@ -248,7 +280,6 @@ class SpaceOverlay():
             points = gpd.GeoDataFrame(points, geometry='geometry')
         self.pts = points.reset_index(drop=True)
         self.n_threads = n_threads
-        self.verbose = verbose
 
         self.parallelOverlay = _ParallelOverlay(self.pts.geometry.x.values, self.pts.geometry.y.values,
             self.layer_paths, points_crs=self.pts.crs, raster_tiles=raster_tiles, tile_id_col=tile_id_col, 
@@ -299,13 +330,17 @@ class SpaceOverlay():
         assert self.pts.shape[0] == self.data_overlay.shape[1], "Not matching size between input points and the overalied data"
         
         self.data_array[self.layer_idxs,:] = self.data_overlay[:,:]
-        run_whales(self.catalog, self.data_array, self.n_threads)
+        self.pts = self.pts.reset_index(drop=True)
+        self.pts['lon'] = self.pts['geometry'].x
+        self.pts['lat'] = self.pts['geometry'].y
+        
+        run_whales(self.catalog, self.data_array, self.n_threads, lat_info = self.pts['lat'].to_numpy())
         # @FIXME check that all the filled flages are True or assert at this point
         df = pd.DataFrame(self.data_array.T, columns=self.ordered_feats_names)
-        self.pts_out = pd.concat([self.pts.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
+        if 'lat' in df:
+            self.pts = self.pts.drop(columns=['lat'])
+        self.pts_out = pd.concat([self.pts, df.reset_index(drop=True)], axis=1)
 
-        self.pts_out['lon'] = self.pts_out['geometry'].x
-        self.pts_out['lat'] = self.pts_out['geometry'].y
         self.pts_out = self.pts_out.drop(columns=['geometry'])
         if out_file_name is not None:
             self.pts_out.to_parquet(out_file_name)
@@ -328,7 +363,7 @@ class SpaceOverlay():
             unique_blocks_dict = unique_blocks.set_index('block_id')[['block_row_off', 'block_col_off', 'block_height', 'block_width']].to_dict('index')
             layer_path_dict = layers.set_index('layer_id')['path'].to_dict()
             if self.verbose:
-                ttprint(f'Loading and sampling {len(layer_path_dict)} raster layers for group {key}')
+                ttprint(f'Loading and sampling {len(set(key_layer_ids))} raster layers for group {key}')
             layer_nodata_dict = layers.set_index('layer_id')['nodata'].to_dict()
             key_layer_ids_comb, unique_blocks_ids_comb = map(list, zip(*itertools.product(key_layer_ids, unique_blocks_ids)))
             block_row_off_comb = [unique_blocks_dict[ubid]['block_row_off'] for ubid in unique_blocks_ids_comb]
@@ -362,7 +397,7 @@ class SpaceOverlay():
                 data_array = np.empty((chunk_size, n_block_pix), dtype=np.float32)
                 perm_vec = range(chunk_size)
                 sb.readDataBlocks(data_array, self.n_threads, key_layer_paths_chunk, perm_vec, block_col_off_chunk, block_row_off_chunk,
-                                  block_width_chunk, block_height_chunk, bands_list, gdal_opts, key_layer_nodatas_chunk, np.nan)
+                                  block_width_chunk, block_height_chunk, bands_list, gdal_opts, None, np.nan)
                 pix_blok_ids = key_query_pixels['block_id'].tolist()
                 sample_rows = key_query_pixels['sample_row'].tolist()
                 sample_cols = key_query_pixels['sample_col'].tolist()
@@ -460,11 +495,14 @@ class SpaceTimeOverlay():
 
             if self.verbose:
                 ttprint(f'Running the overlay for {year}')
-            year_result = self.overlay_objs[year].run(max_ram_mb, out_file_name, gdal_opts)
+            year_result = self.overlay_objs[year].run(max_ram_mb, None, gdal_opts)
 
             if self.result is None:
                 self.result = year_result
             else:
                 self.result = pd.concat([self.result, year_result], ignore_index=True)
+                
+            if out_file_name is not None:
+                self.result.to_parquet(out_file_name)
 
         return self.result

@@ -3,6 +3,69 @@
 
 namespace skmap {
 
+    void argsortMatrixAscending(Eigen::Ref<MatFloat> in_matrix, Eigen::Ref<MatUint> perm_matrix, bool sort_each_row_true_sort_each_col_false) 
+    {
+        if (sort_each_row_true_sort_each_col_false) 
+        {
+            #pragma omp parallel for
+            for (int i = 0; i < in_matrix.rows(); ++i) 
+            {
+                std::vector<uint_t> indices(in_matrix.cols());
+                std::iota(indices.begin(), indices.end(), 0);
+                std::sort(indices.begin(), indices.end(), [&](uint_t a, uint_t b)
+                {return in_matrix(i, a) < in_matrix(i, b);});
+
+                MatFloat sorted_row(1, in_matrix.cols());
+                for (int j = 0; j < in_matrix.cols(); ++j) 
+                {
+                    sorted_row(0, j) = in_matrix(i, indices[j]);
+                    perm_matrix(i, j) = indices[j];
+                }
+                in_matrix.row(i) = sorted_row;
+            }
+        } else {
+            #pragma omp parallel for
+            for (int j = 0; j < in_matrix.cols(); ++j) 
+            {
+                std::vector<uint_t> indices(in_matrix.rows());
+                std::iota(indices.begin(), indices.end(), 0);
+                std::sort(indices.begin(), indices.end(), [&](uint_t a, uint_t b)
+                {return in_matrix(a, j) < in_matrix(b, j);});
+
+                MatFloat sorted_col(in_matrix.rows(), 1);
+                for (int i = 0; i < in_matrix.rows(); ++i) 
+                {
+                    sorted_col(i, 0) = in_matrix(indices[i], j);
+                    perm_matrix(i, j) = indices[i];
+                }
+                in_matrix.col(j) = sorted_col;
+            }
+        }
+    }
+
+    void applyPermutation(Eigen::Ref<MatFloat> sorted_matrix, Eigen::Ref<MatUint> perm_matrix, bool sort_each_row_true_sort_each_col_false) 
+    {
+        MatFloat original_matrix = sorted_matrix;
+        if (sort_each_row_true_sort_each_col_false) {
+            #pragma omp parallel for
+            for (int i = 0; i < sorted_matrix.rows(); ++i) {
+                for (int j = 0; j < sorted_matrix.cols(); ++j) {
+                    original_matrix(i, perm_matrix(i, j)) = sorted_matrix(i, j);
+                }
+            }
+        } else {
+            #pragma omp parallel for
+            for (int j = 0; j < sorted_matrix.cols(); ++j) {
+                for (int i = 0; i < sorted_matrix.rows(); ++i) {
+                    original_matrix(perm_matrix(i, j), j) = sorted_matrix(i, j);
+                }
+            }
+        }
+        sorted_matrix = original_matrix;
+    }
+    
+
+
     TransArray::TransArray(Eigen::Ref<MatFloat> data, const uint_t n_threads)
             : ParArray(data, n_threads)
     {
@@ -224,6 +287,39 @@ namespace skmap {
         this->parChunk(blocksAverageChunk);
     }
 
+  
+
+    void TransArray::blocksAverageVecs(Eigen::Ref<MatFloat> in1,
+                                  Eigen::Ref<MatFloat> in2,
+                                  uint_t n_pix,
+                                  uint_t y,
+                                  uint_t row_offset)
+    {
+        auto blocksAverageVecsElem = [&] (uint_t i)
+        {
+            m_data(row_offset,i) = 0.25 * (in1(0, i + y*n_pix) + 
+                                           in1(0, i + (y+1)*n_pix) + 
+                                           in2(0, i + y*n_pix) + 
+                                           in2(0, i + (y+1)*n_pix));
+        };
+        this->parForRange(blocksAverageVecsElem, n_pix);
+    }
+
+
+    void TransArray::elementwiseAverage(Eigen::Ref<MatFloat> in1,
+                                  Eigen::Ref<MatFloat> in2)
+    {
+        skmapAssertIfTrue(((uint_t) in1.cols() != (uint_t) in2.cols()),
+                          "scikit-map ERROR 52: the two input arrays must have the same number of columns");
+        auto elementwiseAverageChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            chunk.array() = 0.5 * (in1.block(row_start, 0, row_end - row_start, in1.cols()).array() + 
+                                   in2.block(row_start, 0, row_end - row_start, in2.cols()).array());
+        };
+        this->parChunk(elementwiseAverageChunk);
+    }
+
+
     void TransArray::extractArrayRows(Eigen::Ref<MatFloat> out_data,
                                       std::vector<uint_t> row_select)
     {
@@ -281,7 +377,6 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
 }
 
 
-
     void TransArray::maskNan(std::vector<uint_t> row_select,
                              float_t new_value)
     {
@@ -289,6 +384,19 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
         {
             auto tmp_row = m_data.row(row_select[i]);
             tmp_row = tmp_row.array().isNaN().select(new_value, tmp_row);
+        };
+        this->parForRange(swapRowValues, row_select.size());
+    }
+
+    void TransArray::maskNanRows(std::vector<uint_t> row_select,
+                             Eigen::Ref<VecFloat> new_value_vec)
+    {
+        skmapAssertIfTrue((row_select.size() != (uint_t) new_value_vec.size()),
+                          "scikit-map ERROR 48: row_select and new_value_vec must be of the same size");
+        auto swapRowValues = [&] (uint_t i)
+        {
+            auto tmp_row = m_data.row(row_select[i]);
+            tmp_row = tmp_row.array().isNaN().select(new_value_vec(i), tmp_row);
         };
         this->parForRange(swapRowValues, row_select.size());
     }
@@ -388,19 +496,62 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
         this->parForRange(fillArrayRow, m_data.rows());
     }
 
+    void TransArray::texturesBwTransform(Eigen::Ref<MatFloat> texture_2,
+                                        float_t k,
+                                        float_t a,
+                                        Eigen::Ref<MatFloat> sand,
+                                        Eigen::Ref<MatFloat> silt,
+                                        Eigen::Ref<MatFloat> clay)
+    {
+        auto texturesBwTransformChunk = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end) 
+        {
+            // Extract the relevant block from texture_1 and texture_2
+            MatFloat x1 = Eigen::pow(2., chunk.array());
+            MatFloat x2 = Eigen::pow(2., texture_2.block(row_start, 0, row_end - row_start, texture_2.cols()).array());
+
+            // Compute the inverse transformation
+            MatFloat C = ((1. - (x1.array() + x2.array() - 2.) * k).array() / (x1.array() + x2.array() + 1.).array()).cwiseMax(0.);
+            MatFloat S = (x1.array() * C.array() + x1.array() * k - k).cwiseMax(0);
+            MatFloat L = (x2.array() * C.array() + x2.array() * k - k).cwiseMax(0);
+            
+            // Compute total sum for normalization
+            MatFloat total = S.array() + L.array() + C.array();
+
+            // Avoid division by zero: Compute scale factor
+            MatFloat scale_factor = (total.array() > 0).select(a / total.array(), 0.);  // If total > 0, scale; else, set to 0
+
+            // Store results in the respective blocks
+            sand.block(row_start, 0, row_end - row_start, sand.cols()) = S.array() * scale_factor.array();
+            silt.block(row_start, 0, row_end - row_start, silt.cols()) = L.array() * scale_factor.array();
+            clay.block(row_start, 0, row_end - row_start, clay.cols()) = C.array() * scale_factor.array();
+
+            
+            // Apply NaN mask where necessary (assuming NaN handling is required)
+            MatBool mask = (chunk.array().isNaN() || texture_2.block(row_start, 0, row_end - row_start, texture_2.cols()).array().isNaN());
+
+            sand.block(row_start, 0, row_end - row_start, sand.cols()) = mask.select(nan_v, sand.block(row_start, 0, row_end - row_start, sand.cols()).array());
+            clay.block(row_start, 0, row_end - row_start, clay.cols()) = mask.select(nan_v, clay.block(row_start, 0, row_end - row_start, clay.cols()).array());
+            silt.block(row_start, 0, row_end - row_start, silt.cols()) = mask.select(nan_v, silt.block(row_start, 0, row_end - row_start, silt.cols()).array());
+        };
+
+        // Apply parallel execution
+        this->parChunk(texturesBwTransformChunk);
+    }
+
+    
     void TransArray::fitPercentage(Eigen::Ref<MatFloat> in1,
                                    Eigen::Ref<MatFloat> in2)
     {
-        auto fitPercentageChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
-        {
-            chunk.array() = 100. / (in1.block(row_start, 0, row_end - row_start, in1.cols()).array() + 
-                                    in2.block(row_start, 0, row_end - row_start, in2.cols()).array() +
-                                    1.);
-        };
-        this->parChunk(fitPercentageChunk);
+    auto fitPercentageChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+    {
+    chunk.array() = 100. / (in1.block(row_start, 0, row_end - row_start, in1.cols()).array() + 
+            in2.block(row_start, 0, row_end - row_start, in2.cols()).array() +
+            1.);
+    };
+    this->parChunk(fitPercentageChunk);
     }
-    
-    
+
+
     void TransArray::hadamardProduct(Eigen::Ref<MatFloat> in1,
                                      Eigen::Ref<MatFloat> in2)
     {
@@ -437,20 +588,28 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
     {
         skmapAssertIfTrue((positive_indices.size() != negative_indices.size()) || (positive_indices.size() != result_indices.size()),
                           "scikit-map ERROR 3: positive_i, negative_i, result_i must be of the same size");
-        auto computeNormalizedDifferenceRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
+        for (size_t i = 0; i < result_indices.size(); i++)
         {
             uint_t positive_i = positive_indices[i];
             uint_t negative_i = negative_indices[i];
-            row = (m_data.row(positive_i) * positive_scaling - m_data.row(negative_i) * negative_scaling).array() /
-                  (m_data.row(positive_i) * positive_scaling + m_data.row(negative_i) * negative_scaling).array() *
-                  result_scaling + result_offset;
-            row = (row.array()).round();
-            row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
-            row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
-            row = (row.array() < clip_value[0]).select(clip_value[0], row);
-            row = (row.array() > clip_value[1]).select(clip_value[1], row);
-        };
-        this->parRowPerm(computeNormalizedDifferenceRow, result_indices);
+            auto computeNormalizedDifferenceElement = [&] (uint_t j)
+            {
+                float_t val = (m_data(positive_i, j) * positive_scaling - m_data(negative_i, j) * negative_scaling) /
+                    (m_data(positive_i, j) * positive_scaling + m_data(negative_i, j) * negative_scaling) *
+                    result_scaling + result_offset;
+                val = std::round(val);
+                if (val == -inf_v)
+                    val = -result_scaling + result_offset;
+                else if (val == +inf_v)
+                    val = result_scaling + result_offset;
+                if (val < clip_value[0])
+                    val = clip_value[0];
+                else if (val > clip_value[1])
+                    val = clip_value[1];
+                m_data(result_indices[i], j) = val;
+            };
+            this->parForRange(computeNormalizedDifferenceElement, (uint_t) m_data.cols());
+        }
     }
 
 
@@ -465,20 +624,27 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
     {
         skmapAssertIfTrue((nir_indices.size() != red_indices.size()) || (nir_indices.size() != result_indices.size()),
                           "scikit-map ERROR 3: nir_i, red_i, result_i must be of the same size");
-        auto computeNirvRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
+        for (size_t i = 0; i < result_indices.size(); i++)
         {
             uint_t nir_i = nir_indices[i];
             uint_t red_i = red_indices[i];
-            row = ((((m_data.row(nir_i) * nir_scaling - m_data.row(red_i) * red_scaling).array() /
-                     (m_data.row(nir_i) * nir_scaling + m_data.row(red_i) * red_scaling).array()) - 0.08).array() * (m_data.row(nir_i) * nir_scaling).array()) *
-                  result_scaling + result_offset;
-            row = (row.array()).round();
-            row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
-            row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
-            row = (row.array() < clip_value[0]).select(clip_value[0], row);
-            row = (row.array() > clip_value[1]).select(clip_value[1], row);
-        };
-        this->parRowPerm(computeNirvRow, result_indices);
+            auto computeNirvElement = [&] (uint_t j)
+            {
+                float_t val = ((((m_data(nir_i, j) * nir_scaling - m_data(red_i, j) * red_scaling) /
+                (m_data(nir_i, j) * nir_scaling + m_data(red_i, j) * red_scaling)) - 0.08) * (m_data(nir_i, j) * nir_scaling)) * result_scaling + result_offset;
+                val = std::round(val);
+                if (val == -inf_v)
+                    val = -result_scaling + result_offset;
+                else if (val == +inf_v)
+                    val = result_scaling + result_offset;
+                if (val < clip_value[0])
+                    val = clip_value[0];
+                else if (val > clip_value[1])
+                    val = clip_value[1];
+                m_data(result_indices[i], j) = val;
+            };
+            this->parForRange(computeNirvElement, (uint_t) m_data.cols());
+        }
     }
 
 
@@ -588,22 +754,30 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
                                   float_t result_offset,
                                   std::vector<float_t> clip_value)
     {
-        auto computeSaviRow = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
+        for (size_t i = 0; i < result_indices.size(); i++)
         {
             uint_t red_i = red_indices[i];
             uint_t nir_i = nir_indices[i];
-            row = (((m_data.row(nir_i) * nir_scaling
-                        - m_data.row(red_i) * red_scaling).array() * 1.5).array() /
-                       ((m_data.row(nir_i) * nir_scaling
-                        + m_data.row(red_i) * red_scaling).array() + 0.5).array()).array() *
-                  result_scaling + result_offset;
-            row = (row.array()).round();
-            row = (row.array() == -inf_v).select(-result_scaling + result_offset, row);
-            row = (row.array() == +inf_v).select(result_scaling + result_offset, row);
-            row = (row.array() < clip_value[0]).select(clip_value[0], row);
-            row = (row.array() > clip_value[1]).select(clip_value[1], row);
-        };
-        this->parRowPerm(computeSaviRow, result_indices);
+            auto computeSaviElement = [&] (uint_t j)
+            {
+                float_t val = (((m_data(nir_i, j) * nir_scaling
+                    - m_data(red_i, j) * red_scaling) * 1.5) /
+                    ((m_data(nir_i, j) * nir_scaling
+                    + m_data(red_i, j) * red_scaling) + 0.5)) *
+                    result_scaling + result_offset;
+                val = std::round(val);
+                if (val == -inf_v)
+                    val = -result_scaling + result_offset;
+                else if (val == +inf_v)
+                    val = result_scaling + result_offset;
+                if (val < clip_value[0])
+                    val = clip_value[0];
+                else if (val > clip_value[1])
+                    val = clip_value[1];
+                m_data(result_indices[i], j) = val;
+            };
+            this->parForRange(computeSaviElement, (uint_t) m_data.cols());
+        }
     }
 
 
@@ -676,7 +850,8 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
             float_t max_float = std::numeric_limits<float_t>::max();
             sorted_chunk = sorted_chunk.array().isNaN().select(max_float, sorted_chunk);
             Eigen::VectorXi not_nan_count(chunk.rows());
-            for (uint_t i = 0; i < (uint_t) sorted_chunk.rows(); ++i) {
+            for (uint_t i = 0; i < (uint_t) sorted_chunk.rows(); ++i) 
+            {
                 std::vector<float_t> sorted_row(sorted_chunk.row(i).data(), sorted_chunk.row(i).data() + sorted_chunk.row(i).size());
                 std::sort(sorted_row.begin(), sorted_row.end());
                 for (uint_t j = 0; j < (uint_t) sorted_chunk.cols(); ++j) {
@@ -710,6 +885,101 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
             }
         };
         this->parChunk(computePercentilesChunk);
+    }
+
+
+    void TransArray::fitProibabilites(Eigen::Ref<MatFloat> out_data,
+                                      float_t input_scaling,
+                                      uint_t target_scaling,
+                                      Eigen::Ref<MatFloat> best_classes_data,
+                                      uint_t n_best_classes)
+    {
+        skmapAssertIfTrue(out_data.cols() != m_data.cols(),
+                          "scikit-map ERROR 56: in and out data should have the same number of columns");
+        skmapAssertIfTrue((uint_t) best_classes_data.cols() != n_best_classes,
+                                  "scikit-map ERROR 57: best_classes_data must have n_best_classes columns");
+
+        uint_t n_classes = m_data.cols();
+        int_t power_of_two_start = 1;
+        while (std::pow(2, power_of_two_start + 1) < n_classes)
+            power_of_two_start++;
+        
+        auto fitProibabilitesChunk = [&] (Eigen::Ref<MatFloat> in_chunk, uint_t row_start, uint_t row_end)
+        {
+            uint_t n_pix = row_end - row_start;
+            auto out_chunk = out_data.block(row_start, 0, n_pix, n_classes);
+            out_chunk = in_chunk;
+            MatUint perm_matrix(n_pix, n_classes);
+            out_chunk = out_chunk.array() / input_scaling * (float_t) target_scaling;
+
+            argsortMatrixAscending(out_chunk, perm_matrix, true);
+            
+            best_classes_data.block(row_start, 0, n_pix, n_best_classes) = perm_matrix.block(0, n_classes-n_best_classes, n_pix, n_best_classes).cast<float_t>();
+            
+            MatFloat out_chunk_floor = out_chunk.array().floor();
+            MatFloat out_chunk_ceil = out_chunk.array().ceil();
+            VecFloat sum_floor = out_chunk_floor.rowwise().sum();
+            VecFloat sum_ceil = out_chunk_ceil.rowwise().sum();
+    
+            #pragma omp parallel for
+            for (uint_t i = 0; i < n_pix; ++i)
+            {
+                if (std::isnan(sum_floor(i)) || std::isnan(sum_ceil(i)))
+                {
+                    out_chunk.row(i).array() = nan_v;
+                    best_classes_data.row(row_start+i).array() = nan_v;
+                    continue;
+                }
+
+                // Adjust floor sum
+                uint_t last_modified_floor = 0;
+                while (sum_floor(i) > target_scaling)
+                {
+                    while (out_chunk_floor(i, last_modified_floor) == 0)
+                        last_modified_floor = (last_modified_floor + 1) % n_classes;
+                    out_chunk_floor(i, last_modified_floor) -= 1;
+                    sum_floor(i) -= 1;
+                }
+    
+                // Adjust ceil sum
+                uint_t last_modified_ceil = n_classes - 1;
+                while (sum_ceil(i) < target_scaling)
+                {
+                    out_chunk_ceil(i, last_modified_ceil) += 1;
+                    sum_ceil(i) += 1;
+                    last_modified_ceil = (last_modified_ceil - 1) % n_classes;
+                }
+    
+                // Apply binary search-based for mid selection
+                uint_t tmp_sum = target_scaling + 1;
+                int_t power_of_two = power_of_two_start;
+                uint_t mid = 1 << power_of_two; // mid = 2^power_of_two
+                VecFloat mix_vec(n_classes);
+                while (tmp_sum != target_scaling)
+                {
+                    power_of_two--;
+                    mix_vec.head(mid) = out_chunk_floor.row(i).head(mid);
+                    mix_vec.tail(n_classes - mid) = out_chunk_ceil.row(i).tail(n_classes - mid);
+                    tmp_sum = (uint_t) mix_vec.sum();
+                    if (tmp_sum == target_scaling || power_of_two < 0)
+                        break;
+                    else if (tmp_sum < target_scaling)
+                    {
+                        mid = mid - (1 << power_of_two);
+                        skmapAssertIfTrue(mid < 0, "Mid should not get inferior to 0, something went wrong");
+                    }
+                    else
+                    {
+                        mid = std::min(mid + (1 << power_of_two), n_classes);
+                    }
+                }
+                out_chunk.row(i) = mix_vec.transpose();
+            }
+
+            applyPermutation(out_chunk, perm_matrix, true);
+
+        };
+        this->parChunk(fitProibabilitesChunk);
 
     }
 
@@ -853,10 +1123,8 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
             }
         };
         this->parChunk(averageAggregateChunk);
-
     }
 
-   
     
     void TransArray::nanMeanAggregatePattern(Eigen::Ref<MatFloat> out_data,
                                              std::vector<std::vector<uint_t>>& agg_pattern)
@@ -925,27 +1193,29 @@ void TransArray::swapRowsValues(std::vector<uint_t> row_select,
         this->parChunk(computeMannKendallPValuesChunk);
     }
 
-    void TransArray::linearRegression(Eigen::Ref<VecFloat> x,
-                                      Eigen::Ref<VecFloat> beta_0,
-                                      Eigen::Ref<VecFloat> beta_1)
+void TransArray::linearRegression(Eigen::Ref<VecFloat> x,
+                                  Eigen::Ref<VecFloat> beta_0,
+                                  Eigen::Ref<VecFloat> beta_1)
+{
+    skmapAssertIfTrue((uint_t) m_data.cols() != (uint_t) x.size(),
+                      "scikit-map ERROR 37: regression variable is assumed to match size of data columns");
+    auto linearRegressionChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
     {
-        skmapAssertIfTrue((uint_t) m_data.cols() != (uint_t) x.size(),
-                          "scikit-map ERROR 37: regression variable is assumed to match size of data columns");
-        auto linearRegressionChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
-        {
-            float_t n_samp = chunk.cols();
-            VecFloat Y_mean = chunk.rowwise().mean();
-            float_t x_mean = x.mean();
-            MatFloat covariance_p1 = chunk.colwise() - Y_mean;
-            VecFloat covariance_p2 = x.array() - x_mean;
-            VecFloat covariance = covariance_p1 * covariance_p2;
-            covariance /= n_samp;
-            float_t x_variance = (x.array() - x_mean).square().sum() / n_samp;
-            beta_1.segment(row_start, row_end-row_start) = covariance.array() / x_variance;
-            beta_0.segment(row_start, row_end-row_start) = Y_mean - beta_1 * x_mean;
-        };
-        this->parChunk(linearRegressionChunk);
-    }
+        float_t n_samp = chunk.cols();
+        VecFloat Y_mean = chunk.rowwise().mean();
+        float_t x_mean = x.mean();
+        MatFloat covariance_p1 = chunk.colwise() - Y_mean;
+        VecFloat covariance_p2 = x.array() - x_mean;
+        VecFloat covariance = covariance_p1 * covariance_p2;
+        covariance /= n_samp;
+        float_t x_variance = (x.array() - x_mean).square().sum() / n_samp;
+        beta_1.segment(row_start, row_end - row_start) = covariance.array() / x_variance;
+        beta_0.segment(row_start, row_end - row_start) = Y_mean - beta_1 * x_mean;
+
+    };
+    this->parChunk(linearRegressionChunk);
+}
+
 
 }
 
