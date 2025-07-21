@@ -121,12 +121,17 @@ class ControlS3():
         else:
             sub_prefix = 'done'
         current_tile_name = tile_id + '..server.' + server_name
-        new_tile_name = current_tile_name + '..time.' + str(int(time_seconds))
-        tmp_tile_file = '/tmp/' + new_tile_name
-        self.create_empty_file(tmp_tile_file)
-        self.push_file(tmp_tile_file, bucket_prefix + '/slurm_tiles/' + sub_prefix)
-        self.remove([bucket_prefix + '/slurm_tiles/doing/' + current_tile_name])
-        
+        ret = self.remove([bucket_prefix + '/slurm_tiles/doing/' + current_tile_name])
+        if ret == False:
+            print(f"The file {bucket_prefix + '/slurm_tiles/doing/' + current_tile_name} was not present, tile processed by other server")
+        else:
+            new_tile_name = current_tile_name + '..time.' + str(int(time_seconds))
+            tmp_tile_file = '/tmp/' + new_tile_name
+            self.create_empty_file(tmp_tile_file)
+            self.push_file(tmp_tile_file, bucket_prefix + '/slurm_tiles/' + sub_prefix)
+            print(f"The file {bucket_prefix + '/slurm_tiles/' + sub_prefix} was pushed to s3")
+            
+                  
     
 
 def mmdd_to_doy(mmdd: str) -> int:
