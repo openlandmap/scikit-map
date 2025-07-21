@@ -28,14 +28,18 @@ FetchContent_MakeAvailable(eigen pybind11)
 
 find_package(GDAL REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(OpenCV REQUIRED)
 
 message(STATUS "GDAL library: ${GDAL_LIBRARIES}")
 message(STATUS "GDAL headers: ${GDAL_INCLUDE_DIRS}")
-
+message(STATUS "OpenCV library: ${OpenCV_LIBS}")
+message(STATUS "OpenCV headers: ${OpenCV_INCLUDE_DIRS}"
+)
 add_subdirectory("${pybind11_SOURCE_DIR}")
 
 include_directories("${eigen_SOURCE_DIR}")
 include_directories("${GDAL_INCLUDE_DIRS}")
+include_directories("${OpenCV_INCLUDE_DIRS}")
 include_directories(skmap/include)
 include_directories(skmap/src)
 
@@ -54,4 +58,4 @@ endif()
 set(SOURCES skmap/src/skmap_bindings.cpp skmap/src/ParArray.cpp skmap/src/io/IoArray.cpp skmap/src/transform/TransArray.cpp)
 pybind11_add_module(skmap_bindings ${SOURCES})
 
-target_link_libraries(skmap_bindings PRIVATE ${GDAL_LIBRARIES} OpenMP::OpenMP_CXX)
+target_link_libraries(skmap_bindings PRIVATE ${GDAL_LIBRARIES} ${OpenCV_LIBS} OpenMP::OpenMP_CXX)

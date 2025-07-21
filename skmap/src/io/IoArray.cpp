@@ -30,7 +30,7 @@ namespace skmap {
 
         // @FIXME: this function assumes that the data is single band
         // Extracting reference metadata
-        GDALDataset *refTileDataset = (GDALDataset *)GDALOpen(ref_tile_path.c_str(), GA_ReadOnly);
+        GDALDataset *refTileDataset = (GDALDataset *)GDALOpen(ref_tile_path.c_str(), GA_ReadOnly);        
         skmapAssertIfTrue(refTileDataset == nullptr, "scikit-map ERROR 24: issues in opening ref_tile_path with path " + ref_tile_path);
         
         double ref_geotransform[6];
@@ -137,7 +137,8 @@ namespace skmap {
         if (nullStream.is_open())
         {
             CPLSetErrorHandler(CPLLoggingErrorHandler);
-            CPLSetConfigOption("CPL_LOG", "/dev/null");
+            //CPLSetConfigOption("CPL_LOG", "/dev/null");
+            CPLSetConfigOption("CPL_LOG", "GDAL.log");
         }
         else
         {CPLPushErrorHandler(CPLQuietErrorHandler);}
@@ -154,7 +155,8 @@ namespace skmap {
                            std::optional<float_t> value_to_mask,
                            std::optional<float_t> value_to_set)
     {
-            GDALDataset *readDataset = (GDALDataset*)GDALOpen(file_loc.c_str(), GA_ReadOnly);
+            //GDALDataset *readDataset = (GDALDataset*)GDALOpen(file_loc.c_str(), GA_ReadOnly);
+            GDALDataset *readDataset = (GDALDataset *)GDALOpenEx(file_loc.c_str(), GDAL_OF_RASTER | GDAL_OF_THREAD_SAFE, nullptr, nullptr, nullptr);
             skmapAssertIfTrue(readDataset == nullptr, "scikit-map ERROR 1: issues in opening the file with path " + file_loc);
             // It is assumed that the X/Y buffers size is equevalent to the portion of data to read
             if (!(value_to_mask.has_value()) && value_to_set.has_value()) {

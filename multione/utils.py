@@ -1,5 +1,5 @@
 # Various utils 
-
+#%%
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List
 from numpy.typing import NDArray, ArrayLike
@@ -25,6 +25,8 @@ from settings import bands_prefix_out, file_ending_out, no_data_out, month_start
 from settings import s3_aliases, s3_params, s3_setup
 
 from processing_utils import get_SWA_weights
+
+#%%
 
 # Function to set up S3 aliases using MinIO Client (mc)
 # This function takes access key, secret key, and a list of Gaia addresses,
@@ -92,7 +94,8 @@ def get_landsat_data(landsat_tile, years) -> NDArray[np.float32]:
     n_s_agg = n_years*n_imag_per_year_agg
     landsat_data = np.empty((n_s*(n_spect_bands + 2), n_pix), dtype=np.float32)
     sb.readData(landsat_data, n_threads, landsat_files, range(len(landsat_files)), x_off, y_off, x_size, y_size, [1], gdal_opts, no_data, np.nan)
-    
+    # sb.readData(landsat_data, n_threads, landsat_files, [2], x_off, y_off, x_size, y_size, [1], gdal_opts, no_data, np.nan)
+    # sb.readData(landsat_data, n_threads, ld, [0], x_off, y_off, x_size, y_size, [1], gdal_opts, no_data, np.nan)
     return landsat_data
 
 def get_modis_ndvi_data(landsat_tile, years, resampling_strategy='GRA_Bilinear') -> NDArray[np.float32]:
@@ -144,9 +147,11 @@ def mask_from_qa(landsat_data: NDArray[np.float32], n_years:int) -> NDArray[np.f
     n_spect_bands = len(bands_prefix) - 1
     range_qa = range(n_s*(n_spect_bands), n_s*(n_spect_bands+1))
     
+    ''' This is a workaround for the above commented code, which is not parallel
     landsat_mask = np.empty((n_s, n_pix), dtype=np.float32)
     sb.extractArrayRows(landsat_data, n_threads, landsat_mask, range_qa)
-
+    '''
+    #landsat_mask = landsat_data[range_qa, :]
     # Try removing snow, check 16d_intervals.xlsx for the QA info and scaling
     # 14 = additional cloud buffer over land
     # 3 = cloud
@@ -156,13 +161,68 @@ def mask_from_qa(landsat_data: NDArray[np.float32], n_years:int) -> NDArray[np.f
     gap_mask_remove_buffer = [1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1]
 
     # @FIXME this thing is basically not parallel
+    ind_start = n_s*n_spect_bands
+    landsat_mask = np.empty((n_s, n_pix), dtype=np.float32)
+    sb.fillArray(landsat_mask, n_threads, 1.)
     for i in range(n_s):
-        n_cloud_pix = np.sum((landsat_mask[i] == 3)) + 1
-        n_buff_pix = np.sum((landsat_mask[i] == 14)) + 1 # avoid division by 0
-        gap_mask = gap_mask_remove_buffer if (n_cloud_pix/n_buff_pix) >= 1 else gap_mask_keep_buffer
+        n_cloud_pix = np.sum((landsat_data[ind_start + i,:] == 3))# + 1
+        n_buff_pix = np.sum((landsat_data[ind_start + i,:] == 14))# + 1 # avoid division by 0
+        gap_mask = gap_mask_remove_buffer if (n_cloud_pix>n_buff_pix) else gap_mask_keep_buffer
+        '''
         for k in range(0,18):
             sb.swapRowsValues(landsat_mask, n_threads, [i], k, gap_mask[k])
+        '''
+        # This is a workaround for the above commented code, which is not parallel
+        #mask_ones = np.nonzero(gap_mask)[0]
+        mask_zeros = np.nonzero(np.logical_not(gap_mask))[0]
+        ind = np.isin(landsat_data[ind_start + i,:], mask_zeros) # kind='table' is faster but only for integer arrays
+        landsat_mask[i,ind] = 0.
+        
 
+    for i in range(n_spect_bands):
+        sb.maskData(landsat_data, n_threads, range(n_s*i, n_s*(i+1)), landsat_mask, 1., np.nan)
+
+    del landsat_mask
+    gc.collect()
+
+    return landsat_data
+
+def mask_from_qa_parallel(landsat_data: NDArray[np.float32], n_years:int) -> NDArray[np.float32]:
+    # Use parallel processing to mask Landsat data from QA
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    n_s = n_years*n_imag_per_year
+    n_spect_bands = len(bands_prefix) - 1
+
+    #landsat_mask = landsat_data[range_qa, :]
+    # Try removing snow, check 16d_intervals.xlsx for the QA info and scaling
+    # 14 = additional cloud buffer over land
+    # 3 = cloud
+    # 6 = snow
+    #                         0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17   
+    gap_mask_keep_buffer   = [1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
+    gap_mask_remove_buffer = [1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1]
+
+    # @FIXME this thing is basically not parallel
+    ind_start = n_s*n_spect_bands
+    landsat_mask = np.empty((n_s, n_pix), dtype=np.float32)
+    sb.fillArray(landsat_mask, n_threads, 1.)
+
+    def process_mask_row(i: int) -> None:
+        n_cloud_pix = np.sum((landsat_data[ind_start + i,:] == 3))
+        n_buff_pix = np.sum((landsat_data[ind_start + i,:] == 14))  # avoid division by 0
+        gap_mask = gap_mask_remove_buffer if (n_cloud_pix > n_buff_pix) else gap_mask_keep_buffer
+
+        mask_zeros = np.nonzero(np.logical_not(gap_mask))[0]
+        ind = np.isin(landsat_data[ind_start + i,:], mask_zeros) # kind='table' is faster but only for integer arrays
+        landsat_mask[i,ind] = 0.
+        
+    with ThreadPoolExecutor(max_workers=n_threads) as executor:
+        futures = [executor.submit(process_mask_row, i) for i in range(n_s)]
+        for future in futures:
+            future.result()
+        
     for i in range(n_spect_bands):
         sb.maskData(landsat_data, n_threads, range(n_s*i, n_s*(i+1)), landsat_mask, 1., np.nan)
 
@@ -180,14 +240,14 @@ def mask_from_modis(landsat_data: NDArray[np.float32], modis_data:NDArray[np.flo
     n_spect_bands = len(bands_prefix) - 1
 
     range_nir = range(n_s*1, n_s*2)
-    range_red = range(n_s*0, n_s*0)
+    range_red = range(n_s*0, n_s*1)
     range_ndvi = range(n_s*(n_spect_bands+1), n_s*(n_spect_bands+2))
     range_qa = range(n_s*(n_spect_bands), n_s*(n_spect_bands+1))
 
     diff_th, count_th = filter_params(n_years)
     
     sb.computeNormalizedDifference(landsat_data, n_threads,
-                                range_nir, range_nir, range_ndvi,
+                                range_nir, range_red, range_ndvi,
                                 mask_band_scaling, mask_band_scaling, mask_result_scaling, 
                                 mask_result_offset, [-mask_result_scaling, mask_result_scaling])
     landsat_NDVI_masked = np.empty((n_s, n_pix), dtype=np.float32)
@@ -309,3 +369,21 @@ def save_landsat_bands(landsat_bands_rec_t: NDArray[np.float32], landsat_tile: s
                 x_off, y_off, x_size, y_size, no_data_out, compression_command, s3_out)
 
     
+# %%
+def show_image(landsat_data: NDArray[np.float32], years:List, year:int, img_in_year:int, band:int) -> None:
+    """
+    Show Landsat image for a specific band.
+    """
+    # year=2000; img_in_year=0; band=7
+    # band 7=qa, band 8=ndvi
+    import matplotlib.pyplot as plt
+    
+    n_years = len(years)
+    n_s = n_years*n_imag_per_year    
+    ind_band = n_s*band + (year - years[0])*n_s + img_in_year
+
+    data = landsat_data[ind_band, :].reshape((y_size, x_size))
+    plt.imshow(data)
+    plt.title(f'Band {band} for year {year} image {img_in_year}')
+    plt.colorbar()
+    plt.show()  

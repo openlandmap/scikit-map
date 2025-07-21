@@ -19,3 +19,6 @@ It doesn't work - kernel dies on sb.readData
 eval "$(micromamba shell hook --shell bash)"
 micromamba activate arcov2_38
 python setup_cmake.py build_ext --inplace
+
+# On server nibble
+# 
