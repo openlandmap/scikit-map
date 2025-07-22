@@ -156,7 +156,9 @@ class TiledDataLoader(TiledData):
             os.remove(self.mask_path)
             ttprint(f"Temporary mask data {self.mask_path} has been deleted.")
     
-    def load_tile_data(self, tile_id):
+    def load_tile_data(self, tile_id, n_threads_read = None):
+        if n_threads_read = None:
+            n_threads_read = self.n_threads
         self.tile_id = tile_id
         self.mask_path = self.mask_template_path.format(tile_id=tile_id)
         # @FIXME: this only work with our setting of Landsat data
@@ -211,17 +213,17 @@ class TiledDataLoader(TiledData):
             if tile_paths:
                 if self.spatial_aggregation:
                     tmp_data = sb_arr(len(tile_paths), 4000 * 4000)
-                    sb.readData(tmp_data, self.n_threads, tile_paths, range(len(tile_paths)), 2, 2, 4000, 4000, [1], self.gdal_opts, None, np.nan)
+                    sb.readData(tmp_data, n_threads_read, tile_paths, range(len(tile_paths)), 2, 2, 4000, 4000, [1], self.gdal_opts, None, np.nan)
                     arr_reshaped = tmp_data.reshape(len(tile_paths), 4000, 4000)
                     arr_aggregated = arr_reshaped.reshape(len(tile_paths), self.y_size, self.spatial_aggregation, self.x_size, self.spatial_aggregation).mean(axis=(2, 4))
                     arr_final = arr_aggregated.reshape(len(tile_paths), self.x_size * self.y_size)
                     self.array[tile_idxs,:] = arr_final[:,:]
                 else:
-                    sb.readData(self.array, self.n_threads, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, 
+                    sb.readData(self.array, n_threads_read, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, 
                                 self.y_size, [1], self.gdal_opts, None, np.nan)
             # Go whales, go!!
             lon_lat = sb_arr(2, self.n_pixels)
-            sb.getLatLonArray(lon_lat, self.n_threads, self.gdal_opts, self.mask_path, self.x_off, self.y_off, self.x_size, self.y_size)
+            sb.getLatLonArray(lon_lat, n_threads_read, self.gdal_opts, self.mask_path, self.x_off, self.y_off, self.x_size, self.y_size)
             run_whales(self.catalog, self.array, self.n_threads, lon_lat[1,:])
         return self
                     
