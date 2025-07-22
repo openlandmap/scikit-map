@@ -157,7 +157,7 @@ class TiledDataLoader(TiledData):
             ttprint(f"Temporary mask data {self.mask_path} has been deleted.")
     
     def load_tile_data(self, tile_id, n_threads_read = None):
-        if n_threads_read = None:
+        if n_threads_read == None:
             n_threads_read = self.n_threads
         self.tile_id = tile_id
         self.mask_path = self.mask_template_path.format(tile_id=tile_id)
