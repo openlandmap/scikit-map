@@ -157,13 +157,15 @@ class TiledDataLoader(TiledData):
         self.n_pixels_valid = None
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if os.path.exists(self.mask_path) & (self.spatial_aggregation != None):
+        if os.path.exists(self.mask_path):
             os.remove(self.mask_path)
             ttprint(f"Temporary mask data {self.mask_path} has been deleted.")
     
     def load_tile_data(self, tile_id):
         self.tile_id = tile_id
-        self.mask_path = self.mask_template_path.format(tile_id=tile_id)
+        tmp_mask_path = self.mask_template_path.format(tile_id=tile_id)
+        self.mask_path = f"/tmp/tmp_mask_{tmp_mask_path.split('/')[-1].split('.')[0]}.tif"
+        subprocess.run(f'wget {tmp_mask_path} -q -O {self.mask_path}' , shell=True, check=True)
         # @FIXME: this only work with our setting of Landsat data
         if self.spatial_aggregation:
             if self.verbose:
