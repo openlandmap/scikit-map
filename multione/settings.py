@@ -74,6 +74,7 @@ bands_prefix = ['red_glad',
                 'swir2_glad',
                 'thermal_glad',
                 'qa_mask']
+n_spect_bands = len(bands_prefix) - 1  # Exclude 'qa_mask' band
 
 bands_prefix_out = ['red_glad',
                     'nir_glad',
@@ -118,6 +119,13 @@ landsat_file_ending = '_go_epsg.4326_v20240521.tif'
 mask_band_scaling = 1/4e4
 mask_result_scaling = 1e4
 mask_result_offset = 0.
+
+# Impainting stripes parameters
+fft_th = 1.5
+gap_stripes_th, gap_general_th = 0.35, 0.05
+inpaint_chunk_size = 128
+inpaint_radius = 3
+inpaint_padding = 15
 
 # MODIS NDVI filtering parameters
 # diff_th, count_th = (3000, int(0.3*n_s))
