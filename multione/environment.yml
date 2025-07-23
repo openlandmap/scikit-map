@@ -1,0 +1,21 @@
+name: arcov2_38
+channels:
+  - conda-forge
+dependencies:
+  - bottleneck
+  - gdal
+  - geopandas
+  - gspread
+  - joblib
+  - jupyter
+  - matplotlib
+  - minio
+  - numba
+  - psutil
+  - pybind11
+  - pystac
+  - rasterio
+  - scikit-image
+  - scikit-learn
+  - shapely
+

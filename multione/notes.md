@@ -1,0 +1,2 @@
+ - consider, 1 minute of computing time per tile corresponds to 1 day in production, this means that if you stay below 15-20 minutes it's ok
+ - landsat_data - rows = n_years * n_imag_per_year * (n_spect_bands + 2), extra bands are NDVI and QA

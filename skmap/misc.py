@@ -2,17 +2,20 @@
 Miscellaneous utils
 '''
 
-from typing import List, Dict, Union, Iterable
+from typing import List, Union, Iterable
 from datetime import datetime, timedelta
 from functools import reduce
 
+from minio import Minio
+from minio.error import S3Error
 import os
-import gc
+import random
 import tempfile
 import rasterio
 import geopandas as gp
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 import math
 import time
@@ -22,6 +25,119 @@ from shapely.geometry import box,shape
 from dateutil.relativedelta import relativedelta
 
 TMP_DIR = tempfile.gettempdir()
+
+class ControlS3():
+    def __init__(self,
+                 endpoint_url,
+                 access_key,
+                 secret_key) -> None:
+        self.client = Minio(
+            endpoint_url,
+            access_key=access_key,
+            secret_key=secret_key,
+            secure=False
+        )
+    
+    def list(self, bucket_prefix, recursive=True):
+        prefix = '/'.join(bucket_prefix.split('/')[1:])
+        bucket = bucket_prefix.split('/')[0]
+        return [bucket + '/' + o.object_name for o in self.client.list_objects(bucket, prefix=prefix, recursive=recursive)]
+    
+    def push_file(self, file_path, bucket_prefix):
+        object_name = '/'.join(bucket_prefix.split('/')[1:]) + '/' + file_path.split('/')[-1]
+        bucket = bucket_prefix.split('/')[0]
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"Local file not found: {file_path}")
+        try:
+            self.client.fput_object(bucket, object_name, file_path)
+        except S3Error as e:
+            raise RuntimeError(f"Upload failed: {e}")
+        os.remove(file_path)
+        
+    def create_empty_file(self, file_path):
+        try:
+            with open(file_path, "x") as f:
+                f.write("empty")
+        except FileExistsError:
+            print(f"File {file_path} already exists.")
+    
+    def remove(self, objects_list):
+        for bucket_key in objects_list:
+            key = '/'.join(bucket_key.split('/')[1:])
+            bucket = bucket_key.split('/')[0]
+            try:
+                self.client.stat_object(bucket, key)
+                self.client.remove_object(bucket, key)
+            except S3Error as e:
+                if e.code == "NoSuchKey":
+                    print(f"No key {key} in the bucket {bucket}")
+                    return False
+                else:
+                    raise Exception("Issue in stating or removign the object")
+        return True
+    
+    def select_slurm_tile(self, bucket_prefix, server_name, deplete_doing = True, max_attempts = 100):
+        """
+        Seturn a slurm tile to compute if available, and move the tile in the doing folder.
+
+        :param bucket_prefix: Bucket and prefix excluding ``slurm_tiles``.
+        :param server_name: Server name used to define the name in the doing folder.
+        :param deplete_doing: If ``True`` it does also consider the doing
+                              in case todo is empty.
+        :param max_attempts: To avoid infinite while loops.
+                              
+        :returns: A tuple with convention ``available, tile`` where if a tile is available
+                  ``available`` is ``True`` and ``tile`` is the tile string, otherwise 
+                  ``available`` is ``False`` and ``tile`` is ``None``.
+        """
+        flag_avail = max_attempts
+        while flag_avail > 0:
+            todo_tiles = self.list(bucket_prefix + '/slurm_tiles/todo')
+            if len(todo_tiles) == 0:
+                if deplete_doing:
+                    todo_tiles = self.list(bucket_prefix + '/slurm_tiles/doing')
+                    if len(todo_tiles) == 0:
+                        return False, None
+                    else:
+                        todo_tiles = [(t, t.split('/')[-1].split('..server.')[0]) for t in todo_tiles]
+                else:
+                    return False, None
+            else:
+                todo_tiles = [(t, t.split('/')[-1]) for t in todo_tiles]
+            tile_object, tile_id = random.choice(todo_tiles)
+            flag_remove = self.remove([tile_object])
+            if flag_remove:
+                new_tile_name = tile_id + '..server.' + server_name
+                tmp_tile_file = '/tmp/' + new_tile_name
+                self.create_empty_file(tmp_tile_file)
+                self.push_file(tmp_tile_file, bucket_prefix + '/slurm_tiles/doing')
+                return True, tile_id
+            flag_avail -= 1
+        raise Exception(f'Already attempted {max_attempts} times to get a tile, aborting to avoid infinite loop')
+    
+    def move_completed_tile(self, bucket_prefix, server_name, tile_id, time_seconds, skipped):
+        if skipped:
+            sub_prefix = 'skipped'
+        else:
+            sub_prefix = 'done'
+        current_tile_name = tile_id + '..server.' + server_name
+        new_tile_name = current_tile_name + '..time.' + str(int(time_seconds))
+        tmp_tile_file = '/tmp/' + new_tile_name
+        self.create_empty_file(tmp_tile_file)
+        self.push_file(tmp_tile_file, bucket_prefix + '/slurm_tiles/' + sub_prefix)
+        self.remove([bucket_prefix + '/slurm_tiles/doing/' + current_tile_name])
+        
+    
+
+def mmdd_to_doy(mmdd: str) -> int:
+    date = datetime.strptime(mmdd, "%m%d")
+    return date.timetuple().tm_yday
+
+def sb_arr(rows, cols):
+    return np.empty((rows, cols), np.float32)
+
+def sb_vec(elems):
+    return np.empty((elems,), np.float32)
 
 def _warn_deps(e, module_name):
         import warnings

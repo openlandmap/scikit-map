@@ -84,30 +84,48 @@ class IoArray: public ParArray
 
             auto writeTiff = [&] (uint_t i, Eigen::Ref<MatFloat::RowXpr> row)
             {
-                skmapAssertIfTrue((uint_t) m_data.cols() < x_size * y_size, "scikit-map ERROR 9: reading region size smaller then the number of columns");
+                if ((uint_t)m_data.cols() < x_size * y_size) {
+                    throw std::runtime_error("scikit-map ERROR 9: reading region size smaller than the number of columns");
+                }
                 GDALDataset *inputDataset = (GDALDataset *)GDALOpen(base_files[i].c_str(), GA_ReadOnly);
+                if (inputDataset == nullptr) {
+                    throw std::runtime_error("scikit-map ERROR 10: issues in reading the file " + base_files[i]);
+                }
                 double geotransform[6];
-                inputDataset->GetGeoTransform(geotransform);
+                if (inputDataset->GetGeoTransform(geotransform) != CE_None) {
+                    throw std::runtime_error("scikit-map ERROR 10: Failed to get GeoTransform.");
+                }
                 auto projection = inputDataset->GetProjectionRef();
+                if (projection == nullptr) {
+                    throw std::runtime_error("scikit-map ERROR 10: Failed to get ProjectionRef.");
+                }
                 auto spatial_ref = inputDataset->GetSpatialRef();
+                if (spatial_ref == nullptr) {
+                    throw std::runtime_error("scikit-map ERROR 10: Failed to get SpatialRef.");
+                }
                 int x_size_in = inputDataset->GetRasterXSize();
                 int y_size_in = inputDataset->GetRasterYSize();
-                std::string ending;
-                if (bash_compression_command.has_value())
-                    ending = "_tmp.tif";
-                else 
-                    ending = ".tif";
-                    
                 std::string layer_name = file_names[i];
+                const std::string suffix = ".tif";
+                if (layer_name.size() >= suffix.size() && layer_name.compare(layer_name.size() - suffix.size(), suffix.size(), suffix) == 0) {
+                    layer_name = layer_name.substr(0, layer_name.size() - suffix.size());
+                }
                 GDALDriver *driver = GetGDALDriverManager()->GetDriverByName("GTiff");
+                row = row.array().isNaN().select(static_cast<float_t>(no_data_value), row);
                 Eigen::RowVectorX<T> casted_row = row.cast<T>();
-                GDALDataset *writeDataset = driver->Create((base_folder + "/" + layer_name + ending).c_str(),
+                std::string file_name = base_folder + "/" + layer_name;
+                std::string ending = bash_compression_command.has_value() ? "_tmp.tif" : ".tif";
+                std::string tmp_file_name = file_name + ending;
+                GDALDataset *writeDataset = driver->Create(tmp_file_name.c_str(),
                     inputDataset->GetRasterXSize(), inputDataset->GetRasterYSize(), 1, write_type, nullptr);
+                if (writeDataset == nullptr) {
+                    throw std::runtime_error("scikit-map ERROR 10: issues in creating the file " + tmp_file_name);
+                }
                 writeDataset->SetGeoTransform(geotransform);
                 writeDataset->SetSpatialRef(spatial_ref);
                 writeDataset->SetProjection(projection);
                 GDALRasterBand *writeBand = writeDataset->GetRasterBand(1);
-                writeBand->SetNoDataValue((double) no_data_value);
+                writeBand->SetNoDataValue(static_cast<double>(no_data_value));
                 using MatType = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
                 MatType init_raster = MatType::Constant(1, x_size_in * y_size_in, no_data_value);
                 auto out_write1 = writeBand->RasterIO(
@@ -124,15 +142,13 @@ class IoArray: public ParArray
                 GDALClose(writeDataset);
                 if (bash_compression_command.has_value())
                 {                    
-                    runBashCommand(bash_compression_command.value() + " " + base_folder + "/" + layer_name + ending + " "
-                                 + base_folder + "/" + layer_name + ".tif");
-                    runBashCommand("rm " + base_folder + "/" + layer_name + ending);
+                    runBashCommand(bash_compression_command.value() + " " + tmp_file_name + " " + file_name + ".tif");
+                    runBashCommand("rm " + tmp_file_name);
                 }
                 if (seaweed_path.has_value())
                 {                    
-                    runBashCommand("mc cp " + base_folder + "/" + layer_name + ".tif " +
-                                              seaweed_path.value()[i] + "/" + layer_name + ".tif ");
-                    runBashCommand("rm " + base_folder + "/" + layer_name + ".tif");
+                    runBashCommand("mc cp " + file_name + ".tif " + seaweed_path.value()[i] + "/" + layer_name + ".tif ");
+                    runBashCommand("rm " + file_name + ".tif");
                 }
 
             };
