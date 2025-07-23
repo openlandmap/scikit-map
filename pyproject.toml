@@ -8,7 +8,7 @@ version = "0.8.1"
 description = "scikit-learn applied to mapping and spatial prediction"
 readme = "README.md" # Assuming your long_description content is in a README.md
 requires-python = ">=3.7"
-license = { text = "MIT License" }
+license = "MIT"
 authors = [
   # You'll need to add authors here, as it's not explicitly in your setup.py
   # { name = "Your Name", email = "your.email@example.com" },

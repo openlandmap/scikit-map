@@ -8,6 +8,7 @@ import gc
 import rasterio as rio
 import rasterio.vrt, rasterio.enums
 from tqdm import tqdm
+import os
 
 import subprocess
 from datetime import datetime
@@ -225,8 +226,8 @@ def mask_from_qa(landsat_data: NDArray[np.float32], n_years:int) -> NDArray[np.f
     # 3 = cloud
     # 6 = snow
     #                         0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17   
-    gap_mask_keep_buffer   = [1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
-    gap_mask_remove_buffer = [1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1]
+    gap_mask_keep_buffer   = [1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
+    gap_mask_remove_buffer = [1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1]
 
     # @FIXME this thing is basically not parallel
     ind_start = n_s*n_spect_bands
@@ -268,8 +269,8 @@ def mask_from_qa_parallel(landsat_data: NDArray[np.float32], n_years:int) -> NDA
     # 3 = cloud
     # 6 = snow
     #                         0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17   
-    gap_mask_keep_buffer   = [1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
-    gap_mask_remove_buffer = [1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1]
+    gap_mask_keep_buffer   = [1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
+    gap_mask_remove_buffer = [1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1]
 
     # @FIXME this thing is basically not parallel
     ind_start = n_s*n_spect_bands
@@ -525,9 +526,8 @@ def save_landsat_bands(landsat_bands_rec_t: NDArray[np.float32], landsat_tile: s
     gc.collect()
 
     
-    out_dir = f'data_out/{landsat_tile}'
-    # os.makedirs('data_out', exist_ok = True)
-    # os.makedirs(out_dir, exist_ok = True)
+    out_dir = f'/tmp/{landsat_tile}'
+    os.makedirs(out_dir, exist_ok = True)
     
     compression_command = f"gdal_translate -a_nodata {no_data_out} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
     out_files = []
@@ -539,6 +539,8 @@ def save_landsat_bands(landsat_bands_rec_t: NDArray[np.float32], landsat_tile: s
     s3_out = [f'{random.choice(s3_aliases)}/{s3_params["s3_prefix"]}/{landsat_tile}' for _ in range(len(out_files))]
     sb.writeUInt16Data(out_data, n_threads, gdal_opts, landsat_files[0:len(out_files)], out_dir, out_files, range(len(out_files)),
                 x_off, y_off, x_size, y_size, no_data_out, compression_command, s3_out)
+    os.rmdir(out_dir)
+    print(f"Check gaia at {s3_out[0]}")
 
     
 # %%

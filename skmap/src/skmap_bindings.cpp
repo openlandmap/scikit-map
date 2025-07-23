@@ -118,6 +118,36 @@ void extractOverlay(Eigen::Ref<MatFloat> data,
     ioArray.extractOverlay(pix_blok_ids, pix_inblock_idxs, unique_blocks_ids_comb, key_layer_ids_comb, data_overlay);
 }
 
+void inpaintChunks(Eigen::Ref<MatFloat> data,
+                  const uint_t n_threads,
+                  uint_t inpaint_radius,
+                  uint_t padding,
+                  uint_t x_size,
+                  uint_t y_size,
+                  std::vector<uint_t> sample_idxs,
+                  std::vector<uint_t> row_starts,
+                  std::vector<uint_t> row_ends,
+                  std::vector<uint_t> col_starts,
+                  std::vector<uint_t> col_ends)
+{
+    TransArray transArray(data, n_threads);
+    transArray.inpaintChunks(inpaint_radius, padding, x_size, y_size, sample_idxs, row_starts, row_ends, col_starts, col_ends);
+}
+
+void eraseChunks(Eigen::Ref<MatFloat> data,
+                  const uint_t n_threads,
+                  uint_t x_size,
+                  uint_t y_size,
+                  std::vector<uint_t> sample_idxs,
+                  std::vector<uint_t> row_starts,
+                  std::vector<uint_t> row_ends,
+                  std::vector<uint_t> col_starts,
+                  std::vector<uint_t> col_ends)
+{
+    TransArray transArray(data, n_threads);
+    transArray.eraseChunks(x_size, y_size, sample_idxs, row_starts, row_ends, col_starts, col_ends);
+}
+
 
 void readData(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
@@ -872,7 +902,8 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("maskDataRows", &maskDataRows, "Mask data rows");
     m.def("maskNan", &maskNan, "Mask NaN");
     m.def("maskNanRows", &maskNanRows, "Mask NaN Rows");
-    m.def("swapRowsValues", &swapRowsValues, "Swap array values");
+    m.def("swapRowsValues", &swapRowsValues, py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
+        py::arg() = std::nullopt, "Swap array values");
     m.def("expandArrayRows", &expandArrayRows, "Expand array rows");
     m.def("expandArrayCols", &expandArrayCols, "Expand array cols");
     m.def("extractArrayRows", &extractArrayRows, "Extract array rows");
@@ -934,5 +965,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("castFloat64ToFloat32", castFloat64ToFloat32);
     m.def("castFloat32ToFloat64", castFloat32ToFloat64);
     m.def("fitProibabilites", fitProibabilites);
+    m.def("inpaintChunks", &inpaintChunks, "Inpaint chunks");
+    m.def("eraseChunks", &eraseChunks, "Erase chunks");
 }
 
