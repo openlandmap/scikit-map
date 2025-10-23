@@ -512,23 +512,38 @@ class TiledDataExporter(TiledData):
         self.n_pixels = int(pred_depths_texture1[0].array.shape[1]/len(self.years))
         n_quant = len(self.quantiles)
         self.array = sb_arr(self.n_layers, self.n_pixels)
+        
         array_t = sb_arr(self.n_pixels, self.n_layers)
         n_trees = pred_depths_texture1[0].array.shape[0]
+        print('d')
+        
         for d in range(len(self.depths) - 1):
             for y in range(len(self.years) - 1):
+
                 offset_caly = d * (len(self.years) - 1) * 3 * (n_quant + 1) + y * 3 * (n_quant + 1)
                 offset_sand = d * (len(self.years) - 1) * 3 * (n_quant + 1) + y * 3 * (n_quant + 1) + (n_quant + 1)
                 offset_silt = d * (len(self.years) - 1) * 3 * (n_quant + 1) + y * 3 * (n_quant + 1) + 2 * (n_quant + 1)
                 trees_avg_texture1 = sb_arr(n_trees, self.n_pixels)
                 trees_avg_texture2 = sb_arr(n_trees, self.n_pixels)
+                print(self.n_threads)
+                print(self.n_pixels)
+                print(trees_avg_texture1.shape)
+                print(pred_depths_texture1[d].array.shape)
+                print(pred_depths_texture1[d+1].array.shape)
+                print(trees_avg_texture2.shape)
+                print(pred_depths_texture2[d].array.shape)
+                print(pred_depths_texture2[d+1].array.shape)
+                
                 sb.blocksAverage(trees_avg_texture1, self.n_threads,
                                  pred_depths_texture1[d].array, pred_depths_texture1[d+1].array, self.n_pixels, y)
                 sb.blocksAverage(trees_avg_texture2, self.n_threads,
                                  pred_depths_texture2[d].array, pred_depths_texture2[d+1].array, self.n_pixels, y)
+                print("b")
                 trees_avg_texture1_t = sb_arr(self.n_pixels, n_trees)
                 trees_avg_texture2_t = sb_arr(self.n_pixels, n_trees)
                 mean_texture1 = sb_arr(self.n_pixels, 1)
                 mean_texture2 = sb_arr(self.n_pixels, 1)
+                
                 sb.transposeArray(trees_avg_texture1, self.n_threads, trees_avg_texture1_t)
                 sb.transposeArray(trees_avg_texture2, self.n_threads, trees_avg_texture2_t)
                 sb.nanMean(trees_avg_texture1_t, self.n_threads, mean_texture1)
@@ -560,34 +575,31 @@ class TiledDataExporter(TiledData):
         self.n_pixels = int(pred_depths_texture1[0].array.shape[1]/len(self.years))
         self.array = sb_arr(self.n_layers, self.n_pixels)
         array_t = sb_arr(self.n_pixels, self.n_layers)
-        n_trees = pred_depths_texture1[0].array.shape[0]
+        n_trees1 = pred_depths_texture1[0].array.shape[0]
+        n_trees2 = pred_depths_texture2[0].array.shape[0]
         for d in range(len(self.depths) - 1):
             for y in range(len(self.years) - 1):
                 offset_caly = d * (len(self.years) - 1) * 3 + y * 3
                 offset_sand = d * (len(self.years) - 1) * 3 + y * 3 + 1
                 offset_silt = d * (len(self.years) - 1) * 3 + y * 3 + 2
-                trees_avg_texture1 = sb_arr(n_trees, self.n_pixels)
-                trees_avg_texture2 = sb_arr(n_trees, self.n_pixels)
+                trees_avg_texture1 = sb_arr(n_trees1, self.n_pixels)
+                trees_avg_texture2 = sb_arr(n_trees2, self.n_pixels)
                 sb.blocksAverage(trees_avg_texture1, self.n_threads,
                                  pred_depths_texture1[d].array, pred_depths_texture1[d+1].array, self.n_pixels, y)
                 sb.blocksAverage(trees_avg_texture2, self.n_threads,
                                  pred_depths_texture2[d].array, pred_depths_texture2[d+1].array, self.n_pixels, y)
-                trees_avg_texture1_t = sb_arr(self.n_pixels, n_trees)
-                trees_avg_texture2_t = sb_arr(self.n_pixels, n_trees)
+                trees_avg_texture1_t = sb_arr(self.n_pixels, n_trees1)
+                trees_avg_texture2_t = sb_arr(self.n_pixels, n_trees2)
                 mean_texture1 = sb_arr(self.n_pixels, 1)
                 mean_texture2 = sb_arr(self.n_pixels, 1)
                 sb.transposeArray(trees_avg_texture1, self.n_threads, trees_avg_texture1_t)
                 sb.transposeArray(trees_avg_texture2, self.n_threads, trees_avg_texture2_t)
                 sb.nanMean(trees_avg_texture1_t, self.n_threads, mean_texture1)
                 sb.nanMean(trees_avg_texture2_t, self.n_threads, mean_texture2)
-                clay_trees = sb_arr(self.n_pixels, n_trees)
-                sand_trees = sb_arr(self.n_pixels, n_trees)
-                silt_trees = sb_arr(self.n_pixels, n_trees)
                 clay_mean = sb_arr(self.n_pixels, 1)
                 sand_mean = sb_arr(self.n_pixels, 1)
                 silt_mean = sb_arr(self.n_pixels, 1)
                 
-                sb.texturesBwTransform(trees_avg_texture1_t, self.n_threads, trees_avg_texture2_t, k, a, sand_trees, silt_trees, clay_trees)
                 sb.texturesBwTransform(mean_texture1, self.n_threads, mean_texture2, k, a, sand_mean, silt_mean, clay_mean)
                 
                 array_t[:,offset_caly] = clay_mean[:,0]
