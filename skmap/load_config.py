@@ -1,6 +1,16 @@
 import yaml
 from types import SimpleNamespace
 from typing import Any, Dict
+from skmap.modeler import RFRegressor, RFRegressorTrees, Modeler, Regressor, Classifier, RFClassifier
+
+MODEL_REGISTRY = {
+    'RFRegressor': RFRegressor,
+    'RFRegressorTrees': RFRegressorTrees,
+    'Modeler': Modeler,
+    'Classifier': Classifier,
+    'RFClassifier': RFClassifier,
+    'Regressor': Regressor,
+}
 
 class _SafeDict(dict):
     """
@@ -53,24 +63,27 @@ def parse_config(yaml_path: str) -> SimpleNamespace:
         data = yaml.safe_load(f)
 
     # 1. Separate base config from the models list
-    base_config = {k: v for k, v in data.items() if k != 'model_params'}
-    model_params_list = data.get('model_params', [])
+    base_config = {k: v for k, v in data.items() if k != 'models_params'}
+    models_params_list = data.get('models_params', [])
 
     # 2. Iteratively format the base configuration
     for _ in range(5):
         context = _SafeDict(base_config)
         base_config = _recursive_format(base_config, context)
 
-    # 3. Process each dictionary within the model_params list
+    # 3. Process each dictionary within the models_params list
     processed_models = []
-    for model_dict in model_params_list:
+    for model_dict in models_params_list:
         full_context = _SafeDict({**base_config, **model_dict})
         formatted_model = _recursive_format(model_dict, full_context)
+        formatted_model['model'] = MODEL_REGISTRY[base_config['model_type']](formatted_model['model_path_template'])
         processed_models.append(formatted_model)
 
     # 4. Recombine into the final configuration dictionary
     final_config_dict = base_config
-    final_config_dict['model_params'] = processed_models
+    final_config_dict['models_params'] = processed_models
+    
+    final_config_dict['s3_params']['s3_addresses'] = [final_config_dict['gaia_addr_range']['template'].format(gaia_ip=gaia_ip) for gaia_ip in range(final_config_dict['gaia_addr_range']['start'], final_config_dict['gaia_addr_range']['end'])]
 
     # 5. Convert only the top level to a SimpleNamespace
     return _to_hybrid_namespace(final_config_dict)
