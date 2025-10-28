@@ -548,9 +548,13 @@ class TiledDataExporter(TiledData):
                 clay_trees = sb_arr(self.n_pixels, n_trees)
                 sand_trees = sb_arr(self.n_pixels, n_trees)
                 silt_trees = sb_arr(self.n_pixels, n_trees)
-                trees_avg_texture1_t = trees_avg_texture1_t[:,0:n_trees] # Fit to the minimum number of trees
-                trees_avg_texture2_t = trees_avg_texture2_t[:,0:n_trees] # Fit to the minimum number of trees
-                sb.texturesBwTransform(trees_avg_texture1_t, self.n_threads, trees_avg_texture2_t, k, a, sand_trees, silt_trees, clay_trees)
+                trees_avg_texture1_t_sel = sb_arr(self.n_pixels, n_trees)
+                trees_avg_texture2_t_sel = sb_arr(self.n_pixels, n_trees)
+                # Randomly as many trees as the minimum number of trees
+                sb.extractArrayCols(trees_avg_texture1_t, self.n_threads, trees_avg_texture1_t_sel, range(0,n_trees))
+                sb.extractArrayCols(trees_avg_texture2_t, self.n_threads, trees_avg_texture2_t_sel, range(0,n_trees))
+                
+                sb.texturesBwTransform(trees_avg_texture1_t_sel, self.n_threads, trees_avg_texture2_t_sel, k, a, sand_trees, silt_trees, clay_trees)
                 
                 percentiles = [q*100. for q in self.quantiles]
                 sb.computePercentiles(clay_trees, self.n_threads, range(clay_trees.shape[1]), array_t,
