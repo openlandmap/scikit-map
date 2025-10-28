@@ -37,7 +37,8 @@ class ControlS3():
             secret_key=secret_key,
             secure=False
         )
-    
+        self.previous_tile = ""
+        
     def list(self, bucket_prefix, recursive=True):
         prefix = '/'.join(bucket_prefix.split('/')[1:])
         bucket = bucket_prefix.split('/')[0]
@@ -105,12 +106,16 @@ class ControlS3():
             else:
                 todo_tiles = [(t, t.split('/')[-1]) for t in todo_tiles]
             tile_object, tile_id = random.choice(todo_tiles)
+            if (self.previous_tile == tile_id):
+                print(f'Selecting tile {tile_id} that was selected just before, returning no tiles to avoid infinite loops')
+                return False, None
             flag_remove = self.remove([tile_object])
             if flag_remove:
                 new_tile_name = tile_id + '..server.' + server_name
                 tmp_tile_file = '/tmp/' + new_tile_name
                 self.create_empty_file(tmp_tile_file)
                 self.push_file(tmp_tile_file, bucket_prefix + '/slurm_tiles/doing')
+                self.previous_tile = tile_id
                 return True, tile_id
             flag_avail -= 1
         raise Exception(f'Already attempted {max_attempts} times to get a tile, aborting to avoid infinite loop')
