@@ -137,12 +137,12 @@ class ControlS3():
             if len(done_tile_others) > 0:
                 print(f"The tile {current_tile_name} was already in done, not adding it there")
                 return
-    # Proceed to create and push the new 'done' or 'skipped' tile
-    new_tile_name = current_tile_name + '..time.' + str(int(time_seconds))
-    tmp_tile_file = '/tmp/' + new_tile_name
-    self.create_empty_file(tmp_tile_file)
-    self.push_file(tmp_tile_file, bucket_prefix + '/slurm_tiles/' + sub_prefix)
-    print(f"The file {bucket_prefix + '/slurm_tiles/' + sub_prefix + '/' + new_tile_name} was pushed to s3")
+        # Proceed to create and push the new 'done' or 'skipped' tile
+        new_tile_name = current_tile_name + '..time.' + str(int(time_seconds))
+        tmp_tile_file = '/tmp/' + new_tile_name
+        self.create_empty_file(tmp_tile_file)
+        self.push_file(tmp_tile_file, bucket_prefix + '/slurm_tiles/' + sub_prefix)
+        print(f"The file {bucket_prefix + '/slurm_tiles/' + sub_prefix + '/' + new_tile_name} was pushed to s3")
     
 
 def mmdd_to_doy(mmdd: str) -> int:
