@@ -41,7 +41,21 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=build_temp)
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=build_temp)
 
-
+install_requires = [
+    "affine>=2.4.0",
+    "geopandas>=0.13.2",
+    "joblib>=1.3.2",
+    "numpy>=1.24.3",
+    "pandas>=2.0.2",
+    "requests>=2.31.0",
+    "scikit-learn>=1.3.2",
+    "rasterio>=1.3.6",
+    "cmake>=3.15",
+    "minio>=7.1.5",
+    "gspread>=5.3.2",
+    "tomli>=2.0.1",
+    "PyYAML>=6.0",
+]
 
 # Detect system libgdal version (via gdal-config) and build the
 # install_requires list accordingly. If detection fails, fall back to a
@@ -59,28 +73,13 @@ def _detect_system_gdal_version():
 
 _sys_gdal_version = _detect_system_gdal_version()
 
-install_requires = [
-    "affine>=2.4.0",
-    "geopandas>=0.13.2",
-    "joblib>=1.3.2",
-    "numpy>=1.24.3",
-    "pandas>=2.0.2",
-    "requests>=2.31.0",
-    "scikit-learn>=1.3.2",
-    "rasterio>=1.3.6",
-    "cmake>=3.15",
-    "minio>=7.1.5",
-    "gspread>=5.3.2",
-    "tomli>=2.0.1",
-    "PyYAML>=6.0",
-]
+
 
 if _sys_gdal_version:
     # Pin GDAL to the system library version to avoid mismatches
     install_requires.append(f"GDAL=={_sys_gdal_version}")
 else:
     raise RuntimeError("GDAL lib not found in the system")
-
 
 setup(
     name="scikit-map",
