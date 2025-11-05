@@ -1068,7 +1068,7 @@ namespace skmap {
                 MatFloat mat = MatFloat::Zero(n_cols, n_cols);
                 mat.triangularView<Eigen::Upper>() = chunk.row(i).transpose().replicate(n_cols, 1) - chunk.row(i).replicate(1, n_cols);
                 // Mann-Kendal's score
-                float_t s = mat.unaryExpr(std::ptr_fun(signFunc)).array().sum();
+                float_t s = mat.unaryExpr([](float_t v) { return signFunc(v); }).array().sum();
                 float_t z_score = 0.;
                 if (s > 0.)
                     z_score = (s - 1.) / std::sqrt(var_s);
