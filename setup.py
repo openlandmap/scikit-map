@@ -1,155 +1,93 @@
-import setuptools
-import numpy as np
-from pathlib import Path
+import os
+import subprocess
+import sys
+from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
-
-# Convert distutils Windows platform specifiers to CMake -A arguments
-PLAT_TO_CMAKE = {
-    "win32": "Win32",
-    "win-amd64": "x64",
-    "win-arm32": "ARM",
-    "win-arm64": "ARM64",
-}
+import shutil
 
 
-# A CMakeExtension needs a sourcedir instead of a file list.
-# The name must be the _single_ output extension from the CMake build.
-# If you need multiple extensions, see scikit-build.
 class CMakeExtension(Extension):
-    def __init__(self, name: str, sourcedir: str = "") -> None:
+    def __init__(self, name, sourcedir=""):
         super().__init__(name, sources=[])
-        self.sourcedir = os.fspath(Path(sourcedir).resolve())
+        self.sourcedir = os.path.abspath(sourcedir)
 
 
 class CMakeBuild(build_ext):
-    def build_extension(self, ext: CMakeExtension) -> None:
-        # Must be in this form due to bug in .resolve() only fixed in Python 3.10+
-        ext_fullpath = Path.cwd() / self.get_ext_fullpath(ext.name)
-        extdir = ext_fullpath.parent.resolve()
+    def run(self):
+        try:
+            subprocess.check_output(["cmake", "--version"])
+        except OSError:
+            raise RuntimeError(
+                "CMake must be installed to build the following extensions: "
+                + ", ".join(e.name for e in self.extensions)
+            )
+        for ext in self.extensions:
+            self.build_extension(ext)
 
-        # Using this requires trailing slash for auto-detection & inclusion of
-        # auxiliary "native" libs
+    def build_extension(self, ext):
+        extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
+        cfg = "Release" if not self.debug else "Debug"
+        build_args = ["--config", cfg]
 
-        debug = int(os.environ.get("DEBUG", 0)) if self.debug is None else self.debug
-        cfg = "Debug" if debug else "Release"
-
-        # CMake lets you override the generator - we need to check this.
-        # Can be set with Conda-Build, for example.
-        cmake_generator = os.environ.get("CMAKE_GENERATOR", "")
-
-        # Set Python_EXECUTABLE instead if you use PYBIND11_FINDPYTHON
-        # EXAMPLE_VERSION_INFO shows you how to pass a value into the C++ code
-        # from Python.
         cmake_args = [
-            f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}{os.sep}",
+            f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DPYTHON_EXECUTABLE={sys.executable}",
-            f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
+            f"-DCMAKE_BUILD_TYPE={cfg}",
         ]
-        build_args = []
-        # Adding CMake arguments set as environment variable
-        # (needed e.g. to build for ARM OSx on conda-forge)
-        if "CMAKE_ARGS" in os.environ:
-            cmake_args += [item for item in os.environ["CMAKE_ARGS"].split(" ") if item]
 
-        # In this example, we pass in the version to C++. You might not need to.
-        cmake_args += [f"-DEXAMPLE_VERSION_INFO={self.distribution.get_version()}"]
+        build_temp = os.path.join(self.build_temp, ext.name)
+        os.makedirs(build_temp, exist_ok=True)
 
-        if self.compiler.compiler_type != "msvc":
-            # Using Ninja-build since it a) is available as a wheel and b)
-            # multithreads automatically. MSVC would require all variables be
-            # exported for Ninja to pick it up, which is a little tricky to do.
-            # Users can override the generator with CMAKE_GENERATOR in CMake
-            # 3.15+.
-            if not cmake_generator or cmake_generator == "Ninja":
-                try:
-                    import ninja
+        subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=build_temp)
+        subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=build_temp)
 
-                    ninja_executable_path = Path(ninja.BIN_DIR) / "ninja"
-                    cmake_args += [
-                        "-GNinja",
-                        f"-DCMAKE_MAKE_PROGRAM:FILEPATH={ninja_executable_path}",
-                    ]
-                except ImportError:
-                    pass
 
-        else:
-            # Single config generators are handled "normally"
-            single_config = any(x in cmake_generator for x in {"NMake", "Ninja"})
 
-            # CMake allows an arch-in-generator style for backward compatibility
-            contains_arch = any(x in cmake_generator for x in {"ARM", "Win64"})
+# Detect system libgdal version (via gdal-config) and build the
+# install_requires list accordingly. If detection fails, fall back to a
+# permissive GDAL requirement.
+def _detect_system_gdal_version():
+    if shutil.which("gdal-config"):
+        try:
+            # text=True requires Python 3.7+; keep compatibility by decoding
+            out = subprocess.check_output(["gdal-config", "--version"]).decode()
+            return out.strip()
+        except Exception:
+            return None
+    return None
 
-            # Specify the arch if using MSVC generator, but only if it doesn't
-            # contain a backward-compatibility arch spec already in the
-            # generator name.
-            if not single_config and not contains_arch:
-                cmake_args += ["-A", PLAT_TO_CMAKE[self.plat_name]]
 
-            # Multi-config generators have a different way to specify configs
-            if not single_config:
-                cmake_args += [
-                    f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}"
-                ]
-                build_args += ["--config", cfg]
+_sys_gdal_version = _detect_system_gdal_version()
 
-        if sys.platform.startswith("darwin"):
-            # Cross-compile support for macOS - respect ARCHFLAGS if set
-            archs = re.findall(r"-arch (\S+)", os.environ.get("ARCHFLAGS", ""))
-            if archs:
-                cmake_args += ["-DCMAKE_OSX_ARCHITECTURES={}".format(";".join(archs))]
+install_requires = [
+    "affine>=2.4.0",
+    "geopandas>=0.13.2",
+    "joblib>=1.3.2",
+    "numpy>=1.24.3",
+    "pandas>=2.0.2",
+    "requests>=2.31.0",
+    "scikit-learn>=1.3.2",
+    "rasterio>=1.3.6",
+    "cmake>=3.15",
+    "minio>=7.1.5",
+    "gspread>=5.3.2",
+    "tomli>=2.0.1",
+    "PyYAML>=6.0",
+]
 
-        # Set CMAKE_BUILD_PARALLEL_LEVEL to control the parallel build level
-        # across all generators.
-        if "CMAKE_BUILD_PARALLEL_LEVEL" not in os.environ:
-            # self.parallel is a Python 3 only way to set parallel jobs by hand
-            # using -j in the build_ext call, not supported by pip or PyPA-build.
-            if hasattr(self, "parallel") and self.parallel:
-                # CMake 3.12+ only.
-                build_args += [f"-j{self.parallel}"]
+if _sys_gdal_version:
+    # Pin GDAL to the system library version to avoid mismatches
+    install_requires.append(f"GDAL=={_sys_gdal_version}")
+else:
+    raise RuntimeError("GDAL lib not found in the system")
 
-        build_temp = Path(self.build_temp) / ext.name
-        if not build_temp.exists():
-            build_temp.mkdir(parents=True)
 
-        subprocess.run(
-            ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True
-        )
-        subprocess.run(
-            ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
-        )
-
-# The setup() call should only contain what's NOT in pyproject.toml
-setuptools.setup(
-    ext_modules=[CMakeExtension("skmap_bindings", ".")], # Assuming 'src' is your CMake source directory
+setup(
+    name="scikit-map",
+    version="0.9.1",
+    packages=["skmap"],
+    ext_modules=[CMakeExtension("skmap_bindings", ".")],
     cmdclass={"build_ext": CMakeBuild},
+    zip_safe=False,
+    install_requires=install_requires,
 )
-
-#module_skmap_bindings = setuptools.Extension(
-#    'skmap_bindings',
-#    sources=[
-#        'skmap/src/skmap_bindings.cpp',
-#        'skmap/src/ParArray.cpp',
-#        'skmap/src/io/IoArray.cpp',
-#        'skmap/src/transform/TransArray.cpp'
-#    ],
-#    include_dirs=[
-#        np.get_include(),
-#        'pybind11/include',
-#        'skmap/include',
-#        'skmap/src'
-#    ],
-#    extra_compile_args=[
-#        '-fopenmp',
-#        '-std=c++17',
-#        '-std=gnu++17',
-#        # '-march=native',
-#        # '-mavx512f',
-#        # '-mavx512dq',
-#        # '-mavx512vl',
-#        # '-mavx512bw'
-#    ],
-#    extra_link_args=['-lgomp'],
-#    libraries=[
-#        'm', 'gomp', 'gdal'
-#    ]
-#

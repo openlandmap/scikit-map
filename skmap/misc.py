@@ -203,47 +203,6 @@ def ref_memmap(array):
         'shape': array.shape
     }
 
-def concat_memmap(arrs, axis = 0): 
-    
-    from skmap import parallel
-
-    ttprint("Begin concat")
-    shapes = np.stack([ a.shape for a in arrs ], axis=0)
-    noaxis = [ i for i in range(0, len(shapes[0])) if i != axis ]
-    all_noaxis = np.all(np.all(shapes == shapes[0], axis=0)[noaxis])
-    
-    if not all_noaxis:
-        raise Exception(f"All arrays must have same shape in all dimensions excepet in {axis}")
-    
-    newshape = list(shapes[0])
-    newshape[axis] = np.sum(shapes[:,axis])
-    newshape = tuple(newshape)
-    out_memmap = new_memmap(arrs[0].dtype, newshape)
-    ref_out_memmap = ref_memmap(out_memmap)
-
-    inds = [0] + list(np.cumsum(shapes[:,axis]))
-    
-    args = []
-    for arr, i1, i2 in zip(arrs, inds[:-1], np.roll(inds, -1)[:-1]):
-        ref_arr = ref_memmap(arr)
-        args.append((ref_out_memmap, ref_arr, i1, i2))
-    
-    n_jobs = parallel.CPU_COUNT
-    if len(args) < n_jobs:
-        n_jobs = len(args)
-
-    for r in parallel.job(_concat_memmap, args, joblib_args={
-            'backend': 'threading', 
-            'pre_dispatch': math.ceil(n_jobs / 3), 
-            'batch_size': math.floor(len(args) / n_jobs),
-            'return_as': 'generator'
-        }):
-        continue
-    #out_memmap[:,:,i1:i2] = arr
-    #del_memmap(arr)
-    ttprint("End concat")
-
-    return out_memmap
 
 def make_tempdir(basedir='skmap', make_subdir = True):
     tempdir = Path(TMP_DIR).joinpath(basedir)

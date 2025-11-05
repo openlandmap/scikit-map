@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.15...3.26)
 project(skmap_bindings LANGUAGES CXX)
 
 include(FetchContent)
@@ -36,15 +36,45 @@ include_directories(skmap/include)
 include_directories(skmap/src)
 
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-mavx512f" COMPILER_SUPPORTS_AVX512F)
 
+# Base compiler options (always used)
+add_compile_options(-fopenmp -std=c++17 -std=gnu++17 -march=native)
+
+# Check AVX-512 features individually and accumulate supported flags
+set(AVX512_FLAGS "")
+
+check_cxx_compiler_flag("-mavx512f" COMPILER_SUPPORTS_AVX512F)
 if(COMPILER_SUPPORTS_AVX512F)
-  message(STATUS "Compiler supports AVX-512")
-  add_definitions(-DHAVE_AVX512)
-  add_compile_options(-fopenmp -std=c++17 -std=gnu++17 -march=native -mavx512f -mavx512dq -mavx512vl -mavx512bw)
+    message(STATUS "Compiler supports AVX-512F")
+    list(APPEND AVX512_FLAGS "-mavx512f")
+    
+    # Only check additional AVX-512 features if base AVX-512F is supported
+    check_cxx_compiler_flag("-mavx512dq" COMPILER_SUPPORTS_AVX512DQ)
+    if(COMPILER_SUPPORTS_AVX512DQ)
+        message(STATUS "Compiler supports AVX-512DQ")
+        list(APPEND AVX512_FLAGS "-mavx512dq")
+    endif()
+    
+    check_cxx_compiler_flag("-mavx512vl" COMPILER_SUPPORTS_AVX512VL)
+    if(COMPILER_SUPPORTS_AVX512VL)
+        message(STATUS "Compiler supports AVX-512VL")
+        list(APPEND AVX512_FLAGS "-mavx512vl")
+    endif()
+    
+    # check_cxx_compiler_flag("-mavx512bw" COMPILER_SUPPORTS_AVX512BW)
+    # if(COMPILER_SUPPORTS_AVX512BW)
+    #     message(STATUS "Compiler supports AVX-512BW")
+    #     list(APPEND AVX512_FLAGS "-mavx512bw")
+    # endif()
+    
+    # If we have any AVX-512 support, enable the feature macro
+    if(AVX512_FLAGS)
+        add_definitions(-DHAVE_AVX512)
+        add_compile_options(${AVX512_FLAGS})
+        message(STATUS "Enabling AVX-512 flags: ${AVX512_FLAGS}")
+    endif()
 else()
-  add_compile_options(-fopenmp -std=c++17 -std=gnu++17 -march=native)
-  message(STATUS "Compiler does NOT support AVX-512")
+    message(STATUS "Compiler does NOT support AVX-512")
 endif()
 
 set(SOURCES skmap/src/skmap_bindings.cpp skmap/src/ParArray.cpp skmap/src/io/IoArray.cpp skmap/src/transform/TransArray.cpp)
