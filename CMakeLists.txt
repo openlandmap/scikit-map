@@ -37,44 +37,36 @@ include_directories(skmap/src)
 
 include(CheckCXXCompilerFlag)
 
-# Base compiler options (always used)
-add_compile_options(-fopenmp -std=c++17 -std=gnu++17 -march=native)
-
-# Check AVX-512 features individually and accumulate supported flags
+# List of AVX-512 flags to test
+set(AVX512_CANDIDATES avx512f avx512dq avx512cd avx512bw avx512vl)
 set(AVX512_FLAGS "")
 
-check_cxx_compiler_flag("-mavx512f" COMPILER_SUPPORTS_AVX512F)
-if(COMPILER_SUPPORTS_AVX512F)
-    message(STATUS "Compiler supports AVX-512F")
-    list(APPEND AVX512_FLAGS "-mavx512f")
-    
-    # Only check additional AVX-512 features if base AVX-512F is supported
-    check_cxx_compiler_flag("-mavx512dq" COMPILER_SUPPORTS_AVX512DQ)
-    if(COMPILER_SUPPORTS_AVX512DQ)
-        message(STATUS "Compiler supports AVX-512DQ")
-        list(APPEND AVX512_FLAGS "-mavx512dq")
+foreach(FLAG IN LISTS AVX512_CANDIDATES)
+    set(CXX_FLAG "-m${FLAG}")
+    set(VAR_NAME "COMPILER_SUPPORTS_${FLAG}")
+
+    # Check if compiler supports this flag
+    check_cxx_compiler_flag("${CXX_FLAG}" ${VAR_NAME})
+
+    # Check CPU support individually via /proc/cpuinfo
+    execute_process(
+        COMMAND bash -c "grep -m1 -o ${FLAG} /proc/cpuinfo || true"
+        OUTPUT_VARIABLE CPU_HAS_FLAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    # Only append if both compiler and CPU support it
+    if(${VAR_NAME} AND CPU_HAS_FLAG)
+        list(APPEND AVX512_FLAGS "${CXX_FLAG}")
+        message(STATUS "Enabling AVX-512 flag: ${CXX_FLAG}")
+    else()
+        message(STATUS "Skipping ${CXX_FLAG} (compiler or CPU does not support it)")
     endif()
-    
-    check_cxx_compiler_flag("-mavx512vl" COMPILER_SUPPORTS_AVX512VL)
-    if(COMPILER_SUPPORTS_AVX512VL)
-        message(STATUS "Compiler supports AVX-512VL")
-        list(APPEND AVX512_FLAGS "-mavx512vl")
-    endif()
-    
-    # check_cxx_compiler_flag("-mavx512bw" COMPILER_SUPPORTS_AVX512BW)
-    # if(COMPILER_SUPPORTS_AVX512BW)
-    #     message(STATUS "Compiler supports AVX-512BW")
-    #     list(APPEND AVX512_FLAGS "-mavx512bw")
-    # endif()
-    
-    # If we have any AVX-512 support, enable the feature macro
-    if(AVX512_FLAGS)
-        add_definitions(-DHAVE_AVX512)
-        add_compile_options(${AVX512_FLAGS})
-        message(STATUS "Enabling AVX-512 flags: ${AVX512_FLAGS}")
-    endif()
-else()
-    message(STATUS "Compiler does NOT support AVX-512")
+endforeach()
+
+# Add all supported flags at once
+if(AVX512_FLAGS)
+    add_compile_options(${AVX512_FLAGS})
 endif()
 
 set(SOURCES skmap/src/skmap_bindings.cpp skmap/src/ParArray.cpp skmap/src/io/IoArray.cpp skmap/src/transform/TransArray.cpp)
