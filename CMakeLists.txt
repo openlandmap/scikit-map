@@ -65,9 +65,15 @@ foreach(FLAG IN LISTS AVX512_CANDIDATES)
 endforeach()
 
 # Add all supported flags at once
+
+
 if(AVX512_FLAGS)
+    # Always append -mfma when using AVX-512
+    list(APPEND AVX512_FLAGS -mfma)
     add_compile_options(${AVX512_FLAGS})
+    message(STATUS "Final AVX-512 compile options: ${AVX512_FLAGS}")
 endif()
+
 
 set(SOURCES skmap/src/skmap_bindings.cpp skmap/src/ParArray.cpp skmap/src/io/IoArray.cpp skmap/src/transform/TransArray.cpp)
 pybind11_add_module(skmap_bindings ${SOURCES})
