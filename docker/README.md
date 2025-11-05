@@ -1,66 +1,55 @@
-# README.md
+# Scikit-map on Docker 
 
-## Docker and Docker-Compose
+This document provides instructions on how to build and use several docker images compatible with scikit-map provided by OpenGeoHub Foundation and available in [DockerHub](https://hub.docker.com/u/opengeohub).
 
-This document provides instructions on how to use the provided `docker-compose.yml` and Docker directly for the `scikit-map` service.
 
-### Prerequisites
+### Pre-requisites
 
-- Docker: Please ensure Docker is installed on your machine. You can follow the installation instructions based on your operating system from the official Docker docs: [https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/)
+Docker: Please ensure Docker is installed on your machine. You can follow the installation instructions based on your operating system from the official Docker docs: [https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/)
 
-- Docker Compose: Docker Compose is also required. If you're on Windows or Mac and installed Docker Desktop, Docker Compose should already be included. For Linux users, please follow these instructions to install Docker Compose: [https://docs.docker.com/compose/install/](https://docs.docker.com/compose/install/)
-
-### Using Docker Compose
-
-Docker Compose is a tool for defining and running multi-container Docker applications. Here's how to use it for our `scikit-map` service:
+### Building images
 
 1. **Clone the repository**
-    ```
-    git clone <repository_url>
-    cd <repository_name>
-    ```
-
-2. **Build and Run the Docker Compose**
-    ```
-    docker-compose up --build
-    ```
-    This command builds the Docker image as per the Dockerfile instructions and then starts the container. The `-d` flag can be used to start the container in detached mode (in the background).
-
-3. **Stop the Docker Compose**
-    ```
-    docker-compose down
-    ```
-    This command stops and removes the container. Any changes made inside the container that are not saved to a volume will be lost.
-
-### Using Docker Directly
-
-You can also run the Docker container directly using Docker commands. Follow these steps:
-
-1. **Clone the repository**
-    ```
-    git clone https://github.com/openlandmap/scikit-map.git
+```
+    git clone http://github.com/openlandmap/scikit-map
     cd scikit-map/docker
-    ```
+```
 
-2. **Build the Docker Image**
-    ```
-    docker build -t scikit-map -f Dockerfile .
-    ```
-    This command builds a Docker image named "scikit-map" using the Dockerfile in the current directory.
+2. **Build docker images**
+```
+    sudo su
+    build-all.sh
+ ```
 
-3. **Run the Docker Container**
-    ```
-    docker run -d --name scikit-map -v "$(pwd):/app" scikit-map
-    ```
-    This command runs the "scikit-map" container in the background (`-d`), names it "scikit-map" (`--name`), and mounts the current directory (`$(pwd)`) to `/app` in the container (`-v`).
+This command builds locally the following images:
 
-4. **Stop and Remove the Docker Container**
-    ```
-    docker stop scikit-map
-    docker rm scikit-map
-    ```
-    These commands stop and remove the "scikit-map" container. Any changes made inside the container that are not saved to a volume will be lost. 
+- **opengeohub/gdal-ubuntu:v3.10.3**: Image based on Ubuntu 24.04 with [ubuntugis-unstable repository](https://launchpad.net/~ubuntugis/+archive/ubuntu/ubuntugis-unstable) and [GDAL 3.10.3](https://github.com/OSGeo/gdal/blob/v3.10.3/NEWS.md) pre-installed
+- **opengeohub/pygeo:v3.12.3-gdal3103**: Image based on gdal-ubuntu:v3.10.3 with [Python 3.12](https://www.python.org/downloads/release/python-3120/) and scikit-map pre-installed in root [venv](https://docs.python.org/3/library/venv.html) (*no conda at all*)
+- **opengeohub/pygeo:v3.12.3-intel-gdal3103**:  Image based on gdal-ubuntu:v3.10.3 with [Intel Python 3.12](https://www.intel.com/content/www/us/en/developer/tools/oneapi/distribution-for-python.html), [scikit-learn-intelex](https://github.com/uxlfoundation/scikit-learn-intelex), scikit-map pre-installed in root [venv](https://docs.python.org/3/library/venv.html) (*no conda at all*)
+- **opengeohub/pygeo-ide:v3.12.3-gdal3103**: Image based on pygeo:v3.12.3-gdal3103 with [JupyteLab](https://jupyter.org/install), [geemap](https://geemap.org/) and [ipyleaflet](https://ipyleaflet.readthedocs.io/en/latest/) pre-installed in root [venv](https://docs.python.org/3/library/venv.html) (*no conda at all*)
+- **opengeohub/pygeo-ide:v3.12.3-intel-gdal3103**:  Image based on pygeo:v3.12.3-intel-gdal3103 with [JupyteLab](https://jupyter.org/install), [geemap](https://geemap.org/) and [ipyleaflet](https://ipyleaflet.readthedocs.io/en/latest/) pre-installed in root [venv](https://docs.python.org/3/library/venv.html) (*no conda at all*)
 
-### Important Note
 
-Please note that the `scikit-map` service uses the current directory (`.`) as a volume, mounted at `/app` in the container. Any changes you make inside the `/app` directory in the container will be reflected in your host machine's current directory, and vice versa.
+### Running images
+
+Execute a single **GDAL command** and remove the container:
+
+```
+    docker run --rm -it opengeohub/gdal-ubuntu:v3.10.3 gdalinfo --version
+```
+
+Open an interative **Python session** and remove the container after `exit()`:
+```
+    docker run --rm -it -v /mnt:/mnt opengeohub/pygeo:v3.12.3-intel-gdal3103
+
+```
+
+Deploy a JupyterLab instance on port 8888 and share all `/mnt` folder with the container (for more options see [server options](https://jupyter-docker-stacks.readthedocs.io/en/latest/using/common.html#jupyter-server-options)):
+
+```
+    docker run -d --restart=always --name pygeo_ide_skmap -v /mnt:/mnt -p 8888:8888 --tmpfs /tmpfs:mode=1777 opengeohub/pygeo-ide:v3.12.3-intel-gdal3103 jupyter lab --allow-root --LabApp.token='opengeohub' --ServerApp.root_dir='/' --no-browser --ip=0.0.0.0
+```
+
+JupyterLab should be accessible on http://localhost:8888 (password: `opengeohub`)
+
+![JupyterLab login page](../docs/img/jupyterlab.png)
