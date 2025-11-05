@@ -129,14 +129,19 @@ class TiledDataLoader(TiledData):
                  resampling_strategy:str = "GRA_NearestNeighbour",
                  gdal_opts:Dict[str,str] = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'}, 
                  n_threads:int = os.cpu_count(),
-                 verbose:bool = True) -> None:
+                 verbose:bool = True,
+                 n_threads_read = None) -> None:
         self.catalog = catalog
         self.mask_template_path = mask_template_path
         self.spatial_aggregation = spatial_aggregation
         self.resampling_strategy = resampling_strategy
         self.gdal_opts = gdal_opts
         self.n_threads = n_threads
-        self.executor = ProcessPoolExecutor(max_workers=self.n_threads)
+        if n_threads_read == None:
+            self.n_threads_read = self.n_threads
+        else:
+            self.n_threads_read = n_threads_read
+        self.executor = ProcessPoolExecutor(max_workers=self.n_threads_read)
         self.mask_path = None
         self.array = None
         self.array_valid = None
@@ -152,13 +157,15 @@ class TiledDataLoader(TiledData):
         self.n_pixels_valid = None
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if os.path.exists(self.mask_path) & (self.spatial_aggregation != None):
+        if os.path.exists(self.mask_path):
             os.remove(self.mask_path)
             ttprint(f"Temporary mask data {self.mask_path} has been deleted.")
     
     def load_tile_data(self, tile_id):
         self.tile_id = tile_id
-        self.mask_path = self.mask_template_path.format(tile_id=tile_id)
+        tmp_mask_path = self.mask_template_path.format(tile_id=tile_id)
+        self.mask_path = f"/tmp/tmp_mask_{tmp_mask_path.split('/')[-1].split('.')[0]}.tif"
+        subprocess.run(f'wget {tmp_mask_path} -q -O {self.mask_path}' , shell=True, check=True)
         # @FIXME: this only work with our setting of Landsat data
         if self.spatial_aggregation:
             if self.verbose:
@@ -211,17 +218,17 @@ class TiledDataLoader(TiledData):
             if tile_paths:
                 if self.spatial_aggregation:
                     tmp_data = sb_arr(len(tile_paths), 4000 * 4000)
-                    sb.readData(tmp_data, self.n_threads, tile_paths, range(len(tile_paths)), 2, 2, 4000, 4000, [1], self.gdal_opts, None, np.nan)
+                    sb.readData(tmp_data, self.n_threads_read, tile_paths, range(len(tile_paths)), 2, 2, 4000, 4000, [1], self.gdal_opts, None, np.nan)
                     arr_reshaped = tmp_data.reshape(len(tile_paths), 4000, 4000)
                     arr_aggregated = arr_reshaped.reshape(len(tile_paths), self.y_size, self.spatial_aggregation, self.x_size, self.spatial_aggregation).mean(axis=(2, 4))
                     arr_final = arr_aggregated.reshape(len(tile_paths), self.x_size * self.y_size)
                     self.array[tile_idxs,:] = arr_final[:,:]
                 else:
-                    sb.readData(self.array, self.n_threads, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, 
+                    sb.readData(self.array, self.n_threads_read, tile_paths, tile_idxs, self.x_off, self.y_off, self.x_size, 
                                 self.y_size, [1], self.gdal_opts, None, np.nan)
             # Go whales, go!!
             lon_lat = sb_arr(2, self.n_pixels)
-            sb.getLatLonArray(lon_lat, self.n_threads, self.gdal_opts, self.mask_path, self.x_off, self.y_off, self.x_size, self.y_size)
+            sb.getLatLonArray(lon_lat, self.n_threads_read, self.gdal_opts, self.mask_path, self.x_off, self.y_off, self.x_size, self.y_size)
             run_whales(self.catalog, self.array, self.n_threads, lon_lat[1,:])
         return self
                     
@@ -303,6 +310,8 @@ class TiledDataExporter(TiledData):
             assert (quantiles != None), "Need to provide quantiles"
         elif self.mode == 'depths_years':
             assert (years != None) & (depths != None), "Need to provide years, depths"
+        elif self.mode == 'depths_years_textures':
+            assert (years != None) & (depths != None), "Need to provide years, depths"
         elif self.mode == 'years':
             assert (years != None), "Need to provide years"
         elif (self.mode == 'probabilities'):
@@ -310,7 +319,7 @@ class TiledDataExporter(TiledData):
         elif (self.mode == 'static') | (self.mode == 'dominant_class'):
             pass
         else:
-            raise Exception("Available modes: dominant_class, probabilities, depths_years_quantiles_textures, depths_years_quantiles, depths_years, years, static_depths_quantiles, static_quantiles, static")
+            raise Exception("Available modes: dominant_class, probabilities, depths_years_quantiles_textures, depths_years_quantiles, depths_years, depths_years_textures, years, static_depths_quantiles, static_quantiles, static")
         self.n_layers = len(self._get_out_names("",""))
         if (self.n_layers != None) & (self.n_pixels != None):
             self.array = sb_arr(self.n_layers, n_pixels)
@@ -332,6 +341,8 @@ class TiledDataExporter(TiledData):
             return self._get_out_names_depths_years_quantiles(prefix, sufix)
         elif self.mode == 'depths_years':
             return self._get_out_names_depths_years(prefix, sufix)
+        elif self.mode == 'depths_years_textures':
+            return self._get_out_names_depths_years_textures(prefix, sufix)
         elif self.mode == 'static_depths_quantiles':
             return self._get_out_names_static_depths_quantiles(prefix, sufix, time_frame)
         elif self.mode == 'static_quantiles':
@@ -345,7 +356,7 @@ class TiledDataExporter(TiledData):
         elif self.mode == 'years':
             return self._get_out_names_years(prefix, sufix)
         else:
-            raise Exception("Available modes: depths_years_quantiles_textures, depths_years_quantiles, depths_years, years")
+            raise Exception("Available modes: dominant_class, probabilities, depths_years_quantiles_textures, depths_years_quantiles, depths_years, depths_years_textures, years, static_depths_quantiles, static_quantiles, static")
     
     def _get_out_names_years(self, prefix, sufix):
         out_files = []
@@ -411,6 +422,17 @@ class TiledDataExporter(TiledData):
                     for q in self.quantiles:
                         formatted_p = get_percentiele_string(q)
                         out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{self.years[y]}0101_{self.years[y+1]}1231_{sufix}")
+        return out_files
+    
+    def _get_out_names_depths_years_textures(self, prefixes, sufix):
+        if prefixes == "":
+            prefixes = ["","",""]
+        # order: prefixes = [prefix_caly, prefix_sand, prefix_silt]
+        out_files = []
+        for d in range(len(self.depths) - 1):
+            for y in range(len(self.years) - 1):
+                for prefix in prefixes :
+                    out_files.append(f"{prefix}_m_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{self.years[y]}0101_{self.years[y+1]}1231_{sufix}")
         return out_files
                   
     
@@ -490,36 +512,49 @@ class TiledDataExporter(TiledData):
         self.n_pixels = int(pred_depths_texture1[0].array.shape[1]/len(self.years))
         n_quant = len(self.quantiles)
         self.array = sb_arr(self.n_layers, self.n_pixels)
+        
         array_t = sb_arr(self.n_pixels, self.n_layers)
-        n_trees = pred_depths_texture1[0].array.shape[0]
+        n_trees1 = pred_depths_texture1[0].array.shape[0]
+        n_trees2 = pred_depths_texture2[0].array.shape[0]
+        n_trees = min(n_trees1, n_trees2)
+        
         for d in range(len(self.depths) - 1):
             for y in range(len(self.years) - 1):
+
                 offset_caly = d * (len(self.years) - 1) * 3 * (n_quant + 1) + y * 3 * (n_quant + 1)
                 offset_sand = d * (len(self.years) - 1) * 3 * (n_quant + 1) + y * 3 * (n_quant + 1) + (n_quant + 1)
                 offset_silt = d * (len(self.years) - 1) * 3 * (n_quant + 1) + y * 3 * (n_quant + 1) + 2 * (n_quant + 1)
-                trees_avg_texture1 = sb_arr(n_trees, self.n_pixels)
-                trees_avg_texture2 = sb_arr(n_trees, self.n_pixels)
+                
+                trees_avg_texture1 = sb_arr(n_trees1, self.n_pixels)
+                trees_avg_texture2 = sb_arr(n_trees2, self.n_pixels)
                 sb.blocksAverage(trees_avg_texture1, self.n_threads,
                                  pred_depths_texture1[d].array, pred_depths_texture1[d+1].array, self.n_pixels, y)
                 sb.blocksAverage(trees_avg_texture2, self.n_threads,
                                  pred_depths_texture2[d].array, pred_depths_texture2[d+1].array, self.n_pixels, y)
-                trees_avg_texture1_t = sb_arr(self.n_pixels, n_trees)
-                trees_avg_texture2_t = sb_arr(self.n_pixels, n_trees)
-                mean_texture1 = sb_arr(self.n_pixels, 1)
-                mean_texture2 = sb_arr(self.n_pixels, 1)
+                trees_avg_texture1_t = sb_arr(self.n_pixels, n_trees1)
+                trees_avg_texture2_t = sb_arr(self.n_pixels, n_trees2)                
                 sb.transposeArray(trees_avg_texture1, self.n_threads, trees_avg_texture1_t)
                 sb.transposeArray(trees_avg_texture2, self.n_threads, trees_avg_texture2_t)
+                
+                mean_texture1 = sb_arr(self.n_pixels, 1)
+                mean_texture2 = sb_arr(self.n_pixels, 1)
                 sb.nanMean(trees_avg_texture1_t, self.n_threads, mean_texture1)
                 sb.nanMean(trees_avg_texture2_t, self.n_threads, mean_texture2)
-                clay_trees = sb_arr(self.n_pixels, n_trees)
-                sand_trees = sb_arr(self.n_pixels, n_trees)
-                silt_trees = sb_arr(self.n_pixels, n_trees)
                 clay_mean = sb_arr(self.n_pixels, 1)
                 sand_mean = sb_arr(self.n_pixels, 1)
                 silt_mean = sb_arr(self.n_pixels, 1)
-                
-                sb.texturesBwTransform(trees_avg_texture1_t, self.n_threads, trees_avg_texture2_t, k, a, sand_trees, silt_trees, clay_trees)
                 sb.texturesBwTransform(mean_texture1, self.n_threads, mean_texture2, k, a, sand_mean, silt_mean, clay_mean)
+
+                clay_trees = sb_arr(self.n_pixels, n_trees)
+                sand_trees = sb_arr(self.n_pixels, n_trees)
+                silt_trees = sb_arr(self.n_pixels, n_trees)
+                trees_avg_texture1_t_sel = sb_arr(self.n_pixels, n_trees)
+                trees_avg_texture2_t_sel = sb_arr(self.n_pixels, n_trees)
+                # Randomly as many trees as the minimum number of trees
+                sb.extractArrayCols(trees_avg_texture1_t, self.n_threads, trees_avg_texture1_t_sel, range(0,n_trees))
+                sb.extractArrayCols(trees_avg_texture2_t, self.n_threads, trees_avg_texture2_t_sel, range(0,n_trees))
+                
+                sb.texturesBwTransform(trees_avg_texture1_t_sel, self.n_threads, trees_avg_texture2_t_sel, k, a, sand_trees, silt_trees, clay_trees)
                 
                 percentiles = [q*100. for q in self.quantiles]
                 sb.computePercentiles(clay_trees, self.n_threads, range(clay_trees.shape[1]), array_t,
@@ -528,6 +563,43 @@ class TiledDataExporter(TiledData):
                                       range(offset_sand+1,offset_sand+1+len(percentiles)), percentiles)
                 sb.computePercentiles(silt_trees, self.n_threads, range(silt_trees.shape[1]), array_t,
                                       range(offset_silt+1,offset_silt+1+len(percentiles)), percentiles)
+                array_t[:,offset_caly] = clay_mean[:,0]
+                array_t[:,offset_sand] = sand_mean[:,0]
+                array_t[:,offset_silt] = silt_mean[:,0]
+        sb.transposeArray(array_t, self.n_threads, self.array)            
+        
+    def derive_block_mean_textures(self, pred_depths_texture1, pred_depths_texture2, k=1., a=100.):
+        assert self.mode == 'depths_years_textures', "Mode must be 'depths_years_textures'"
+        self.n_pixels = int(pred_depths_texture1[0].array.shape[1]/len(self.years))
+        self.array = sb_arr(self.n_layers, self.n_pixels)
+        array_t = sb_arr(self.n_pixels, self.n_layers)
+        n_trees1 = pred_depths_texture1[0].array.shape[0]
+        n_trees2 = pred_depths_texture2[0].array.shape[0]
+        for d in range(len(self.depths) - 1):
+            for y in range(len(self.years) - 1):
+                offset_caly = d * (len(self.years) - 1) * 3 + y * 3
+                offset_sand = d * (len(self.years) - 1) * 3 + y * 3 + 1
+                offset_silt = d * (len(self.years) - 1) * 3 + y * 3 + 2
+                trees_avg_texture1 = sb_arr(n_trees1, self.n_pixels)
+                trees_avg_texture2 = sb_arr(n_trees2, self.n_pixels)
+                sb.blocksAverage(trees_avg_texture1, self.n_threads,
+                                 pred_depths_texture1[d].array, pred_depths_texture1[d+1].array, self.n_pixels, y)
+                sb.blocksAverage(trees_avg_texture2, self.n_threads,
+                                 pred_depths_texture2[d].array, pred_depths_texture2[d+1].array, self.n_pixels, y)
+                trees_avg_texture1_t = sb_arr(self.n_pixels, n_trees1)
+                trees_avg_texture2_t = sb_arr(self.n_pixels, n_trees2)
+                mean_texture1 = sb_arr(self.n_pixels, 1)
+                mean_texture2 = sb_arr(self.n_pixels, 1)
+                sb.transposeArray(trees_avg_texture1, self.n_threads, trees_avg_texture1_t)
+                sb.transposeArray(trees_avg_texture2, self.n_threads, trees_avg_texture2_t)
+                sb.nanMean(trees_avg_texture1_t, self.n_threads, mean_texture1)
+                sb.nanMean(trees_avg_texture2_t, self.n_threads, mean_texture2)
+                clay_mean = sb_arr(self.n_pixels, 1)
+                sand_mean = sb_arr(self.n_pixels, 1)
+                silt_mean = sb_arr(self.n_pixels, 1)
+                
+                sb.texturesBwTransform(mean_texture1, self.n_threads, mean_texture2, k, a, sand_mean, silt_mean, clay_mean)
+                
                 array_t[:,offset_caly] = clay_mean[:,0]
                 array_t[:,offset_sand] = sand_mean[:,0]
                 array_t[:,offset_silt] = silt_mean[:,0]
@@ -574,11 +646,14 @@ class TiledDataExporter(TiledData):
                      scaling = 1,
                      scaling_metadata = None,
                      gdal_opts:Dict[str,str] = {'GDAL_HTTP_VERSION': '1.0', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif'},
-                     timeframe = None):
+                     timeframe = None,
+                     n_threads_write = None):
         with TimeTracker(f"   Prepare data to export for {self.tile_id}", False):
         
             if scaling_metadata == None:
                 scaling_metadata = 1./scaling
+            if n_threads_write == None:
+                n_threads_write = self.n_threads
             if self.tile_id is None: raise ValueError("Argument 'tile_id' cannot be None")
             out_files = self._get_out_names(prefix, sufix, timeframe)
             n_files = len(out_files)
@@ -613,12 +688,12 @@ class TiledDataExporter(TiledData):
             else:
                 if self.s3_prefix:
                     s3_out = ([f'{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}' for _ in range(len(out_files))])
-                    sb.writeData(write_data, self.n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
+                    sb.writeData(write_data, n_threads_write, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
                         range(n_files), 0, 0, x_size, y_size, nodata,
                         save_type, compress_cmd, s3_out)
                     ttprint(f'Export complete, check mc ls {s3_out[0]}/{out_files[0]}')
                 else:
-                    sb.writeData(write_data, self.n_threads, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
+                    sb.writeData(write_data, n_threads_write, gdal_opts, [template_file for _ in range(n_files)], tile_dir, out_files,
                         range(n_files), 0, 0, x_size, y_size, nodata,
                         save_type, compress_cmd)
                     ttprint(f'Export complete, check mc {tile_dir}')
