@@ -648,10 +648,8 @@ class PredictedProbs():
 #
 class Reducer():
     def __init__(self, 
-                 reducer_name:str, 
                  reducer_features:List[str],
                  reducer_fn:Callable) -> None:
-        self.reducer_name = reducer_name
         self.reducer_features = reducer_features
         self.reducer_fn = reducer_fn
         self.in_covs_t = None
@@ -679,17 +677,16 @@ class Reducer():
                 sb.transposeArray(self.in_covs_t, data.n_threads, self.in_covs)
                 sb.selArrayRows(self.in_covs, data.n_threads, self.in_covs_valid, data.get_pixels_valid_idx(n_groups))
             # create output result
-            result = ReducedValues(data=data, reducer_name=self.reducer_name)
+            result = ReducedValues(data=data)
             # compute
             with TimeTracker(f"    Tile {data.tile_id} - model prediction"):
                 result._out_reduc_valid[:] = self.reducer_fn(self.in_covs_valid)
         return result # shape: (n_samples, 1)
 #
 class ReducedValues():
-    def __init__(self, data:TiledDataLoader, reducer_name:str) -> None:
+    def __init__(self, data:TiledDataLoader) -> None:
         self.data = data
         assert(self.data is not None)
-        self.reducer_name = reducer_name
         self.groups = self.data.catalog.get_groups()
         self.n_groups = len(self.groups)
         self._out_reduc_valid = np.empty((self.n_groups * self.data.n_pixels_valid), dtype=np.float32)
@@ -740,7 +737,7 @@ class ReducedValues():
             sb.inverseReorderArray(self._out_reduc_t, threads, self._out_reduc_gdal, inverse_idx)
         # write outputs
         with TimeTracker(f"    Tile {self.data.tile_id} - write probs images ({threads} threads)"):
-            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}/{self.reducer_name}")
+            out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
             write_idx = list(range(self._out_reduc_gdal.shape[0]))
