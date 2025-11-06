@@ -380,7 +380,7 @@ class TiledDataExporter(TiledData):
         out_files.append(f"{prefix}_m_{self.spatial_res}_s_{time_frame}_{sufix}")
         for q in self.quantiles:
             formatted_p = get_percentiele_string(q) 
-            out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_b{self.depths[d]}cm..{self.depths[d+1]}cm_{time_frame}_{sufix}")
+            out_files.append(f"{prefix}_{formatted_p}_{self.spatial_res}_s_{time_frame}_{sufix}")
         return out_files
     
     def _get_out_names_depths_years(self, prefix, sufix):
