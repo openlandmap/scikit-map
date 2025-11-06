@@ -3,11 +3,6 @@ import os
 import random
 from sklearn.ensemble import RandomForestRegressor
 import joblib
-import tl2cgen
-try:
-    tl2cgen.util.check_if_fast()
-except:
-    print("The current installation of tl2cgen is not the one with parallel DMatrix and can be slow")
 import threading
 import numpy as np
 from joblib import Parallel, delayed
@@ -68,6 +63,11 @@ def _tree_based_load_model(model_path):
         model = joblib.load(model_path)
         predict_fn = lambda predictor, data: predictor.predict(data)
     elif model_path.endswith('.so'):
+        import tl2cgen
+        try:
+            tl2cgen.util.check_if_fast()
+        except:
+            print("The current installation of tl2cgen is not the one with parallel DMatrix and can be slow")
         model = tl2cgen.Predictor(model_path, nthread=n_cpus)
         def predict_tl2cgen(predictor, data):
             dmat = tl2cgen.DMatrix(data, dtype='float32')
