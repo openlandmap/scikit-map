@@ -39,7 +39,8 @@ full = [
   "scikit_image>=0.20",
   "Shapely>=1.7",
   "whoosh>=2.7.4",
-  "tl2cgen>=1.1.0"
+  "tl2cgen>=1.1.0",
+  "h5py>=3.8.0",
 ]
 
 [tool.setuptools.packages.find]

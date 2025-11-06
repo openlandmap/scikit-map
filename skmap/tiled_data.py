@@ -6,7 +6,6 @@ import skmap_bindings as sb
 from skmap.misc import TimeTracker, ttprint, sb_arr, sb_vec
 from concurrent.futures import ProcessPoolExecutor
 from skmap.catalog import DataCatalog, run_whales
-import h5py
 import warnings, random
 os.environ['USE_PYGEOS'] = '0'
 os.environ['PROJ_LIB'] = '/opt/conda/share/proj/'
@@ -677,6 +676,7 @@ class TiledDataExporter(TiledData):
             compress_cmd = f"gdal_translate -a_nodata {nodata} -a_scale {scaling_metadata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
         with TimeTracker(f"   Exporting data for {self.tile_id}", False):
             if self.save_hdf5:
+                import h5py
                 s3_out = f'{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}'
                 with h5py.File(f'{tile_dir}/{out_files[0]}.h5', 'w') as f:
                     if save_type == 'byte':
