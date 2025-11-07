@@ -26,18 +26,28 @@ The design of RichDEM is guided by these principles:
 
 ## making documentation
 
+Index: what is this library? is it the right fit for me?
+
 ### Quickstart
+
+I have data, want use this lib and want to get going because there is a deadline in a week
 
 ### Tutorial: machine learning pipeline
 
 ![](../../docs/img/pipeline.svg)
 
+### In-depth
 
-### In-depth space-time overlay
+- I ran into an error and maybe I'm using the library incorrectly?
+- My workflow is slow, I want to do speed-junkie quirks
+- I want to help contribute to the library and get a high-level overview
 
-#### Whales
+#### In-depth space-time overlay
 
-### In-depth: target-scale predictions
+##### Whales <- where?
+
+
+#### In-depth: target-scale predictions
 
 In modern computing workloads, parallelization is a huge speedup. For optimal performance, operations should work on contiguous blocks of memory. Data is loaded from a backend using GDAL VRTs and whales into a `TiledData` array. 
 

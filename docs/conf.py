@@ -108,7 +108,7 @@ templates_path = ["_templates"]
 #    import sphinx_rtd_theme
 #    html_theme = "sphinx_rtd_theme"
 #    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
-html_css_files = ["readthedocs-custom.css"] # Override some CSS settings
+html_css_files = ["readthedocs-custom.css", "pydata-custom.css"] # Override some CSS settings
 
 # import sphinx_pdj_theme
 # html_theme = 'sphinx_pdj_theme'

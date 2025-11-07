@@ -5,8 +5,9 @@
    :hidden:
 
    Home <self>
-   Quickstart <quickstart>
+   Quickstart <quickstart/quickstart>
    Tutorials <tutorials>
+   In-Depth <in-depth/in-depth>
    API Reference <_autosummary/skmap>
 
 Scikit-Map is a library to fill gaps in the Python machine learning ecosystem when dealing with geospatial data. It offers *parallel data access* and manipulation for **space-time overlays** and **large-scale predictions**.
@@ -27,7 +28,7 @@ Docker
 The best way to install ``skmap`` is using Docker. Check the `official documentation <https://docs.docker.com/get-docker/>`_ to get Docker running in your environment.
 
 JupyterLab Container
-------------------
+--------------------
 
 The image `opengeohub/pygeo-ide <https://hub.docker.com/r/opengeohub/pygeo-ide>`_ provides access to all ``skmap`` dependencies and to `JupyterLab <https://jupyterlab.readthedocs.io/en/stable/>`_ IDE. The follow instructions are specific for Intel CPUs, which supports `MKL <https://software.intel.com/content/www/us/en/develop/tools/oneapi/components/onemkl.html>`_, for other CPUs it's recommend to use the `openblas version <https://hub.docker.com/r/opengeohub/pygeo-ide/tags?page=1&ordering=last_updated>`_.
  

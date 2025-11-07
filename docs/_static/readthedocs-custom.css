@@ -28,6 +28,19 @@
     max-width: 60% !important;
 }
 
+
+/* Font-face definition */
+@font-face {
+    font-family: "Roboto Slab";
+    src: url("RobotoSlab-Regular-webfont.woff") format("woff");
+    font-weight: normal;
+    font-style: normal;
+}
+
+/* h2 {
+    font-family: "Roboto Slab", serif !important;
+} */
+
 /* Ensure all images (especially SVGs) stay transparent */
 img {
   background: none !important;
@@ -35,6 +48,7 @@ img {
 }
 
 :root {
+    --pst-font-family-heading: "Roboto Slab", var(--pst-font-family-base);
     --pst-teal-900: #0e2125;
     --pst-teal-800: #18393e;
     --pst-teal-700: #235258;
