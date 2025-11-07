@@ -3,7 +3,7 @@ Parallel block-wise processing and result aggregation for large raster datasets
 '''
 
 try:
-    import pygeos as pg
+    import shapely.geos as pg
     import rasterio as rio
     import rasterio.features as rfeatures
     import numpy as np
