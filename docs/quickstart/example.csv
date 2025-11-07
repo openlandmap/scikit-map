@@ -1,0 +1,3 @@
+layer_name, file_name, temporal_resolution, type, start_year, end_year, extent,
+layer_{year}, {base_path}/file_{year}.tif, yearly, temporal, 2000, 2022, eu,
+static, {base_path}/static.tif, longterm_or_static, common, , ,eu,
