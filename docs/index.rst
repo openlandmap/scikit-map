@@ -7,6 +7,7 @@
    Home <self>
    Quickstart <quickstart>
    Tutorials <tutorials>
+   API Reference <_autosummary/skmap>
 
 Scikit-Map is a library to fill gaps in the Python machine learning ecosystem when dealing with geospatial data. It offers *parallel data access* and manipulation for **space-time overlays** and **large-scale predictions**.
 

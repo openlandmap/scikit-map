@@ -15,7 +15,7 @@ from operator import add
 from functools import reduce
 
 from .parallel import blocks
-from .datasets.catalogue import _Resource
+# from .datasets.catalogue import _Resource
 
 _LANDMASK_REF = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_land.mask_pflugmacher2019.landcover.12_f_30m_s0..0m_2014..2016_skmap_epsg3035_v0.1.tif'
 
@@ -156,28 +156,28 @@ class Test:
 
         return result
     
-    def metadata_consistency(self,
-        resource:_Resource,
-    ) -> dict:
-        META_KEYS = (
-            'title',
-            'abstract',
-            'theme',
-            'authors',
-        )
-        result = []
+    # def metadata_consistency(self,
+    #     resource:_Resource,
+    # ) -> dict:
+    #     META_KEYS = (
+    #         'title',
+    #         'abstract',
+    #         'theme',
+    #         'authors',
+    #     )
+    #     result = []
         
-        for meta_key in META_KEYS:
-            try:
-                meta_val = resource.meta[meta_key]
-                assert _test_field_nonempty(meta_val)
-                result.append(True)
-            except (KeyError, AssertionError):
-                result.append(False)
-                if self.verbose:
-                    print('Missing metadata:', meta_key)
+    #     for meta_key in META_KEYS:
+    #         try:
+    #             meta_val = resource.meta[meta_key]
+    #             assert _test_field_nonempty(meta_val)
+    #             result.append(True)
+    #         except (KeyError, AssertionError):
+    #             result.append(False)
+    #             if self.verbose:
+    #                 print('Missing metadata:', meta_key)
         
-        if self.verbose:
-            print('All metadata present:', all(result))
+    #     if self.verbose:
+    #         print('All metadata present:', all(result))
             
-        return dict(zip(META_KEYS, result))
+    #     return dict(zip(META_KEYS, result))
