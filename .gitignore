@@ -16,3 +16,6 @@ skmap_test.ipynb
 *.pq
 *.so
 *.gpkg
+.cache/
+html/
+latex/

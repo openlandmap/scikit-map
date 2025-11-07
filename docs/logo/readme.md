@@ -19,10 +19,15 @@ then open and close inkscape.
 ## palette guides:
 
 - for diagrams, mainly use inner colors, they have Capital names like `Blue 1-5`
-  - outer colors (`blue 0,6,7`) should be used sparingly
+  - lower-case outer colors (`blue 0,6,7`) should be used sparingly
 - For the logo, the darkest blue is named `Blue Marble`, this is the preferred color
   - Terra also has some shades, use the middle one, named `Terra`
   - Don't mix `Terra` and `Blue Marble`
+
+color scheme is matched with this software-as-soil image:
+
+![](../img/stack_data_users.svg)![](../img/stack_legend.svg)
+
 - Python is blue
 - C++ is green
 - dependencies (GDAL) and other things we use but don't modify is brown
