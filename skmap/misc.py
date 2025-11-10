@@ -93,7 +93,7 @@ class ControlS3():
         """
         flag_avail = max_attempts
         while flag_avail > 0:
-        todo_tiles = self.list(bucket_prefix + f'/slurm_tiles_{time_stamp}/todo')
+            todo_tiles = self.list(bucket_prefix + f'/slurm_tiles_{time_stamp}/todo')
             if len(todo_tiles) == 0:
                 if deplete_doing:
                     if len(todo_tiles) == 0:
