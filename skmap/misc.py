@@ -77,7 +77,7 @@ class ControlS3():
                     raise Exception("Issue in stating or removign the object")
         return True
     
-    def select_slurm_tile(self, bucket_prefix, server_name, deplete_doing = True, max_attempts = 100):
+    def select_slurm_tile(self, bucket_prefix, server_name, deplete_doing = True, max_attempts = 100, time_stamp = ''):
         """
         Seturn a slurm tile to compute if available, and move the tile in the doing folder.
 
@@ -93,10 +93,9 @@ class ControlS3():
         """
         flag_avail = max_attempts
         while flag_avail > 0:
-            todo_tiles = self.list(bucket_prefix + '/slurm_tiles/todo')
+        todo_tiles = self.list(bucket_prefix + f'/slurm_tiles_{time_stamp}/todo')
             if len(todo_tiles) == 0:
                 if deplete_doing:
-                    todo_tiles = self.list(bucket_prefix + '/slurm_tiles/doing')
                     if len(todo_tiles) == 0:
                         return False, None
                     else:
@@ -114,25 +113,25 @@ class ControlS3():
                 new_tile_name = tile_id + '..server.' + server_name
                 tmp_tile_file = '/tmp/' + new_tile_name
                 self.create_empty_file(tmp_tile_file)
-                self.push_file(tmp_tile_file, bucket_prefix + '/slurm_tiles/doing')
+                self.push_file(tmp_tile_file, bucket_prefix + f'/slurm_tiles_{time_stamp}/doing')
                 self.previous_tile = tile_id
                 return True, tile_id
             flag_avail -= 1
         raise Exception(f'Already attempted {max_attempts} times to get a tile, aborting to avoid infinite loop')
     
-    def move_completed_tile(self, bucket_prefix, server_name, tile_id, time_seconds, skipped):
+    def move_completed_tile(self, bucket_prefix, server_name, tile_id, time_seconds, skipped, time_stamp = ''):
         sub_prefix = 'skipped' if skipped else 'done'
         current_tile_name = tile_id + '..server.' + server_name
         # Attempt to remove the primary 'doing' tile
-        ret = self.remove([bucket_prefix + '/slurm_tiles/doing/' + current_tile_name])
+        ret = self.remove([bucket_prefix + f'/slurm_tiles_{time_stamp}/doing/' + current_tile_name])
         # This block executes if another server already processed the tile
         if not ret:
-            print(f"The file {bucket_prefix + '/slurm_tiles/doing/' + current_tile_name} was not present, tile processed by other server")
-            doing_filenames = [path.split('/')[-1] for path in self.list(bucket_prefix + '/slurm_tiles/doing')]
+            print(f"The file {bucket_prefix + f'/slurm_tiles_{time_stamp}/doing/' + current_tile_name} was not present, tile processed by other server")
+            doing_filenames = [path.split('/')[-1] for path in self.list(bucket_prefix + f'/slurm_tiles_{time_stamp}/doing')]
             doing_tile_others = [filename for filename in doing_filenames if filename.startswith(tile_id + '..server.')]
             for doing_tile_other in doing_tile_others:
-                ret = self.remove([bucket_prefix + '/slurm_tiles/doing/' + doing_tile_other]) # No checks done on ret here but I think it's not needed
-            done_filenames = [path.split('/')[-1] for path in self.list(bucket_prefix + '/slurm_tiles/done')]
+                ret = self.remove([bucket_prefix + f'/slurm_tiles_{time_stamp}/doing/' + doing_tile_other]) # No checks done on ret here but I think it's not needed
+            done_filenames = [path.split('/')[-1] for path in self.list(bucket_prefix + f'/slurm_tiles_{time_stamp}/done')]
             done_tile_others = [filename for filename in done_filenames if filename.startswith(tile_id + '..server.')]
             if len(done_tile_others) > 0:
                 print(f"The tile {current_tile_name} was already in done, not adding it there")
@@ -141,8 +140,8 @@ class ControlS3():
         new_tile_name = current_tile_name + '..time.' + str(int(time_seconds))
         tmp_tile_file = '/tmp/' + new_tile_name
         self.create_empty_file(tmp_tile_file)
-        self.push_file(tmp_tile_file, bucket_prefix + '/slurm_tiles/' + sub_prefix)
-        print(f"The file {bucket_prefix + '/slurm_tiles/' + sub_prefix + '/' + new_tile_name} was pushed to s3")
+        self.push_file(tmp_tile_file, bucket_prefix + f'/slurm_tiles_{time_stamp}/' + sub_prefix)
+        print(f"The file {bucket_prefix + f'/slurm_tiles_{time_stamp}/' + sub_prefix + '/' + new_tile_name} was pushed to s3")
     
 
 def mmdd_to_doy(mmdd: str) -> int:
