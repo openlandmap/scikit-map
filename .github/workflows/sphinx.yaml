@@ -1,0 +1,34 @@
+name: Python sphinx
+
+on: [push, pull_request]
+
+jobs:
+  doctest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libproj-dev libgeos-dev gdal-bin libgdal-dev pandoc
+          gdal-config --version
+      - name: Install the latest version of uv and set the python version
+        uses: astral-sh/setup-uv@v7
+        with:
+          activate-environment: "true"
+      - name: Run doctests
+        run: |
+          gdal-config --version
+          uv pip install .[full,dev,docs]
+          . .venv/bin/activate
+          sphinx-build -M doctest docs/ build/
+      - name: Build docs
+        run: |
+          . .venv/bin/activate
+          sphinx-build docs/ build/
+          rm -rf build/*.linux-*
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build
