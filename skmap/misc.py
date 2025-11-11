@@ -96,6 +96,7 @@ class ControlS3():
             todo_tiles = self.list(bucket_prefix + f'/slurm_tiles_{time_stamp}/todo')
             if len(todo_tiles) == 0:
                 if deplete_doing:
+                    todo_tiles = self.list(bucket_prefix + f'/slurm_tiles_{time_stamp}/doing')
                     if len(todo_tiles) == 0:
                         return False, None
                     else:
