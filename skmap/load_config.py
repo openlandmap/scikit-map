@@ -1,24 +1,34 @@
 import yaml
 from types import SimpleNamespace
 from typing import Any, Dict
-from skmap.modeler import RFRegressor, RFRegressorTrees, Modeler, Regressor, Classifier, RFClassifier
+from skmap.modeler import (
+    RFRegressor,
+    RFRegressorTrees,
+    Modeler,
+    Regressor,
+    Classifier,
+    RFClassifier,
+)
 
 MODEL_REGISTRY = {
-    'RFRegressor': RFRegressor,
-    'RFRegressorTrees': RFRegressorTrees,
-    'Modeler': Modeler,
-    'Classifier': Classifier,
-    'RFClassifier': RFClassifier,
-    'Regressor': Regressor,
+    "RFRegressor": RFRegressor,
+    "RFRegressorTrees": RFRegressorTrees,
+    "Modeler": Modeler,
+    "Classifier": Classifier,
+    "RFClassifier": RFClassifier,
+    "Regressor": Regressor,
 }
+
 
 class _SafeDict(dict):
     """
     A dictionary subclass that returns '{key}' for missing keys when used
     with str.format_map(). This prevents KeyError for placeholders.
     """
+
     def __missing__(self, key: str) -> str:
-        return f'{{{key}}}'
+        return f"{{{key}}}"
+
 
 def _recursive_format(item: Any, context: dict) -> Any:
     """
@@ -31,11 +41,12 @@ def _recursive_format(item: Any, context: dict) -> Any:
     elif isinstance(item, list):
         return [_recursive_format(v, context) for v in item]
     elif isinstance(item, str):
-        if item == 'None':
+        if item == "None":
             return None
         return item.format_map(context)
     else:
         return item
+
 
 def _to_hybrid_namespace(d: Dict) -> SimpleNamespace:
     """
@@ -46,6 +57,7 @@ def _to_hybrid_namespace(d: Dict) -> SimpleNamespace:
     for key, value in d.items():
         setattr(ns, key, value)
     return ns
+
 
 def parse_config(yaml_path: str) -> SimpleNamespace:
     """
@@ -59,12 +71,12 @@ def parse_config(yaml_path: str) -> SimpleNamespace:
     Returns:
         A SimpleNamespace object with nested dictionaries.
     """
-    with open(yaml_path, 'r') as f:
+    with open(yaml_path, "r") as f:
         data = yaml.safe_load(f)
 
     # 1. Separate base config from the models list
-    base_config = {k: v for k, v in data.items() if k != 'models_params'}
-    models_params_list = data.get('models_params', [])
+    base_config = {k: v for k, v in data.items() if k != "models_params"}
+    models_params_list = data.get("models_params", [])
 
     # 2. Iteratively format the base configuration
     for _ in range(5):
@@ -76,14 +88,22 @@ def parse_config(yaml_path: str) -> SimpleNamespace:
     for model_dict in models_params_list:
         full_context = _SafeDict({**base_config, **model_dict})
         formatted_model = _recursive_format(model_dict, full_context)
-        formatted_model['model'] = MODEL_REGISTRY[base_config['model_type']](formatted_model['model_path_template'])
+        formatted_model["model"] = MODEL_REGISTRY[base_config["model_type"]](
+            formatted_model["model_path_template"]
+        )
         processed_models.append(formatted_model)
 
     # 4. Recombine into the final configuration dictionary
     final_config_dict = base_config
-    final_config_dict['models_params'] = processed_models
-    
-    final_config_dict['s3_params']['s3_addresses'] = [final_config_dict['gaia_addr_range']['template'].format(gaia_ip=gaia_ip) for gaia_ip in range(final_config_dict['gaia_addr_range']['start'], final_config_dict['gaia_addr_range']['end'])]
+    final_config_dict["models_params"] = processed_models
+
+    final_config_dict["s3_params"]["s3_addresses"] = [
+        final_config_dict["gaia_addr_range"]["template"].format(gaia_ip=gaia_ip)
+        for gaia_ip in range(
+            final_config_dict["gaia_addr_range"]["start"],
+            final_config_dict["gaia_addr_range"]["end"],
+        )
+    ]
 
     # 5. Convert only the top level to a SimpleNamespace
     return _to_hybrid_namespace(final_config_dict)

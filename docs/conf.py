@@ -38,6 +38,7 @@ extensions = [
     "sphinx.ext.autosummary",  # Create neat summary tables for modules/classes/methods etc
     "sphinx.ext.intersphinx",  # Link to other project's documentation (see mapping below)
     "sphinx.ext.viewcode",  # Add a link to the Python source code for classes, functions etc.
+    "sphinx.ext.doctest",  # run code snippets
     "sphinx_autodoc_typehints",  # Automatically document param types (less noise in class signature)
     "nbsphinx",  # Integrate Jupyter Notebooks and Sphinx
     "numpydoc",
@@ -108,7 +109,7 @@ templates_path = ["_templates"]
 #    import sphinx_rtd_theme
 #    html_theme = "sphinx_rtd_theme"
 #    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
-html_css_files = ["readthedocs-custom.css", "pydata-custom.css"] # Override some CSS settings
+# html_css_files = ["readthedocs-custom.css"] # Override some CSS settings
 
 # import sphinx_pdj_theme
 # html_theme = 'sphinx_pdj_theme'
@@ -116,36 +117,26 @@ html_css_files = ["readthedocs-custom.css", "pydata-custom.css"] # Override some
 
 # Pydata theme
 html_theme = "pydata_sphinx_theme"
-html_logo = "logo/print_logo_white.svg"
 # html_theme_options = { "show_prev_next": False}
-# html_css_files = ['pydata-custom.css']
+html_css_files = ['readthedocs-custom.css']
 html_theme_options = {
     "collapse_navigation": False,
     "icon_links": [
         {
-            "name": "GitHub",
-            "url": "https://github.com/openlandmap/scikit-map",
-            "icon": "fab fa-github",
+            "name": "GitLab",
+            "url": "https://gitlab.com/geoharmonizer_inea/skmap",
+            "icon": "fab fa-codeberg",
         }
     ],
     "external_links": [
         {"name": "Open Data Science Europe", "url": "http://opendatascience.eu"},
     ],
     "show_prev_next": False,
-    # brand styling
     "logo": {
-        "image_light": "logo/print_logo.svg",
-        "image_dark": "logo/print_logo_white.svg",
-    },
+      "image_light": "logo/print_logo.svg",
+      "image_dark": "logo/print_logo_white.svg",
+   }
 }
-
-# conf.py
-exclude_patterns = [
-    "_build",  # <- ignore built files
-    ".ipynb_checkpoints",  # if using notebooks
-    "Thumbs.db",
-    ".DS_Store",
-]
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
