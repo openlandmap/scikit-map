@@ -46,7 +46,6 @@ class DataCatalog:
         catalog_dict = cls._create_dict_catalog(
             catalog_def, years, base_path, verbose, replace_group_feat_name
         )
-        print(catalog_dict)
         data = {}
         years = [str(year) for year in years]
         if not "common" in years:  # common is default
@@ -105,12 +104,10 @@ class DataCatalog:
                     value = value.replace(old, new)
             return value
 
-        print(covar)
         covar["layer_name"] = covar["layer_name"].apply(replace_layer_name_placeholders)
         covar["path"] = covar["path"].apply(
             lambda x: replace_layer_name_placeholders(x) if "/whale/" in x else x
         )
-        print(covar)
         perc_mask = covar["layer_name"].str.contains(r"\{perc\}") | covar[
             "path"
         ].str.contains(r"\{perc\}")
