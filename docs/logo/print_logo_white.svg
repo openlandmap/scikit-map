@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   version="1.1"
+   id="svg1"
+   width="1984.2521"
+   height="396.8504"
+   viewBox="0 0 1984.2521 396.85041"
+   sodipodi:docname="print_logo_white.svg"
+   inkscape:version="1.4.2 (ebf0e940d0, 2025-05-08)"
+   inkscape:export-filename="print_logo_zilla.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     showgrid="true"
+     inkscape:zoom="0.45821245"
+     inkscape:cx="1133.7536"
+     inkscape:cy="6.5471813"
+     inkscape:window-width="2560"
+     inkscape:window-height="1371"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g1"
+     showguides="true"
+     inkscape:document-units="mm">
+    <inkscape:page
+       x="0"
+       y="0"
+       inkscape:label="1"
+       id="page1"
+       width="1984.2521"
+       height="396.8504"
+       margin="0"
+       bleed="0" />
+    <inkscape:grid
+       id="grid15"
+       units="mm"
+       originx="-1.0178802e-06"
+       originy="3.3596985e-06"
+       spacingx="18.897638"
+       spacingy="18.897638"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="5"
+       enabled="true"
+       visible="true" />
+  </sodipodi:namedview>
+  <g
+     id="g1"
+     inkscape:groupmode="layer"
+     inkscape:label="1"
+     transform="translate(6.6298828e-5)">
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:321.26px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:1;stroke-width:6.39011;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:6.39011, 19.1704"
+       x="19.28512"
+       y="283.4646"
+       id="text9"><tspan
+         sodipodi:role="line"
+         id="tspan9"
+         x="19.28512"
+         y="283.4646"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:321.26px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';fill:#ffffff;stroke-width:6.39011">scikit</tspan></text>
+    <g
+       id="g16"
+       transform="translate(873.66976,415.74805)"
+       style="fill:#ffffff">
+      <rect
+         style="fill:#ffffff;fill-opacity:1;stroke-width:3.77953;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:3.77953, 11.3386"
+         id="rect12"
+         width="94.48819"
+         height="94.48819"
+         x="28.346407"
+         y="-132.28346" />
+      <rect
+         style="fill:#ffffff;fill-opacity:1;stroke-width:3.77953;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:3.77953, 11.3386"
+         id="rect13"
+         width="169.46756"
+         height="169.46756"
+         x="122.83456"
+         y="-301.75098" />
+      <rect
+         style="fill:#ffffff;fill-opacity:1;stroke-width:3.77953;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:3.77953, 11.3386"
+         id="rect14"
+         width="95.099419"
+         height="95.099419"
+         x="292.30209"
+         y="-396.85034" />
+    </g>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:321.26px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:1;stroke-width:3.77953;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:3.77953, 11.3386"
+       x="1285.5835"
+       y="283.4646"
+       id="text16"><tspan
+         sodipodi:role="line"
+         id="tspan16"
+         x="1285.5835"
+         y="283.4646">map</tspan></text>
+  </g>
+</svg>

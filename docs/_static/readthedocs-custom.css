@@ -28,3 +28,73 @@
     max-width: 60% !important;
 }
 
+
+/* Font-face definition */
+@font-face {
+    font-family: "Roboto Slab";
+    src: url("RobotoSlab-Regular-webfont.woff") format("woff");
+    font-weight: normal;
+    font-style: normal;
+}
+
+/* h2 {
+    font-family: "Roboto Slab", serif !important;
+} */
+
+/* Ensure all images (especially SVGs) stay transparent */
+img {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+:root {
+    --pst-font-family-heading: "Roboto Slab", var(--pst-font-family-base);
+    --pst-teal-900: #0e2125;
+    --pst-teal-800: #18393e;
+    --pst-teal-700: #235258;
+    --pst-teal-600: #2c656d;
+    --pst-teal-500: #31737d;
+    --pst-teal-400: #3a8692;
+    --pst-teal-300: #44a2b6;
+    --pst-teal-200: #72b9ca;
+    --pst-teal-100: #d7ecef;
+    /* --pst-teal-100: #;
+    --pst-teal-50: #; */
+}
+/*******************************************************************************
+* light theme
+*
+* all the variables used for light theme coloring
+*/
+html[data-theme="light"] {
+  /*****************************************************************************
+  * main colors
+  */
+  --pst-color-text-base: var(--pst-teal-900);
+  --pst-color-text-muted: var(--pst-teal-800); 
+}
+
+/*******************************************************************************
+* dark theme
+*
+* all the variables used for dark theme coloring
+*/
+html[data-theme="dark"] {
+  /*****************************************************************************
+  * depth colors
+  *
+  * background: the more in depth color
+  * on-background: the object directly set on the background, use of a light grey in dark theme
+  * surface: object set on the background (without shadows)
+  * on_surface: object set on surface object (without shadows)
+  */
+  --pst-color-background: var(--pst-teal-900);
+  --pst-color-on-background: var(--pst-teal-800);
+  --pst-color-surface: var(--pst-teal-700);
+  --pst-color-on-surface: var(--pst-teal-600);
+
+  /* specific brightness applied on images*/
+  img {
+    filter: brightness(0.8) contrast(1.2);
+  }
+}
