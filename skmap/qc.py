@@ -1,7 +1,6 @@
-'''
+"""
 Dataset quality control utilities
-'''
-
+"""
 
 from typing import Iterable, Union
 import warnings
@@ -17,12 +16,14 @@ from functools import reduce
 from .parallel import blocks
 # from .datasets.catalogue import _Resource
 
-_LANDMASK_REF = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_land.mask_pflugmacher2019.landcover.12_f_30m_s0..0m_2014..2016_skmap_epsg3035_v0.1.tif'
+_LANDMASK_REF = "https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_land.mask_pflugmacher2019.landcover.12_f_30m_s0..0m_2014..2016_skmap_epsg3035_v0.1.tif"
+
 
 def _test_field_nonempty(val):
     if isinstance(val, str):
         val = val.strip()
-    return val not in ['', []]
+    return val not in ["", []]
+
 
 class Test:
     """
@@ -46,16 +47,18 @@ class Test:
 
     """
 
-    def __init__(self,
+    def __init__(
+        self,
         bounds: Iterable,
-        crs: bool=None,
-        verbose: bool=False,
+        crs: bool = None,
+        verbose: bool = False,
     ):
         self.bounds = bounds
         self.verbose = verbose
         self.crs = crs
 
-    def accessibility(self,
+    def accessibility(
+        self,
         dataset_url: str,
     ) -> bool:
         """
@@ -72,21 +75,22 @@ class Test:
 
         if self.verbose:
             if result:
-                acc = 'accessible'
+                acc = "accessible"
             else:
-                acc = 'inaccessible'
+                acc = "inaccessible"
             print(
-                f'Dataset {acc}:',
+                f"Dataset {acc}:",
                 dataset_url,
-                sep='\n',
+                sep="\n",
             )
 
         return result
 
-    def raster_land_coverage(self,
+    def raster_land_coverage(
+        self,
         dataset_path: Union[str, Path],
-        include_ice: bool=False,
-        include_wetlands: bool=False,
+        include_ice: bool = False,
+        include_wetlands: bool = False,
     ) -> float:
         """
         Check completeness of a remote raster resource against land mask derived from [1].
@@ -116,11 +120,12 @@ class Test:
 
             idx_data = (data != nodata) & idx_landmask
 
-            return np.array([
-                idx_data.sum(),
-                idx_landmask.sum(),
-            ])
-
+            return np.array(
+                [
+                    idx_data.sum(),
+                    idx_landmask.sum(),
+                ]
+            )
 
         reader = blocks.RasterBlockReader(_LANDMASK_REF)
         agg = blocks.RasterBlockAggregator(reader)
@@ -140,7 +145,8 @@ class Test:
         _geom = g.mapping(_gdf.geometry[0])
 
         counts = agg.aggregate(
-            [_LANDMASK_REF, dataset_path], _geom,
+            [_LANDMASK_REF, dataset_path],
+            _geom,
             block_func=_get_counts,
             agg_func=lambda results: reduce(add, results),
         )
@@ -149,13 +155,13 @@ class Test:
 
         if self.verbose:
             print(
-                f'Completeness {result*100}% for dataset:',
+                f"Completeness {result * 100}% for dataset:",
                 dataset_path,
-                sep='\n',
+                sep="\n",
             )
 
         return result
-    
+
     # def metadata_consistency(self,
     #     resource:_Resource,
     # ) -> dict:
@@ -166,7 +172,7 @@ class Test:
     #         'authors',
     #     )
     #     result = []
-        
+
     #     for meta_key in META_KEYS:
     #         try:
     #             meta_val = resource.meta[meta_key]
@@ -176,8 +182,8 @@ class Test:
     #             result.append(False)
     #             if self.verbose:
     #                 print('Missing metadata:', meta_key)
-        
+
     #     if self.verbose:
     #         print('All metadata present:', all(result))
-            
+
     #     return dict(zip(META_KEYS, result))
