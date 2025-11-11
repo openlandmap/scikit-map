@@ -1,0 +1,28 @@
+name: Python test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libproj-dev libgeos-dev gdal-bin libgdal-dev
+          gdal-config --version
+      - name: Install the latest version of uv and set the python version
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          activate-environment: "true"
+      - name: Test with python ${{ matrix.python-version }}
+        run: |
+          gdal-config --version
+          uv pip install .[full,dev]
+          . .venv/bin/activate
+          pytest
