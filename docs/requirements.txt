@@ -11,3 +11,6 @@ jupyter
 matplotlib
 numpy
 numpydoc
+statsmodels
+tl2cgen
+h5py
