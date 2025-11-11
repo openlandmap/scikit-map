@@ -1,0 +1,13 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/runner/work/scikit-map/scikit-map/build/temp.linux-x86_64-cpython-312/skmap_bindings/cmake_install.cmake",
+		"/home/runner/work/scikit-map/scikit-map/build/temp.linux-x86_64-cpython-312/skmap_bindings/_deps/eigen-build/cmake_install.cmake",
+		"/home/runner/work/scikit-map/scikit-map/build/temp.linux-x86_64-cpython-312/skmap_bindings/_deps/eigen-build/unsupported/cmake_install.cmake",
+		"/home/runner/work/scikit-map/scikit-map/build/temp.linux-x86_64-cpython-312/skmap_bindings/_deps/eigen-build/unsupported/Eigen/cmake_install.cmake",
+		"/home/runner/work/scikit-map/scikit-map/build/temp.linux-x86_64-cpython-312/skmap_bindings/_deps/eigen-build/unsupported/Eigen/CXX11/cmake_install.cmake",
+		"/home/runner/work/scikit-map/scikit-map/build/temp.linux-x86_64-cpython-312/skmap_bindings/_deps/pybind11-build/cmake_install.cmake",
+		"/home/runner/work/scikit-map/scikit-map/build/temp.linux-x86_64-cpython-312/skmap_bindings/build/temp.linux-x86_64-cpython-312/skmap_bindings/_deps/pybind11-src/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

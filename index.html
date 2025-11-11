@@ -1,0 +1,525 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Installation &#8212; skmap library 0.7.3 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/readthedocs-custom.css?v=ec7c6751" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="_static/documentation_options.js?v=c98573da"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quickstart" href="quickstart/quickstart.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="0.7" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="#">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/print_logo.svg" class="logo__image only-light" alt="skmap library 0.7.3 documentation - Home"/>
+    <img src="_static/print_logo_white.svg" class="logo__image only-dark pst-js-only" alt="skmap library 0.7.3 documentation - Home"/>
+  
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="#">
+    Home
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="quickstart/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="tutorials.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="in-depth/in-depth.html">
+    In-Depth
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="http://opendatascience.eu">
+    Open Data Science Europe
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://gitlab.com/geoharmonizer_inea/skmap" title="GitLab" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-codeberg fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitLab</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="#">
+    Home
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="quickstart/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="tutorials.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="in-depth/in-depth.html">
+    In-Depth
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="http://opendatascience.eu">
+    Open Data Science Europe
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://gitlab.com/geoharmonizer_inea/skmap" title="GitLab" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-codeberg fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitLab</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none"></div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <div class="toctree-wrapper compound">
+</div>
+<p>Scikit-Map is a library to fill gaps in the Python machine learning ecosystem when dealing with geospatial data. It offers <em>parallel data access</em> and manipulation for <strong>space-time overlays</strong> and <strong>large-scale predictions</strong>.</p>
+<img alt="_images/pipeline.svg" src="_images/pipeline.svg" />
+<p>It implements efficient <strong>raster access</strong> through <a class="reference external" href="https://rasterio.readthedocs.io">rasterio</a>, multiple <strong>gapfiling</strong> approaches, <strong>spatial and spacetime overlay</strong>, <strong>training samples</strong> preparation (LUCAS points), and <strong>Ensemble Machine Learning</strong> applied to spatial predictions (fully compatible with <a class="reference external" href="https://scikit-learn.org">scikit-learn</a>).</p>
+<section id="installation">
+<span id="installation-section"></span><h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h1>
+<section id="docker">
+<h2>Docker<a class="headerlink" href="#docker" title="Link to this heading">#</a></h2>
+<p>The best way to install <code class="docutils literal notranslate"><span class="pre">skmap</span></code> is using Docker. Check the <a class="reference external" href="https://docs.docker.com/get-docker/">official documentation</a> to get Docker running in your environment.</p>
+<section id="jupyterlab-container">
+<h3>JupyterLab Container<a class="headerlink" href="#jupyterlab-container" title="Link to this heading">#</a></h3>
+<p>The image <a class="reference external" href="https://hub.docker.com/r/opengeohub/pygeo-ide">opengeohub/pygeo-ide</a> provides access to all <code class="docutils literal notranslate"><span class="pre">skmap</span></code> dependencies and to <a class="reference external" href="https://jupyterlab.readthedocs.io/en/stable/">JupyterLab</a> IDE. The follow instructions are specific for Intel CPUs, which supports <a class="reference external" href="https://software.intel.com/content/www/us/en/develop/tools/oneapi/components/onemkl.html">MKL</a>, for other CPUs it’s recommend to use the <a class="reference external" href="https://hub.docker.com/r/opengeohub/pygeo-ide/tags?page=1&amp;ordering=last_updated">openblas version</a>.</p>
+<p>First, download the image:</p>
+<div class="highlight-shell-session notranslate"><div class="highlight"><pre><span></span><span class="go">docker pull opengeohub/pygeo-ide:v3.8.6-mkl-gdal314</span>
+</pre></div>
+</div>
+<p>Then create the container:</p>
+<div class="highlight-shell-session notranslate"><div class="highlight"><pre><span></span><span class="go">docker run -d --restart=always --name opengeohub_pygeo_ide -v /mnt:/mnt -p 8888:8888 -e GRANT_SUDO=yes --user root opengeohub/pygeo-ide:v3.8.6-mkl-gdal314 start.sh jupyter lab --LabApp.token=&#39;opengeohub&#39; --ServerApp.root_dir=&#39;/&#39;</span>
+</pre></div>
+</div>
+<p>As last step access the JupyterLab through <a class="reference external" href="http://localhost:8888">http://localhost:8888</a> using the password <strong>opengeohub</strong>, open a terminal and install the last version of <code class="docutils literal notranslate"><span class="pre">scikit-map</span></code>:</p>
+<div class="highlight-shell-session notranslate"><div class="highlight"><pre><span></span><span class="go">pip install -e &#39;git+https://gitlab.com/geoharmonizer_inea/eumap.git#egg=eumap[full]&#39;</span>
+</pre></div>
+</div>
+<img alt="_images/docker_eumap.gif" src="_images/docker_eumap.gif" />
+</section>
+</section>
+<section id="conda">
+<h2>Conda<a class="headerlink" href="#conda" title="Link to this heading">#</a></h2>
+<p>To install <code class="docutils literal notranslate"><span class="pre">skmap</span></code> using <a class="reference external" href="https://conda.io/projects/conda/en/latest/user-guide/install/index.html">conda</a>, first it’s necessary download the file <a class="reference external" href="https://gitlab.com/geoharmonizer_inea/eumap/-/raw/master/conda_env.yml">conda_env.yml</a>:</p>
+<div class="highlight-shell-session notranslate"><div class="highlight"><pre><span></span><span class="go">curl https://gitlab.com/geoharmonizer_inea/eumap/-/raw/master/conda_env.yml &gt; ./conda_env.yml</span>
+</pre></div>
+</div>
+<p>Then use this file to create new a environment and activate it:</p>
+<div class="highlight-shell-session notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>It<span class="w"> </span>will<span class="w"> </span>take<span class="w"> </span>a<span class="w"> </span><span class="k">while</span>
+<span class="go">conda env create --quiet --name skmap --file conda_env.yml</span>
+<span class="go">conda activate skmap</span>
+</pre></div>
+</div>
+<p>As last step install the <code class="docutils literal notranslate"><span class="pre">skmap</span></code>:</p>
+<div class="highlight-shell-session notranslate"><div class="highlight"><pre><span></span><span class="go">pip install -e &#39;git+https://gitlab.com/geoharmonizer_inea/eumap.git#egg=eumap[full]&#39;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="contributing">
+<h1>Contributing<a class="headerlink" href="#contributing" title="Link to this heading">#</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">scikit-map</span></code> library has been developed and used by a group of active community members. Your help is very valuable to make the package better for everyone. Check our <a class="reference external" href="https://github.com/openlandmap/scikit-map/blob/main/CONTRIBUTING.md">contribution guidelines</a> and <a class="reference external" href="https://github.com/openlandmap/scikit-map/issues">open issues</a></p>
+</section>
+<section id="license">
+<h1>License<a class="headerlink" href="#license" title="Link to this heading">#</a></h1>
+<p>© Contributors, 2020. Licensed under an <a class="reference external" href="https://github.com/openlandmap/scikit-map?tab=MIT-1-ov-file#readme">MIT</a> license.</p>
+</section>
+<section id="funding">
+<h1>Funding<a class="headerlink" href="#funding" title="Link to this heading">#</a></h1>
+<p>This work is co-financed under Grant Agreement Connecting Europe Facility (CEF) Telecom <a class="reference external" href="https://ec.europa.eu/inea/en/connecting-europe-facility/cef-telecom/2018-eu-ia-0095">project 2018-EU-IA-0095</a> by the European Union.</p>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#">Installation</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#docker">Docker</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jupyterlab-container">JupyterLab Container</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#conda">Conda</a></li>
+</ul>
+</li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#contributing">Contributing</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#license">License</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#funding">Funding</a></li>
+</ul>
+
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2019-2021, Geo-harmonizer project team.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

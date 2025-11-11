@@ -1,0 +1,88 @@
+
+---
+events:
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/runner/work/_temp/setup-uv-cache/builds-v0/.tmpJnymsP/lib/python3.12/site-packages/cmake/data/share/cmake-4.1/Modules/CMakeDetermineSystem.cmake:12 (find_program)"
+      - "CMakeLists.txt:16 (project)"
+    mode: "program"
+    variable: "CMAKE_UNAME"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "uname"
+    candidate_directories:
+      - "/home/runner/work/_temp/setup-uv-cache/builds-v0/.tmpJnymsP/bin/"
+      - "/home/runner/work/scikit-map/scikit-map/.venv/bin/"
+      - "/home/runner/work/_temp/uv-python-dir/"
+      - "/opt/hostedtoolcache/uv/0.9.8/x86_64/"
+      - "/home/runner/.local/bin/"
+      - "/snap/bin/"
+      - "/opt/pipx_bin/"
+      - "/home/runner/.cargo/bin/"
+      - "/home/runner/.config/composer/vendor/bin/"
+      - "/usr/local/.ghcup/bin/"
+      - "/home/runner/.dotnet/tools/"
+      - "/usr/local/sbin/"
+      - "/usr/local/bin/"
+      - "/usr/sbin/"
+      - "/usr/bin/"
+      - "/sbin/"
+      - "/bin/"
+      - "/usr/games/"
+      - "/usr/local/games/"
+    searched_directories:
+      - "/home/runner/work/_temp/setup-uv-cache/builds-v0/.tmpJnymsP/bin/uname"
+      - "/home/runner/work/scikit-map/scikit-map/.venv/bin/uname"
+      - "/home/runner/work/_temp/uv-python-dir/uname"
+      - "/opt/hostedtoolcache/uv/0.9.8/x86_64/uname"
+      - "/home/runner/.local/bin/uname"
+      - "/snap/bin/uname"
+      - "/opt/pipx_bin/uname"
+      - "/home/runner/.cargo/bin/uname"
+      - "/home/runner/.config/composer/vendor/bin/uname"
+      - "/usr/local/.ghcup/bin/uname"
+      - "/home/runner/.dotnet/tools/uname"
+      - "/usr/local/sbin/uname"
+      - "/usr/local/bin/uname"
+      - "/usr/sbin/uname"
+    found: "/usr/bin/uname"
+    search_context:
+      ENV{PATH}:
+        - "/home/runner/work/_temp/setup-uv-cache/builds-v0/.tmpJnymsP/bin"
+        - "/home/runner/work/scikit-map/scikit-map/.venv/bin"
+        - "/home/runner/work/_temp/uv-python-dir"
+        - "/opt/hostedtoolcache/uv/0.9.8/x86_64"
+        - "/home/runner/.local/bin"
+        - "/snap/bin"
+        - "/home/runner/.local/bin"
+        - "/opt/pipx_bin"
+        - "/home/runner/.cargo/bin"
+        - "/home/runner/.config/composer/vendor/bin"
+        - "/usr/local/.ghcup/bin"
+        - "/home/runner/.dotnet/tools"
+        - "/usr/local/sbin"
+        - "/usr/local/bin"
+        - "/usr/sbin"
+        - "/usr/bin"
+        - "/sbin"
+        - "/bin"
+        - "/usr/games"
+        - "/usr/local/games"
+        - "/snap/bin"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/runner/work/_temp/setup-uv-cache/builds-v0/.tmpJnymsP/lib/python3.12/site-packages/cmake/data/share/cmake-4.1/Modules/CMakeDetermineSystem.cmake:212 (message)"
+      - "CMakeLists.txt:16 (project)"
+    message: |
+      The system is: Linux - 6.11.0-1018-azure - x86_64
+...
