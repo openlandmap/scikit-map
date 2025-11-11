@@ -1,3 +1,3 @@
-layer_name, file_name, type, start_year, end_year,
-layer_{year}, {base_path}/file_{year}.tif, temporal, 2000, 2022,
-static, {base_path}/static.tif, common, , ,
+layer_name,path,type,start_year,end_year,
+layer_{year}, file_{year}.tif,temporal,2000,2022,
+static,static.tif,common,,,
