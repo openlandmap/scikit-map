@@ -273,7 +273,10 @@ class TiledDataExporter(TiledData):
                  tile_id:str = None,
                  mode:str = None,
                  spatial_res:str = None,
-                 s3_params = None,
+                 s3_access_key = None,
+                 s3_secret_key = None,
+                 s3_prefix = None,
+                 s3_addresses = None,
                  verbose = False,
                  years = None,
                  depths = None,
@@ -281,11 +284,11 @@ class TiledDataExporter(TiledData):
                  quantiles = None,
                  save_hdf5 = None,
                  n_threads:int = os.cpu_count()) -> None:
-        if s3_params:
-            self.s3_aliases = s3_setup(s3_params['s3_access_key'],
-                                       s3_params['s3_secret_key'],
-                                       s3_params['s3_addresses'])
-            self.s3_prefix = s3_params['s3_prefix']
+        if s3_prefix and s3_access_key and s3_prefix and s3_addresses:
+            self.s3_aliases = s3_setup(s3_access_key,
+                                       s3_secret_key,
+                                       s3_addresses)
+            self.s3_prefix = s3_prefix
         else:
             self.s3_aliases = None
             self.s3_prefix = None

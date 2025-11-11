@@ -83,7 +83,7 @@ def parse_config(yaml_path: str) -> SimpleNamespace:
     final_config_dict = base_config
     final_config_dict['models_params'] = processed_models
     
-    final_config_dict['s3_params']['s3_addresses'] = [final_config_dict['gaia_addr_range']['template'].format(gaia_ip=gaia_ip) for gaia_ip in range(final_config_dict['gaia_addr_range']['start'], final_config_dict['gaia_addr_range']['end'])]
+    final_config_dict['s3_addresses'] = [final_config_dict['gaia_template_url'].format(gaia_ip=gaia_ip) for gaia_ip in range(final_config_dict['gaia_start_ip'], final_config_dict['gaia_end_ip'])]
 
     # 5. Convert only the top level to a SimpleNamespace
     return _to_hybrid_namespace(final_config_dict)
