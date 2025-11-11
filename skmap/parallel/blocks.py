@@ -1,6 +1,6 @@
-'''
+"""
 Parallel block-wise processing and result aggregation for large raster datasets
-'''
+"""
 
 try:
     import shapely.geos as pg
@@ -9,6 +9,7 @@ try:
     import numpy as np
     import sys
     from shapely import speedups
+
     if speedups.available:
         speedups.enable()
     import shapely.geometry as g
@@ -22,8 +23,8 @@ try:
     def _read_block(
         src: Union[rio.DatasetReader, Iterable[rio.DatasetReader]],
         window: rio.windows.Window,
-        geometry: Union[dict, None]=None,
-        band: int=1,
+        geometry: Union[dict, None] = None,
+        band: int = 1,
     ):
         if isinstance(src, rio.DatasetReader):
             src = [src]
@@ -44,21 +45,18 @@ try:
             mask = mask & gmask
         if not mask.any():
             return None
-        data = np.stack([
-            s.read(band, window=window)
-            for s in src
-        ])
+        data = np.stack([s.read(band, window=window) for s in src])
         return data[:, mask], mask, window
 
     def _id(x):
         return x
 
     class _RasterBlockFunction:
-
-        def __init__(self,
+        def __init__(
+            self,
             func: Callable,
             # agg_func: Callable=_id, # should not be done here
-            return_data_only: bool=False,
+            return_data_only: bool = False,
         ):
             self.func = func
             # self.agg_func = agg_func # should not be done here
@@ -103,23 +101,27 @@ try:
 
         """
 
-        def __init__(self,
-            reference_file: str=None,
+        def __init__(
+            self,
+            reference_file: str = None,
         ):
             self.reference = None
             if reference_file is not None:
                 self._build_rtree(reference_file)
 
-        def _open(self,
+        def _open(
+            self,
             src_path,
         ):
             src = rio.open(src_path)
-            if all((
-                src.crs == self.reference.crs,
-                src.transform == self.reference.transform,
-                src.width == self.reference.width,
-                src.height == self.reference.height,
-            )):
+            if all(
+                (
+                    src.crs == self.reference.crs,
+                    src.transform == self.reference.transform,
+                    src.width == self.reference.width,
+                    src.height == self.reference.height,
+                )
+            ):
                 return src
 
             return rio.vrt.WarpedVRT(
@@ -133,34 +135,34 @@ try:
 
         def _build_rtree(self, reference_file):
             self.reference = rio.open(reference_file)
-            self.block_windows = np.array([
-                tup[1]
-                for tup in self.reference.block_windows()
-            ])
+            self.block_windows = np.array(
+                [tup[1] for tup in self.reference.block_windows()]
+            )
             boxes = self._blocks2boxes(self.block_windows)
             self.rtree = pg.strtree.STRtree(boxes)
             __ = self.rtree.query(boxes[0])
 
-        def _get_block_indices(self,
+        def _get_block_indices(
+            self,
             geometry: dict,
         ):
             _geom = pg.from_shapely(g.shape(geometry))
             return self.rtree.query(_geom)
 
         def _blocks2boxes(self, block_windows):
-            coords = np.array([
-                self.reference.window_bounds(bw)
-                for bw in block_windows
-            ])
+            coords = np.array(
+                [self.reference.window_bounds(bw) for bw in block_windows]
+            )
             return pg.box(*coords.T)
 
-        def read_overlay(self,
+        def read_overlay(
+            self,
             src_path: Union[str, Iterable[str]],
             geometry: dict,
-            band: int=1,
-            geometry_mask: bool=True,
-            max_workers: int=mp.cpu_count(),
-            optimize_threadcount: bool=True,
+            band: int = 1,
+            geometry_mask: bool = True,
+            max_workers: int = mp.cpu_count(),
+            optimize_threadcount: bool = True,
         ) -> Iterator[Tuple[np.ndarray, np.ndarray, rio.windows.Window]]:
             """
             Thread-parallel reading of large rasters within a bounding geometry.
@@ -219,12 +221,10 @@ try:
 
             def _read_worker(window: rio.windows.Window):
                 import threading
+
                 tname = threading.current_thread().name
                 if tname not in sources:
-                    sources[tname] = [
-                        self._open(sp)
-                        for sp in src_path
-                    ]
+                    sources[tname] = [self._open(sp) for sp in src_path]
                 return _read_block(
                     sources[tname],
                     window,
@@ -241,7 +241,10 @@ try:
                     first_results = []
 
                     while block_idx.size > 0 and n_workers <= max_workers:
-                        batch_idx, block_idx = block_idx[:n_workers], block_idx[n_workers:]
+                        batch_idx, block_idx = (
+                            block_idx[:n_workers],
+                            block_idx[n_workers:],
+                        )
                         with ThreadPool(n_workers) as pool:
                             t_start = datetime.now()
                             first_results += pool.map(
@@ -256,7 +259,7 @@ try:
                         t_block_best = dt
                         n_workers += 1
 
-                    print(f'reader using {n_workers} threads')
+                    print(f"reader using {n_workers} threads")
 
                     for block_data in first_results:
                         if block_data is not None:
@@ -304,16 +307,18 @@ try:
 
         """
 
-        def __init__(self,
-            reader: RasterBlockReader=None,
+        def __init__(
+            self,
+            reader: RasterBlockReader = None,
         ):
             self.reader = reader
 
-        def aggregate(self,
+        def aggregate(
+            self,
             src_path: Union[str, Iterable[str]],
             geometry: dict,
             block_func: Callable,
-            agg_func: Callable=np.mean,
+            agg_func: Callable = np.mean,
             **kwargs,
         ):
             """
@@ -406,18 +411,20 @@ try:
 
         """
 
-        def __init__(self,
-            reader: RasterBlockReader=None,
+        def __init__(
+            self,
+            reader: RasterBlockReader = None,
         ):
             self.reader = reader
 
-        def write(self,
+        def write(
+            self,
             src_path: Union[str, Iterable[str]],
             dst_path: str,
             geometry: dict,
-            block_func: Callable=_id,
-            geometry_mask: bool=True,
-            reader_kwargs: dict={},
+            block_func: Callable = _id,
+            geometry_mask: bool = True,
+            reader_kwargs: dict = {},
             **kwargs,
         ):
             """
@@ -472,13 +479,17 @@ try:
             profile = self.reader.reference.profile
 
             block_indices = self.reader._get_block_indices(geometry)
-            out_window_geometry = self.reader._blocks2boxes(self.reader.block_windows[block_indices])
-            out_window_geometry = pg.set_operations.coverage_union_all(out_window_geometry)
+            out_window_geometry = self.reader._blocks2boxes(
+                self.reader.block_windows[block_indices]
+            )
+            out_window_geometry = pg.set_operations.coverage_union_all(
+                out_window_geometry
+            )
             out_bounds = pg.measurement.bounds(out_window_geometry)
 
             out_window = rio.windows.from_bounds(
                 *out_bounds,
-                transform=profile['transform'],
+                transform=profile["transform"],
             )
             out_transform = self.reader.reference.window_transform(out_window)
             profile.update(
@@ -489,7 +500,8 @@ try:
             profile.update(**kwargs)
 
             with rio.open(
-                dst_path, 'w',
+                dst_path,
+                "w",
                 **profile,
             ) as dst:
                 for data, mask, window in map(
@@ -499,14 +511,17 @@ try:
                         geometry,
                         geometry_mask=geometry_mask,
                         **reader_kwargs,
-                    )
+                    ),
                 ):
                     window_bounds = self.reader.reference.window_bounds(window)
-                    window = rio.windows.from_bounds(*window_bounds, transform=dst.transform)
-                    out = np.full_like(mask, profile['nodata'], dtype=profile['dtype'])
-                    out[mask] = data.astype(profile['dtype'])
+                    window = rio.windows.from_bounds(
+                        *window_bounds, transform=dst.transform
+                    )
+                    out = np.full_like(mask, profile["nodata"], dtype=profile["dtype"])
+                    out[mask] = data.astype(profile["dtype"])
                     dst.write(out, 1, window=window)
 
 except ImportError as e:
     from ..misc import _warn_deps
-    _warn_deps(e, 'blocks')
+
+    _warn_deps(e, "blocks")

@@ -41,6 +41,7 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=build_temp)
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=build_temp)
 
+
 install_requires = [
     "affine>=2.4.0",
     "geopandas>=0.13.2",
@@ -57,6 +58,7 @@ install_requires = [
     "PyYAML>=6.0",
 ]
 
+
 # Detect system libgdal version (via gdal-config) and build the
 # install_requires list accordingly. If detection fails, fall back to a
 # permissive GDAL requirement.
@@ -72,7 +74,6 @@ def _detect_system_gdal_version():
 
 
 _sys_gdal_version = _detect_system_gdal_version()
-
 
 
 if _sys_gdal_version:
