@@ -117,22 +117,25 @@ templates_path = ["_templates"]
 
 # Pydata theme
 html_theme = "pydata_sphinx_theme"
-html_logo = "_static/logo.png"
 # html_theme_options = { "show_prev_next": False}
-# html_css_files = ['pydata-custom.css']
+html_css_files = ['readthedocs-custom.css']
 html_theme_options = {
     "collapse_navigation": False,
     "icon_links": [
         {
             "name": "GitLab",
             "url": "https://gitlab.com/geoharmonizer_inea/skmap",
-            "icon": "fab fa-gitlab",
+            "icon": "fab fa-codeberg",
         }
     ],
     "external_links": [
         {"name": "Open Data Science Europe", "url": "http://opendatascience.eu"},
     ],
     "show_prev_next": False,
+    "logo": {
+      "image_light": "logo/print_logo.svg",
+      "image_dark": "logo/print_logo_white.svg",
+   }
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
