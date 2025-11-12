@@ -87,3 +87,37 @@ def parse_config(yaml_path: str) -> SimpleNamespace:
 
     # 5. Convert only the top level to a SimpleNamespace
     return _to_hybrid_namespace(final_config_dict)
+
+
+def pred_warmup_phase(yaml_path: str):
+    from skmap.load_config import parse_config
+    from skmap.catalog import DataCatalog
+    from skmap.tiled_data import TiledDataLoader, TiledDataExporter
+    from skmap.misc import ControlS3, TimeTracker, ttprint
+    import skmap_bindings as sb
+    import sys, warnings, time
+    warnings.filterwarnings("ignore", module="sklearn")
+    from osgeo import gdal
+    
+    cfg = parse_config(yaml_path)
+
+    # Exporting GDAL configurations
+    for k in cfg.gdal_opts.keys():
+        gdal.SetConfigOption(k,cfg.gdal_opts[k])
+    
+    properties_features = {f for params in cfg.models_params for f in params['model'].model_covs}
+    catalog = DataCatalog.create_catalog(catalog_def=cfg.catalog_path, years=cfg.years, base_path=cfg.s3_addresses, verbose=False)
+    catalog.query(properties_features, [str(y) for y in cfg.years])
+
+    properties_data = TiledDataLoader(catalog, cfg.mask_template_path, cfg.spatial_aggregation, cfg.resampling_strategy, verbose=False, n_threads_read=cfg.threads)
+
+    export_data = TiledDataExporter(spatial_res=cfg.spatial_res, s3_access_key=cfg.s3_access_key, s3_secret_key=cfg.s3_secret_key, s3_prefix=cfg.s3_prefix, 
+                                    s3_addresses=cfg.s3_addresses, mode=cfg.mode, years=cfg.years, depths=cfg.depths, quantiles=cfg.quantiles)
+
+    s3c = ControlS3(endpoint_url=cfg.s3_addresses[0].split('//')[1],
+                          access_key=cfg.s3_access_key,
+                          secret_key=cfg.s3_secret_key)
+
+    out_files_suffix = f'{cfg.extent}_{cfg.projection}_v{cfg.version}'
+    
+    return cfg, properties_data, export_data, s3c, out_files_suffix
