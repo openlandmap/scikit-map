@@ -21,14 +21,14 @@ jobs:
           gdal-config --version
           uv pip install .[full,dev,docs]
           . .venv/bin/activate
-          sphinx-build -M doctest docs/ build/
+          sphinx-build -M doctest docs/ _build/
       - name: Build docs
         run: |
           . .venv/bin/activate
-          sphinx-build docs/ build/
+          sphinx-build docs/ _build/
           rm -rf build/*.linux-*
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
+          publish_dir: ./_build
