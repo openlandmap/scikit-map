@@ -28,8 +28,6 @@ find_package(OpenMP REQUIRED)
 message(STATUS "GDAL library: ${GDAL_LIBRARIES}")
 message(STATUS "GDAL headers: ${GDAL_INCLUDE_DIRS}")
 
-add_subdirectory("${pybind11_SOURCE_DIR}")
-
 include_directories("${eigen_SOURCE_DIR}")
 include_directories("${GDAL_INCLUDE_DIRS}")
 include_directories(skmap/include)

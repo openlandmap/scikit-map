@@ -185,11 +185,11 @@ def mmdd_to_doy(mmdd: str) -> int:
     return date.timetuple().tm_yday
 
 
-def sb_arr(rows, cols):
+def sb_arr(rows: int, cols: int) -> np.ndarray:
     return np.empty((rows, cols), np.float32)
 
 
-def sb_vec(elems):
+def sb_vec(elems: int) -> np.ndarray:
     return np.empty((elems,), np.float32)
 
 
@@ -394,8 +394,9 @@ def ttprint(*args, **kwargs):
     ========
 
     >>> from skmap.misc import ttprint
-    >>> ttprint('skmap rocks!')
-
+    >>> ttprint('skmap rocks!') # doctest: +SKIP
+    [16:39:11] skmap rocks!
+    
     """
     from datetime import datetime
     import sys
@@ -404,7 +405,7 @@ def ttprint(*args, **kwargs):
     print(*args, **kwargs, flush=True)
 
 
-def find_files(dir_list: List, pattern: str = "*.*"):
+def find_files(dir_list: List, pattern: str = "*.*") -> [Path]:
     """
     Recursively find files in multiple directories according to the
     specified pattern. It's basically a wrapper for
@@ -418,7 +419,8 @@ def find_files(dir_list: List, pattern: str = "*.*"):
 
     >>> from skmap.misc import find_files
     >>> libs_so = find_files(['/lib', '/usr/lib64/'], f'*.so')
-    >>> print(f'{len(libs_so)} files found')
+    >>> print(f'{len(libs_so)} files found') # doctest: +SKIP
+    1337 files found
 
     References
     ==========
@@ -463,6 +465,7 @@ def nan_percentile(arr: np.array, q: List = [25, 50, 75], keep_original_vals=Fal
     >>> data[2:5,0:10,0] = np.nan
     >>> data_perc = nan_percentile(data, q=[25, 50, 75])
     >>> print(f'Shape: data={data.shape} data_perc={data_perc.shape}')
+    Shape: data=(10, 10, 10) data_perc=(3, 10, 10)
 
     References
     ==========
@@ -583,7 +586,7 @@ def sample_groups(
     ========
 
     >>> import geopandas as gp
-    >>> import pygeos as pg
+    >>> import shapely
     >>> import numpy as np
     >>> from datetime import datetime, timedelta
     >>> from sklearn.linear_model import LogisticRegression
@@ -591,41 +594,58 @@ def sample_groups(
     >>>
     >>> from skmap.misc import sample_groups
     >>>
+    >>> np.random.seed(42)
+    >>>
     >>> # construct some synthetic point data
     >>> coords = np.random.random((1000, 2)) * 4000
     >>> dates = datetime.now() + np.array([*map(
-    >>>         timedelta,
-    >>>         range(1000),
-    >>> )])
+    ...         timedelta,
+    ...         range(1000),
+    ... )])
     >>>
     >>> points = gp.GeoDataFrame({
-    >>>         'geometry': pg.points(coords),
-    >>>         'date': dates,
-    >>>         'group': np.random.choice(['a', 'b'], size=1000),
-    >>>         'predictor': np.random.random(1000),
-    >>>         'target': np.random.randint(2, size=1000),
-    >>> })
+    ...         'geometry': shapely.points(coords),
+    ...         'date': dates,
+    ...         'group': np.random.choice(['a', 'b'], size=1000),
+    ...         'predictor': np.random.random(1000),
+    ...         'target': np.random.randint(2, size=1000),
+    ... })
     >>>
     >>> # get the point groups
     >>> groups = sample_groups(
-    >>>         points,
-    >>>         'group',
-    >>>         spatial_resolution=1000,
-    >>>         temporal_resolution=timedelta(days=365),
-    >>> )
+    ...         points,
+    ...         'group',
+    ...         spatial_resolution=1000,
+    ...         temporal_resolution=timedelta(days=365),
+    ... )
     >>>
     >>> print(np.unique(groups))
+    ['ax0y0t0' 'ax0y0t1' 'ax0y0t2' 'ax0y1t0' 'ax0y1t1' 'ax0y1t2' 'ax0y2t0'
+     'ax0y2t1' 'ax0y2t2' 'ax0y3t0' 'ax0y3t1' 'ax0y3t2' 'ax1y0t0' 'ax1y0t1'
+     'ax1y0t2' 'ax1y1t0' 'ax1y1t1' 'ax1y1t2' 'ax1y2t0' 'ax1y2t1' 'ax1y2t2'
+     'ax1y3t0' 'ax1y3t1' 'ax1y3t2' 'ax2y0t0' 'ax2y0t1' 'ax2y0t2' 'ax2y1t0'
+     'ax2y1t1' 'ax2y1t2' 'ax2y2t0' 'ax2y2t1' 'ax2y2t2' 'ax2y3t0' 'ax2y3t1'
+     'ax2y3t2' 'ax3y0t0' 'ax3y0t1' 'ax3y0t2' 'ax3y1t0' 'ax3y1t1' 'ax3y1t2'
+     'ax3y2t0' 'ax3y2t1' 'ax3y2t2' 'ax3y3t0' 'ax3y3t1' 'ax3y3t2' 'bx0y0t0'
+     'bx0y0t1' 'bx0y0t2' 'bx0y1t0' 'bx0y1t1' 'bx0y1t2' 'bx0y2t0' 'bx0y2t1'
+     'bx0y2t2' 'bx0y3t0' 'bx0y3t1' 'bx0y3t2' 'bx1y0t0' 'bx1y0t1' 'bx1y0t2'
+     'bx1y1t0' 'bx1y1t1' 'bx1y1t2' 'bx1y2t0' 'bx1y2t1' 'bx1y2t2' 'bx1y3t0'
+     'bx1y3t1' 'bx1y3t2' 'bx2y0t0' 'bx2y0t1' 'bx2y0t2' 'bx2y1t0' 'bx2y1t1'
+     'bx2y1t2' 'bx2y2t0' 'bx2y2t1' 'bx2y2t2' 'bx2y3t0' 'bx2y3t1' 'bx2y3t2'
+     'bx3y0t0' 'bx3y0t1' 'bx3y0t2' 'bx3y1t0' 'bx3y1t1' 'bx3y1t2' 'bx3y2t0'
+     'bx3y2t1' 'bx3y2t2' 'bx3y3t0' 'bx3y3t1' 'bx3y3t2']
     >>>
     >>> kfold = GroupKFold(n_splits=5)
     >>>
     >>> # cross validate a classifier
     >>> print(cross_val_score(
-    >>>         estimator=LogisticRegression(),
-    >>>         X=points.predictor.values.reshape(-1, 1),
-    >>>         y=points.target,
-    >>>         scoring='f1',
-    >>>         groups=groups, # our groups go here
-    >>> ))
+    ...         estimator=LogisticRegression(),
+    ...         X=points.predictor.values.reshape(-1, 1),
+    ...         y=points.target,
+    ...         scoring='f1',
+    ...         groups=groups, # our groups go here
+    ... ))
+    [0.67549669 0.63309353 0.55084746 0.6        0.67109635]
     """
 
     group_elements = [points[col].values.astype(str) for col in group_element_columns]
@@ -803,14 +823,15 @@ try:
         Examples
         ========
 
+        >>> from skmap.misc import GoogleSheet
         >>> # Generate your key follow the instructions in https://docs.gspread.org/en/latest/oauth2.html
         >>> key_file = '<GDRIVE_KEY>'
         >>> # Public accessible Google Spreadsheet (Anyone on the internet with this link can view)
         >>> url = 'https://docs.google.com/spreadsheets/d/1O3n5O6MQ3OPX--ZbJEREC5fu-bLKK2AaTYDqeAPMRQY/edit?usp=sharing'
         >>>
-        >>> gsheet = GoogleSheet(key_file, url)
-        >>> print('Sheet points_nl: ', gsheet.points_nl.shape)
-        >>> print('Sheet tiles: ', gsheet.tiles.shape)
+        >>> gsheet = GoogleSheet(key_file, url) # doctest: +SKIP
+        >>> print('Sheet points_nl: ', gsheet.points_nl.shape) # doctest: +SKIP
+        >>> print('Sheet tiles: ', gsheet.tiles.shape) # doctest: +SKIP
 
         References
         ==========

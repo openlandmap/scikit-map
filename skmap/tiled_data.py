@@ -54,6 +54,7 @@ mask_aggregation_bash_script = """#!/bin/bash
 
 
 def warp_tile(tile_file, mosaic_paths, n_pix, resample):
+    """no docs"""
     warp_data = sb_vec(
         n_pix,
     )
@@ -107,6 +108,8 @@ def s3_setup(access_key, secret_key, gaia_addrs):
 
 
 class TiledData:
+    """Base class for `TiledDataLoader` and `TiledDataExporter`
+    """
     def __init__(
         self,
         n_layers: int = None,
@@ -146,6 +149,25 @@ class TiledData:
 
 
 class TiledDataLoader(TiledData):
+    """
+    Loads tiled data in parallel based on a catalog file
+
+    :param catalog: scikit-map `DataCatalog`
+    :param mask_template_path: ``str`` with a ``{tile_id}`` placeholder
+    :type mask_template_path: str
+    :param spatial_aggregation: Whether to use spatial aggregation Should be powers of 2?, defaults to None
+    :type spatial_aggregation: int, optional
+    :param resampling_strategy: _description_, defaults to "GRA_NearestNeighbour"
+    :type resampling_strategy: str, optional
+    :param gdal_opts: _description_, defaults to { "GDAL_HTTP_VERSION": "1.0", "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif", }
+    :type gdal_opts: Dict[str, str], optional
+    :param n_threads: The number of threads to use for whales, defaults to os.cpu_count()
+    :type n_threads: int, optional
+    :param verbose: Whether to print output, defaults to True
+    :type verbose: bool, optional
+    :param n_threads_read: Number of threads for GDAL, defaults to n_threads
+    :type n_threads_read: int, optional
+    """
     def __init__(
         self,
         catalog: DataCatalog,
@@ -160,6 +182,13 @@ class TiledDataLoader(TiledData):
         verbose: bool = True,
         n_threads_read=None,
     ) -> None:
+        """_summary_
+
+        :param catalog: _description_
+        :type catalog: DataCatalog
+        :param mask_template_path: _description_
+        
+        """
         self.catalog = catalog
         self.mask_template_path = mask_template_path
         self.spatial_aggregation = spatial_aggregation
