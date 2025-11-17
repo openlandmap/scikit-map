@@ -1,5 +1,6 @@
 __pycache__
-build
+build/
+_build/
 dist
 *.egg*
 .vscode
@@ -7,7 +8,6 @@ dist
 skmap_data
 gapfilled
 tmp*
-docs/_build/
 docs/_autosummary/
 docs/notebooks/*.gpkg
 *.aux.xml

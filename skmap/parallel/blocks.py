@@ -3,7 +3,7 @@ Parallel block-wise processing and result aggregation for large raster datasets
 """
 
 try:
-    import shapely.geos as pg
+    import shapely as pg
     import rasterio as rio
     import rasterio.features as rfeatures
     import numpy as np
@@ -88,9 +88,9 @@ try:
         >>>
         >>> fp = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_skmap_epsg3035_v0.1.tif'
         >>>
-        >>> ttprint('initializing reader')
-        >>> reader = RasterBlockReader(fp)
-        >>> ttprint('reader initialized')
+        >>> ttprint('initializing reader') # doctest: +SKIP
+        >>> reader = RasterBlockReader(fp) # doctest: +SKIP
+        >>> ttprint('reader initialized') # doctest: +SKIP
 
         References
         ==========
@@ -188,17 +188,17 @@ try:
             ========
 
             >>> geom = {
-            >>>     'type': 'Polygon',
-            >>>     'coordinates': [[
-            >>>         [4765389, 2441103],
-            >>>         [4764441, 2439352],
-            >>>         [4767369, 2438696],
-            >>>         [4761659, 2441949],
-            >>>         [4765389, 2441103],
-            >>>     ]],
-            >>> }
-            >>> block_data_gen = reader.read_overlay(fp)
-            >>> data, mask, window = next(block_data_gen)
+            ...     'type': 'Polygon',
+            ...     'coordinates': [[
+            ...         [4765389, 2441103],
+            ...         [4764441, 2439352],
+            ...         [4767369, 2438696],
+            ...         [4761659, 2441949],
+            ...         [4765389, 2441103],
+            ...     ]],
+            ... }
+            >>> block_data_gen = reader.read_overlay(fp) # doctest: +SKIP
+            >>> data, mask, window = next(block_data_gen) # doctest: +SKIP
 
             References
             ==========
@@ -297,8 +297,8 @@ try:
         >>>
         >>> fp = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_skmap_epsg3035_v0.1.tif'
         >>>
-        >>> reader = RasterBlockReader(fp)
-        >>> aggregator = RasterBlockAggregator(reader)
+        >>> reader = RasterBlockReader(fp) # doctest: +SKIP
+        >>> aggregator = RasterBlockAggregator(reader) # doctest: +SKIP
 
         References
         ==========
@@ -337,25 +337,26 @@ try:
             Examples
             ========
 
+            >>> from skmap.parallel import blocks
             >>> geom = {
-            >>>     'type': 'Polygon',
-            >>>     'coordinates': [[
-            >>>         [4765389, 2441103],
-            >>>         [4764441, 2439352],
-            >>>         [4767369, 2438696],
-            >>>         [4761659, 2441949],
-            >>>         [4765389, 2441103],
-            >>>     ]],
-            >>> }
+            ...     'type': 'Polygon',
+            ...     'coordinates': [[
+            ...         [4765389, 2441103],
+            ...         [4764441, 2439352],
+            ...         [4767369, 2438696],
+            ...         [4761659, 2441949],
+            ...         [4765389, 2441103],
+            ...     ]],
+            ... }
             >>>
             >>> def urban_fabric_area(lc):
-            >>>     return (lc==1) * 9e-4 # spatial resolution is 30x30 m
+            ...     return (lc==1) * 9e-4 # spatial resolution is 30x30 m
             >>>
-            >>> result = agg.aggregate(
-            >>>     fp, geom,
-            >>>     block_func=urban_fabric_area,
-            >>>     agg_func=np.sum,
-            >>> )
+            >>> result = aggregator.aggregate(
+            ...     fp, geom,
+            ...     block_func=urban_fabric_area,
+            ...     agg_func=np.sum,
+            ... ) # doctest: +SKIP
 
             References
             ==========
@@ -401,8 +402,8 @@ try:
         >>>
         >>> fp = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_skmap_epsg3035_v0.1.tif'
         >>>
-        >>> reader = RasterBlockReader(fp)
-        >>> writer = RasterBlockWriter(reader)
+        >>> reader = RasterBlockReader(fp) # doctest: +SKIP
+        >>> writer = RasterBlockWriter(reader) # doctest: +SKIP
 
         References
         ==========
@@ -446,20 +447,20 @@ try:
             ========
 
             >>> geom = {
-            >>>     'type': 'Polygon',
-            >>>     'coordinates': [[
-            >>>         [4765389, 2441103],
-            >>>         [4764441, 2439352],
-            >>>         [4767369, 2438696],
-            >>>         [4761659, 2441949],
-            >>>         [4765389, 2441103],
-            >>>     ]],
-            >>> }
+            ...     'type': 'Polygon',
+            ...     'coordinates': [[
+            ...         [4765389, 2441103],
+            ...         [4764441, 2439352],
+            ...         [4767369, 2438696],
+            ...         [4761659, 2441949],
+            ...         [4765389, 2441103],
+            ...     ]],
+            ... }
             >>>
             >>> def is_urban_fabric(lc):
-            >>>     return lc == 1
+            ...     return lc == 1
             >>>
-            >>> writer.write(fp, 'urban_fabric.tif', geom, is_urban_fabric, dtype='uint8', nodata=0)
+            >>> writer.write(fp, 'urban_fabric.tif', geom, is_urban_fabric, dtype='uint8', nodata=0) # doctest: +SKIP
 
             References
             ==========

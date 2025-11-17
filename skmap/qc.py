@@ -42,8 +42,8 @@ class Test:
     >>> test = Test(bounds, verbose=True)
     >>> dataset_url = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_skmap_epsg3035_v0.1.tif'
     >>>
-    >>> available = test.availability(dataset_url)
-    >>> coverage_fraction = test.raster_land_coverage(dataset_url, include_ice=True, include_wetlands=True)
+    >>> available = test.availability(dataset_url) # doctest: +SKIP
+    >>> coverage_fraction = test.raster_land_coverage(dataset_url, include_ice=True, include_wetlands=True) # doctest: +SKIP
 
     """
 

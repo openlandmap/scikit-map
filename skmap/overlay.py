@@ -591,7 +591,7 @@ class SpaceTimeOverlay:
     Examples
     ========
 
-    >>> from skmap.mapper import SpaceTimeOverlay
+    >>> from skmap.overlay import SpaceTimeOverlay
     >>>
 
     """

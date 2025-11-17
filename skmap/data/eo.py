@@ -121,15 +121,15 @@ class GLADLandsat:
         Examples
         ========
 
-        >>> from skmap.datasets.eo import GLADLandsat
+        >>> from skmap.data.eo import GLADLandsat
         >>>
         >>> # Do the registration in
         >>> # https://glad.umd.edu/ard/user-registration
         >>> username = '<YOUR_USERNAME>'
         >>> password = '<YOUR_PASSWORD>'
         >>> glad_landsat = GLADLandsat(username, password, verbose=True)
-        >>> data, urls, base_raster = glad_landsat.read('092W_47N', '2020-6', '2020-10')
-        >>> print(f'Data shape: {data.shape}')
+        >>> data, urls, base_raster = glad_landsat.read('092W_47N', '2020-6', '2020-10') # doctest: +SKIP
+        >>> print(f'Data shape: {data.shape}') # doctest: +SKIP
 
         References
         ==========
@@ -315,16 +315,22 @@ class GLADLandsat:
         Examples
         ========
 
-        >>> from skmap.datasets.eo import GLADLandsat
+        >>> from skmap.data.eo import GLADLandsat
         >>>
         >>> # Do the registration here
         >>> # https://glad.umd.edu/ard/user-registration
         >>> username = '<YOUR_USERNAME>'
         >>> password = '<YOUR_PASSWORD>'
+        >>>
         >>> glad_landsat = GLADLandsat(username, password, verbose=True)
-        >>> data, base_raster, _ = glad_landsat.percentile_agg('092W_47N', '2020-6', '2020-10',
-        >>>                         p=[25,50,75], output_dir='./glad_landsat_ard_percentiles')
-        >>> print(f'Shape of data: {data.shape}')
+        >>> data, base_raster, _ = glad_landsat.percentile_agg(
+        ...     '092W_47N',
+        ...     '2020-6',
+        ...     '2020-10',
+        ...     p=[25,50,75],
+        ...     output_dir='./glad_landsat_ard_percentiles'
+        ... ) # doctest: +SKIP
+        >>> print(f'Shape of data: {data.shape}') # doctest: +SKIP
 
         References
         ==========
@@ -1232,16 +1238,16 @@ try:
             ========
 
             >>> from skmap.misc import GoogleSheet
-            >>> from skmap.datasets.eo import STACGenerator
+            >>> from skmap.data.eo import STACGenerator
             >>>
             >>> # Generate your key follow the instructions in https://docs.gspread.org/en/latest/oauth2.html
             >>> key_file = '<GDRIVE_KEY>'
             >>> # Public accessible Google Spreadsheet (Anyone on the internet with this link can view)
             >>> url = 'https://docs.google.com/spreadsheets/d/10tAhEpZ7TYPD0UWhrI0LHcuIzGZNt5AgSjx2Bu-FciU'
             >>>
-            >>> gsheet = GoogleSheet(key_file, url, verbose=True)
-            >>> stac_generator = STACGenerator(gsheet, asset_id_fields=[1,2,3,5], catalogs=catalogs, verbose=True)
-            >>> stac_generator.save_all(output_dir='stac_odse', thumb_base_url=f'https://s3.eu-central-1.wasabisys.com/stac')
+            >>> gsheet = GoogleSheet(key_file, url, verbose=True) # doctest: +SKIP
+            >>> stac_generator = STACGenerator(gsheet, asset_id_fields=[1,2,3,5], catalogs=catalogs, verbose=True) # doctest: +SKIP
+            >>> stac_generator.save_all(output_dir='stac_odse', thumb_base_url=f'https://s3.eu-central-1.wasabisys.com/stac') # doctest: +SKIP
 
             """
 
@@ -1308,9 +1314,9 @@ try:
             >>> # Public accessible Google Spreadsheet (Anyone on the internet with this link can view)
             >>> url = 'https://docs.google.com/spreadsheets/d/10tAhEpZ7TYPD0UWhrI0LHcuIzGZNt5AgSjx2Bu-FciU'
             >>>
-            >>> gsheet = GoogleSheet(key_file, url)
-            >>> stac_generator = STACGenerator(gsheet, verbose=True)
-            >>> stac_generator.save_and_publish_all(s3_host, s3_access_key, s3_access_secret, s3_bucket_name)
+            >>> gsheet = GoogleSheet(key_file, url) # doctest: +SKIP
+            >>> stac_generator = STACGenerator(gsheet, verbose=True) # doctest: +SKIP
+            >>> stac_generator.save_and_publish_all(s3_host, s3_access_key, s3_access_secret, s3_bucket_name) # doctest: +SKIP
 
             """
 

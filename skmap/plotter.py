@@ -117,12 +117,12 @@ try:
         >>> multiband = np.random.randint(0, 255, [3, 5, 5])
         >>>
         >>> plotter.plot_rasters(
-        >>>     singleband,
-        >>>     multiband,
-        >>>     titles=['single band', 'RGB'],
-        >>>     figsize=4,
-        >>>     cmaps='Greens',
-        >>> )
+        ...     singleband,
+        ...     multiband,
+        ...     titles=['single band', 'RGB'],
+        ...     figsize=4,
+        ...     cmaps='Greens',
+        ... )
 
         References
         ==========

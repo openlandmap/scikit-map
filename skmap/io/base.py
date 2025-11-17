@@ -64,7 +64,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
 from copy import deepcopy
 
-import skmap_bindings
+import skmap_bindings as sb
 from skmap.misc import make_tempdir
 
 _INT_DTYPE = (
@@ -369,13 +369,13 @@ def save_rasters_cpp(
     if isinstance(base_raster, str):
         base_raster = [base_raster for i in out_files]
 
-    write_fn = skmap_bindings.writeInt16Data
+    write_fn = sb.writeInt16Data
     if dtype == np.uint8:
-        write_fn = skmap_bindings.writeByteData
+        write_fn = sb.writeByteData
     elif dtype == np.uint16:
-        write_fn = skmap_bindings.writeUInt16Data
+        write_fn = sb.writeUInt16Data
     elif dtype == np.float32:
-        write_fn = skmap_bindings.writeData
+        write_fn = sb.writeData
 
     if verbose:
         ttprint(f"Saving {n_layers} layers using window={window} to ")
@@ -444,7 +444,7 @@ def read_rasters_cpp(
             f"Reading {n_layers} layers using window={window} and array={out_data.shape}"
         )
 
-    skmap_bindings.readData(
+    sb.readData(
         out_data,
         n_jobs,
         raster_files,
@@ -516,23 +516,24 @@ def read_rasters(
     ========
 
     >>> import rasterio
-    >>> from skmap.raster import read_rasters
+    >>> from skmap.io.base import read_rasters
     >>>
     >>> # skmap COG layers - NDVI seasons for 2000
+    >>> # these actually 404
     >>> raster_files = [
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200003_skmap_epsg3035_v1.0.tif', # winter
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200006_skmap_epsg3035_v1.0.tif', # spring
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200009_skmap_epsg3035_v1.0.tif', # summer
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200012_skmap_epsg3035_v1.0.tif'  # fall
-    >>> ]
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200003_skmap_epsg3035_v1.0.tif', # winter
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200006_skmap_epsg3035_v1.0.tif', # spring
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200009_skmap_epsg3035_v1.0.tif', # summer
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200012_skmap_epsg3035_v1.0.tif'  # fall
+    ... ]
     >>>
     >>> # Transform for the EPSG:3035
-    >>> eu_transform = rasterio.open(raster_files[0]).transform
+    >>> eu_transform = rasterio.open(raster_files[0]).transform # doctest: +SKIP
     >>> # Bounding box window over Wageningen, NL
-    >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform)
+    >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform) # doctest: +SKIP
     >>>
-    >>> data, _ = read_rasters(raster_files=raster_files, window=window, verbose=True)
-    >>> print(f'Data shape: {data.shape}')
+    >>> data, _ = read_rasters_cpp(raster_files=raster_files, window=window, verbose=True) # doctest: +SKIP
+    >>> print(f'Data shape: {data.shape}') # doctest: +SKIP
 
     References
     ==========
@@ -688,22 +689,27 @@ def read_auth_rasters(
     Examples
     ========
 
-    >>> from skmap.raster import read_auth_rasters
+    >>> from skmap.io.base import read_auth_rasters
     >>>
     >>> # Do the registration in
     >>> # https://glad.umd.edu/ard/user-registration
     >>> username = '<YOUR_USERNAME>'
     >>> password = '<YOUR_PASSWORD>'
     >>> raster_files = [
-    >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/850.tif',
-    >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/851.tif',
-    >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/852.tif',
-    >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/853.tif'
-    >>> ]
+    ...     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/850.tif',
+    ...     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/851.tif',
+    ...     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/852.tif',
+    ...     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/853.tif'
+    ... ]
     >>>
-    >>> data, base_raster = read_auth_rasters(raster_files, username, password,
-    >>>                         return_base_raster=True, verbose=True)
-    >>> print(f'Data: shape={data.shape}, dtype={data.dtype} and base_raster={base_raster}')
+    >>> data, base_raster = read_auth_rasters(
+    ...     raster_files,
+    ...     username,
+    ...     password,
+    ...     return_base_raster=True,
+    ...     verbose=True
+    ... ) # doctest: +SKIP
+    >>> print(f'Data: shape={data.shape}, dtype={data.dtype} and base_raster={base_raster}') # doctest: +SKIP
 
     References
     ==========
@@ -814,32 +820,32 @@ def save_rasters(
     ========
 
     >>> import rasterio
-    >>> from skmap.raster import read_rasters, save_rasters
+    >>> from skmap.io.base import read_rasters, save_rasters
     >>>
     >>> # skmap COG layers - NDVI seasons for 2019
     >>> raster_files = [
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
-    >>> ]
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
+    ... ]
     >>>
     >>> # Transform for the EPSG:3035
-    >>> eu_transform = rasterio.open(raster_files[0]).transform
+    >>> eu_transform = rasterio.open(raster_files[0]).transform # doctest: +SKIP
     >>> # Bounding box window over Wageningen, NL
-    >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform)
+    >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform) #doctest: +SKIP
     >>>
-    >>> data, _ = read_rasters(raster_files=raster_files, window=window, verbose=True)
+    >>> data, _ = read_rasters(raster_files=raster_files, window=window, verbose=True) #doctest: +SKIP
     >>>
     >>> # Save in the current execution folder
     >>> raster_files = [
-    >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_wageningen_epsg3035_v1.0.tif',
-    >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_wageningen_epsg3035_v1.0.tif',
-    >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_wageningen_epsg3035_v1.0.tif',
-    >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_wageningen_epsg3035_v1.0.tif'
-    >>> ]
+    ...     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_wageningen_epsg3035_v1.0.tif',
+    ...     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_wageningen_epsg3035_v1.0.tif',
+    ...     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_wageningen_epsg3035_v1.0.tif',
+    ...     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_wageningen_epsg3035_v1.0.tif'
+    ... ] # doctest: +SKIP
     >>>
-    >>> save_rasters(raster_files[0], raster_files, data, window=window, verbose=True)
+    >>> save_rasters(raster_files[0], raster_files, data, window=window, verbose=True) #doctest: +SKIP
 
     """
 
@@ -1656,11 +1662,12 @@ class RasterData(SKMapBase):
 
         Examples
         ========
-        import geopandas as gpd
-        from skmap.data import toy
-        rasterdata = toy.ndvi_rdata(gappy=False)
-        points = gpd.read_file('./skmap/data/toy/samples/samples.gpkg')
-        rdata.point_query(x=points.geometry.x.to_list(), y=points.geometry.y.to_list() , label_xaxis='index', cols=3, titles=points.label)
+
+        >>> import geopandas as gpd
+        >>> from skmap.data import toy
+        >>> rasterdata = toy.ndvi_rdata(gappy=False) #doctest: +SKIP
+        >>> points = gpd.read_file('./skmap/data/toy/samples/samples.gpkg')
+        >>> rasterdata.point_query(x=points.geometry.x.to_list(), y=points.geometry.y.to_list() , label_xaxis='index', cols=3, titles=points.label) #doctest: +SKIP
         """
         df = pd.DataFrame()
         df["x"], df["y"], df["title"] = x, y, titles
