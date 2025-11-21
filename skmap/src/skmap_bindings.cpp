@@ -36,7 +36,7 @@ GDALDataType GetGDALDataTypeFromString(const std::string& gdal_data_type_str) {
     //     return GDT_CFloat64;
     } else {
         // Default case if the string does not match any known GDALDataType
-        throw std::invalid_argument("Unknown GDALDataType string: " + gdal_data_type_str);
+        throw std::invalid_argument("Unknown GDALDataType string: " + gdal_data_type_str + "format should be one of 'byte', 'uint16', 'int16', 'uint32', 'int32', 'float32', 'float64'");
     }
 }
 
@@ -901,7 +901,7 @@ PYBIND11_MODULE(skmap_bindings, m)
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
-        "Write data in Int16 format");
+        "Write data");
     m.def("getLatLonArray", &getLatLonArray, "Compute latitude and longitude for each pixel of a GeoTIFF");
     m.def("computeNormalizedDifference", &computeNormalizedDifference, "Compute normalized difference indices");
     m.def("computeBsi", &computeBsi, "Compute BSI");
