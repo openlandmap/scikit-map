@@ -263,8 +263,6 @@ class SpaceOverlay:
     :param n_threads: Number of CPU cores to be used in parallel. By default all cores
         are used.
     :param verbose: Use ``True`` to print the overlay progress.
-
-
     """
 
     def __init__(
@@ -381,10 +379,12 @@ class SpaceOverlay:
         :rtype: geopandas.GeoDataFrame
         """
         feats_names, _, feats_idx = self.catalog.get_unrolled_catalog()
+
+        # FIXME: this should be in a unit test
         assert (self.catalog.data_size == len(self.catalog.get_feature_names())) & (
             self.catalog.data_size == len(feats_names)
         ), (
-            "Catalog data size should coincide wiht the number of features, something went wrong"
+            "Catalog data size should coincide with the number of features, something went wrong"
         )
 
         self.ordered_feats_names = [s for _, s in sorted(zip(feats_idx, feats_names))]
@@ -420,7 +420,17 @@ class SpaceOverlay:
 
         return self.pts_out
 
-    def read_data(self, gdal_opts, max_ram_mb):
+    def read_data(self, gdal_opts: dict[str, str], max_ram_mb: int) -> np.ndarray:
+        """read data in parallel across blocks, normally called by `self.run`
+
+        :param gdal_opts: additional options to pass to GDAL
+        :type gdal_opts: dict[str, str]
+        :param max_ram_mb: max RAM to use in MB
+        :type max_ram_mb: int
+        :return: return array ?with overlay applied?
+        :rtype: np.ndarray
+        """
+
         layers = self.parallelOverlay.layers
         layers["layer_id"] = layers.index
         query_pixels = self.parallelOverlay.query_pixels

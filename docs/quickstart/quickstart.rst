@@ -4,6 +4,10 @@ Quickstart
 
 See :ref:`installation-section` for installation instructions.
 
+``Scikit-map`` is used in two places in a machine learning pipeline: For Space-time overlay and large-scale predictions.
+
+.. image:: ../img/pipeline.svg
+
 Creating a catalog
 ==================
 
@@ -32,7 +36,7 @@ Space-Time overlay
 
 .. image:: ../img/spacetime_overlay.svg
 
-TODO
+
 
 Large-scale predictions
 =======================

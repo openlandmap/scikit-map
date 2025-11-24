@@ -16,7 +16,11 @@ For reporting issues and making feature suggestions please refer to the [issue t
 
 1. Clone the repo: `git clone https://github.com/openlandmap/scikit-map.git`
 2. Install dependencies (not needed if only contributing documentation):
-  - for the Python package: `pip install -r requirements.txt` into a Python 3.6+ environment
+  - for the Python package: `pip install -e .[full,dev,docs] sphinx-autobuild` into a Python 3.6+ environment
+3. in the top-level directory, run `doxygen` to create xml documentation for `skmap_bindings`
+4. `sphinx-autobuild docs/ _build/ --watch xml/`
+
+This will ensure that a change to python files triggers a rebuild, as well as running `doxygen` again.
 
 ### Development
 

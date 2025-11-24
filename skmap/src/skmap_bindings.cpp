@@ -118,7 +118,6 @@ void extractOverlay(Eigen::Ref<MatFloat> data,
     ioArray.extractOverlay(pix_blok_ids, pix_inblock_idxs, unique_blocks_ids_comb, key_layer_ids_comb, data_overlay);
 }
 
-
 void readData(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
               const std::vector<std::string>& file_locs,
