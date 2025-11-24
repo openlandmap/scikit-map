@@ -5,7 +5,7 @@ Access to skmap toy demo datasets
 from pathlib import Path
 from geopandas import read_file
 from skmap.misc import find_files
-from skmap.io import read_rasters, RasterData
+from skmap.io import RasterData
 
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR.joinpath("toy")

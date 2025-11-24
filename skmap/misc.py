@@ -396,7 +396,7 @@ def ttprint(*args, **kwargs):
     >>> from skmap.misc import ttprint
     >>> ttprint('skmap rocks!') # doctest: +SKIP
     [16:39:11] skmap rocks!
-    
+
     """
     from datetime import datetime
     import sys

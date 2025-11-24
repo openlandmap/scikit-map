@@ -786,7 +786,7 @@ class TaskSequencer:
         >>>
         >>> taskSeq.run(input_data=[ (const, 10) for const in range(0,3) ]) # doctest: +SKIP
         >>> taskSeq.run(input_data=[ (const, 20) for const in range(3,6) ]) # doctest: +SKIP
-        
+
 
         """
 

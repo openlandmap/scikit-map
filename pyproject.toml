@@ -63,6 +63,7 @@ docs = [
   "matplotlib",
   "numpy",
   "numpydoc",
+  "breathe",
 ]
 
 [tool.setuptools.packages.find]

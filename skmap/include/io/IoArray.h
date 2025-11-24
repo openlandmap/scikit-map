@@ -13,11 +13,60 @@ class IoArray: public ParArray
 
         IoArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
 
+        /**
+        * @brief Warp a single-band mosaic to match a reference tile.
+        *
+        * @deprecated This function is deprecated. Use GDAL VRTs instead, which
+        * provide on-the-fly mosaicking and warping, support multiple bands, and
+        * avoid loading full rasters into memory.
+        *
+        * @param ref_tile_path  File path to reference raster tile.
+        * @param mosaic_path    File path to mosaic raster.
+        * @param resample       Resampling method ("nearest", "bilinear", etc.)
+        *
+        * @details
+        * This function opens the reference tile and mosaic, computes the target
+        * dimensions, sets up GDALWarpOptions, and performs an in-memory warp
+        * to match the reference. The resulting raster is read into `m_data`.
+        *
+        * @note Only works for single-band float32 rasters.
+        */
+        [[deprecated("Use GDAL VRTs instead of warpTile")]]
         void warpTile(std::string ref_tile_path,
                       std::string mosaic_path,
                       std::string resample);
 
 
+        /**
+        * @brief Reads a portion of a raster dataset into a row buffer.
+        *
+        * This function opens a raster dataset using GDAL, reads a rectangular
+        * window defined by offsets and sizes into an Eigen row expression,
+        * and optionally replaces a specific masked value with another value.
+        *
+        * @param row          Reference to an Eigen row expression where the data will be stored.
+        * @param file_loc     File path or URL of the raster dataset to read.
+        * @param x_off        Horizontal offset of the window to read.
+        * @param y_off        Vertical offset of the window to read.
+        * @param x_size       Width of the window to read.
+        * @param y_size       Height of the window to read.
+        * @param read_type    GDAL data type to read (e.g., GDT_Float32).
+        * @param bands_list   List of band indices to read from the dataset.
+        * @param value_to_mask Optional value in the dataset to treat as "masked" (e.g., nodata).
+        * @param value_to_set  Optional value to replace the masked values with.
+        *
+        * @note If only `value_to_set` is provided, the function automatically
+        *       determines the dataset's nodata value to use as `value_to_mask`.
+        *
+        * @throws skmapAssertIfTrue if the dataset cannot be opened or read.
+        *
+        * @details
+        * Opens the GDAL dataset in read-only mode, reads the specified rectangular
+        * portion into the provided Eigen row buffer, and closes the dataset.
+        * If both `value_to_mask` and `value_to_set` are provided and are different,
+        * the function replaces all occurrences of `value_to_mask` in the buffer
+        * with `value_to_set`.
+        */
         void readDataCore(Eigen::Ref<MatFloat::RowXpr> row,
                            std::string file_loc,
                            uint_t x_off,
@@ -29,6 +78,39 @@ class IoArray: public ParArray
                            std::optional<float_t> value_to_mask,
                            std::optional<float_t> value_to_set);
 
+        /**
+        * @brief Reads multiple raster datasets into the internal matrix in parallel.
+        *
+        * This function reads specified regions from a set of raster files
+        * (`file_locs`) into the internal `m_data` matrix, using a permutation
+        * vector to control the row order. Reading is performed in parallel
+        * via the `parRowPerm` helper, which calls `readDataCore` for each file.
+        *
+        * @param file_locs     Vector of file paths or URLs of raster datasets to read.
+        * @param perm_vec      Vector of row indices specifying the permutation order
+        *                      for writing into `m_data`.
+        * @param x_off         Horizontal offset of the reading window in the rasters.
+        * @param y_off         Vertical offset of the reading window in the rasters.
+        * @param x_size        Width of the window to read.
+        * @param y_size        Height of the window to read.
+        * @param read_type     GDALDataType specifying the type to read (e.g., GDT_Float32).
+        * @param bands_list    List of band indices to read from each dataset.
+        * @param value_to_mask Optional value to treat as masked (e.g., nodata). If not
+        *                      provided, no masking is performed.
+        * @param value_to_set  Optional value to replace masked values with.
+        *
+        * @throws skmapAssertIfTrue if the number of columns in `m_data` is smaller
+        *         than the requested reading window (`x_size * y_size`).
+        *
+        * @details
+        * The function defines a lambda `readTiff` that wraps `readDataCore`, which
+        * reads a single raster into a given row buffer. `parRowPerm` executes this
+        * lambda in parallel over the permutation vector, efficiently filling the
+        * internal matrix `m_data`.
+        *
+        * @note Both `value_to_mask` and `value_to_set` are forwarded to `readDataCore`
+        *       for per-pixel masking and replacement.
+        */
         void readData(std::vector<std::string> file_locs,
                        std::vector<uint_t> perm_vec,
                        uint_t x_off,
@@ -51,6 +133,23 @@ class IoArray: public ParArray
                            std::optional<std::vector<float_t>> value_to_mask_vec,
                            std::optional<float_t> value_to_set);
 
+        /**
+        * @brief Initialize GDAL with custom configuration options and error handling.
+        *
+        * Sets GDAL runtime options from the input dictionary, registers all GDAL drivers, and
+        * configures error logging to suppress console output if possible.
+        *
+        * @param dict Dictionary of GDAL configuration options (key-value pairs) where keys and
+        *             values are strings recognized by GDAL.
+        *
+        * @details
+        * Each key-value pair in `dict` is applied via CPLSetConfigOption(). GDALAllRegister() is
+        * called to ensure all drivers are available. Error logging is redirected to "/dev/null" if
+        * possible; otherwise, a quiet error handler is used to suppress warnings and errors.
+        *
+        * @note This function modifies global GDAL state and should be called before performing any
+        *       GDAL I/O operations. All Python-exposed functions call it already.
+        */
         void setupGdal(dict_t dict);
 
         void getLatLonArray(std::string file_loc,
@@ -66,6 +165,37 @@ class IoArray: public ParArray
                                  Eigen::Ref<MatFloat> data_overlay);
 
 
+        /**
+        * @brief Write portions of the internal matrix `m_data` to multiple GeoTIFF files.
+        *
+        * This function writes selected rows of the `m_data` matrix into GeoTIFF files
+        * based on a set of base files and offsets. It supports in-place row casting,
+        * NoData masking, optional bash compression commands, and optional uploading
+        * to a remote storage (e.g., SeaweedFS).
+        *
+        * @tparam T The data type to write to disk (e.g., float, double).
+        *
+        * @param base_files Vector of file paths to base raster files to copy metadata from.
+        * @param base_folder Folder where output files will be written.
+        * @param file_names Names of the output files (without folder path).
+        * @param data_indices Indices of rows in `m_data` corresponding to each output file.
+        * @param x_off X-offset within the raster to start writing data.
+        * @param y_off Y-offset within the raster to start writing data.
+        * @param x_size Width of the region to write.
+        * @param y_size Height of the region to write.
+        * @param write_type GDAL data type to write (e.g., GDT_Float32).
+        * @param no_data_value Value to use for missing or NaN cells.
+        * @param bash_compression_command Optional: shell command to compress the output files (e.g., gdal_translate or gzip).
+        * @param seaweed_path Optional: vector of remote storage paths to upload each output file.
+        *
+        * @details
+        * For each row specified in `data_indices`, the function:
+        * 1. Opens the corresponding base file and copies geotransform, projection, and spatial reference.
+        * 2. Masks NaN values with `no_data_value`.
+        * 3. Writes the row to a temporary raster if compression is requested, otherwise directly to the final file.
+        * 4. Applies optional bash compression.
+        * 5. Uploads the file to `seaweed_path` if provided and removes local copies as needed.
+        */
         template<typename T>
         void writeData(std::vector<std::string> base_files,
                         std::string base_folder,

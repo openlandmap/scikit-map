@@ -54,7 +54,12 @@ mask_aggregation_bash_script = """#!/bin/bash
 
 
 def warp_tile(tile_file, mosaic_paths, n_pix, resample):
-    """no docs"""
+    """
+    no docs
+
+    .. deprecated:: 0.10.0
+        Use GDAL vrt's
+    """
     warp_data = sb_vec(
         n_pix,
     )
@@ -108,8 +113,8 @@ def s3_setup(access_key, secret_key, gaia_addrs):
 
 
 class TiledData:
-    """Base class for `TiledDataLoader` and `TiledDataExporter`
-    """
+    """Base class for `TiledDataLoader` and `TiledDataExporter`"""
+
     def __init__(
         self,
         n_layers: int = None,
@@ -168,6 +173,7 @@ class TiledDataLoader(TiledData):
     :param n_threads_read: Number of threads for GDAL, defaults to n_threads
     :type n_threads_read: int, optional
     """
+
     def __init__(
         self,
         catalog: DataCatalog,
@@ -187,7 +193,7 @@ class TiledDataLoader(TiledData):
         :param catalog: _description_
         :type catalog: DataCatalog
         :param mask_template_path: _description_
-        
+
         """
         self.catalog = catalog
         self.mask_template_path = mask_template_path

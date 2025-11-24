@@ -19,3 +19,6 @@ skmap_test.ipynb
 .cache/
 html/
 latex/
+xml/
+.*_cache/
+.venv/

@@ -143,6 +143,7 @@ namespace skmap {
         {CPLPushErrorHandler(CPLQuietErrorHandler);}
     }
 
+
     void IoArray::readDataCore(Eigen::Ref<MatFloat::RowXpr> row,
                            std::string file_loc,
                            uint_t x_off,
@@ -278,7 +279,6 @@ namespace skmap {
             }
         };
         this->parForRange(extractOverlayPix, n_pix);
-
     }
 
 
