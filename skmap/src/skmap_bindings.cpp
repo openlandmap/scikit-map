@@ -258,22 +258,28 @@ void expandArrayCols(Eigen::Ref<MatFloat> data,
     transArray.expandArrayCols(out_data, col_select);
 }
 
+/**
+* @deprecated use selArrayRows in stead
+*/
 void extractArrayRows(Eigen::Ref<MatFloat> data,
                      const uint_t n_threads,
                      Eigen::Ref<MatFloat> out_data,
                      std::vector<uint_t> row_select)
 {
     TransArray transArray(data, n_threads);
-    transArray.extractArrayRows(out_data, row_select);
+    transArray.selArrayRows(out_data, row_select);
 }
 
+/**
+* @deprecated use selArrayCols in stead
+*/
 void extractArrayCols(Eigen::Ref<MatFloat> data,
                      const uint_t n_threads,
                      Eigen::Ref<MatFloat> out_data,
                      std::vector<uint_t> col_select)
 {
     TransArray transArray(data, n_threads);
-    transArray.extractArrayCols(out_data, col_select);
+    transArray.selArrayCols(out_data, col_select);
 }
 
 void swapRowsValues(Eigen::Ref<MatFloat> data,
@@ -715,6 +721,10 @@ void writeData(Eigen::Ref<MatFloat> data,
     }, *no_data_variant);
 }
 
+
+/**
+* @deprecated use WriteData
+*/
 void writeInt16Data(Eigen::Ref<MatFloat> data,
                    const uint_t n_threads,
                    py::dict conf_GDAL,
@@ -738,7 +748,9 @@ void writeInt16Data(Eigen::Ref<MatFloat> data,
 }
 
 
-
+/**
+* @deprecated use WriteData
+*/
 void writeUInt16Data(Eigen::Ref<MatFloat> data,
                    const uint_t n_threads,
                    py::dict conf_GDAL,
@@ -785,7 +797,7 @@ void computePercentiles(Eigen::Ref<MatFloat> data,
     transArray.computePercentiles(col_in_select, out_data, col_out_select, percentiles);
 }
 
-void fitProibabilites(Eigen::Ref<MatFloat> data,
+void fitProbabilities(Eigen::Ref<MatFloat> data,
                       const uint_t n_threads,
                       Eigen::Ref<MatFloat> out_data,
                       float_t input_scaling,
@@ -794,7 +806,7 @@ void fitProibabilites(Eigen::Ref<MatFloat> data,
                       uint_t n_best_classes)
 {
     TransArray transArray(data, n_threads);
-    transArray.fitProibabilites(out_data, input_scaling, target_scaling, best_classes_data, n_best_classes);
+    transArray.fitProbabilities(out_data, input_scaling, target_scaling, best_classes_data, n_best_classes);
 }
 
 
@@ -948,6 +960,6 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("checkSimdInstructionSetsInUse", checkSimdInstructionSetsInUse);
     m.def("castFloat64ToFloat32", castFloat64ToFloat32);
     m.def("castFloat32ToFloat64", castFloat32ToFloat64);
-    m.def("fitProibabilites", fitProibabilites);
+    m.def("fitProbabilities", fitProbabilities);
 }
 
