@@ -3,237 +3,177 @@
 
 #include "ParArray.h"
 
-namespace skmap
-{
+namespace skmap {
 
-class TransArray: public ParArray 
-{
-    public :
+class TransArray : public ParArray {
+public:
+  TransArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
 
-        TransArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
-        
-        void linearRegression(Eigen::Ref<VecFloat> x,
-                                      Eigen::Ref<VecFloat> beta_0,
-                                      Eigen::Ref<VecFloat> beta_1);
+  void linearRegression(Eigen::Ref<VecFloat> x, Eigen::Ref<VecFloat> beta_0,
+                        Eigen::Ref<VecFloat> beta_1);
 
-        void copyVecInMatrixRow(Eigen::Ref<VecFloat> in_vec,
-                                uint_t row_idx);
+  void copyVecInMatrixRow(Eigen::Ref<VecFloat> in_vec, uint_t row_idx);
 
-        void offsetAndScale(float_t offset,
-                            float_t scaling);
+  void offsetAndScale(float_t offset, float_t scaling);
 
-        void offsetsAndScales(std::vector<uint_t> row_select,
-                            Eigen::Ref<VecFloat> offsets,
-                            Eigen::Ref<VecFloat> scalings);
+  void offsetsAndScales(std::vector<uint_t> row_select,
+                        Eigen::Ref<VecFloat> offsets,
+                        Eigen::Ref<VecFloat> scalings);
 
-        void averageAggregate(Eigen::Ref<MatFloat> out_data,
-                              uint_t agg_factor);
+  void averageAggregate(Eigen::Ref<MatFloat> out_data, uint_t agg_factor);
 
-        void maskDifference(float_t diff_th,
-                            uint_t count_th,
-                            Eigen::Ref<MatFloat> ref_data,
-                                    Eigen::Ref<MatFloat> mask_out);
+  void maskDifference(float_t diff_th, uint_t count_th,
+                      Eigen::Ref<MatFloat> ref_data,
+                      Eigen::Ref<MatFloat> mask_out);
 
-        void reorderArray(Eigen::Ref<MatFloat> out_data,
-                          std::vector<std::vector<uint_t>> indices_matrix);
+  void reorderArray(Eigen::Ref<MatFloat> out_data,
+                    std::vector<std::vector<uint_t>> indices_matrix);
 
-        void selArrayRows(Eigen::Ref<MatFloat> out_data,
-                              std::vector<uint_t> row_select);
-        
-        void selArrayCols(Eigen::Ref<MatFloat> out_data,
-                              std::vector<uint_t> col_select);
-        
-        void fitPercentage(Eigen::Ref<MatFloat> in1,
-                           Eigen::Ref<MatFloat> in2);
-                           
-        void hadamardProduct(Eigen::Ref<MatFloat> in1,
-                             Eigen::Ref<MatFloat> in2);
+  void selArrayRows(Eigen::Ref<MatFloat> out_data,
+                    std::vector<uint_t> row_select);
 
-        void nanMean(Eigen::Ref<VecFloat> out_data);
-        
-        void computeMannKendallPValues(Eigen::Ref<VecFloat> out_data);
-        
-        void expandArrayRows(Eigen::Ref<MatFloat> out_data,
-                              std::vector<uint_t> row_select);
+  void selArrayCols(Eigen::Ref<MatFloat> out_data,
+                    std::vector<uint_t> col_select);
 
-        void expandArrayCols(Eigen::Ref<MatFloat> out_data,
-                              std::vector<uint_t> col_select);
+  void fitPercentage(Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2);
 
-        void extractArrayRows(Eigen::Ref<MatFloat> out_data,
-                          std::vector<uint_t> row_select);
-                          
-        void extractArrayCols(Eigen::Ref<MatFloat> out_data,
-                          std::vector<uint_t> col_select);
-        
-        void fillArray(float_t val);
-        
-        void blocksAverage(Eigen::Ref<MatFloat> in1,
-                          Eigen::Ref<MatFloat> in2,
-                          uint_t n_pix,
-                          uint_t y);
+  void hadamardProduct(Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2);
 
-        void blocksAverageVecs(Eigen::Ref<MatFloat> in1,
-                                  Eigen::Ref<MatFloat> in2,
-                                  uint_t n_pix,
-                                  uint_t y,
-                                  uint_t row_offset);
+  void nanMean(Eigen::Ref<VecFloat> out_data);
 
-        void elementwiseAverage(Eigen::Ref<MatFloat> in1,
-                          Eigen::Ref<MatFloat> in2);
+  void computeMannKendallPValues(Eigen::Ref<VecFloat> out_data);
 
-        void texturesBwTransform(Eigen::Ref<MatFloat> texture_2,
-                            float_t k,
-                            float_t a,
-                            Eigen::Ref<MatFloat> sand,
-                            Eigen::Ref<MatFloat> silt,
-                            Eigen::Ref<MatFloat> clay);
+  void expandArrayRows(Eigen::Ref<MatFloat> out_data,
+                       std::vector<uint_t> row_select);
 
-        void inverseReorderArray(Eigen::Ref<MatFloat> out_data,
-                                   std::vector<std::vector<uint_t>> indices_matrix);
+  void expandArrayCols(Eigen::Ref<MatFloat> out_data,
+                       std::vector<uint_t> col_select);
 
-        void transposeArray(Eigen::Ref<MatFloat> out_data);
+  void extractArrayRows(Eigen::Ref<MatFloat> out_data,
+                        std::vector<uint_t> row_select);
 
-        void slidingWindowClassMode(Eigen::Ref<MatFloat> out_data,
-                                  size_t window_size);
+  void extractArrayCols(Eigen::Ref<MatFloat> out_data,
+                        std::vector<uint_t> col_select);
 
+  void fillArray(float_t val);
 
-        void computeNormalizedDifference(std::vector<uint_t> positive_indices,
-                                         std::vector<uint_t> negative_indices,
-                                         std::vector<uint_t> result_indices,
-                                         float_t positive_scaling,
-                                         float_t negative_scaling,
-                                         float_t result_scaling,
-                                         float_t result_offset,
-                                         std::vector<float_t> clip_value);
+  void blocksAverage(Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2,
+                     uint_t n_pix, uint_t y);
 
-        void computeBsi(std::vector<uint_t> swir1_indices,
-                            std::vector<uint_t> red_indices,
-                            std::vector<uint_t> nir_indices,
-                            std::vector<uint_t> blue_indices,
-                            std::vector<uint_t> result_indices,
-                            float_t swir1_scaling,
-                            float_t red_scaling,
-                            float_t nir_scaling,
-                            float_t blue_scaling,
-                            float_t result_scaling,
-                            float_t result_offset,
-                            std::vector<float_t> clip_value);
+  void blocksAverageVecs(Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2,
+                         uint_t n_pix, uint_t y, uint_t row_offset);
 
-        void computeEvi(std::vector<uint_t> red_indices,
-                            std::vector<uint_t> nir_indices,
-                            std::vector<uint_t> blue_indices,
-                            std::vector<uint_t> result_indices,
-                            float_t red_scaling,
-                            float_t nir_scaling,
-                            float_t blue_scaling,
-                            float_t result_scaling,
-                            float_t result_offset,
-                            std::vector<float_t> clip_value);
+  void elementwiseAverage(Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2);
 
-        void computeNirv(std::vector<uint_t> nir_indices,
-                     std::vector<uint_t> red_indices,
-                     std::vector<uint_t> result_indices,
-                     float_t nir_scaling,
-                     float_t red_scaling,
-                     float_t result_scaling,
-                     float_t result_offset,
-                     std::vector<float_t> clip_value);
+  void texturesBwTransform(Eigen::Ref<MatFloat> texture_2, float_t k, float_t a,
+                           Eigen::Ref<MatFloat> sand, Eigen::Ref<MatFloat> silt,
+                           Eigen::Ref<MatFloat> clay);
 
-        void computeFapar(std::vector<uint_t> red_indices,
-                            std::vector<uint_t> nir_indices,
-                            std::vector<uint_t> result_indices,
-                            float_t red_scaling,
-                            float_t nir_scaling,
-                            float_t result_scaling,
-                            float_t result_offset,
-                            std::vector<float_t> clip_value);
-        
+  void inverseReorderArray(Eigen::Ref<MatFloat> out_data,
+                           std::vector<std::vector<uint_t>> indices_matrix);
 
-        void computeSavi(std::vector<uint_t> red_indices,
-                            std::vector<uint_t> nir_indices,
-                            std::vector<uint_t> result_indices,
-                            float_t red_scaling,
-                            float_t nir_scaling,
-                            float_t result_scaling,
-                            float_t result_offset,
-                            std::vector<float_t> clip_value);
-        
+  void transposeArray(Eigen::Ref<MatFloat> out_data);
 
-        void computeGeometricTemperature(Eigen::Ref<MatFloat> latitude,
-                                         Eigen::Ref<MatFloat> elevation,
-                                         float_t elevation_scaling,
-                                         float_t a,
-                                         float_t b,
-                                         float_t result_scaling,
-                                         std::vector<uint_t> result_indices,
-                                         std::vector<float_t> days_of_year);
+  void slidingWindowClassMode(Eigen::Ref<MatFloat> out_data,
+                              size_t window_size);
 
-        void swapRowsValues(std::vector<uint_t> row_select,
-                                 float_t value_to_mask,
-                                 float_t new_value);
+  void computeNormalizedDifference(std::vector<uint_t> positive_indices,
+                                   std::vector<uint_t> negative_indices,
+                                   std::vector<uint_t> result_indices,
+                                   float_t positive_scaling,
+                                   float_t negative_scaling,
+                                   float_t result_scaling,
+                                   float_t result_offset,
+                                   std::vector<float_t> clip_value);
 
-        void computePercentiles(std::vector<uint_t> col_in_select,
-                                Eigen::Ref<MatFloat> out_data,
-                                std::vector<uint_t> col_out_select,
-                                std::vector<float_t> percentiles);
+  void computeBsi(std::vector<uint_t> swir1_indices,
+                  std::vector<uint_t> red_indices,
+                  std::vector<uint_t> nir_indices,
+                  std::vector<uint_t> blue_indices,
+                  std::vector<uint_t> result_indices, float_t swir1_scaling,
+                  float_t red_scaling, float_t nir_scaling,
+                  float_t blue_scaling, float_t result_scaling,
+                  float_t result_offset, std::vector<float_t> clip_value);
 
-        void fitProbabilities(Eigen::Ref<MatFloat> out_data,
-                              float_t input_scaling,
-                              uint_t target_scaling,
-                              Eigen::Ref<MatFloat> best_classes_data,
-                              uint_t n_best_classes);
-                                
-        void maskNan(std::vector<uint_t> row_select,
-                     float_t new_value_in_data);
+  void computeEvi(std::vector<uint_t> red_indices,
+                  std::vector<uint_t> nir_indices,
+                  std::vector<uint_t> blue_indices,
+                  std::vector<uint_t> result_indices, float_t red_scaling,
+                  float_t nir_scaling, float_t blue_scaling,
+                  float_t result_scaling, float_t result_offset,
+                  std::vector<float_t> clip_value);
 
-        void maskNanRows(std::vector<uint_t> row_select,
-                         Eigen::Ref<VecFloat> new_value_vec);
+  void computeNirv(std::vector<uint_t> nir_indices,
+                   std::vector<uint_t> red_indices,
+                   std::vector<uint_t> result_indices, float_t nir_scaling,
+                   float_t red_scaling, float_t result_scaling,
+                   float_t result_offset, std::vector<float_t> clip_value);
 
-        void maskData(std::vector<uint_t> row_select,
-                      Eigen::Ref<MatFloat> mask,
-                      float_t value_of_mask_to_mask,
-                      float_t new_value_in_data);
+  void computeFapar(std::vector<uint_t> red_indices,
+                    std::vector<uint_t> nir_indices,
+                    std::vector<uint_t> result_indices, float_t red_scaling,
+                    float_t nir_scaling, float_t result_scaling,
+                    float_t result_offset, std::vector<float_t> clip_value);
 
-        void maskDataRows(std::vector<uint_t> row_select,
-                      Eigen::Ref<MatFloat> mask,
-                      float_t value_of_mask_to_mask,
-                      float_t new_value_in_data);
+  void computeSavi(std::vector<uint_t> red_indices,
+                   std::vector<uint_t> nir_indices,
+                   std::vector<uint_t> result_indices, float_t red_scaling,
+                   float_t nir_scaling, float_t result_scaling,
+                   float_t result_offset, std::vector<float_t> clip_value);
 
+  void computeGeometricTemperature(Eigen::Ref<MatFloat> latitude,
+                                   Eigen::Ref<MatFloat> elevation,
+                                   float_t elevation_scaling, float_t a,
+                                   float_t b, float_t result_scaling,
+                                   std::vector<uint_t> result_indices,
+                                   std::vector<float_t> days_of_year);
 
-        void applyTsirf(Eigen::Ref<MatFloat> out_data,
-                         uint_t out_index_offset,
-                         float_t w_0,
-                         Eigen::Ref<VecFloat> w_p,
-                         Eigen::Ref<VecFloat> w_f,
-                         bool keep_original_values,
-                         const std::string& version,
-                         const std::string& backend);
-                         
-        void convolveRows(Eigen::Ref<MatFloat> out_data,
-                         float_t w_0,
-                         Eigen::Ref<VecFloat> w_p,
-                         Eigen::Ref<VecFloat> w_f);
-                         
-        void scaleAndOffset(float_t offset,
-                            float_t scaling);
+  void swapRowsValues(std::vector<uint_t> row_select, float_t value_to_mask,
+                      float_t new_value);
 
-        void transposeReorderArray(Eigen::Ref<MatFloat> out_data,
-                                   std::vector<std::vector<uint_t>> permutation_matrix);
+  void computePercentiles(std::vector<uint_t> col_in_select,
+                          Eigen::Ref<MatFloat> out_data,
+                          std::vector<uint_t> col_out_select,
+                          std::vector<float_t> percentiles);
 
-        void extractIndicators(Eigen::Ref<MatFloat> data_out,
-                               uint_t col_in_select,
-                               std::vector<uint_t> col_out_select,
-                               std::vector<uint_t> classes);
+  void fitProbabilities(Eigen::Ref<MatFloat> out_data, float_t input_scaling,
+                        uint_t target_scaling,
+                        Eigen::Ref<MatFloat> best_classes_data,
+                        uint_t n_best_classes);
 
-        void nanMeanAggregatePattern(Eigen::Ref<MatFloat> out_data,
-                                     std::vector<std::vector<uint_t>>& agg_pattern);
+  void maskNan(std::vector<uint_t> row_select, float_t new_value_in_data);
 
+  void maskNanRows(std::vector<uint_t> row_select,
+                   Eigen::Ref<VecFloat> new_value_vec);
 
+  void maskData(std::vector<uint_t> row_select, Eigen::Ref<MatFloat> mask,
+                float_t value_of_mask_to_mask, float_t new_value_in_data);
 
+  void maskDataRows(std::vector<uint_t> row_select, Eigen::Ref<MatFloat> mask,
+                    float_t value_of_mask_to_mask, float_t new_value_in_data);
 
+  void applyTsirf(Eigen::Ref<MatFloat> out_data, uint_t out_index_offset,
+                  float_t w_0, Eigen::Ref<VecFloat> w_p,
+                  Eigen::Ref<VecFloat> w_f, bool keep_original_values,
+                  const std::string &version, const std::string &backend);
+
+  void convolveRows(Eigen::Ref<MatFloat> out_data, float_t w_0,
+                    Eigen::Ref<VecFloat> w_p, Eigen::Ref<VecFloat> w_f);
+
+  void scaleAndOffset(float_t offset, float_t scaling);
+
+  void
+  transposeReorderArray(Eigen::Ref<MatFloat> out_data,
+                        std::vector<std::vector<uint_t>> permutation_matrix);
+
+  void extractIndicators(Eigen::Ref<MatFloat> data_out, uint_t col_in_select,
+                         std::vector<uint_t> col_out_select,
+                         std::vector<uint_t> classes);
+
+  void nanMeanAggregatePattern(Eigen::Ref<MatFloat> out_data,
+                               std::vector<std::vector<uint_t>> &agg_pattern);
 };
 
-}
- 
- 
+} // namespace skmap
+
 #endif
