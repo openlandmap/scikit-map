@@ -970,7 +970,7 @@ class TiledDataExporter(TiledData):
         in_probs_t = sb_arr(n_pix, n_classes)
         best_classes_t = sb_arr(n_pix, n_best_classes)
         sb.transposeArray(in_probs, self.n_threads, in_probs_t)
-        sb.fitProibabilites(
+        sb.fitProbabilities(
             in_probs_t,
             self.n_threads,
             array_t,
