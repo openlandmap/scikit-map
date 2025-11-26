@@ -43,6 +43,7 @@ inline void skmapPrint(T message)
 
 inline void skmapAssertIfTrue(bool cond, std::string message)
 {
+    // FIXME: plz die already! (doesn't work in release yet) use raise
     if (cond)
     {
         std::cerr << message << std::endl;

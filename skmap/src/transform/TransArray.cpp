@@ -151,7 +151,17 @@ namespace skmap {
         this->parForRange(selArrayRow, out_data.rows());
     }
 
-
+    void TransArray::extractArrayRows(Eigen::Ref<MatFloat> out_data,
+                                      std::vector<uint_t> row_select)
+    {
+        skmapAssertIfTrue((row_select.size() > (uint_t) out_data.rows()),
+                          "scikit-map ERROR 35: size of the old array does not match the size of selected");
+        auto extractArrayRow = [&] (uint_t i)
+        {
+            out_data.row(i) = m_data.row(row_select[i]);
+        };
+        this->parForRange(extractArrayRow, row_select.size());
+    }
 
     void TransArray::slidingWindowClassMode(Eigen::Ref<MatFloat> out_data,
                                   size_t window_size)
@@ -201,19 +211,6 @@ namespace skmap {
             out_data.row(row_select[i]) = m_data.row(i);
         };
         this->parForRange(expandArrayRow, row_select.size());
-    }
-    
-
-    void TransArray::selArrayCols(Eigen::Ref<MatFloat> out_data,
-                                  std::vector<uint_t> col_select)
-    {
-        skmapAssertIfTrue((col_select.size() != (uint_t) out_data.cols()),
-                          "scikit-map ERROR 14: size of the new array does not match the size of selected");
-        auto selArrayCol = [&] (uint_t i)
-        {
-            out_data.col(i) = m_data.col(col_select[i]);
-        };
-        this->parForRange(selArrayCol, out_data.cols());
     }
 
 
@@ -278,19 +275,6 @@ namespace skmap {
     }
 
 
-    void TransArray::extractArrayRows(Eigen::Ref<MatFloat> out_data,
-                                      std::vector<uint_t> row_select)
-    {
-        skmapAssertIfTrue((row_select.size() > (uint_t) out_data.rows()),
-                          "scikit-map ERROR 35: size of the old array does not match the size of selected");
-        auto extractArrayRow = [&] (uint_t i)
-        {
-            out_data.row(i) = m_data.row(row_select[i]);
-        };
-        this->parForRange(extractArrayRow, row_select.size());
-    }
-
-
     void TransArray::extractArrayCols(Eigen::Ref<MatFloat> out_data,
                                       std::vector<uint_t> col_select)
     {
@@ -304,6 +288,17 @@ namespace skmap {
     }
 
 
+    void TransArray::selArrayCols(Eigen::Ref<MatFloat> out_data,
+                                  std::vector<uint_t> col_select)
+    {
+        skmapAssertIfTrue((col_select.size() != (uint_t) out_data.cols()),
+                          "scikit-map ERROR 14: size of the new array does not match the size of selected");
+        auto selArrayCol = [&] (uint_t i)
+        {
+            out_data.col(i) = m_data.col(col_select[i]);
+        };
+        this->parForRange(selArrayCol, out_data.cols());
+    }
 
 
     void TransArray::swapRowsValues(std::vector<uint_t> row_select,
@@ -777,7 +772,7 @@ namespace skmap {
     }
 
 
-    void TransArray::fitProibabilites(Eigen::Ref<MatFloat> out_data,
+    void TransArray::fitProbabilities(Eigen::Ref<MatFloat> out_data,
                                       float_t input_scaling,
                                       uint_t target_scaling,
                                       Eigen::Ref<MatFloat> best_classes_data,
@@ -793,7 +788,7 @@ namespace skmap {
         while (std::pow(2, power_of_two_start + 1) < n_classes)
             power_of_two_start++;
         
-        auto fitProibabilitesChunk = [&] (Eigen::Ref<MatFloat> in_chunk, uint_t row_start, uint_t row_end)
+        auto fitProbabilitiesChunk = [&] (Eigen::Ref<MatFloat> in_chunk, uint_t row_start, uint_t row_end)
         {
             uint_t n_pix = row_end - row_start;
             auto out_chunk = out_data.block(row_start, 0, n_pix, n_classes);
@@ -868,7 +863,7 @@ namespace skmap {
             applyPermutation(out_chunk, perm_matrix, true);
 
         };
-        this->parChunk(fitProibabilitesChunk);
+        this->parChunk(fitProbabilitiesChunk);
 
     }
 
