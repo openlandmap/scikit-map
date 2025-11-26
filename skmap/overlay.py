@@ -366,7 +366,7 @@ class SpaceOverlay:
             "GDAL_HTTP_VERSION": "1.0",
             "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif",
         },
-    ):
+    ) -> pd.DataFrame:
         """
         Execute the space overlay.
 
@@ -408,7 +408,7 @@ class SpaceOverlay:
             self.n_threads,
             lat_info=self.pts["lat"].to_numpy(),
         )
-        # @FIXME check that all the filled flages are True or assert at this point
+        # @FIXME check that all the filled flags are True or assert at this point
         df = pd.DataFrame(self.data_array.T, columns=self.ordered_feats_names)
         if "lat" in df:
             self.pts = self.pts.drop(columns=["lat"])
@@ -445,7 +445,7 @@ class SpaceOverlay:
             ]
             key_query_pixels = query_pixels[key]
             assert key_query_pixels.shape[0] == query_pixels[keys[0]].shape[0], (
-                "Query pixel size is inconsisten between keys, something went wrong"
+                "Query pixel size is inconsistent between keys, something went wrong"
             )
             unique_blocks = key_query_pixels[
                 [
@@ -563,7 +563,7 @@ class SpaceOverlay:
                     None,
                     np.nan,
                 )
-                pix_blok_ids = key_query_pixels["block_id"].tolist()
+                pix_block_ids = key_query_pixels["block_id"].tolist()
                 sample_rows = key_query_pixels["sample_row"].tolist()
                 sample_cols = key_query_pixels["sample_col"].tolist()
                 block_width_dict = unique_blocks.set_index("block_id")[
@@ -571,12 +571,12 @@ class SpaceOverlay:
                 ].to_dict()
                 pix_inblock_idxs = [
                     sample_rows[k] * block_width_dict[ubid] + sample_cols[k]
-                    for k, ubid in enumerate(pix_blok_ids)
+                    for k, ubid in enumerate(pix_block_ids)
                 ]
                 sb.extractOverlay(
                     data_array,
                     self.n_threads,
-                    pix_blok_ids,
+                    pix_block_ids,
                     pix_inblock_idxs,
                     unique_blocks_ids_chunk,
                     key_layer_ids_chunk,

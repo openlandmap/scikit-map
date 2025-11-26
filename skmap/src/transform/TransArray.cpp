@@ -102,7 +102,7 @@ namespace skmap {
     {
         skmapAssertIfTrue((indices_matrix.size() != (uint_t) out_data.rows()) ||
                           (indices_matrix[0].size() * (uint_t) m_data.cols() != (uint_t) out_data.cols()),
-                          "scikit-map ERROR 5: size of the new array does not match the input array and the requred reordering");
+                          "scikit-map ERROR 5: size of the new array does not match the input array and the required reordering");
         auto reorderArrayRow = [&] (uint_t i)
         {
             for (uint_t j = 0; j < indices_matrix[i].size(); j++)
@@ -727,7 +727,7 @@ namespace skmap {
 
         skmapAssertIfTrue(col_out_select.size() != percentiles.size(),
                           "scikit-map ERROR 19: out_data too small");
-        // @FIXME: the clean way would be that also for out_data a ParArray oject is created and that only the corresponding cunk is sent
+        // @FIXME: the clean way would be that also for out_data a ParArray object is created and that only the corresponding cunk is sent
         auto computePercentilesChunk = [&] (Eigen::Ref<MatFloat> rows_block, uint_t row_start, uint_t row_end)
         {
             MatFloat chunk(rows_block.rows(), col_in_select.size());
