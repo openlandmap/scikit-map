@@ -158,7 +158,22 @@ class IoArray: public ParArray
                                uint_t x_size,
                                uint_t y_size);
 
-        void extractOverlay(std::vector<uint_t> pix_blok_ids,
+        /**
+        * @brief Extract overlay values from raster blocks for a set of points.
+        *
+        * For each pixel (given by `pix_block_ids` and `pix_inblock_idxs`),
+        * this function finds the matching block and copies the corresponding
+        * raster values from `m_data` into `data_overlay`.
+        *
+        * The operation is parallelized across pixels.
+        *
+        * @param pix_block_ids Vector of block IDs corresponding to each pixel.
+        * @param pix_inblock_idxs Vector of linear indices of each pixel within its block.
+        * @param unique_blocks_ids_comb Vector of all unique block IDs for the current chunk.
+        * @param key_layer_ids_comb Vector of layer indices corresponding to each block-layer combination.
+        * @param data_overlay Output array (layers x pixels) where extracted values will be stored.
+        */
+        void extractOverlay(std::vector<uint_t> pix_block_ids,
                                  std::vector<uint_t> pix_inblock_idxs,
                                  std::vector<uint_t> unique_blocks_ids_comb,
                                  std::vector<uint_t> key_layer_ids_comb,

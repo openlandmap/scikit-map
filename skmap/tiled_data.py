@@ -561,7 +561,7 @@ class TiledDataExporter(TiledData):
         for q in self.quantiles:
             formatted_p = get_percentiele_string(q)
             out_files.append(
-                f"{prefix}_{formatted_p}_{self.spatial_res}_s_{time_frame}_{sufix}"
+                f"{prefix}_{formatted_p}_{self.spatial_res}_s_{time_frame}_{suffix}"
             )
         return out_files
 

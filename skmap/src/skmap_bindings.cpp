@@ -108,14 +108,14 @@ void readDataCore(Eigen::Ref<MatFloat> data,
 
 void extractOverlay(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
-              const std::vector<uint_t> pix_blok_ids,
+              const std::vector<uint_t> pix_block_ids,
               const std::vector<uint_t> pix_inblock_idxs,
               const std::vector<uint_t> unique_blocks_ids_comb,
               const std::vector<uint_t> key_layer_ids_comb,
               Eigen::Ref<MatFloat> data_overlay)
 {
     IoArray ioArray(data, n_threads);
-    ioArray.extractOverlay(pix_blok_ids, pix_inblock_idxs, unique_blocks_ids_comb, key_layer_ids_comb, data_overlay);
+    ioArray.extractOverlay(pix_block_ids, pix_inblock_idxs, unique_blocks_ids_comb, key_layer_ids_comb, data_overlay);
 }
 
 void readData(Eigen::Ref<MatFloat> data,
@@ -670,6 +670,22 @@ void writeByteData(Eigen::Ref<MatFloat> data,
 
 }
 
+/**
+ * @brief Python-friendly wrapper for writing raster data using GDAL and Eigen.
+ *
+ * This function wraps the `IoArray::writeData` method, handling GDAL setup,
+ * nodata type dispatching, and optional post-processing (compression or remote storage).
+ * 
+ * @note For full details on the writing behavior, memory handling, and parallelization,
+ *       see `IoArray::writeData`:
+ *       @ref IoArray::writeData
+ *
+ * @param data      Eigen::matrix reference containing the data to write.
+ * @param n_threads Number of threads for parallel I/O operations.
+ * @param conf_GDAL Python dictionary of GDAL configuration options.
+ *
+ * Other parameters are passed to `IoArray::WriteData`: @ref IoArray::WriteData
+ */
 void writeData(Eigen::Ref<MatFloat> data,
                const uint_t n_threads,
                py::dict conf_GDAL,
@@ -912,7 +928,7 @@ PYBIND11_MODULE(skmap_bindings, m)
     m.def("computeSavi", &computeSavi, "Compute SAVI");
     m.def("nanMean", &nanMean, "Compute average between available values");
     m.def("computeMannKendallPValues", &computeMannKendallPValues, "Compute Mann-Kendall p-values");
-    m.def("warpTile", &warpTile, "Compute FAPAR");
+    m.def("warpTile", &warpTile, "Warp tile, deprecated in favor of VRTs");
     m.def("linearRegression", &linearRegression, "Compute linear regression slope and intercept");
     m.def("transposeReorderArray", &transposeReorderArray, "Transpose and reorder an array into a new one");
     m.def("computeGeometricTemperature", &computeGeometricTemperature, "Compute geometric temperautre");
