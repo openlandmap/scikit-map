@@ -37,11 +37,12 @@ release = meta.version("scikit-map")
 extensions = [
     "sphinx.ext.autodoc",  # Core Sphinx library for auto html doc generation from docstrings
     "sphinx.ext.autosummary",  # Create neat summary tables for modules/classes/methods etc
-    "breathe",  # Doxygen autodoc
+    "sphinx.ext.graphviz", # dot graphs in C++ documentation
     "sphinx.ext.intersphinx",  # Link to other project's documentation (see mapping below)
     "sphinx.ext.viewcode",  # Add a link to the Python source code for classes, functions etc.
     "sphinx.ext.doctest",  # run code snippets
     "sphinx_autodoc_typehints",  # Automatically document param types (less noise in class signature)
+    "breathe",  # Doxygen autodoc
     "nbsphinx",  # Integrate Jupyter Notebooks and Sphinx
     "numpydoc",
     "sphinx_copybutton",
