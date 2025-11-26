@@ -87,25 +87,18 @@ map_t convPyMap(py::dict in_map)
     return cpp_map;
 }
 
+/** 
+ * @defgroup io IO / Storage
+ * @brief Functions for reading/writing raster or matrix data to/from disk.
+ *
+ * This group contains all I/O related functions, including GDAL-backed reading/writing
+ * and Python-friendly wrapper functions.
+ * @{
+ */
 
-void readDataCore(Eigen::Ref<MatFloat> data,
-              const uint_t n_threads,
-              const std::string file_loc,
-              const uint_t x_off,
-              const uint_t y_off,
-              const uint_t x_size,
-              const uint_t y_size,
-              const std::vector<int> bands_list,
-              py::dict conf_GDAL,
-              std::optional<float_t> value_to_mask,
-              std::optional<float_t> value_to_set)
-{
-    IoArray ioArray(data, n_threads);
-    ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.readDataCore(data.row(0), file_loc, x_off, y_off, x_size, y_size, GDALDataType::GDT_Float32,
-                     bands_list, value_to_mask, value_to_set);
-}
-
+ /**
+ * @brief wrapper for `IoArray::extractOverlay`
+ */
 void extractOverlay(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
               const std::vector<uint_t> pix_block_ids,
@@ -118,6 +111,9 @@ void extractOverlay(Eigen::Ref<MatFloat> data,
     ioArray.extractOverlay(pix_block_ids, pix_inblock_idxs, unique_blocks_ids_comb, key_layer_ids_comb, data_overlay);
 }
 
+/**
+* @brief see `IoArray::readData`
+*/
 void readData(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
               const std::vector<std::string>& file_locs,
@@ -138,6 +134,83 @@ void readData(Eigen::Ref<MatFloat> data,
 }
 
 
+/**
+ * @brief Python-friendly wrapper for writing raster data using GDAL and Eigen.
+ *
+ * This function wraps the `IoArray::writeData` method, handling GDAL setup,
+ * nodata type dispatching, and optional post-processing (compression or remote storage).
+ * 
+ * @note For full details on the writing behavior, memory handling, and parallelization,
+ *       see `IoArray::writeData`:
+ *       @ref IoArray::writeData
+ *
+ * @param data      Eigen::matrix reference containing the data to write.
+ * @param n_threads Number of threads for parallel I/O operations.
+ * @param conf_GDAL Python dictionary of GDAL configuration options.
+ *
+ * Other parameters are passed to `IoArray::WriteData`: @ref IoArray::WriteData
+ */
+void writeData(Eigen::Ref<MatFloat> data,
+               const uint_t n_threads,
+               py::dict conf_GDAL,
+               std::vector<std::string> base_files,
+               std::string base_folder,
+               std::vector<std::string> file_names,
+               std::vector<uint_t> data_indices,
+               uint_t x_off,
+               uint_t y_off,
+               uint_t x_size,
+               uint_t y_size,
+               float_t no_data_value,
+               std::string gdal_data_type_str,
+               std::optional<std::string> bash_compression_command,
+               std::optional<std::vector<std::string>> seaweed_path) 
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    GDALDataType gdal_data_type = GetGDALDataTypeFromString(gdal_data_type_str);
+    auto no_data_variant = getNodataVariant(gdal_data_type_str, no_data_value);
+    if (!no_data_variant)
+        throw std::invalid_argument("scikit-map ERROR 61: Unknown data type for no_data_value: " + gdal_data_type_str);
+    std::visit([&](auto&& casted_nodata) {
+        ioArray.writeData(base_files, base_folder, file_names, data_indices,
+                          x_off, y_off, x_size, y_size, gdal_data_type,
+                          casted_nodata, bash_compression_command, seaweed_path);
+    }, *no_data_variant);
+}
+
+/**
+* @brief wrapper for `IoArray::warpTile`
+* @deprecated Please use gdal VRTs
+*/
+void warpTile(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    py::dict conf_GDAL,
+                    std::string tilePath,
+                    std::string mosaicPath,
+                    std::string resample)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.warpTile(tilePath, mosaicPath, resample);
+}
+
+
+void getLatLonArray(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    py::dict conf_GDAL,
+                    std::string file_loc,
+                    uint_t x_off,
+                    uint_t y_off,
+                    uint_t x_size,
+                    uint_t y_size)
+{
+    IoArray ioArray(data, n_threads);
+    ioArray.setupGdal(convPyDict(conf_GDAL));
+    ioArray.getLatLonArray(file_loc, x_off, y_off, x_size, y_size);
+}
+/** @} */ // end of io group
+
 void readDataBlocks(Eigen::Ref<MatFloat> data,
               const uint_t n_threads,
               const std::vector<std::string>& file_locs,
@@ -157,57 +230,94 @@ void readDataBlocks(Eigen::Ref<MatFloat> data,
                      bands_list, value_to_mask_vec, value_to_set);
 }
 
-
-
-void getLatLonArray(Eigen::Ref<MatFloat> data,
-                    const uint_t n_threads,
-                    py::dict conf_GDAL,
-                    std::string file_loc,
-                    uint_t x_off,
-                    uint_t y_off,
-                    uint_t x_size,
-                    uint_t y_size)
+/** @brief core implementation, see `IoArray::readDataCore` */
+void readDataCore(Eigen::Ref<MatFloat> data,
+              const uint_t n_threads,
+              const std::string file_loc,
+              const uint_t x_off,
+              const uint_t y_off,
+              const uint_t x_size,
+              const uint_t y_size,
+              const std::vector<int> bands_list,
+              py::dict conf_GDAL,
+              std::optional<float_t> value_to_mask,
+              std::optional<float_t> value_to_set)
 {
     IoArray ioArray(data, n_threads);
     ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.getLatLonArray(file_loc, x_off, y_off, x_size, y_size);
+    ioArray.readDataCore(data.row(0), file_loc, x_off, y_off, x_size, y_size, GDALDataType::GDT_Float32,
+                     bands_list, value_to_mask, value_to_set);
 }
 
-void blocksAverage(Eigen::Ref<MatFloat> out,
-                  const uint_t n_threads,
-                  Eigen::Ref<MatFloat> in1,
-                  Eigen::Ref<MatFloat> in2,
-                  uint_t n_pix,
-                  uint_t y)
+/**
+* @deprecated `IoArray::writeData`
+*/
+void writeInt16Data(Eigen::Ref<MatFloat> data,
+                   const uint_t n_threads,
+                   py::dict conf_GDAL,
+                   std::vector<std::string> base_files,
+                   std::string base_folder,
+                   std::vector<std::string> file_names,
+                   std::vector<uint_t> data_indices,
+                   uint_t x_off,
+                   uint_t y_off,
+                   uint_t x_size,
+                   uint_t y_size,
+                   int16_t no_data_value,
+                   std::optional<std::string> bash_compression_command,
+                   std::optional<std::vector<std::string>> seaweed_path)
 {
-    TransArray transArray(out, n_threads);
-    transArray.blocksAverage(in1, in2, n_pix, y);
+    writeData(data, n_threads, conf_GDAL, base_files, base_folder, file_names, data_indices, x_off, y_off, x_size, y_size, no_data_value, "int16", bash_compression_command, seaweed_path);
 }
 
-void blocksAverageVecs(Eigen::Ref<MatFloat> out,
-                  const uint_t n_threads,
-                  Eigen::Ref<MatFloat> in1,
-                  Eigen::Ref<MatFloat> in2,
-                  uint_t n_pix,
-                  uint_t y,
-                  uint_t row_offset)
+
+/**
+* @deprecated use `IoArray::writeData`
+*/
+void writeUInt16Data(Eigen::Ref<MatFloat> data,
+                   const uint_t n_threads,
+                   py::dict conf_GDAL,
+                   std::vector<std::string> base_files,
+                   std::string base_folder,
+                   std::vector<std::string> file_names,
+                   std::vector<uint_t> data_indices,
+                   uint_t x_off,
+                   uint_t y_off,
+                   uint_t x_size,
+                   uint_t y_size,
+                   uint16_t no_data_value,
+                   std::optional<std::string> bash_compression_command,
+                   std::optional<std::vector<std::string>> seaweed_path)
 {
-    TransArray transArray(out, n_threads);
-    transArray.blocksAverageVecs(in1, in2, n_pix, y, row_offset);
+    writeData(data, n_threads, conf_GDAL, base_files, base_folder, file_names, data_indices, x_off, y_off, x_size, y_size, no_data_value, "uint16", bash_compression_command, seaweed_path);
 }
 
-
-
-void elementwiseAverage(Eigen::Ref<MatFloat> out,
-                  const uint_t n_threads,
-                  Eigen::Ref<MatFloat> in1,
-                  Eigen::Ref<MatFloat> in2)
+/**
+* @deprecated use `IoArray::writeData`
+*/
+void writeByteData(Eigen::Ref<MatFloat> data,
+                   const uint_t n_threads,
+                   py::dict conf_GDAL,
+                   std::vector<std::string> base_files,
+                   std::string base_folder,
+                   std::vector<std::string> file_names,
+                   std::vector<uint_t> data_indices,
+                   uint_t x_off,
+                   uint_t y_off,
+                   uint_t x_size,
+                   uint_t y_size,
+                   byte_t no_data_value,
+                   std::optional<std::string> bash_compression_command,
+                   std::optional<std::vector<std::string>> seaweed_path)
 {
-    TransArray transArray(out, n_threads);
-    transArray.elementwiseAverage(in1, in2);
+    writeData(data, n_threads, conf_GDAL, base_files, base_folder, file_names, data_indices, x_off, y_off, x_size, y_size, no_data_value, "byte", bash_compression_command, seaweed_path);
 }
 
-
+/**
+* @defgroup mangling Data mangling
+* Functions for changing the shape of data for efficient parallel processing
+* @{
+ */
 void reorderArray(Eigen::Ref<MatFloat> data,
                   const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
@@ -217,8 +327,6 @@ void reorderArray(Eigen::Ref<MatFloat> data,
     transArray.reorderArray(out_data, indices_matrix);
 }
 
-
-
 void selArrayRows(Eigen::Ref<MatFloat> data,
                   const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
@@ -227,8 +335,6 @@ void selArrayRows(Eigen::Ref<MatFloat> data,
     TransArray transArray(data, n_threads);
     transArray.selArrayRows(out_data, row_select);
 }
-
-
 
 void selArrayCols(Eigen::Ref<MatFloat> data,
                   const uint_t n_threads,
@@ -258,6 +364,34 @@ void expandArrayCols(Eigen::Ref<MatFloat> data,
     transArray.expandArrayCols(out_data, col_select);
 }
 
+void inverseReorderArray(Eigen::Ref<MatFloat> data,
+                          const uint_t n_threads,
+                          Eigen::Ref<MatFloat> out_data,
+                          std::vector<std::vector<uint_t>> indices_matrix)
+{
+    TransArray transArray(data, n_threads);
+    transArray.inverseReorderArray(out_data, indices_matrix);
+}
+
+void transposeReorderArray(Eigen::Ref<MatFloat> data,
+                         const uint_t n_threads,
+                         Eigen::Ref<MatFloat> out_data,
+                         std::vector<std::vector<uint_t>> permutation_matrix)
+{
+    TransArray transArray(data, n_threads);
+    transArray.transposeReorderArray(out_data, permutation_matrix);
+}
+
+void transposeArray(Eigen::Ref<MatFloat> data,
+                          const uint_t n_threads,
+                          Eigen::Ref<MatFloat> out_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.transposeArray(out_data);
+}
+
+/** @} */ //endgroup mangling
+
 /**
 * @deprecated use selArrayRows in stead
 */
@@ -282,6 +416,12 @@ void extractArrayCols(Eigen::Ref<MatFloat> data,
     transArray.selArrayCols(out_data, col_select);
 }
 
+/**
+* @defgroup manipulation Data manipulation
+* parallel operations on data arrays
+* @{
+ */
+
 void swapRowsValues(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     std::vector<uint_t> row_select,
@@ -291,19 +431,6 @@ void swapRowsValues(Eigen::Ref<MatFloat> data,
     TransArray transArray(data, n_threads);
     transArray.swapRowsValues(row_select, value_to_mask, new_value);
 }
-
-
-void extractIndicators(Eigen::Ref<MatFloat> data_in,
-                            const uint_t n_threads,
-                            Eigen::Ref<MatFloat> data_out,
-                            uint_t col_in_select,
-                            std::vector<uint_t> col_out_select,
-                            std::vector<uint_t> classes)
-{
-    TransArray transArray(data_in, n_threads);
-    transArray.extractIndicators(data_out, col_in_select, col_out_select, classes);
-}
-
 
 void maskNan(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
@@ -336,29 +463,6 @@ void maskData(Eigen::Ref<MatFloat> data,
     transArray.maskData(row_select, mask, value_of_mask_to_mask, new_value_in_data);
 }
 
-void fitPercentage(Eigen::Ref<MatFloat> out,
-    const uint_t n_threads,
-    Eigen::Ref<MatFloat> in1,
-    Eigen::Ref<MatFloat> in2)
-{
-    TransArray transArray(out, n_threads);
-    transArray.fitPercentage(in1, in2);
-}
-
-void texturesBwTransform(Eigen::Ref<MatFloat> texture_1,
-                        const uint_t n_threads,
-                        Eigen::Ref<MatFloat> texture_2,
-                        float_t k,
-                        float_t a,
-                        Eigen::Ref<MatFloat> sand,
-                        Eigen::Ref<MatFloat> silt,
-                        Eigen::Ref<MatFloat> clay)
-{
-    TransArray transArray(texture_1, n_threads);
-    transArray.texturesBwTransform(texture_2, k, a, sand, silt, clay);
-}
-
-
 void hadamardProduct(Eigen::Ref<MatFloat> out,
                      const uint_t n_threads,
                      Eigen::Ref<MatFloat> in1,
@@ -379,9 +483,6 @@ void maskDataRows(Eigen::Ref<MatFloat> data,
     transArray.maskDataRows(row_select, mask, value_of_mask_to_mask, new_value_in_data);
 }
 
-
-
-
 void fillArray(Eigen::Ref<MatFloat> data,
                const uint_t n_threads,
                float_t val)
@@ -390,41 +491,6 @@ void fillArray(Eigen::Ref<MatFloat> data,
     transArray.fillArray(val);
 }
 
-void copyVecInMatrixRow(Eigen::Ref<MatFloat> data,
-               const uint_t n_threads,
-               Eigen::Ref<VecFloat> in_vec,
-               uint_t row_idx)
-{
-    TransArray transArray(data, n_threads);
-    transArray.copyVecInMatrixRow(in_vec, row_idx);
-}
-
-
-void inverseReorderArray(Eigen::Ref<MatFloat> data,
-                          const uint_t n_threads,
-                          Eigen::Ref<MatFloat> out_data,
-                          std::vector<std::vector<uint_t>> indices_matrix)
-{
-    TransArray transArray(data, n_threads);
-    transArray.inverseReorderArray(out_data, indices_matrix);
-}
-
-void transposeReorderArray(Eigen::Ref<MatFloat> data,
-                         const uint_t n_threads,
-                         Eigen::Ref<MatFloat> out_data,
-                         std::vector<std::vector<uint_t>> permutation_matrix)
-{
-    TransArray transArray(data, n_threads);
-    transArray.transposeReorderArray(out_data, permutation_matrix);
-}
-
-void transposeArray(Eigen::Ref<MatFloat> data,
-                          const uint_t n_threads,
-                          Eigen::Ref<MatFloat> out_data)
-{
-    TransArray transArray(data, n_threads);
-    transArray.transposeArray(out_data);
-}
 
 void offsetAndScale(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
@@ -435,6 +501,14 @@ void offsetAndScale(Eigen::Ref<MatFloat> data,
     transArray.offsetAndScale(offset, scaling);
 }
 
+void scaleAndOffset(Eigen::Ref<MatFloat> data,
+                    const uint_t n_threads,
+                    float_t offset,
+                    float_t scaling)
+{
+    TransArray transArray(data, n_threads);
+    transArray.scaleAndOffset(offset, scaling);
+}
 
 void offsetsAndScales(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
@@ -445,43 +519,6 @@ void offsetsAndScales(Eigen::Ref<MatFloat> data,
     TransArray transArray(data, n_threads);
     transArray.offsetsAndScales(row_select, offsets, scalings);
 }
-
-void nanMean(Eigen::Ref<MatFloat> data,
-             const uint_t n_threads,
-             Eigen::Ref<VecFloat> out_data)
-{
-    TransArray transArray(data, n_threads);
-    transArray.nanMean(out_data);
-}
-
-void linearRegression(Eigen::Ref<MatFloat> data,
-                      const uint_t n_threads,
-                      Eigen::Ref<VecFloat> x,
-                      Eigen::Ref<VecFloat> beta_0,
-                      Eigen::Ref<VecFloat> beta_1)
-{
-    TransArray transArray(data, n_threads);
-    transArray.linearRegression(x, beta_0, beta_1);
-}
-
-
-void computeMannKendallPValues(Eigen::Ref<MatFloat> data,
-                      const uint_t n_threads,
-                      Eigen::Ref<VecFloat> out_data)
-{
-    TransArray transArray(data, n_threads);
-    transArray.computeMannKendallPValues(out_data);
-}
-
-void averageAggregate(Eigen::Ref<MatFloat> data,
-                      const uint_t n_threads,
-                      Eigen::Ref<MatFloat> out_data,
-                      uint_t agg_factor)
-{
-    TransArray transArray(data, n_threads);
-    transArray.averageAggregate(out_data, agg_factor);
-}
-
 
 void castFloat32ToFloat64(Eigen::Ref<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> data,
                           const uint_t n_threads,
@@ -520,6 +557,127 @@ void castFloat64ToFloat32(Eigen::Ref<Eigen::Matrix<double, Eigen::Dynamic, Eigen
         out_data.row(i) = data.row(i).cast<float>();
     }
 }
+
+void copyVecInMatrixRow(Eigen::Ref<MatFloat> data,
+               const uint_t n_threads,
+               Eigen::Ref<VecFloat> in_vec,
+               uint_t row_idx)
+{
+    TransArray transArray(data, n_threads);
+    transArray.copyVecInMatrixRow(in_vec, row_idx);
+}
+
+/** @} */ // endgroup manipulation
+
+/**
+* @defgroup processing Data processing
+* data processing and statistics
+* @{
+ */
+
+
+void blocksAverage(Eigen::Ref<MatFloat> out,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> in1,
+                  Eigen::Ref<MatFloat> in2,
+                  uint_t n_pix,
+                  uint_t y)
+{
+    TransArray transArray(out, n_threads);
+    transArray.blocksAverage(in1, in2, n_pix, y);
+}
+
+void blocksAverageVecs(Eigen::Ref<MatFloat> out,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> in1,
+                  Eigen::Ref<MatFloat> in2,
+                  uint_t n_pix,
+                  uint_t y,
+                  uint_t row_offset)
+{
+    TransArray transArray(out, n_threads);
+    transArray.blocksAverageVecs(in1, in2, n_pix, y, row_offset);
+}
+
+void elementwiseAverage(Eigen::Ref<MatFloat> out,
+                  const uint_t n_threads,
+                  Eigen::Ref<MatFloat> in1,
+                  Eigen::Ref<MatFloat> in2)
+{
+    TransArray transArray(out, n_threads);
+    transArray.elementwiseAverage(in1, in2);
+}
+
+
+void extractIndicators(Eigen::Ref<MatFloat> data_in,
+                            const uint_t n_threads,
+                            Eigen::Ref<MatFloat> data_out,
+                            uint_t col_in_select,
+                            std::vector<uint_t> col_out_select,
+                            std::vector<uint_t> classes)
+{
+    TransArray transArray(data_in, n_threads);
+    transArray.extractIndicators(data_out, col_in_select, col_out_select, classes);
+}
+
+void fitPercentage(Eigen::Ref<MatFloat> out,
+    const uint_t n_threads,
+    Eigen::Ref<MatFloat> in1,
+    Eigen::Ref<MatFloat> in2)
+{
+    TransArray transArray(out, n_threads);
+    transArray.fitPercentage(in1, in2);
+}
+
+void texturesBwTransform(Eigen::Ref<MatFloat> texture_1,
+                        const uint_t n_threads,
+                        Eigen::Ref<MatFloat> texture_2,
+                        float_t k,
+                        float_t a,
+                        Eigen::Ref<MatFloat> sand,
+                        Eigen::Ref<MatFloat> silt,
+                        Eigen::Ref<MatFloat> clay)
+{
+    TransArray transArray(texture_1, n_threads);
+    transArray.texturesBwTransform(texture_2, k, a, sand, silt, clay);
+}
+
+void nanMean(Eigen::Ref<MatFloat> data,
+             const uint_t n_threads,
+             Eigen::Ref<VecFloat> out_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.nanMean(out_data);
+}
+
+void linearRegression(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<VecFloat> x,
+                      Eigen::Ref<VecFloat> beta_0,
+                      Eigen::Ref<VecFloat> beta_1)
+{
+    TransArray transArray(data, n_threads);
+    transArray.linearRegression(x, beta_0, beta_1);
+}
+
+
+void computeMannKendallPValues(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<VecFloat> out_data)
+{
+    TransArray transArray(data, n_threads);
+    transArray.computeMannKendallPValues(out_data);
+}
+
+void averageAggregate(Eigen::Ref<MatFloat> data,
+                      const uint_t n_threads,
+                      Eigen::Ref<MatFloat> out_data,
+                      uint_t agg_factor)
+{
+    TransArray transArray(data, n_threads);
+    transArray.averageAggregate(out_data, agg_factor);
+}
+
 
 void maskDifference(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
@@ -654,137 +812,7 @@ void computeGeometricTemperature(Eigen::Ref<MatFloat> data,
     transArray.computeGeometricTemperature(latitude, elevation, elevation_scaling, a, b, result_scaling, result_indices, days_of_year);
 }
 
-void writeByteData(Eigen::Ref<MatFloat> data,
-                   const uint_t n_threads,
-                   py::dict conf_GDAL,
-                   std::vector<std::string> base_files,
-                   std::string base_folder,
-                   std::vector<std::string> file_names,
-                   std::vector<uint_t> data_indices,
-                   uint_t x_off,
-                   uint_t y_off,
-                   uint_t x_size,
-                   uint_t y_size,
-                   byte_t no_data_value,
-                   std::optional<std::string> bash_compression_command,
-                   std::optional<std::vector<std::string>> seaweed_path)
-{
-    IoArray ioArray(data, n_threads);
-    ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.writeData(base_files, base_folder, file_names, data_indices,
-        x_off, y_off, x_size, y_size, GDT_Byte, no_data_value, bash_compression_command, seaweed_path);
 
-}
-
-/**
- * @brief Python-friendly wrapper for writing raster data using GDAL and Eigen.
- *
- * This function wraps the `IoArray::writeData` method, handling GDAL setup,
- * nodata type dispatching, and optional post-processing (compression or remote storage).
- * 
- * @note For full details on the writing behavior, memory handling, and parallelization,
- *       see `IoArray::writeData`:
- *       @ref IoArray::writeData
- *
- * @param data      Eigen::matrix reference containing the data to write.
- * @param n_threads Number of threads for parallel I/O operations.
- * @param conf_GDAL Python dictionary of GDAL configuration options.
- *
- * Other parameters are passed to `IoArray::WriteData`: @ref IoArray::WriteData
- */
-void writeData(Eigen::Ref<MatFloat> data,
-               const uint_t n_threads,
-               py::dict conf_GDAL,
-               std::vector<std::string> base_files,
-               std::string base_folder,
-               std::vector<std::string> file_names,
-               std::vector<uint_t> data_indices,
-               uint_t x_off,
-               uint_t y_off,
-               uint_t x_size,
-               uint_t y_size,
-               float_t no_data_value,
-               std::string gdal_data_type_str,
-               std::optional<std::string> bash_compression_command,
-               std::optional<std::vector<std::string>> seaweed_path) 
-{
-    IoArray ioArray(data, n_threads);
-    ioArray.setupGdal(convPyDict(conf_GDAL));
-    GDALDataType gdal_data_type = GetGDALDataTypeFromString(gdal_data_type_str);
-    auto no_data_variant = getNodataVariant(gdal_data_type_str, no_data_value);
-    if (!no_data_variant)
-        throw std::invalid_argument("scikit-map ERROR 61: Unknown data type for no_data_value: " + gdal_data_type_str);
-    std::visit([&](auto&& casted_nodata) {
-        ioArray.writeData(base_files, base_folder, file_names, data_indices,
-                          x_off, y_off, x_size, y_size, gdal_data_type,
-                          casted_nodata, bash_compression_command, seaweed_path);
-    }, *no_data_variant);
-}
-
-
-/**
-* @deprecated use WriteData
-*/
-void writeInt16Data(Eigen::Ref<MatFloat> data,
-                   const uint_t n_threads,
-                   py::dict conf_GDAL,
-                   std::vector<std::string> base_files,
-                   std::string base_folder,
-                   std::vector<std::string> file_names,
-                   std::vector<uint_t> data_indices,
-                   uint_t x_off,
-                   uint_t y_off,
-                   uint_t x_size,
-                   uint_t y_size,
-                   int16_t no_data_value,
-                   std::optional<std::string> bash_compression_command,
-                   std::optional<std::vector<std::string>> seaweed_path)
-{
-    IoArray ioArray(data, n_threads);
-    ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.writeData(base_files, base_folder, file_names, data_indices,
-        x_off, y_off, x_size, y_size, GDT_Int16, no_data_value, bash_compression_command, seaweed_path);
-
-}
-
-
-/**
-* @deprecated use WriteData
-*/
-void writeUInt16Data(Eigen::Ref<MatFloat> data,
-                   const uint_t n_threads,
-                   py::dict conf_GDAL,
-                   std::vector<std::string> base_files,
-                   std::string base_folder,
-                   std::vector<std::string> file_names,
-                   std::vector<uint_t> data_indices,
-                   uint_t x_off,
-                   uint_t y_off,
-                   uint_t x_size,
-                   uint_t y_size,
-                   uint16_t no_data_value,
-                   std::optional<std::string> bash_compression_command,
-                   std::optional<std::vector<std::string>> seaweed_path)
-{
-    IoArray ioArray(data, n_threads);
-    ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.writeData(base_files, base_folder, file_names, data_indices,
-        x_off, y_off, x_size, y_size, GDT_UInt16, no_data_value, bash_compression_command, seaweed_path);
-
-}
-
-
-void warpTile(Eigen::Ref<MatFloat> data,
-                    const uint_t n_threads,
-                    py::dict conf_GDAL,
-                    std::string tilePath,
-                    std::string mosaicPath,
-                    std::string resample)
-{
-    IoArray ioArray(data, n_threads);
-    ioArray.setupGdal(convPyDict(conf_GDAL));
-    ioArray.warpTile(tilePath, mosaicPath, resample);
-}
 
 void computePercentiles(Eigen::Ref<MatFloat> data,
                           const uint_t n_threads,
@@ -829,15 +857,6 @@ void applyTsirf(Eigen::Ref<MatFloat> data,
                            w_0, w_p, w_f, keep_original_values, version, backend);
 }
 
-void scaleAndOffset(Eigen::Ref<MatFloat> data,
-                    const uint_t n_threads,
-                    float_t offset,
-                    float_t scaling)
-{
-    TransArray transArray(data, n_threads);
-    transArray.scaleAndOffset(offset, scaling);
-}
-
 void nanMeanAggregatePattern(Eigen::Ref<MatFloat> data,
                     const uint_t n_threads,
                     Eigen::Ref<MatFloat> out_data,
@@ -867,6 +886,8 @@ void slidingWindowClassMode(Eigen::Ref<MatFloat> data,
     TransArray transArray(data, n_threads);
     transArray.slidingWindowClassMode(out_data, window_size);
 }
+
+/** @} */ // endgroup processing
 
 
 void checkSimdInstructionSetsInUse()
