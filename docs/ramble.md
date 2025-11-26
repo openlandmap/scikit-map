@@ -84,6 +84,46 @@ RECURSIVE               = YES
 
 then again `doxygen Doxyfile` and refresh
 
+Integration with sphinx documentation is done with [Breathe](breathe.readthedocs.io). 
+
+- linking to C++ classes in docs see [here](https://breathe.readthedocs.io/en/latest/domains.html)
+- There's some mismatch going on between classes, python exposed functions and semantics (what the function does) This is where [groups](https://www.doxygen.nl/manual/grouping.html#memgroup) come in:
+  - `skmap_bindings.cpp` can only be included in full, which gives a lot of clutter, because for some reason I cannot say: only include documented functions. So we make [groups](https://breathe.readthedocs.io/en/latest/groups.html), and hopefully in those groups we can have classes and members and such
+  - `TransArray` has both data mangling and statistics, these are split into member groups
+  
+  So here's a short list of group names that I think make sense (sub-grouping?)
+    - IO
+        - overlays?: read points = read pixels from a block
+        - WarpTile: keep C++ function, but don't use in python
+        - ReadData; ReadDataCore
+        - WriteData
+    
+    - mangling
+      - ~~transposeReorder~~
+      - ~~transpose~~
+      - sel{Rows/Cols}
+      - expand{Rows/Cols} opposite of sel
+      - ~~reorder{Rows/Cols}~~
+      - ~~invreorder{Rows/Cols}~~
+
+    - data_manipulation
+      - offsetAndScale
+      - fill
+      - masknan
+      - fillnan
+      - spectral indices
+    
+
+    - data_processing: gives different output (shape)
+      - convolveRows
+      - Tsirf
+      - stats
+        - averages, quantiles
+        - blaAggregate
+      - spectral indices
+        - computeBla
+      
+
 #### Clangd language server
 
 So I wanted to get nice code completion and such, so that's what clangd can help with, 

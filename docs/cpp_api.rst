@@ -4,6 +4,34 @@ C++ API
 
 Fast code in skmap is written in C++ and exposed to Python with thin wrappers. This is a lower-level api. All Python-exposed functions handle setting up GDAL and then call a function on an array class.
 
+IO Group
+========
+
+.. doxygengroup:: io
+   :project: skmap_bindings
+   :members:
+
+Data mangling
+=============
+
+.. doxygengroup:: mangling
+   :project: skmap_bindings
+   :undoc-members:
+
+Data manipulation
+=================
+
+.. doxygengroup:: manipulation
+   :project: skmap_bindings
+   :undoc-members:
+
+Data Processing
+===============
+
+.. doxygengroup:: processing
+   :project: skmap_bindings
+   :undoc-members:
+
 IoArray Class
 =============
 
@@ -18,6 +46,7 @@ TransArray Class
 
 .. doxygenclass:: skmap::TransArray
    :members:
+   :undoc-members:
    :allow-dot-graphs:
 
 ParArray Class
@@ -25,6 +54,7 @@ ParArray Class
 
 .. doxygenclass:: skmap::ParArray
     :members:
+    :undoc-members:
     :allow-dot-graphs:
 
 Bindings

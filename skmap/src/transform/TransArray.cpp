@@ -76,25 +76,17 @@ namespace skmap {
         skmapAssertIfTrue((uint_t) m_data.cols() != (uint_t) in_vec.size(),
                           "scikit-map ERROR 33: number of input and output columns differ");
 
-        uint_t chuck_size = std::ceil((float_t) m_data.cols() / (float_t) m_n_threads);
+        uint_t chunk_size = std::ceil((float_t) m_data.cols() / (float_t) m_n_threads);
         auto copyRowsChunk = [&] (uint_t i)
         {
-            uint_t col_start = i * chuck_size;
-            uint_t col_end = std::min((i+1) * chuck_size, (uint_t) m_data.cols());
+            uint_t col_start = i * chunk_size;
+            uint_t col_end = std::min((i+1) * chunk_size, (uint_t) m_data.cols());
             m_data.row(row_idx).segment(col_start,col_end-col_start) = in_vec.segment(col_start,col_end-col_start);
         };
         this->parForRange(copyRowsChunk, m_n_threads);
     }
 
-    void TransArray::scaleAndOffset(float_t offset,
-                                    float_t scaling)
-    {
-        auto scaleAndOffsetChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
-        {
-            chunk.array() = chunk.array() * scaling + offset;
-        };
-        this->parChunk(scaleAndOffsetChunk);
-    }
+
 
 
     void TransArray::reorderArray(Eigen::Ref<MatFloat> out_data,
@@ -891,7 +883,15 @@ namespace skmap {
         this->parRowPerm(offsetsAndScalesRow, row_select);
     }
 
-
+    void TransArray::scaleAndOffset(float_t offset,
+                                float_t scaling)
+    {
+        auto scaleAndOffsetChunk = [&] (Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end)
+        {
+            chunk.array() = chunk.array() * scaling + offset;
+        };
+        this->parChunk(scaleAndOffsetChunk);
+    }
 
 
     void TransArray::maskDifference(float_t diff_th,

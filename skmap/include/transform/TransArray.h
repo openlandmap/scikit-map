@@ -177,7 +177,7 @@ class TransArray: public ParArray
                                 std::vector<uint_t> col_out_select,
                                 std::vector<float_t> percentiles);
 
-        void fitProibabilites(Eigen::Ref<MatFloat> out_data,
+        void fitProbabilities(Eigen::Ref<MatFloat> out_data,
                               float_t input_scaling,
                               uint_t target_scaling,
                               Eigen::Ref<MatFloat> best_classes_data,

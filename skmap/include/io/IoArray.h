@@ -14,6 +14,7 @@ class IoArray: public ParArray
         IoArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
 
         /**
+        * @ingroup io
         * @brief Warp a single-band mosaic to match a reference tile.
         *
         * @deprecated This function is deprecated. Use GDAL VRTs instead, which
@@ -79,6 +80,7 @@ class IoArray: public ParArray
                            std::optional<float_t> value_to_set);
 
         /**
+        * @ingroup io
         * @brief Reads multiple raster datasets into the internal matrix in parallel.
         *
         * This function reads specified regions from a set of raster files
@@ -159,6 +161,7 @@ class IoArray: public ParArray
                                uint_t y_size);
 
         /**
+        * @ingroup io
         * @brief Extract overlay values from raster blocks for a set of points.
         *
         * For each pixel (given by `pix_block_ids` and `pix_inblock_idxs`),
@@ -181,6 +184,7 @@ class IoArray: public ParArray
 
 
         /**
+        * @ingroup io
         * @brief Write portions of the internal matrix `m_data` to multiple GeoTIFF files.
         *
         * This function writes selected rows of the `m_data` matrix into GeoTIFF files
