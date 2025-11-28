@@ -126,11 +126,24 @@ Integration with sphinx documentation is done with [Breathe](breathe.readthedocs
 
 #### Clangd language server
 
-So I wanted to get nice code completion and such, so that's what clangd can help with, 
+For code completion and intellisense. It needs a `compile_commands.json` at top-level. generate with:
 
-#### Unit tests?
+```bash
+cmake -B build -DTESTS=1 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 .
+mv build/compile_commands.json .
+```
 
-Would be great to have like unit tests for most things
+#### Unit tests
+
+Unit tests with [`gtest`](https://google.github.io/googletest/quickstart-cmake.html) are included.
+
+To run:
+
+```bash
+cmake -B build -DTESTS=1 .
+cmake --build build -j
+./build/tests/src/unit_tests 
+```
 
 ## checking where `sb.` is called:
 

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.15...3.26)
 project(skmap_bindings LANGUAGES CXX)
 
+option(TESTS "Build unit tests" OFF)
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -27,11 +29,6 @@ find_package(OpenMP REQUIRED)
 
 message(STATUS "GDAL library: ${GDAL_LIBRARIES}")
 message(STATUS "GDAL headers: ${GDAL_INCLUDE_DIRS}")
-
-include_directories("${eigen_SOURCE_DIR}")
-include_directories("${GDAL_INCLUDE_DIRS}")
-include_directories(skmap/include)
-include_directories(skmap/src)
 
 include(CheckCXXCompilerFlag)
 
@@ -63,8 +60,6 @@ foreach(FLAG IN LISTS AVX512_CANDIDATES)
 endforeach()
 
 # Add all supported flags at once
-
-
 if(AVX512_FLAGS)
     # Always append -mfma when using AVX-512
     list(APPEND AVX512_FLAGS -mfma)
@@ -72,8 +67,46 @@ if(AVX512_FLAGS)
     message(STATUS "Final AVX-512 compile options: ${AVX512_FLAGS}")
 endif()
 
+# -------------------------
+# LIBRARIES AND EXECS
+# -------------------------
 
-set(SOURCES skmap/src/skmap_bindings.cpp skmap/src/ParArray.cpp skmap/src/io/IoArray.cpp skmap/src/transform/TransArray.cpp)
-pybind11_add_module(skmap_bindings ${SOURCES})
+# create a core library for tests and bindings
 
-target_link_libraries(skmap_bindings PRIVATE ${GDAL_LIBRARIES} OpenMP::OpenMP_CXX)
+# all sources EXCEPT bindings
+set(
+    SOURCES
+    skmap/src/ParArray.cpp skmap/src/io/IoArray.cpp
+    skmap/src/transform/TransArray.cpp
+)
+
+add_library(skmap STATIC ${SOURCES})
+# we need to tell the static library that it will become part of a shared library in the bindings
+set_target_properties(skmap PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
+target_include_directories(skmap PUBLIC
+    ${eigen_SOURCE_DIR}
+    ${GDAL_INCLUDE_DIRS}
+    skmap/include
+    skmap/src
+)
+target_link_libraries(skmap PUBLIC ${GDAL_LIBRARIES} OpenMP::OpenMP_CXX)
+if(AVX512_FLAGS)
+    target_compile_options(skmap PUBLIC ${AVX512_FLAGS})
+endif()
+
+# -------------------------
+# Python bindings
+# -------------------------
+
+set(BINDINGS_SOURCES skmap/src/skmap_bindings.cpp)
+pybind11_add_module(skmap_bindings ${BINDINGS_SOURCES})
+target_link_libraries(skmap_bindings PRIVATE skmap)
+
+# -------------------------
+# Tests
+# -------------------------
+if(TESTS)
+    enable_testing()
+    add_subdirectory(tests/src)
+endif()
