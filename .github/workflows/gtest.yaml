@@ -1,0 +1,25 @@
+name: GTest
+
+on:
+  push:
+    paths:
+      - 'skmap/src/**'
+      - 'skmap/include/**'
+      - 'tests/src/**'
+      - 'CMakeLists.txt'
+
+jobs:
+  gtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev build-essential
+      - name: run tests
+        run: |
+          cmake -B build -DTESTS=1 .
+          cmake --build build -j
+          ./build/tests/src/unit_tests
+      
