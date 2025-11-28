@@ -2,6 +2,7 @@ import yaml
 from types import SimpleNamespace
 from typing import Any, Dict
 from skmap.modeler import RFRegressor, RFRegressorTrees, Modeler, Regressor, Classifier, RFClassifier
+import os
 
 MODEL_REGISTRY = {
     'RFRegressor': RFRegressor,
@@ -82,6 +83,9 @@ def parse_config(yaml_path: str) -> SimpleNamespace:
     # 4. Recombine into the final configuration dictionary
     final_config_dict = base_config
     final_config_dict['models_params'] = processed_models
+
+    if final_config_dict['threads'] == "All":
+        final_config_dict['threads'] = os.cpu_count()
     
     final_config_dict['s3_addresses'] = [final_config_dict['gaia_template_url'].format(gaia_ip=gaia_ip) for gaia_ip in range(final_config_dict['gaia_start_ip'], final_config_dict['gaia_end_ip'])]
 
