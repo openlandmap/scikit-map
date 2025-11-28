@@ -1,6 +1,13 @@
 name: Python sphinx
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - 'skmap/**'
+      - 'tests/**'
+      - 'CMakeLists.txt'
+      - 'setup.py'
+      - 'pyproject.toml'
 
 jobs:
   doctest:
@@ -10,7 +17,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libproj-dev libgeos-dev gdal-bin libgdal-dev pandoc doxygen
+          sudo apt-get install -y libproj-dev libgeos-dev gdal-bin libgdal-dev pandoc doxygen build-essential
           gdal-config --version
       - name: Install the latest version of uv and set the python version
         uses: astral-sh/setup-uv@v7

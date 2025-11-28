@@ -1,6 +1,13 @@
-name: Python test
+name: PyTest
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+     - 'skmap/**'
+     - 'tests/**'
+     - 'CMakeLists.txt'
+     - 'setup.py'
+     - 'pyproject.toml'
 
 jobs:
   test:
