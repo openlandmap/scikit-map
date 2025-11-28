@@ -112,6 +112,7 @@ namespace skmap {
         }
 
         // Cleanup
+        GDALDestroyGenImgProjTransformer(psWarpOptions->pTransformerArg);
         GDALDestroyWarpOptions(psWarpOptions);
         GDALClose(mosaicDataset);
         GDALClose(dstDataset);
