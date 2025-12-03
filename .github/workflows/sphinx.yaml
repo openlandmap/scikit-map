@@ -3,8 +3,9 @@ name: Python sphinx
 on:
   push:
     paths:
+      - '.github/workflows/sphinx.yaml'
+      - 'docs/**'
       - 'skmap/**'
-      - 'tests/**'
       - 'CMakeLists.txt'
       - 'setup.py'
       - 'pyproject.toml'

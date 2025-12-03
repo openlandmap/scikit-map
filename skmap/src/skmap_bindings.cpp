@@ -273,16 +273,12 @@ void writeByteData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 
 /**
  * @defgroup mangling Data mangling
+ *
  * Functions for changing the shape of data for efficient parallel processing
+ *
+ * For canonical usage examples, see 
  * @{
  */
-void reorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
-                  Eigen::Ref<MatFloat> out_data,
-                  std::vector<std::vector<uint_t>> indices_matrix) {
-  TransArray transArray(data, n_threads);
-  transArray.reorderArray(out_data, indices_matrix);
-}
-
 void selArrayRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
                   std::vector<uint_t> row_select) {
@@ -309,6 +305,13 @@ void expandArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                      std::vector<uint_t> col_select) {
   TransArray transArray(data, n_threads);
   transArray.expandArrayCols(out_data, col_select);
+}
+
+void reorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
+                  Eigen::Ref<MatFloat> out_data,
+                  std::vector<std::vector<uint_t>> indices_matrix) {
+  TransArray transArray(data, n_threads);
+  transArray.reorderArray(out_data, indices_matrix);
 }
 
 void inverseReorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
