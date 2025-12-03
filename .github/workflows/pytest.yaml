@@ -3,6 +3,7 @@ name: PyTest
 on:
   push:
     paths:
+     - '.github/workflows/pytest.yaml'
      - 'skmap/**'
      - 'tests/**'
      - 'CMakeLists.txt'

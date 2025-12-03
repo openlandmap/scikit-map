@@ -1,4 +1,5 @@
 #include "transform/TransArray.h"
+#include <cstdio>
 #include <numeric>
 
 namespace skmap {
@@ -98,6 +99,36 @@ void TransArray::reorderArray(Eigen::Ref<MatFloat> out_data,
   this->parForRange(reorderArrayRow, out_data.rows());
 }
 
+void TransArray::transposeArray(Eigen::Ref<MatFloat> out_data) {
+  skmapAssertIfTrue((m_data.rows() != out_data.cols()) ||
+                        (m_data.cols() != out_data.rows()),
+                    "scikit-map ERROR 13: size of the new array does not match "
+                    "the transpose input array");
+  auto transposeArrayCol = [&](uint_t i) {
+    out_data.row(i) = m_data.col(i).transpose();
+  };
+  this->parForRange(transposeArrayCol, out_data.rows());
+}
+
+void TransArray::transposeReorderArray(
+    Eigen::Ref<MatFloat> out_data,
+    std::vector<std::vector<uint_t>> permutation_matrix) {
+  auto transposeReorderArrayRow = [&](uint_t i) {
+    std::cout<<"transposing "<<out_data.rows()<<"x"<<out_data.cols()<<" by "<<std::endl;
+    for (auto row: permutation_matrix){
+      for (auto perm: row)
+        std::cout<<perm<<" ";
+      std::cout<<std::endl;
+    }
+    out_data.row(permutation_matrix[i][0]) =
+        m_data
+            .block(permutation_matrix[i][1] * out_data.cols(),
+                   permutation_matrix[i][2], 1, out_data.cols())
+            .transpose();
+  };
+  this->parForRange(transposeReorderArrayRow, permutation_matrix.size());
+}
+
 void TransArray::inverseReorderArray(
     Eigen::Ref<MatFloat> out_data,
     std::vector<std::vector<uint_t>> indices_matrix) {
@@ -112,19 +143,6 @@ void TransArray::inverseReorderArray(
   this->parForRange(inverseReorderArrayCol, out_data.rows());
 }
 
-void TransArray::transposeReorderArray(
-    Eigen::Ref<MatFloat> out_data,
-    std::vector<std::vector<uint_t>> permutation_matrix) {
-  auto transposeReorderArrayRow = [&](uint_t i) {
-    out_data.row(permutation_matrix[i][0]) =
-        m_data
-            .block(permutation_matrix[i][1] * out_data.cols(),
-                   permutation_matrix[i][2], 1, out_data.cols())
-            .transpose();
-  };
-  this->parForRange(transposeReorderArrayRow, permutation_matrix.size());
-}
-
 void TransArray::selArrayRows(Eigen::Ref<MatFloat> out_data,
                               std::vector<uint_t> row_select) {
   skmapAssertIfTrue((row_select.size() != (uint_t)out_data.rows()),
@@ -136,15 +154,37 @@ void TransArray::selArrayRows(Eigen::Ref<MatFloat> out_data,
   this->parForRange(selArrayRow, out_data.rows());
 }
 
-void TransArray::extractArrayRows(Eigen::Ref<MatFloat> out_data,
-                                  std::vector<uint_t> row_select) {
-  skmapAssertIfTrue((row_select.size() > (uint_t)out_data.rows()),
-                    "scikit-map ERROR 35: size of the old array does not match "
+void TransArray::selArrayCols(Eigen::Ref<MatFloat> out_data,
+                              std::vector<uint_t> col_select) {
+  skmapAssertIfTrue((col_select.size() != (uint_t)out_data.cols()),
+                    "scikit-map ERROR 14: size of the new array does not match "
                     "the size of selected");
-  auto extractArrayRow = [&](uint_t i) {
-    out_data.row(i) = m_data.row(row_select[i]);
+  auto selArrayCol = [&](uint_t i) {
+    out_data.col(i) = m_data.col(col_select[i]);
   };
-  this->parForRange(extractArrayRow, row_select.size());
+  this->parForRange(selArrayCol, out_data.cols());
+}
+
+void TransArray::expandArrayRows(Eigen::Ref<MatFloat> out_data,
+                                 std::vector<uint_t> row_select) {
+  skmapAssertIfTrue((row_select.size() > (uint_t)m_data.rows()),
+                    "scikit-map ERROR 15: size of the old array does not match "
+                    "the size of selected");
+  auto expandArrayRow = [&](uint_t i) {
+    out_data.row(row_select[i]) = m_data.row(i);
+  };
+  this->parForRange(expandArrayRow, row_select.size());
+}
+
+void TransArray::expandArrayCols(Eigen::Ref<MatFloat> out_data,
+                                 std::vector<uint_t> col_select) {
+  skmapAssertIfTrue((col_select.size() > (uint_t)m_data.cols()),
+                    "scikit-map ERROR 15: size of the old array does not match "
+                    "the size of selected");
+  auto expandArrayCol = [&](uint_t i) {
+    out_data.col(col_select[i]) = m_data.col(i);
+  };
+  this->parForRange(expandArrayCol, col_select.size());
 }
 
 void TransArray::slidingWindowClassMode(Eigen::Ref<MatFloat> out_data,
@@ -182,27 +222,6 @@ void TransArray::slidingWindowClassMode(Eigen::Ref<MatFloat> out_data,
   this->parForRange(slidingWindowClassModeCol, m_data.cols());
 }
 
-void TransArray::expandArrayRows(Eigen::Ref<MatFloat> out_data,
-                                 std::vector<uint_t> row_select) {
-  skmapAssertIfTrue((row_select.size() > (uint_t)m_data.rows()),
-                    "scikit-map ERROR 15: size of the old array does not match "
-                    "the size of selected");
-  auto expandArrayRow = [&](uint_t i) {
-    out_data.row(row_select[i]) = m_data.row(i);
-  };
-  this->parForRange(expandArrayRow, row_select.size());
-}
-
-void TransArray::expandArrayCols(Eigen::Ref<MatFloat> out_data,
-                                 std::vector<uint_t> col_select) {
-  skmapAssertIfTrue((col_select.size() > (uint_t)m_data.cols()),
-                    "scikit-map ERROR 15: size of the old array does not match "
-                    "the size of selected");
-  auto expandArrayCol = [&](uint_t i) {
-    out_data.col(col_select[i]) = m_data.col(i);
-  };
-  this->parForRange(expandArrayCol, col_select.size());
-}
 
 void TransArray::blocksAverage(Eigen::Ref<MatFloat> in1,
                                Eigen::Ref<MatFloat> in2, uint_t n_pix,
@@ -249,28 +268,6 @@ void TransArray::elementwiseAverage(Eigen::Ref<MatFloat> in1,
          in2.block(row_start, 0, row_end - row_start, in2.cols()).array());
   };
   this->parChunk(elementwiseAverageChunk);
-}
-
-void TransArray::extractArrayCols(Eigen::Ref<MatFloat> out_data,
-                                  std::vector<uint_t> col_select) {
-  skmapAssertIfTrue((col_select.size() > (uint_t)out_data.cols()),
-                    "scikit-map ERROR 35: size of the old array does not match "
-                    "the size of selected");
-  auto extractArrayCol = [&](uint_t i) {
-    out_data.col(i) = m_data.col(col_select[i]);
-  };
-  this->parForRange(extractArrayCol, col_select.size());
-}
-
-void TransArray::selArrayCols(Eigen::Ref<MatFloat> out_data,
-                              std::vector<uint_t> col_select) {
-  skmapAssertIfTrue((col_select.size() != (uint_t)out_data.cols()),
-                    "scikit-map ERROR 14: size of the new array does not match "
-                    "the size of selected");
-  auto selArrayCol = [&](uint_t i) {
-    out_data.col(i) = m_data.col(col_select[i]);
-  };
-  this->parForRange(selArrayCol, out_data.cols());
 }
 
 void TransArray::swapRowsValues(std::vector<uint_t> row_select,
@@ -411,17 +408,6 @@ void TransArray::hadamardProduct(Eigen::Ref<MatFloat> in1,
         in2.block(row_start, 0, row_end - row_start, in2.cols()).array();
   };
   this->parChunk(hadamardProductChunk);
-}
-
-void TransArray::transposeArray(Eigen::Ref<MatFloat> out_data) {
-  skmapAssertIfTrue((m_data.rows() != out_data.cols()) ||
-                        (m_data.cols() != out_data.rows()),
-                    "scikit-map ERROR 13: size of the new array does not match "
-                    "the transpose input array");
-  auto transposeArrayCol = [&](uint_t i) {
-    out_data.row(i) = m_data.col(i).transpose();
-  };
-  this->parForRange(transposeArrayCol, out_data.rows());
 }
 
 void TransArray::computeNormalizedDifference(

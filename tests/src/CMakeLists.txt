@@ -1,3 +1,8 @@
+if(NOT CMAKE_BUILD_TYPE)
+    message(STATUS "Setting build to debug")
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+endif()
+
 # Enable CTest
 enable_testing()
 
@@ -15,6 +20,8 @@ FetchContent_MakeAvailable(googletest)
 # --- Add test executable ---
 add_executable(unit_tests
     test_warp_tile.cpp
+    io/test_io_array.cpp
+    transform/test_mangling.cpp
     # transform/test_mangling.cpp
     # add more test files here
 )

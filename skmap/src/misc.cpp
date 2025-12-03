@@ -37,7 +37,7 @@ inline void skmapAssertIfTrue(bool cond, std::string message) {
   if (cond) {
     std::cerr << message << std::endl;
     std::cout << message << std::endl;
-    assert(false);
+    throw std::runtime_error(message);
   }
 }
 
