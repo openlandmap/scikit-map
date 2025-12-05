@@ -130,9 +130,9 @@ html_theme_options = {
     "collapse_navigation": False,
     "icon_links": [
         {
-            "name": "GitLab",
+            "name": "Repo",
             "url": "https://github.com/openlandmap/scikit-map",
-            "icon": "fab fa-code-branch",
+            "icon": "fas fa-code-branch",
         }
     ],
     "external_links": [
