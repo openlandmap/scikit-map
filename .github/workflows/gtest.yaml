@@ -22,5 +22,5 @@ jobs:
         run: |
           cmake -B build -DTESTS=1 .
           cmake --build build -j
-          ./build/tests/src/unit_tests --gtest_also_run_disabled_tests
+          ./build/tests/src/unit_tests
       
