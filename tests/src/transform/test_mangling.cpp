@@ -1,47 +1,28 @@
+#include "../common.h"
+#include "misc.cpp"
 #include "transform/TransArray.h"
-#include <Eigen/Dense>
-#include <Eigen/Core>
-#include <gtest/gtest.h>
 #include <iostream>
 #include <stdexcept>
-#include <vector>
 
 using namespace skmap;
-
-const uint_t THREADS = 42;
-
-class TransArrayTest : public ::testing::Test {
-protected:
-    MatFloat input;
-
-    void SetUp() override {
-        input.resize(3,4);
-        // clang-format off
-        input <<
-            1.0,2.0,3.0,4.0,
-            5.0,6.0,7.0,8.0,
-            9.0,10.,11.,12.;
-        // clang-format on
-    }
-};
 
 TEST_F(TransArrayTest, ReorderArray) {
   // clang-format off
   MatFloat out(2,8);
   MatFloat expected(2,8);
   expected <<
-    1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,
-    9.0,10.,11.,12.,9.0,10.,11.,12.;
+    1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0, // 0,1
+    9.0,10.,11.,12.,9.0,10.,11.,12.; // 2,2
   // clang-format on
 
-  TransArray ta( input, THREADS);
-  ta.reorderArray(out, {{0,1},{2,2}});
+  TransArray ta(input, THREADS);
+  ta.reorderArray(out, {{0, 1}, {2, 2}});
 
-  std::cout<<"input\n"<<input<<std::endl;
-  std::cout<<"expected\n"<<expected<<std::endl;
-  std::cout<<"out\n"<<out<<std::endl;
+  std::cout << "input\n" << input << std::endl;
+  std::cout << "expected\n" << expected << std::endl;
+  std::cout << "out\n" << out << std::endl;
 
-  EXPECT_EQ(out,expected);
+  EXPECT_EQ(out, expected);
 }
 
 TEST_F(TransArrayTest, ReorderArrayThrowsOnInvalidSize) {
@@ -50,7 +31,7 @@ TEST_F(TransArrayTest, ReorderArrayThrowsOnInvalidSize) {
   MatFloat out(2,6);
   // clang-format on
   TransArray ta(input, THREADS);
-  EXPECT_THROW(ta.reorderArray(out, {{0,1},{2,2}}), std::runtime_error);
+  EXPECT_THROW(ta.reorderArray(out, {{0, 1}, {2, 2}}), std::runtime_error);
 }
 
 TEST_F(TransArrayTest, TransposeArray) {
@@ -69,7 +50,7 @@ TEST_F(TransArrayTest, TransposeArray) {
 }
 
 TEST_F(TransArrayTest, TransposeArrayThrowsOnInvalidSize) {
-  MatFloat out (5,3);
+  MatFloat out(5, 3);
   TransArray ta(input, THREADS);
   EXPECT_THROW(ta.transposeArray(out), std::runtime_error);
 }
@@ -95,9 +76,19 @@ TEST_F(TransArrayTest, DISABLED_TransposeReorderArray) {
   //   for (int j=0;j<2;j++)
   //     for (int p=8-i;p>0;p--)
   //       for (int q=2-j;q>0;q--)
-  //         std::cout<<"block "<<i<<j<<p<<q<<std::endl<<expected.block(i,j,p,q)<<std::endl;
+  //         std::cout<<"block
+  //         "<<i<<j<<p<<q<<std::endl<<expected.block(i,j,p,q)<<std::endl;
   TransArray ta(input, THREADS);
-  ta.transposeReorderArray(out, {{0,1},{2,2},{0,1},{2,2}});
+  ta.transposeReorderArray(out, {
+                                    {0, 0, 0},
+                                    {1, 0, 0},
+                                    {2, 0, 0},
+                                    {3, 0, 0},
+                                    {4, 0, 0},
+                                    {5, 0, 0},
+                                    {6, 0, 0},
+                                    {7, 0, 0},
+                                });
   EXPECT_EQ(out, expected);
 }
 
@@ -122,7 +113,7 @@ TEST_F(TransArrayTest, InverseReorderArray) {
   ta.transposeArray(trans);
   // reorder
   TransArray ra(trans, THREADS);
-  ra.inverseReorderArray(out, {{0,0},{0,1},{1,0}});
+  ra.inverseReorderArray(out, {{0, 0}, {0, 1}, {1, 0}});
 
   EXPECT_EQ(out, input);
 }
@@ -136,7 +127,7 @@ TEST_F(TransArrayTest, SelArrayRows) {
     9.0,10.,11.,12.;
   // clang-format on
   TransArray ta(input, THREADS);
-  ta.selArrayRows(out, {0,2});
+  ta.selArrayRows(out, {0, 2});
   EXPECT_EQ(out, expected);
 }
 
@@ -150,20 +141,13 @@ TEST_F(TransArrayTest, SelArrayCols) {
     10.,12.;
   // clang-format on
   TransArray ta(input, THREADS);
-  ta.selArrayCols(out, {1,3});
+  ta.selArrayCols(out, {1, 3});
   EXPECT_EQ(out, expected);
 }
 
 TEST_F(TransArrayTest, ExpandArrayRows) {
   // clang-format off
-  MatFloat out(5,4);
-  out <<
-    0.0,0.0,0.0,0.0,
-    0.0,0.0,0.0,0.0,
-    0.0,0.0,0.0,0.0,
-    0.0,0.0,0.0,0.0,
-    0.0,0.0,0.0,0.0
-  ;
+  MatFloat out = MatFloat::Zero(5,4);
   MatFloat expected(5,4);
   expected <<
     1.0,2.0,3.0,4.0, // 0
@@ -173,18 +157,13 @@ TEST_F(TransArrayTest, ExpandArrayRows) {
     5.0,6.0,7.0,8.0; // 4
   // clang-format on
   TransArray ta(input, THREADS);
-  ta.expandArrayRows(out, {0,4, 2});
+  ta.expandArrayRows(out, {0, 4, 2});
   EXPECT_EQ(out, expected);
 }
 
 TEST_F(TransArrayTest, ExpandArrayCols) {
   // clang-format off
-  MatFloat out(3,7);
-  out <<
-  // 0   1   2   3   4   5   6
-    0.0,0.0,0.0,0.0,0.0,0.0,0.0,
-    0.0,0.0,0.0,0.0,0.0,0.0,0.0,
-    0.0,0.0,0.0,0.0,0.0,0.0,0.0;
+  MatFloat out = MatFloat::Zero(3,7);
   MatFloat expected(3,7);
   expected <<
   // 0       2       1       3
@@ -194,6 +173,22 @@ TEST_F(TransArrayTest, ExpandArrayCols) {
     9.0,0.0,11.,0.0,10.,0.0,12.;
   // clang-format on
   TransArray ta(input, THREADS);
-  ta.expandArrayCols(out, {0,4, 2,6});
+  ta.expandArrayCols(out, {0, 4, 2, 6});
   EXPECT_EQ(out, expected);
+}
+
+TEST_F(TransArrayTest, copyVecInMatrixRow) {
+  // clang-format off
+  VecFloat vec(4);
+  vec <<
+    13.,14.,15.,16.;
+  MatFloat expected(3,4);
+  expected <<
+    1.0,2.0,3.0,4.0,
+    13.,14.,15.,16.,
+    9.0,10.,11.,12.;
+  //clang-format on
+  TransArray ta(input, THREADS);
+  ta.copyVecInMatrixRow(vec, 1);
+  EXPECT_EQ(input, expected);
 }

@@ -6,7 +6,7 @@
 using namespace skmap;
 
 TEST(Io, test_write_data) {
-  
+
   std::vector<std::string> file_names = {"test"};
   std::string base_folder = std::filesystem::temp_directory_path();
   int16_t nodata = -1;
@@ -34,5 +34,6 @@ TEST(Io, test_write_data) {
                     y_offset, x_size, y_size, GDT_Int16, -1, std::nullopt,
                     std::nullopt);
 
-  ASSERT_TRUE(std::filesystem::exists(base_folder + "/" + file_names[0] + ".tif"));
+  ASSERT_TRUE(
+      std::filesystem::exists(base_folder + "/" + file_names[0] + ".tif"));
 }

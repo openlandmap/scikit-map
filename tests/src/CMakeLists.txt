@@ -20,10 +20,10 @@ FetchContent_MakeAvailable(googletest)
 # --- Add test executable ---
 add_executable(unit_tests
     test_warp_tile.cpp
+    test_par_array.cpp
     io/test_io_array.cpp
     transform/test_mangling.cpp
-    # transform/test_mangling.cpp
-    # add more test files here
+    transform/test_manipulation.cpp
 )
 
 target_link_libraries(unit_tests
