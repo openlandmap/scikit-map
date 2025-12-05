@@ -96,21 +96,6 @@ map_t convPyMap(py::dict in_map) {
  */
 
 /**
- * @brief wrapper for `IoArray::extractOverlay`
- */
-void extractOverlay(Eigen::Ref<MatFloat> data, const uint_t n_threads,
-                    const std::vector<uint_t> pix_block_ids,
-                    const std::vector<uint_t> pix_inblock_idxs,
-                    const std::vector<uint_t> unique_blocks_ids_comb,
-                    const std::vector<uint_t> key_layer_ids_comb,
-                    Eigen::Ref<MatFloat> data_overlay) {
-  IoArray ioArray(data, n_threads);
-  ioArray.extractOverlay(pix_block_ids, pix_inblock_idxs,
-                         unique_blocks_ids_comb, key_layer_ids_comb,
-                         data_overlay);
-}
-
-/**
  * @brief see `IoArray::readData`
  */
 void readData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
@@ -168,6 +153,21 @@ void writeData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                           seaweed_path);
       },
       *no_data_variant);
+}
+
+/**
+ * @brief wrapper for `IoArray::extractOverlay`
+ */
+void extractOverlay(Eigen::Ref<MatFloat> data, const uint_t n_threads,
+                    const std::vector<uint_t> pix_block_ids,
+                    const std::vector<uint_t> pix_inblock_idxs,
+                    const std::vector<uint_t> unique_blocks_ids_comb,
+                    const std::vector<uint_t> key_layer_ids_comb,
+                    Eigen::Ref<MatFloat> data_overlay) {
+  IoArray ioArray(data, n_threads);
+  ioArray.extractOverlay(pix_block_ids, pix_inblock_idxs,
+                         unique_blocks_ids_comb, key_layer_ids_comb,
+                         data_overlay);
 }
 
 /**
@@ -276,9 +276,19 @@ void writeByteData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
  *
  * Functions for changing the shape of data for efficient parallel processing
  *
- * For canonical usage examples, see 
+ * For canonical usage examples, see [unit
+ * tests](https://github.com/openlandmap/scikit-map/blob/ci/tests/src/transform/test_mangling.cpp)
  * @{
  */
+
+/** @brief see `TransArray::copyVecInMatrixRow` */
+void copyVecInMatrixRow(Eigen::Ref<MatFloat> data, const uint_t n_threads,
+                        Eigen::Ref<VecFloat> in_vec, uint_t row_idx) {
+  TransArray transArray(data, n_threads);
+  transArray.copyVecInMatrixRow(in_vec, row_idx);
+}
+
+/** @brief see `TransArray::selArrayRows` */
 void selArrayRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
                   std::vector<uint_t> row_select) {
@@ -286,6 +296,7 @@ void selArrayRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   transArray.selArrayRows(out_data, row_select);
 }
 
+/** @brief see `TransArray::selArrayCols` */
 void selArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
                   std::vector<uint_t> col_select) {
@@ -293,6 +304,7 @@ void selArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   transArray.selArrayCols(out_data, col_select);
 }
 
+/** @brief see `TransArray::expandArrayRows` */
 void expandArrayRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                      Eigen::Ref<MatFloat> out_data,
                      std::vector<uint_t> row_select) {
@@ -300,6 +312,7 @@ void expandArrayRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   transArray.expandArrayRows(out_data, row_select);
 }
 
+/** @brief see `TransArray::expandArrayCols` */
 void expandArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                      Eigen::Ref<MatFloat> out_data,
                      std::vector<uint_t> col_select) {
@@ -307,6 +320,7 @@ void expandArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   transArray.expandArrayCols(out_data, col_select);
 }
 
+/** @brief see `TransArray::reorderArray` */
 void reorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
                   std::vector<std::vector<uint_t>> indices_matrix) {
@@ -314,13 +328,14 @@ void reorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   transArray.reorderArray(out_data, indices_matrix);
 }
 
-void inverseReorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
-                         Eigen::Ref<MatFloat> out_data,
-                         std::vector<std::vector<uint_t>> indices_matrix) {
+/** @brief simple transpose, see `TransArray::transposeArray` for details */
+void transposeArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
+                    Eigen::Ref<MatFloat> out_data) {
   TransArray transArray(data, n_threads);
-  transArray.inverseReorderArray(out_data, indices_matrix);
+  transArray.transposeArray(out_data);
 }
 
+/** @brief see `TransArray::transposeReorderArray` */
 void transposeReorderArray(
     Eigen::Ref<MatFloat> data, const uint_t n_threads,
     Eigen::Ref<MatFloat> out_data,
@@ -329,12 +344,13 @@ void transposeReorderArray(
   transArray.transposeReorderArray(out_data, permutation_matrix);
 }
 
-void transposeArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
-                    Eigen::Ref<MatFloat> out_data) {
+/** @brief see `TransArray::inverseReorderArray` */
+void inverseReorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
+                         Eigen::Ref<MatFloat> out_data,
+                         std::vector<std::vector<uint_t>> indices_matrix) {
   TransArray transArray(data, n_threads);
-  transArray.transposeArray(out_data);
+  transArray.inverseReorderArray(out_data, indices_matrix);
 }
-
 /** @} */ // endgroup mangling
 
 /**
@@ -363,11 +379,9 @@ void extractArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
  * @{
  */
 
-void swapRowsValues(Eigen::Ref<MatFloat> data, const uint_t n_threads,
-                    std::vector<uint_t> row_select, float_t value_to_mask,
-                    float_t new_value) {
+void fillArray(Eigen::Ref<MatFloat> data, const uint_t n_threads, float_t val) {
   TransArray transArray(data, n_threads);
-  transArray.swapRowsValues(row_select, value_to_mask, new_value);
+  transArray.fillArray(val);
 }
 
 void maskNan(Eigen::Ref<MatFloat> data, const uint_t n_threads,
@@ -391,12 +405,6 @@ void maskData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                       new_value_in_data);
 }
 
-void hadamardProduct(Eigen::Ref<MatFloat> out, const uint_t n_threads,
-                     Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2) {
-  TransArray transArray(out, n_threads);
-  transArray.hadamardProduct(in1, in2);
-}
-
 void maskDataRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   std::vector<uint_t> row_select, Eigen::Ref<MatFloat> mask,
                   float_t value_of_mask_to_mask, float_t new_value_in_data) {
@@ -405,9 +413,17 @@ void maskDataRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                           new_value_in_data);
 }
 
-void fillArray(Eigen::Ref<MatFloat> data, const uint_t n_threads, float_t val) {
+void swapRowsValues(Eigen::Ref<MatFloat> data, const uint_t n_threads,
+                    std::vector<uint_t> row_select, float_t value_to_mask,
+                    float_t new_value) {
   TransArray transArray(data, n_threads);
-  transArray.fillArray(val);
+  transArray.swapRowsValues(row_select, value_to_mask, new_value);
+}
+
+void hadamardProduct(Eigen::Ref<MatFloat> out, const uint_t n_threads,
+                     Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2) {
+  TransArray transArray(out, n_threads);
+  transArray.hadamardProduct(in1, in2);
 }
 
 void offsetAndScale(Eigen::Ref<MatFloat> data, const uint_t n_threads,
@@ -476,12 +492,6 @@ void castFloat64ToFloat32(
   for (uint_t i = 0; i < (uint_t)data.rows(); ++i) {
     out_data.row(i) = data.row(i).cast<float>();
   }
-}
-
-void copyVecInMatrixRow(Eigen::Ref<MatFloat> data, const uint_t n_threads,
-                        Eigen::Ref<VecFloat> in_vec, uint_t row_idx) {
-  TransArray transArray(data, n_threads);
-  transArray.copyVecInMatrixRow(in_vec, row_idx);
 }
 
 /** @} */ // endgroup manipulation

@@ -12,18 +12,18 @@ For reporting issues and making feature suggestions please refer to the [issue t
 
 ## Contributing code and documentation
 
+
+
 ### Initial setup
 
-1. Clone the repo: `git clone https://github.com/openlandmap/scikit-map.git`
+1. Clone the repo: `git clone git@github.com:openlandmap/scikit-map.git`
 2. Install dependencies (not needed if only contributing documentation):
-  - for the Python package: `pip install -e .[full,dev,docs] sphinx-autobuild` into a Python 3.6+ environment
-3. in the top-level directory, run `doxygen` to create xml documentation for `skmap_bindings`
-4. `sphinx-autobuild docs/ _build/ --watch xml/`
-5. If you change C++ documentation, in a separate terminal run `doxygen` again and it will auto-update.
+   - Documentation: `uv pip install .[full,dev,docs] sphinx-autobuild`
+   - Code: `uv` doesn't like editable installs with our setup, after the above, re-run: `pip install -e .[full,dev,docs]` into a Python 3.6+ environment
 
 This will ensure that a change to python files triggers a rebuild, as well as running `doxygen` again.
 
-### Development
+### Development: Git
 
 All changes to code and documentation should be made in a separate branch, created from an up-to-date local `main`. The **branch name** must refer a open issue (``i{ISSUE_ID}``):
 
@@ -76,6 +76,33 @@ Must be one of the following:
 
 Based on [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## Documentation
+
+`scikit-map` is a mixed Python/C++ project. It auto-builds documentation from Python and C++ docstrings.
+
+1. For Python documentation live-updates run
+   ```bash
+   sphinx-autobuild docs/ _build/ --watch xml/
+   ```
+3. in the top-level directory, run `doxygen` to create xml documentation for `skmap_bindings`
+
+5. If you change C++ documentation, in a separate terminal run `doxygen` again and it will auto-update.
+
+#### formatting
+
+Python code is formatted using ruff:
+
+```bash
+ruff format
+```
+
+C++ code is formatted with clang-format:
+
+```bash
+# specify directories to omit build directory
+find {skmap/,tests/} -iname "*.cpp" -o -iname "*.h" | xargs clang-format --verbose -i
+```
+
 ### Code conventions
 
 We strongly prefer to submit code to `scikit-map` with [type hints](https://docs.python.org/3/library/typing.html). Additionally, we support Python versions as low as 3.8 and no code that uses syntax introduced in later versions of Python (e.g. the walrus operator) will be accepted.
@@ -87,4 +114,4 @@ There are currently no style restrictions guidelines imposed upon code contribut
 We adthere to standard [semantic versioning](https://semver.org/). Since we release from `main` <!-- needs to be discussed -->
 all merge requests should be accompanied with a version increment and the responsibility for increasing the version number falls on the contributor merging a branch: when merging a request either increment the MINOR version and reset the PATCH version to zero (if the intent of the merge request is to add new features) or increment the PATCH version (if the merge request only contains bugfixes). When merging a branch made by another contributor (e.g. because they do not have the required permissions to do so) please confirm the intent of the merge request (i.e. which semver number needs to be incremented).
 
-When incrementing the version of `scikit-map` it is enough to write the version change into [`__init__.py`](./skmap/__init__.py) in the appropriate branch.
+When incrementing the version of `scikit-map` it is enough to write the version change into [`pyproject.toml`](./pyproject.toml) in the appropriate branch.

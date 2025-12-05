@@ -19,9 +19,9 @@ FetchContent_MakeAvailable(googletest)
 
 # --- Add test executable ---
 add_executable(unit_tests
-    test_warp_tile.cpp
     test_par_array.cpp
     io/test_io_array.cpp
+    io/test_warp_tile.cpp
     transform/test_mangling.cpp
     transform/test_manipulation.cpp
 )

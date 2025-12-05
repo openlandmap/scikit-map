@@ -114,12 +114,6 @@ void TransArray::transposeReorderArray(
     Eigen::Ref<MatFloat> out_data,
     std::vector<std::vector<uint_t>> permutation_matrix) {
   auto transposeReorderArrayRow = [&](uint_t i) {
-    std::cout<<"transposing "<<out_data.rows()<<"x"<<out_data.cols()<<" by "<<std::endl;
-    for (auto row: permutation_matrix){
-      for (auto perm: row)
-        std::cout<<perm<<" ";
-      std::cout<<std::endl;
-    }
     out_data.row(permutation_matrix[i][0]) =
         m_data
             .block(permutation_matrix[i][1] * out_data.cols(),
@@ -222,7 +216,6 @@ void TransArray::slidingWindowClassMode(Eigen::Ref<MatFloat> out_data,
   this->parForRange(slidingWindowClassModeCol, m_data.cols());
 }
 
-
 void TransArray::blocksAverage(Eigen::Ref<MatFloat> in1,
                                Eigen::Ref<MatFloat> in2, uint_t n_pix,
                                uint_t y) {
@@ -301,12 +294,12 @@ void TransArray::maskNanRows(std::vector<uint_t> row_select,
 }
 
 void TransArray::maskData(std::vector<uint_t> row_select,
-                          Eigen::Ref<MatFloat> mask,
+                          Eigen::Ref<MatFloat> masks,
                           float_t value_of_mask_to_mask,
                           float_t new_value_in_data) {
   auto maskDataRow = [&](uint_t i) {
     m_data.row(row_select[i]) =
-        (mask.row(i).array() == value_of_mask_to_mask)
+        (masks.row(i).array() == value_of_mask_to_mask)
             .select(new_value_in_data, m_data.row(row_select[i]));
   };
   this->parForRange(maskDataRow, row_select.size());
@@ -327,6 +320,42 @@ void TransArray::maskDataRows(std::vector<uint_t> row_select,
 void TransArray::fillArray(float_t val) {
   auto fillArrayRow = [&](uint_t i) { m_data.row(i).array() = val; };
   this->parForRange(fillArrayRow, m_data.rows());
+}
+
+void TransArray::hadamardProduct(Eigen::Ref<MatFloat> in1,
+                                 Eigen::Ref<MatFloat> in2) {
+  auto hadamardProductChunk = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start,
+                                  uint_t row_end) {
+    chunk.array() =
+        in1.block(row_start, 0, row_end - row_start, in1.cols()).array() *
+        in2.block(row_start, 0, row_end - row_start, in2.cols()).array();
+  };
+  this->parChunk(hadamardProductChunk);
+}
+
+void TransArray::offsetAndScale(float_t offset, float_t scaling) {
+  auto offsetAndScaleChunk = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start,
+                                 uint_t row_end) {
+    chunk.array() = (chunk.array() + offset) * scaling;
+  };
+  this->parChunk(offsetAndScaleChunk);
+}
+
+void TransArray::scaleAndOffset(float_t offset, float_t scaling) {
+  auto scaleAndOffsetChunk = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start,
+                                 uint_t row_end) {
+    chunk.array() = chunk.array() * scaling + offset;
+  };
+  this->parChunk(scaleAndOffsetChunk);
+}
+
+void TransArray::offsetsAndScales(std::vector<uint_t> row_select,
+                                  Eigen::Ref<VecFloat> offsets,
+                                  Eigen::Ref<VecFloat> scalings) {
+  auto offsetsAndScalesRow = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
+    row = (row.array() + offsets(row_select[i])) * scalings(row_select[i]);
+  };
+  this->parRowPerm(offsetsAndScalesRow, row_select);
 }
 
 void TransArray::texturesBwTransform(Eigen::Ref<MatFloat> texture_2, float_t k,
@@ -397,17 +426,6 @@ void TransArray::fitPercentage(Eigen::Ref<MatFloat> in1,
          in2.block(row_start, 0, row_end - row_start, in2.cols()).array() + 1.);
   };
   this->parChunk(fitPercentageChunk);
-}
-
-void TransArray::hadamardProduct(Eigen::Ref<MatFloat> in1,
-                                 Eigen::Ref<MatFloat> in2) {
-  auto hadamardProductChunk = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start,
-                                  uint_t row_end) {
-    chunk.array() =
-        in1.block(row_start, 0, row_end - row_start, in1.cols()).array() *
-        in2.block(row_start, 0, row_end - row_start, in2.cols()).array();
-  };
-  this->parChunk(hadamardProductChunk);
 }
 
 void TransArray::computeNormalizedDifference(
@@ -806,31 +824,6 @@ void TransArray::fitProbabilities(Eigen::Ref<MatFloat> out_data,
     applyPermutation(out_chunk, perm_matrix, true);
   };
   this->parChunk(fitProbabilitiesChunk);
-}
-
-void TransArray::offsetAndScale(float_t offset, float_t scaling) {
-  auto offsetAndScaleChunk = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start,
-                                 uint_t row_end) {
-    chunk.array() = (chunk.array() + offset) * scaling;
-  };
-  this->parChunk(offsetAndScaleChunk);
-}
-
-void TransArray::offsetsAndScales(std::vector<uint_t> row_select,
-                                  Eigen::Ref<VecFloat> offsets,
-                                  Eigen::Ref<VecFloat> scalings) {
-  auto offsetsAndScalesRow = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
-    row = (row.array() + offsets(row_select[i])) * scalings(row_select[i]);
-  };
-  this->parRowPerm(offsetsAndScalesRow, row_select);
-}
-
-void TransArray::scaleAndOffset(float_t offset, float_t scaling) {
-  auto scaleAndOffsetChunk = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start,
-                                 uint_t row_end) {
-    chunk.array() = chunk.array() * scaling + offset;
-  };
-  this->parChunk(scaleAndOffsetChunk);
 }
 
 void TransArray::maskDifference(float_t diff_th, uint_t count_th,

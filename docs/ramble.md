@@ -26,6 +26,8 @@ The design of RichDEM is guided by these principles:
 
 ## making documentation
 
+
+
 Index: what is this library? is it the right fit for me?
 
 ### Quickstart
@@ -123,6 +125,12 @@ Integration with sphinx documentation is done with [Breathe](breathe.readthedocs
       - spectral indices
         - computeBla
       
+#### formatting
+
+```bash
+# specify directories to omit build directory
+find {skmap/,tests/} -iname "*.cpp" -o -iname "*.h" | xargs clang-format --verbose -i
+```
 
 #### Clangd language server
 
@@ -140,10 +148,33 @@ Unit tests with [`gtest`](https://google.github.io/googletest/quickstart-cmake.h
 To run:
 
 ```bash
-cmake -B build -DTESTS=1 .
-cmake --build build -j
-./build/tests/src/unit_tests 
+cmake -B build -DTESTS=1 . # only have to run once
+cmake --build build -j && ./build/tests/src/unit_tests 
 ```
+
+Some long-running tests have been disabled, to run those:
+
+```bash
+cmake --build build -j && ./build/tests/src/unit_tests --gtest_also_run_disabled_tests
+```
+
+##### Uglyness
+
+mangling:
+
+- `inverseReorderArray` does not apply a transpose
+  - ask, this is weird and in the python code, no separate transpose is applied
+- `transposeReorderArray` is weird, I could not get it to work and the code looks broken
+  - probably the working version did not get committed -> fix
+
+manipulation:
+
+- `maskData` and `maskDataRows` are semantically opposite to `maskNan`:  
+  In ??all?? other functions, `functionName` works on rows, and `functionNameRows` allows to change the input data per row. (`maskNan`)
+  - swap `maskData` and `maskDataRows` meanings?
+- `offsetAndScales` uses offsets and scales from data row index in stead of row_sel index
+  - make it match `functionNameRows`-type behaviour
+- Then also the `Rows` in `swapRowsValues` is weird, rename to `swapValues`?
 
 ## checking where `sb.` is called:
 
