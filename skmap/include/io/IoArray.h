@@ -11,29 +11,6 @@ public:
   IoArray(Eigen::Ref<MatFloat> data, const uint_t n_threads);
 
   /**
-   * @ingroup io
-   * @brief Warp a single-band mosaic to match a reference tile.
-   *
-   * @deprecated This function is deprecated. Use GDAL VRTs instead, which
-   * provide on-the-fly mosaicking and warping, support multiple bands, and
-   * avoid loading full rasters into memory.
-   *
-   * @param ref_tile_path  File path to reference raster tile.
-   * @param mosaic_path    File path to mosaic raster.
-   * @param resample       Resampling method ("nearest", "bilinear", etc.)
-   *
-   * @details
-   * This function opens the reference tile and mosaic, computes the target
-   * dimensions, sets up GDALWarpOptions, and performs an in-memory warp
-   * to match the reference. The resulting raster is read into `m_data`.
-   *
-   * @note Only works for single-band float32 rasters.
-   */
-  [[deprecated("Use GDAL VRTs instead of warpTile")]]
-  void warpTile(std::string ref_tile_path, std::string mosaic_path,
-                std::string resample);
-
-  /**
    * @brief Reads a portion of a raster dataset into a row buffer.
    *
    * This function opens a raster dataset using GDAL, reads a rectangular
@@ -114,68 +91,6 @@ public:
                 std::vector<int> bands_list,
                 std::optional<float_t> value_to_mask,
                 std::optional<float_t> value_to_set);
-
-  void readDataBlocks(std::vector<std::string> file_locs,
-                      std::vector<uint_t> perm_vec,
-                      std::vector<uint_t> x_off_vec,
-                      std::vector<uint_t> y_off_vec,
-                      std::vector<uint_t> x_size_vec,
-                      std::vector<uint_t> y_size_vec, GDALDataType read_type,
-                      std::vector<int> bands_list,
-                      std::optional<std::vector<float_t>> value_to_mask_vec,
-                      std::optional<float_t> value_to_set);
-
-  /**
-   * @brief Initialize GDAL with custom configuration options and error
-   * handling.
-   *
-   * Sets GDAL runtime options from the input dictionary, registers all GDAL
-   * drivers, and configures error logging to suppress console output if
-   * possible.
-   *
-   * @param dict Dictionary of GDAL configuration options (key-value pairs)
-   * where keys and values are strings recognized by GDAL.
-   *
-   * @details
-   * Each key-value pair in `dict` is applied via CPLSetConfigOption().
-   * GDALAllRegister() is called to ensure all drivers are available. Error
-   * logging is redirected to "/dev/null" if possible; otherwise, a quiet error
-   * handler is used to suppress warnings and errors.
-   *
-   * @note This function modifies global GDAL state and should be called before
-   * performing any GDAL I/O operations. All Python-exposed functions call it
-   * already.
-   */
-  void setupGdal(dict_t dict);
-
-  void getLatLonArray(std::string file_loc, uint_t x_off, uint_t y_off,
-                      uint_t x_size, uint_t y_size);
-
-  /**
-   * @ingroup io
-   * @brief Extract overlay values from raster blocks for a set of points.
-   *
-   * For each pixel (given by `pix_block_ids` and `pix_inblock_idxs`),
-   * this function finds the matching block and copies the corresponding
-   * raster values from `m_data` into `data_overlay`.
-   *
-   * The operation is parallelized across pixels.
-   *
-   * @param pix_block_ids Vector of block IDs corresponding to each pixel.
-   * @param pix_inblock_idxs Vector of linear indices of each pixel within its
-   * block.
-   * @param unique_blocks_ids_comb Vector of all unique block IDs for the
-   * current chunk.
-   * @param key_layer_ids_comb Vector of layer indices corresponding to each
-   * block-layer combination.
-   * @param data_overlay Output array (layers x pixels) where extracted values
-   * will be stored.
-   */
-  void extractOverlay(std::vector<uint_t> pix_block_ids,
-                      std::vector<uint_t> pix_inblock_idxs,
-                      std::vector<uint_t> unique_blocks_ids_comb,
-                      std::vector<uint_t> key_layer_ids_comb,
-                      Eigen::Ref<MatFloat> data_overlay);
 
   /**
    * @ingroup io
@@ -314,6 +229,90 @@ public:
     this->parRowPerm(writeTiff, data_indices);
   }
 };
+
+/**
+ * @ingroup io
+ * @brief Extract overlay values from raster blocks for a set of points.
+ *
+ * For each pixel (given by `pix_block_ids` and `pix_inblock_idxs`),
+ * this function finds the matching block and copies the corresponding
+ * raster values from `m_data` into `data_overlay`.
+ *
+ * The operation is parallelized across pixels.
+ *
+ * @param pix_block_ids Vector of block IDs corresponding to each pixel.
+ * @param pix_inblock_idxs Vector of linear indices of each pixel within its
+ * block.
+ * @param unique_blocks_ids_comb Vector of all unique block IDs for the
+ * current chunk.
+ * @param key_layer_ids_comb Vector of layer indices corresponding to each
+ * block-layer combination.
+ * @param data_overlay Output array (layers x pixels) where extracted values
+ * will be stored.
+ */
+void extractOverlay(std::vector<uint_t> pix_block_ids,
+                    std::vector<uint_t> pix_inblock_idxs,
+                    std::vector<uint_t> unique_blocks_ids_comb,
+                    std::vector<uint_t> key_layer_ids_comb,
+                    Eigen::Ref<MatFloat> data_overlay);
+
+void getLatLonArray(std::string file_loc, uint_t x_off, uint_t y_off,
+                    uint_t x_size, uint_t y_size);
+
+/**
+ * @ingroup io
+ * @brief Warp a single-band mosaic to match a reference tile.
+ *
+ * @deprecated This function is deprecated. Use GDAL VRTs instead, which
+ * provide on-the-fly mosaicking and warping, support multiple bands, and
+ * avoid loading full rasters into memory.
+ *
+ * @param ref_tile_path  File path to reference raster tile.
+ * @param mosaic_path    File path to mosaic raster.
+ * @param resample       Resampling method ("nearest", "bilinear", etc.)
+ *
+ * @details
+ * This function opens the reference tile and mosaic, computes the target
+ * dimensions, sets up GDALWarpOptions, and performs an in-memory warp
+ * to match the reference. The resulting raster is read into `m_data`.
+ *
+ * @note Only works for single-band float32 rasters.
+ */
+[[deprecated("Use GDAL VRTs instead of warpTile")]]
+void warpTile(std::string ref_tile_path, std::string mosaic_path,
+              std::string resample);
+
+void readDataBlocks(std::vector<std::string> file_locs,
+                    std::vector<uint_t> perm_vec, std::vector<uint_t> x_off_vec,
+                    std::vector<uint_t> y_off_vec,
+                    std::vector<uint_t> x_size_vec,
+                    std::vector<uint_t> y_size_vec, GDALDataType read_type,
+                    std::vector<int> bands_list,
+                    std::optional<std::vector<float_t>> value_to_mask_vec,
+                    std::optional<float_t> value_to_set);
+
+/**
+ * @brief Initialize GDAL with custom configuration options and error
+ * handling.
+ *
+ * Sets GDAL runtime options from the input dictionary, registers all GDAL
+ * drivers, and configures error logging to suppress console output if
+ * possible.
+ *
+ * @param dict Dictionary of GDAL configuration options (key-value pairs)
+ * where keys and values are strings recognized by GDAL.
+ *
+ * @details
+ * Each key-value pair in `dict` is applied via CPLSetConfigOption().
+ * GDALAllRegister() is called to ensure all drivers are available. Error
+ * logging is redirected to "/dev/null" if possible; otherwise, a quiet error
+ * handler is used to suppress warnings and errors.
+ *
+ * @note This function modifies global GDAL state and should be called before
+ * performing any GDAL I/O operations. All Python-exposed functions call it
+ * already.
+ */
+void setupGdal(dict_t dict);
 
 } // namespace skmap
 

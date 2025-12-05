@@ -4,6 +4,7 @@
 using namespace skmap;
 
 TEST(LegacyIo, DISABLED_WarpTile) {
+  // mosaic file to load data from
   std::string mosaic_path = "https://s3.openlandmap.org/arco/"
                             "wv_mcd19a2v061.seasconv.sd.yearly_p50_1km_s_"
                             "20000101_20001231_go_epsg.4326_v20230619.tif";
@@ -13,11 +14,15 @@ TEST(LegacyIo, DISABLED_WarpTile) {
   // tests/<this file> -> parent() == tests, parent().parent() == repo root
   std::filesystem::path repo_root =
       src_path.parent_path().parent_path().parent_path();
+
+  // file to match layout of
   std::filesystem::path ref_rel = repo_root / "skmap" / "data" / "toy" /
                                   "swir1" /
                                   "swir1_landsat.ard1_p50_30m_s_20141202_"
                                   "20150320_nl_epsg.3035_v20230720.tif";
   std::string ref_tile_path = ref_rel.string();
+
+  // resampling parameters
   std::string resample = "GRA_CubicSpline";
   uint_t n_threads = 1;
   dict_t conf_GDAL;
@@ -31,10 +36,14 @@ TEST(LegacyIo, DISABLED_WarpTile) {
   uint_t x_offset = 0;
   uint_t y_offset = 0;
   uint_t n_pix = x_size * y_size;
+
+  // create out array and warp
   MatFloat data(1, n_pix);
   IoArray ioArray(data, n_threads);
   ioArray.setupGdal(conf_GDAL);
   ioArray.warpTile(ref_tile_path, mosaic_path, resample);
+
+  // test some values
   ASSERT_FLOAT_EQ(data(0, 0), 314.435);
   ASSERT_FLOAT_EQ(data(0, 255), 241.68356);
   ASSERT_FLOAT_EQ(data(0, 100 * 256), 297.15668);

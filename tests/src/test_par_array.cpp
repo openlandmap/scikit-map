@@ -1,28 +1,25 @@
-#include "common.h"
 #include "ParArray.h"
+#include "common.h"
 #include "misc.cpp"
 #include <gtest/gtest.h>
 
 class ParArrayHelper : public ParArray {
-  public:
-    using ParArray::m_data;
-    ParArrayHelper(Eigen::Ref<MatFloat> data, const uint_t n_threads) : ParArray(data, n_threads) {}
+public:
+  using ParArray::m_data;
+  ParArrayHelper(Eigen::Ref<MatFloat> data, const uint_t n_threads)
+      : ParArray(data, n_threads) {}
 
-    /// Most boringest function ever; fills rows with index
-    void testParForRangeRows() {
-      auto f = [&](uint_t i) {
-        m_data.row(i).fill(i);
-      };
-      this->parForRange(f, m_data.rows());
-    }
+  /// Most boringest function ever; fills rows with index
+  void testParForRangeRows() {
+    auto f = [&](uint_t i) { m_data.row(i).fill(i); };
+    this->parForRange(f, m_data.rows());
+  }
 
-    /// Most boringest function ever; fills cols with index
-    void testParForRangeCols() {
-      auto f = [&](uint_t i) {
-        m_data.col(i).fill(i);
-      };
-      this->parForRange(f, m_data.cols());
-    }
+  /// Most boringest function ever; fills cols with index
+  void testParForRangeCols() {
+    auto f = [&](uint_t i) { m_data.col(i).fill(i); };
+    this->parForRange(f, m_data.cols());
+  }
 };
 
 TEST_F(TransArrayTest, parForRange) {
@@ -40,7 +37,7 @@ TEST_F(TransArrayTest, parForRange) {
   // clang-format on
 
   ParArrayHelper pa(input, THREADS);
-  
+
   pa.testParForRangeRows();
   EXPECT_EQ(input, expect_rows);
 

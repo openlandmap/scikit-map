@@ -87,7 +87,7 @@ TEST_F(TransArrayTest, swapRowsValues) {
   // clang-format on
   MatFloat same = input;
   TransArray ta(input, THREADS);
-  ta.swapRowsValues({1,2}, 1.0, 5.0);
+  ta.swapRowsValues({1, 2}, 1.0, 5.0);
   EXPECT_EQ(input, same);
   ta.swapRowsValues({0}, 1.0, 5.0);
   EXPECT_EQ(input, expected);
