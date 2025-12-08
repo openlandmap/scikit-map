@@ -41,14 +41,14 @@ public:
 
     auto f_out = [&](uint_t i) {
       uint_t row_start = i * (a + 1);
-      uint_t chuck_size = 0;
+      uint_t chunk_size = 0;
       if (i >= c) {
-        chuck_size = a;
+        chunk_size = a;
         row_start = (uint_t)((float_t)row_start - (float_t)i + (float_t)c);
       } else
-        chuck_size = a + 1;
-      uint_t row_end = row_start + chuck_size;
-      if (chuck_size > 0)
+        chunk_size = a + 1;
+      uint_t row_end = row_start + chunk_size;
+      if (chunk_size > 0)
         f_in(m_data.block(row_start, 0, row_end - row_start, m_data.cols()),
              row_start, row_end);
     };
