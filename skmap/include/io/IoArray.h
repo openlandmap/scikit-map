@@ -228,7 +228,6 @@ public:
     };
     this->parRowPerm(writeTiff, data_indices);
   }
-};
 
 /**
  * @ingroup io
@@ -313,6 +312,8 @@ void readDataBlocks(std::vector<std::string> file_locs,
  * already.
  */
 void setupGdal(dict_t dict);
+
+}; // IoArray
 
 } // namespace skmap
 
