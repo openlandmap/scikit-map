@@ -18,9 +18,9 @@ TEST_F(TransArrayTest, ReorderArray) {
   TransArray ta(input, THREADS);
   ta.reorderArray(out, {{0, 1}, {2, 2}});
 
-  std::cout << "input\n" << input << std::endl;
-  std::cout << "expected\n" << expected << std::endl;
-  std::cout << "out\n" << out << std::endl;
+  // std::cout << "input\n" << input << std::endl;
+  // std::cout << "expected\n" << expected << std::endl;
+  // std::cout << "out\n" << out << std::endl;
 
   EXPECT_EQ(out, expected);
 }

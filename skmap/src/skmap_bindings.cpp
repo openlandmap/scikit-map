@@ -379,17 +379,20 @@ void extractArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
  * @{
  */
 
+/** @brief see `TransArray::fillArray` */
 void fillArray(Eigen::Ref<MatFloat> data, const uint_t n_threads, float_t val) {
   TransArray transArray(data, n_threads);
   transArray.fillArray(val);
 }
 
+/** @brief see `TransArray::maskNan` */
 void maskNan(Eigen::Ref<MatFloat> data, const uint_t n_threads,
              std::vector<uint_t> row_select, float_t new_value_in_data) {
   TransArray transArray(data, n_threads);
   transArray.maskNan(row_select, new_value_in_data);
 }
 
+/** @brief see `TransArray::maskNanRows` */
 void maskNanRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                  std::vector<uint_t> row_select,
                  Eigen::Ref<VecFloat> new_value_vec) {
@@ -397,6 +400,7 @@ void maskNanRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   transArray.maskNanRows(row_select, new_value_vec);
 }
 
+/** @brief see `TransArray::maskData` */
 void maskData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
               std::vector<uint_t> row_select, Eigen::Ref<MatFloat> mask,
               float_t value_of_mask_to_mask, float_t new_value_in_data) {
@@ -405,6 +409,7 @@ void maskData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                       new_value_in_data);
 }
 
+/** @brief see `TransArray::maskDataRows` */
 void maskDataRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   std::vector<uint_t> row_select, Eigen::Ref<MatFloat> mask,
                   float_t value_of_mask_to_mask, float_t new_value_in_data) {
@@ -413,6 +418,7 @@ void maskDataRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                           new_value_in_data);
 }
 
+/** @brief see `TransArray::swapRowsValues` */
 void swapRowsValues(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     std::vector<uint_t> row_select, float_t value_to_mask,
                     float_t new_value) {
@@ -420,24 +426,28 @@ void swapRowsValues(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   transArray.swapRowsValues(row_select, value_to_mask, new_value);
 }
 
+/** @brief see `TransArray::hadamardProduct` */
 void hadamardProduct(Eigen::Ref<MatFloat> out, const uint_t n_threads,
                      Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2) {
   TransArray transArray(out, n_threads);
   transArray.hadamardProduct(in1, in2);
 }
 
+/** @brief see `TransArray::offsetAndScale` */
 void offsetAndScale(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     float_t offset, float_t scaling) {
   TransArray transArray(data, n_threads);
   transArray.offsetAndScale(offset, scaling);
 }
 
+/** @brief see `TransArray::scaleAndOffset` */
 void scaleAndOffset(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     float_t offset, float_t scaling) {
   TransArray transArray(data, n_threads);
   transArray.scaleAndOffset(offset, scaling);
 }
 
+/** @brief see `TransArray::offsetsAndScales` */
 void offsetsAndScales(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                       std::vector<uint_t> row_select,
                       Eigen::Ref<VecFloat> offsets,
@@ -446,6 +456,15 @@ void offsetsAndScales(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   transArray.offsetsAndScales(row_select, offsets, scalings);
 }
 
+/**
+ * @brief Cast a `float` array to a `double` array
+ *
+ * Will error on a size mismatch
+ *
+ * @param data Input data
+ * @param n_threads number of threads to use
+ * @param out_data output array
+ */
 void castFloat32ToFloat64(
     Eigen::Ref<
         Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
@@ -470,6 +489,15 @@ void castFloat32ToFloat64(
   }
 }
 
+/**
+ * @brief Cast a `double` array to a `float` array
+ *
+ * Will error on a size mismatch
+ *
+ * @param data Input data
+ * @param n_threads number of threads to use
+ * @param out_data output array
+ */
 void castFloat64ToFloat32(
     Eigen::Ref<
         Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
@@ -545,6 +573,7 @@ void texturesBwTransform(Eigen::Ref<MatFloat> texture_1, const uint_t n_threads,
   transArray.texturesBwTransform(texture_2, k, a, sand, silt, clay);
 }
 
+/** @brief see `TransArray::nanMean` */
 void nanMean(Eigen::Ref<MatFloat> data, const uint_t n_threads,
              Eigen::Ref<VecFloat> out_data) {
   TransArray transArray(data, n_threads);
