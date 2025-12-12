@@ -274,6 +274,14 @@ public:
 
   void fitPercentage(Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2);
 
+  /**
+   * @ingroup processing
+   * @brief Computes the per-row mean of non-Nan values
+   *
+   * Processes chunks in parallel
+   *
+   * @param out_data Vec of rows length
+   */
   void nanMean(Eigen::Ref<VecFloat> out_data);
 
   void computeMannKendallPValues(Eigen::Ref<VecFloat> out_data);

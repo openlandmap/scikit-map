@@ -4,8 +4,8 @@ C++ API
 
 Fast code in skmap is written in C++ and exposed to Python with thin wrappers. This is a lower-level api. All Python-exposed functions handle setting up GDAL and then call a function on an array class.
 
-IO Group
-========
+Input-Output
+============
 
 .. doxygengroup:: io
    :project: skmap_bindings
