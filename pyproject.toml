@@ -49,6 +49,7 @@ dev = [
   "pytest",
   "pytest-cov",
   "ipython",
+  "ruff",
 ]
 docs = [
   "sphinx",
@@ -69,3 +70,6 @@ docs = [
 [tool.setuptools.packages.find]
 include = ["skmap*"]
 where = ["."]
+
+[tool.ruff.lint]
+extend-select = ["ANN"]
