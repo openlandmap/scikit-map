@@ -1,31 +1,21 @@
+import hashlib
+import itertools
+from pathlib import Path
 from typing import List, Union
-import os
+
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import rasterio
-import geopandas as gpd
-from shapely.geometry import Point
-from shapely import box
-from pathlib import Path
-from skmap import parallel
-from skmap.misc import ttprint
-from skmap.catalog import DataCatalog, run_whales
-import skmap_bindings as sb
-import hashlib
-import itertools
 import requests
+import skmap_bindings as sb
+from shapely import box
+from shapely.geometry import Point
 
-n_threads = os.cpu_count()
-os.environ["OMPI_MCA_rmaps_base_oversubscribe"] = "1"
-os.environ["USE_PYGEOS"] = "0"
-os.environ["PROJ_LIB"] = "/opt/conda/share/proj/"
-os.environ["NUMEXPR_MAX_THREADS"] = f"{n_threads}"
-os.environ["NUMEXPR_NUM_THREADS"] = f"{n_threads}"
-os.environ["OMP_THREAD_LIMIT"] = f"{n_threads}"
-os.environ["OMP_NUM_THREADS"] = f"{n_threads}"
-os.environ["OPENBLAS_NUM_THREADS"] = f"{n_threads}"
-os.environ["MKL_NUM_THREADS"] = f"{n_threads}"
-os.environ["VECLIB_MAXIMUM_THREADS"] = f"{n_threads}"
+import skmap.set_env  # noqa: F401
+from skmap import parallel
+from skmap.catalog import DataCatalog, run_whales
+from skmap.misc import ttprint
 
 
 class _ParallelOverlay:
@@ -37,17 +27,17 @@ class _ParallelOverlay:
         self,
         points_x: np.ndarray,
         points_y: np.ndarray,
-        raster_files: List[str],
+        raster_files: str,
         points_crs: None,
-        raster_tiles: Union[gpd.GeoDataFrame, str] = None,
-        tile_id_col: Union[str] = "tile_id",
+        raster_tiles: gpd.GeoDataFrame | str = None,
+        tile_id_col: str = "tile_id",
         n_threads: int = parallel.CPU_COUNT,
         verbose: bool = True,
-    ):
-        self.verbose = verbose
+    ) -> None:
+        self.verbose: bool = verbose
 
-        self.default_tile_id = ""
-        self.tile_id_col = tile_id_col
+        self.default_tile_id: str = ""
+        self.tile_id_col: str = tile_id_col
 
         if raster_tiles is not None:
             if not isinstance(raster_tiles, gpd.GeoDataFrame):
@@ -57,7 +47,7 @@ class _ParallelOverlay:
 
             self.default_tile_id = raster_tiles[self.tile_id_col].iloc[0]
 
-        self.raster_tiles = raster_tiles
+        self.raster_tiles: gpd.GeoDataFrame = raster_tiles
 
         if points_crs is None:
             points_crs = rasterio.open(
@@ -66,13 +56,13 @@ class _ParallelOverlay:
                 )
             ).crs
 
-        samples = gpd.GeoDataFrame(
+        samples: gpd.GeoDataFrame = gpd.GeoDataFrame(
             geometry=gpd.points_from_xy(points_x, points_y), crs=points_crs
         ).reset_index(drop=True)
 
         self.raster_files = raster_files
 
-        self.layers = (
+        self.layers: pd.DataFrame = (
             pd.DataFrame(
                 {
                     "name": [
@@ -90,7 +80,7 @@ class _ParallelOverlay:
             )
         )
 
-        self.query_pixels = self._find_blocks(samples)
+        self.query_pixels: dict[str, gpd.GeoDataFrame] = self._find_blocks(samples)
 
     @staticmethod
     def _layer_metadata(row, default_tile_id):
@@ -118,7 +108,7 @@ class _ParallelOverlay:
         return row
 
     @staticmethod
-    def _is_tiled(path):
+    def _is_tiled(path: Path | str) -> bool:
         return _ParallelOverlay.TILE_PLACEHOLDER in str(path)
 
     @staticmethod
@@ -143,7 +133,7 @@ class _ParallelOverlay:
 
         return tile_blocks
 
-    def _find_blocks_for_src(self, path, samples):
+    def _find_blocks_for_src(self, path, samples: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         gdf_blocks = []
 
         if _ParallelOverlay._is_tiled(path):
@@ -161,7 +151,7 @@ class _ParallelOverlay:
             for _, tile in raster_tiles.iterrows():
                 tile_id = tile[self.tile_id_col]
                 tile_path = path.replace(_ParallelOverlay.TILE_PLACEHOLDER, tile_id)
-                src = rasterio.open(tile_path)
+                src: rasterio.io.DatasetReader = rasterio.open(tile_path)
                 for (i, j), window in src.block_windows(1):
                     gdf_blocks.append(
                         {
@@ -177,7 +167,7 @@ class _ParallelOverlay:
                     )
 
         else:
-            src = rasterio.open(path)
+            src: rasterio.io.DatasetReader = rasterio.open(path)
 
             for (i, j), window in src.block_windows(1):
                 gdf_blocks.append(
@@ -192,15 +182,20 @@ class _ParallelOverlay:
                     }
                 )
 
-        gdf_blocks = gpd.GeoDataFrame(gdf_blocks, crs=src.crs).reset_index(drop=True)
+        gdf_blocks: gpd.GeoDataFrame = gpd.GeoDataFrame(
+            gdf_blocks, crs=src.crs
+        ).reset_index(drop=True)
+
+        src.close()
+
         assert gdf_blocks.crs is not None, f"The layer {path} has not crs, need fix"
-        gdf_blocks = (
+        gdf_blocks: gpd.GeoDataFrame = (
             samples.to_crs(gdf_blocks.crs)
             .sjoin(gdf_blocks, how="inner")
             .rename(columns={"index_right": "block_id"})
         )
 
-        query_pixels = []
+        query_pixels: [gpd.GeoDataFrame] = []
 
         for ij, block in gdf_blocks.groupby("block_id"):
             inv_block_transform = block["inv_transform"].iloc[0]
@@ -222,7 +217,9 @@ class _ParallelOverlay:
             query_pixels.append(block)
 
         assert query_pixels, f"query_pixels is empty for path: {path}"
-        res = pd.concat(query_pixels).drop(columns=["window", "inv_transform"])
+        res: gpd.GeoDataFrame = pd.concat(query_pixels).drop(
+            columns=["window", "inv_transform"]
+        )
         if len(set(res.index)) < int(samples.shape[0] * 0.5):
             print(
                 f"Less then 50% of points queryed for path: {path}, this is suspicious"
@@ -230,7 +227,7 @@ class _ParallelOverlay:
 
         return res
 
-    def _find_blocks(self, samples):
+    def _find_blocks(self, samples: gpd.GeoDataFrame) -> dict[str, gpd.GeoDataFrame]:
         if self.verbose:
             ttprint(f"Scanning blocks of {len(self.raster_files)} layers")
 
@@ -246,7 +243,7 @@ class _ParallelOverlay:
             query_pixels[group] = self._find_blocks_for_src(path, samples)
 
         if self.verbose:
-            ttprint(f"End")
+            ttprint("End")
 
         return query_pixels
 

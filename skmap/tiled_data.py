@@ -1,28 +1,18 @@
-from typing import Dict
-from osgeo import gdal
-import numpy as np
-import subprocess, os, re
-import skmap_bindings as sb
-from skmap.misc import TimeTracker, ttprint, sb_arr, sb_vec
+import os
+import random
+import re
+import subprocess
+import warnings
 from concurrent.futures import ProcessPoolExecutor
+from typing import Dict
+
+import numpy as np
+import skmap_bindings as sb
+from osgeo import gdal
+
+import skmap.set_env  # noqa: F401
 from skmap.catalog import DataCatalog, run_whales
-import warnings, random
-
-os.environ["USE_PYGEOS"] = "0"
-os.environ["PROJ_LIB"] = "/opt/conda/share/proj/"
-n_threads = os.cpu_count()
-os.environ["OMPI_MCA_rmaps_base_oversubscribe"] = "1"
-os.environ["USE_PYGEOS"] = "0"
-os.environ["PROJ_LIB"] = "/opt/conda/share/proj/"
-os.environ["NUMEXPR_MAX_self.n_threads"] = f"{n_threads}"
-os.environ["NUMEXPR_NUM_self.n_threads"] = f"{n_threads}"
-os.environ["OMP_THREAD_LIMIT"] = f"{n_threads}"
-os.environ["OMP_NUM_self.n_threads"] = f"{n_threads}"
-os.environ["OPENBLAS_NUM_self.n_threads"] = f"{n_threads}"
-os.environ["MKL_NUM_self.n_threads"] = f"{n_threads}"
-os.environ["VECLIB_MAXIMUM_self.n_threads"] = f"{n_threads}"
-os.environ["OMP_DYNAMIC"] = f"TRUE"
-
+from skmap.misc import TimeTracker, sb_arr, sb_vec, ttprint
 
 mask_aggregation_bash_script = """#!/bin/bash
     if [ -z "$1" ]; then
@@ -604,7 +594,7 @@ class TiledDataExporter(TiledData):
     def _get_out_names_depths_years_quantiles_textures(self, prefixes, suffix):
         if prefixes == "":
             prefixes = ["", "", ""]
-        # order: prefixes = [prefix_caly, prefix_sand, prefix_silt]
+        # order: prefixes = [prefix_clay, prefix_sand, prefix_silt]
         out_files = []
         for d in range(len(self.depths) - 1):
             for y in range(len(self.years) - 1):
@@ -622,7 +612,7 @@ class TiledDataExporter(TiledData):
     def _get_out_names_depths_years_textures(self, prefixes, suffix):
         if prefixes == "":
             prefixes = ["", "", ""]
-        # order: prefixes = [prefix_caly, prefix_sand, prefix_silt]
+        # order: prefixes = [prefix_clay, prefix_sand, prefix_silt]
         out_files = []
         for d in range(len(self.depths) - 1):
             for y in range(len(self.years) - 1):
@@ -747,7 +737,7 @@ class TiledDataExporter(TiledData):
 
         for d in range(len(self.depths) - 1):
             for y in range(len(self.years) - 1):
-                offset_caly = d * (len(self.years) - 1) * 3 * (n_quant + 1) + y * 3 * (
+                offset_clay = d * (len(self.years) - 1) * 3 * (n_quant + 1) + y * 3 * (
                     n_quant + 1
                 )
                 offset_sand = (
@@ -842,7 +832,7 @@ class TiledDataExporter(TiledData):
                     self.n_threads,
                     range(clay_trees.shape[1]),
                     array_t,
-                    range(offset_caly + 1, offset_caly + 1 + len(percentiles)),
+                    range(offset_clay + 1, offset_clay + 1 + len(percentiles)),
                     percentiles,
                 )
                 sb.computePercentiles(
@@ -861,7 +851,7 @@ class TiledDataExporter(TiledData):
                     range(offset_silt + 1, offset_silt + 1 + len(percentiles)),
                     percentiles,
                 )
-                array_t[:, offset_caly] = clay_mean[:, 0]
+                array_t[:, offset_clay] = clay_mean[:, 0]
                 array_t[:, offset_sand] = sand_mean[:, 0]
                 array_t[:, offset_silt] = silt_mean[:, 0]
         sb.transposeArray(array_t, self.n_threads, self.array)
@@ -879,7 +869,7 @@ class TiledDataExporter(TiledData):
         n_trees2 = pred_depths_texture2[0].array.shape[0]
         for d in range(len(self.depths) - 1):
             for y in range(len(self.years) - 1):
-                offset_caly = d * (len(self.years) - 1) * 3 + y * 3
+                offset_clay = d * (len(self.years) - 1) * 3 + y * 3
                 offset_sand = d * (len(self.years) - 1) * 3 + y * 3 + 1
                 offset_silt = d * (len(self.years) - 1) * 3 + y * 3 + 2
                 trees_avg_texture1 = sb_arr(n_trees1, self.n_pixels)
@@ -927,7 +917,7 @@ class TiledDataExporter(TiledData):
                     clay_mean,
                 )
 
-                array_t[:, offset_caly] = clay_mean[:, 0]
+                array_t[:, offset_clay] = clay_mean[:, 0]
                 array_t[:, offset_sand] = sand_mean[:, 0]
                 array_t[:, offset_silt] = silt_mean[:, 0]
         sb.transposeArray(array_t, self.n_threads, self.array)
@@ -998,13 +988,13 @@ class TiledDataExporter(TiledData):
             "GDAL_HTTP_VERSION": "1.0",
             "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif",
         },
-        timeframe=None,
-        n_threads_write=None,
+        timeframe: int | None = None,
+        n_threads_write: int | None = None,
     ):
         with TimeTracker(f"   Prepare data to export for {self.tile_id}", False):
-            if scaling_metadata == None:
+            if scaling_metadata is None:
                 scaling_metadata = 1.0 / scaling
-            if n_threads_write == None:
+            if n_threads_write is None:
                 n_threads_write = self.n_threads
             if self.tile_id is None:
                 raise ValueError("Argument 'tile_id' cannot be None")
