@@ -2,18 +2,20 @@
 Dataset quality control utilities
 """
 
-from typing import Iterable, Union
 import warnings
-from pathlib import Path
-import rasterio as rio
-from shapely import geometry as g
-import geopandas as gp
-import requests
-import numpy as np
-from operator import add
 from functools import reduce
+from operator import add
+from pathlib import Path
+from typing import Iterable, Union
+
+import geopandas as gp
+import numpy as np
+import rasterio as rio
+import requests
+from shapely import geometry as g
 
 from .parallel import blocks
+
 # from .datasets.catalogue import _Resource
 
 _LANDMASK_REF = "https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_land.mask_pflugmacher2019.landcover.12_f_30m_s0..0m_2014..2016_skmap_epsg3035_v0.1.tif"

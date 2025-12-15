@@ -2,26 +2,25 @@
 Parallelization helpers based in thread/process pools and joblib
 """
 
-import numpy
-import multiprocessing
-from typing import Callable, Iterator, List, Union
-from concurrent.futures import as_completed, wait, FIRST_COMPLETED, ProcessPoolExecutor
-
-import warnings
-from pathlib import Path
-import geopandas as gpd
-import numpy as np
-import multiprocessing
-from osgeo import osr
-import math
-import rasterio
-from rasterio.mask import mask
-from shapely.geometry import Polygon
-from rasterio.windows import Window, from_bounds
-import os.path
-import psutil
-import time
 import gc
+import math
+import multiprocessing
+import os.path
+import time
+import warnings
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, as_completed, wait
+from pathlib import Path
+from typing import Callable, Iterator, List, Union
+
+import geopandas as gpd
+import numpy
+import numpy as np
+import psutil
+import rasterio
+from osgeo import osr
+from rasterio.mask import mask
+from rasterio.windows import Window, from_bounds
+from shapely.geometry import Polygon
 
 from ..misc import ttprint
 

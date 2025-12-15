@@ -3,22 +3,23 @@ Parallel block-wise processing and result aggregation for large raster datasets
 """
 
 try:
-    import shapely as pg
+    import sys
+
+    import numpy as np
     import rasterio as rio
     import rasterio.features as rfeatures
-    import numpy as np
-    import sys
+    import shapely as pg
     from shapely import speedups
 
     if speedups.available:
         speedups.enable()
-    import shapely.geometry as g
-    from multiprocessing.pool import ThreadPool
     import multiprocessing as mp
     import threading
     from datetime import datetime
+    from multiprocessing.pool import ThreadPool
+    from typing import Callable, Iterable, Iterator, Tuple, Union
 
-    from typing import Union, Tuple, Iterable, Callable, Iterator
+    import shapely.geometry as g
 
     def _read_block(
         src: Union[rio.DatasetReader, Iterable[rio.DatasetReader]],

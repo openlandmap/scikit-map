@@ -6,14 +6,15 @@ from typing import Iterable
 
 try:
     import math
-    import matplotlib.pyplot as plt
-    import skimage.exposure as exposure
-    from mpl_toolkits.axes_grid1 import ImageGrid
-    from matplotlib.colors import ListedColormap
-    from typing import Union, List, Iterable
-    import rasterio as rio
-    import numpy as np
     from pathlib import Path
+    from typing import Iterable, List, Union
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import rasterio as rio
+    import skimage.exposure as exposure
+    from matplotlib.colors import ListedColormap
+    from mpl_toolkits.axes_grid1 import ImageGrid
 
     def _percent_clip(data, perc_min, perc_max):
         return (data - np.percentile(data, perc_min)) / (

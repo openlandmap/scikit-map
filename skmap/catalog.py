@@ -1,16 +1,15 @@
-from typing import List, Dict, Union, Optional
+import json
 import os
+import random
+import re
+import sys
+from typing import Dict, List, Optional, Union
+
 import numpy as np
 import pandas as pd
-import re
-import json
 import skmap_bindings as sb
-import sys
-import random
-from skmap.misc import mmdd_to_doy
 
-os.environ["USE_PYGEOS"] = "0"
-os.environ["PROJ_LIB"] = "/opt/conda/share/proj/"
+from skmap.misc import mmdd_to_doy
 
 
 class DataCatalog:
@@ -268,12 +267,12 @@ class DataCatalog:
 
         return catalog_dict
 
-    def save_json(self, json_out_path: Optional[str] = None):
+    def save_json(self, json_out_path: Optional[str] = None) -> None:
         if json_out_path is not None:
             with open(json_out_path, "w") as f:
                 json.dump(self.data, f, indent=4)
 
-    def get_groups(self):
+    def get_groups(self) -> [str]:
         groups = sorted(
             list(set(self.data.keys()).difference(["common"]).difference(["otf"]))
         )  # by default don't return 'common' nor 'otf' group

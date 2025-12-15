@@ -5,12 +5,11 @@ data from GeoNetwork
 """
 
 import base64
-import sys
 import gzip
-from io import BytesIO
-import tempfile
-from pathlib import Path
 import sys
+import tempfile
+from io import BytesIO
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
 sys.path = [

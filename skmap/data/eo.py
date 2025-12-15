@@ -1,27 +1,28 @@
+import gc
+import hashlib
+import json
+import os
+import warnings
+from pathlib import Path
 from typing import List, Union
-from dateutil.relativedelta import relativedelta
 
-import requests
-import numpy as np
 import bottleneck as bc
 import joblib
-from pathlib import Path
+import numpy as np
+import requests
+from dateutil.relativedelta import relativedelta
 from pystac.extensions.file import FileExtension
-import gc
-import os
 
-import warnings
-import hashlib, json
 from skmap import parallel
-from skmap.misc import date_range
 from skmap.io import read_auth_rasters, save_rasters
 from skmap.misc import (
-    _warn_deps,
+    GoogleSheet,
     _eval,
+    _warn_deps,
+    date_range,
+    find_files,
     nan_percentile,
     ttprint,
-    find_files,
-    GoogleSheet,
 )
 
 
@@ -405,22 +406,22 @@ class GLADLandsat:
 
 
 try:
+    import mimetypes
+    from datetime import datetime
+    from itertools import chain
+
+    import matplotlib.pyplot as plt
+    import pandas as pd
     import pystac
     import rasterio
     import requests
-    import mimetypes
-    import pandas as pd
-    import matplotlib.pyplot as plt
-
+    from bs4 import BeautifulSoup
+    from matplotlib.colors import ListedColormap
     from minio import Minio
     from PIL import Image
-    from itertools import chain
-    from datetime import datetime
-    from bs4 import BeautifulSoup
     from pyproj import Transformer
-    from matplotlib.colors import ListedColormap
-    from shapely.geometry import Polygon, mapping, shape
     from pystac.extensions.item_assets import ItemAssetsExtension
+    from shapely.geometry import Polygon, mapping, shape
 
     class STACGenerator:
         """
@@ -1352,9 +1353,9 @@ except Exception as e:
 
 try:
     from pystac import Catalog
-    from whoosh.qparser import QueryParser
-    from whoosh.index import create_in
     from whoosh import fields
+    from whoosh.index import create_in
+    from whoosh.qparser import QueryParser
 
     class STACIndex:
         """

@@ -2,70 +2,62 @@
 Raster data input and output
 """
 
-from osgeo import gdal
-from pathlib import Path
-from hashlib import sha256
-from pandas import DataFrame, Series, to_datetime
-from types import MappingProxyType
-
-import shutil
 import copy
-import pandas as pd
-import numpy
-import numpy as np
-import requests
-import tempfile
-import traceback
-import math
-import re
-import os
-import time
 import gc
-import matplotlib as mpl
-from matplotlib import pyplot
-from matplotlib.animation import FuncAnimation
+import math
+import os
+import re
+import shutil
+import tempfile
+import time
 import traceback
-
-from shapely.geometry import box, shape
-
-from typing import List, Union, TypedDict, Callable
-from skmap.misc import (
-    ttprint,
-    _eval,
-    update_by_separator,
-    date_range,
-    new_memmap,
-    del_memmap,
-    ref_memmap,
-    load_memmap,
-)
-from skmap.misc import vrt_warp
-from skmap import SKMapGroupRunner, SKMapRunner, SKMapBase, parallel
-
-from dateutil.relativedelta import relativedelta
+from base64 import b64decode, encodebytes
+from contextlib import ExitStack
+from copy import deepcopy
 from datetime import datetime
-from minio import Minio
-
+from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
-import rasterio
-from rasterio.windows import Window, from_bounds
-from pystac.item import Item
+from tempfile import TemporaryDirectory
+from types import MappingProxyType
+from typing import Callable, List, TypedDict, Union
+from uuid import uuid4
 
 import bottleneck as bn
-
-from IPython.display import HTML
-from tempfile import TemporaryDirectory
-from io import BytesIO
-from base64 import encodebytes, b64decode
-from uuid import uuid4
-from PIL import Image
-from contextlib import ExitStack
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
-from copy import deepcopy
-
+import matplotlib as mpl
+import numpy
+import numpy as np
+import pandas as pd
+import rasterio
+import requests
 import skmap_bindings as sb
-from skmap.misc import make_tempdir
+from dateutil.relativedelta import relativedelta
+from IPython.display import HTML
+from matplotlib import pyplot
+from matplotlib._animation_data import DISPLAY_TEMPLATE, JS_INCLUDE, STYLE_INCLUDE
+from matplotlib.animation import FuncAnimation
+from minio import Minio
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from osgeo import gdal
+from pandas import DataFrame, Series, to_datetime
+from PIL import Image
+from pystac.item import Item
+from rasterio.windows import Window, from_bounds
+from shapely.geometry import box, shape
+
+from skmap import SKMapBase, SKMapGroupRunner, SKMapRunner, parallel
+from skmap.misc import (
+    _eval,
+    date_range,
+    del_memmap,
+    load_memmap,
+    make_tempdir,
+    new_memmap,
+    ref_memmap,
+    ttprint,
+    update_by_separator,
+    vrt_warp,
+)
 
 _INT_DTYPE = (
     "uint8",

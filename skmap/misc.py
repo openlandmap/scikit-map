@@ -2,27 +2,25 @@
 Miscellaneous utils
 """
 
-from typing import List, Union, Iterable
-from datetime import datetime, timedelta
-from functools import reduce
-
-from minio import Minio
-from minio.error import S3Error
+import math
 import os
 import random
 import tempfile
-import rasterio
-import geopandas as gp
-import pandas as pd
-import numpy as np
-from datetime import datetime
-
-import math
 import time
+from datetime import datetime, timedelta
+from functools import reduce
 from pathlib import Path
+from typing import Iterable, List, Union
+
+import geopandas as gp
+import numpy as np
+import pandas as pd
+import rasterio
+from dateutil.relativedelta import relativedelta
+from minio import Minio
+from minio.error import S3Error
 from osgeo.gdal import BuildVRT, Warp
 from shapely.geometry import box, shape
-from dateutil.relativedelta import relativedelta
 
 TMP_DIR = tempfile.gettempdir()
 
@@ -398,8 +396,8 @@ def ttprint(*args, **kwargs):
     [16:39:11] skmap rocks!
 
     """
-    from datetime import datetime
     import sys
+    from datetime import datetime
 
     print(f"[{datetime.now():%H:%M:%S}] ", end="")
     print(*args, **kwargs, flush=True)
