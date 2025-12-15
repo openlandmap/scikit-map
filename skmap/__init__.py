@@ -4,7 +4,7 @@ from skmap.misc import ttprint
 
 
 class SKMapBase(ABC):
-    def _verbose(self, *args, **kwargs):
+    def _verbose(self, *args, **kwargs) -> None:
         if self.verbose:
             ttprint(*args, **kwargs)
 

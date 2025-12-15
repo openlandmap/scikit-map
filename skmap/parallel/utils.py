@@ -335,7 +335,7 @@ class TilingProcessing:
         base_raster_fn="http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif",
         verbose: bool = False,
         epsg_checking: bool = True,
-    ):
+    ) -> None:
         from pyproj import CRS
 
         self.tiles = gpd.read_file(tiling_system_fn)
@@ -705,7 +705,7 @@ class TaskSequencer:
         mem_usage_limit: float = 0.75,
         wait_timeout: int = 5,
         verbose: bool = False,
-    ):
+    ) -> None:
         self.wait_timeout = wait_timeout
         self.mem_usage_limit = mem_usage_limit
         self.verbose = verbose
@@ -736,7 +736,7 @@ class TaskSequencer:
         self.n_tasks = len(self.tasks)
         self.pipeline_futures = [set() for i in range(0, self.n_tasks)]
 
-    def _verbose(self, *args, **kwargs):
+    def _verbose(self, *args, **kwargs) -> None:
         if self.verbose:
             ttprint(*args, **kwargs)
 

@@ -58,7 +58,7 @@ try:
             func: Callable,
             # agg_func: Callable=_id, # should not be done here
             return_data_only: bool = False,
-        ):
+        ) -> None:
             self.func = func
             # self.agg_func = agg_func # should not be done here
             self.return_data_only = return_data_only
@@ -105,7 +105,7 @@ try:
         def __init__(
             self,
             reference_file: str = None,
-        ):
+        ) -> None:
             self.reference = None
             if reference_file is not None:
                 self._build_rtree(reference_file)
@@ -134,7 +134,7 @@ try:
                 height=self.reference.height,
             )
 
-        def _build_rtree(self, reference_file):
+        def _build_rtree(self, reference_file) -> None:
             self.reference = rio.open(reference_file)
             self.block_windows = np.array(
                 [tup[1] for tup in self.reference.block_windows()]
@@ -310,7 +310,7 @@ try:
         def __init__(
             self,
             reader: RasterBlockReader = None,
-        ):
+        ) -> None:
             self.reader = reader
 
         def aggregate(
@@ -415,7 +415,7 @@ try:
         def __init__(
             self,
             reader: RasterBlockReader = None,
-        ):
+        ) -> None:
             self.reader = reader
 
         def write(
@@ -427,7 +427,7 @@ try:
             geometry_mask: bool = True,
             reader_kwargs: dict = {},
             **kwargs,
-        ):
+        ) -> None:
             """
             Writes block wise calculation results to new raster file.
 

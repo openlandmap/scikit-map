@@ -41,7 +41,7 @@ class ControlS3:
             )
         ]
 
-    def push_file(self, file_path, bucket_prefix):
+    def push_file(self, file_path, bucket_prefix) -> None:
         object_name = (
             "/".join(bucket_prefix.split("/")[1:]) + "/" + file_path.split("/")[-1]
         )
@@ -54,14 +54,14 @@ class ControlS3:
             raise RuntimeError(f"Upload failed: {e}")
         os.remove(file_path)
 
-    def create_empty_file(self, file_path):
+    def create_empty_file(self, file_path) -> None:
         try:
             with open(file_path, "x") as f:
                 f.write("empty")
         except FileExistsError:
             print(f"File {file_path} already exists.")
 
-    def remove(self, objects_list):
+    def remove(self, objects_list) -> bool:
         for bucket_key in objects_list:
             key = "/".join(bucket_key.split("/")[1:])
             bucket = bucket_key.split("/")[0]
@@ -130,7 +130,7 @@ class ControlS3:
 
     def move_completed_tile(
         self, bucket_prefix, server_name, tile_id, time_seconds, skipped
-    ):
+    ) -> None:
         sub_prefix = "skipped" if skipped else "done"
         current_tile_name = tile_id + "..server." + server_name
         # Attempt to remove the primary 'doing' tile
@@ -190,7 +190,7 @@ def sb_vec(elems: int) -> np.ndarray:
     return np.empty((elems,), np.float32)
 
 
-def _warn_deps(e, module_name):
+def _warn_deps(e, module_name) -> None:
     import warnings
 
     warnings.warn(
@@ -347,14 +347,14 @@ def vrt_warp(
 
 
 class TimeTracker(object):
-    def __init__(self, task, enter_enabled=False, exit_enabled=True):
+    def __init__(self, task, enter_enabled=False, exit_enabled=True) -> None:
         self.task = task
         self.enter_enabled = enter_enabled
         self.exit_enabled = exit_enabled
         self.tracks = []
 
     @staticmethod
-    def _print(*args, **kwargs):
+    def _print(*args, **kwargs) -> None:
         print(f"[{datetime.now():%H:%M:%S}] ", end="")
         print(*args, **kwargs, flush=True)
 
@@ -383,7 +383,7 @@ def _make_dir(path):
 #
 
 
-def ttprint(*args, **kwargs):
+def ttprint(*args, **kwargs) -> None:
     """
     A print function that displays the date and time.
 
@@ -846,7 +846,7 @@ try:
             col_date_suffix: str = "_date",
             col_date_format: str = "%Y-%m-%d",
             verbose: bool = False,
-        ):
+        ) -> None:
             self.key_file = key_file
             self.url = url
             self.verbose = verbose
@@ -858,11 +858,11 @@ try:
 
             self._read_gsheet()
 
-        def _verbose(self, *args, **kwargs):
+        def _verbose(self, *args, **kwargs) -> None:
             if self.verbose:
                 ttprint(*args, **kwargs)
 
-        def _read_gsheet(self):
+        def _read_gsheet(self) -> None:
             gc = gspread.service_account(filename=self.key_file)
             self._verbose(f"Accessing {self.url}")
             sht = gc.open_by_url(self.url)
@@ -906,7 +906,7 @@ except ImportError as e:
     _warn_deps(e, "misc.GoogleSheet")
 
 
-def _rm_dir(path):
+def _rm_dir(path) -> None:
     if os.path.exists(path):
         for item in os.listdir(path):
             item_path = os.path.join(path, item)

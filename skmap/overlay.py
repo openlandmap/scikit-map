@@ -270,7 +270,7 @@ class SpaceOverlay:
         tile_id_col: Union[str] = "tile_id",
         n_threads: int = parallel.CPU_COUNT,
         verbose: bool = True,
-    ):
+    ) -> None:
         self.verbose = verbose
         self.catalog = catalog
         self.layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
@@ -612,7 +612,7 @@ class SpaceTimeOverlay:
         tile_id_col: Union[str] = "tile_id",
         n_threads: int = parallel.CPU_COUNT,
         verbose: bool = False,
-    ):
+    ) -> None:
         if not isinstance(points, gpd.GeoDataFrame):
             if not isinstance(points, pd.DataFrame):
                 points = pd.read_parquet(points)

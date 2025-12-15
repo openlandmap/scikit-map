@@ -53,7 +53,7 @@ class Test:
         bounds: Iterable,
         crs: bool = None,
         verbose: bool = False,
-    ):
+    ) -> None:
         self.bounds = bounds
         self.verbose = verbose
         self.crs = crs

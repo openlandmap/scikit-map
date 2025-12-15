@@ -79,7 +79,6 @@ try:
 
             array = rdata._array()
 
-            start = time.time()
             result = self._run(array)
 
             if isinstance(result, tuple) and len(result) >= 2:
@@ -99,7 +98,7 @@ try:
             pass
 
     class Derivator(SKMapGroupRunner, ABC):
-        def __init__(self, verbose: bool = True, temporal=False):
+        def __init__(self, verbose: bool = True, temporal=False) -> None:
             super().__init__(verbose=verbose, temporal=temporal)
 
         def run(
@@ -121,7 +120,6 @@ try:
             if outname is not None:
                 kwargs["outname"] = outname
 
-            start = time.time()
             new_array, new_info = self._run(**kwargs)
 
             return new_array, new_info
@@ -133,7 +131,7 @@ try:
             pass
 
     class Filler(Transformer, ABC):
-        def __init__(self, name: str, verbose: bool = True, temporal=False):
+        def __init__(self, name: str, verbose: bool = True, temporal=False) -> None:
             super().__init__(name=name, verbose=verbose, temporal=temporal)
 
         def _n_gaps(self, data=None):
@@ -156,9 +154,9 @@ try:
             result = self._gapfill(data)
 
             if isinstance(result, tuple) and len(result) >= 2:
-                filled, filled_qa = result[0], result[1]
+                filled = result[0]
             else:
-                filled, filled_qa = result, None
+                filled = result
 
             if self.verbose:
                 r_gaps = self._n_gaps(filled)
@@ -204,7 +202,7 @@ try:
             backend: str = "dense",
             n_jobs: int = os.cpu_count(),
             verbose=False,
-        ):
+        ) -> None:
             super().__init__(name="SIRCLE", verbose=verbose, temporal=True)
             self.wv_0 = wv_0
             self.wv_f = wv_f
@@ -224,15 +222,13 @@ try:
             try:
                 import mkl
 
-                mkl_threads = mkl.get_num_threads()
                 mkl.set_num_threads(self.n_jobs)
-            except:
+            except ImportError:
                 pass
             np.seterr(divide="ignore", invalid="ignore")
             orig_shape = data.shape
             data = np.reshape(data, (data.shape[0] * data.shape[1], data.shape[2]))
             # @TODO avoid this and include the multiband case
-            orig_dtype = data.dtype
             if data.ndim > 1:
                 n_t = data.shape[0]
                 n_s = data.shape[1]
@@ -243,7 +239,7 @@ try:
             assert self.wv_p.ndim == 1, "wv_p must be a 1D array"
             assert self.wv_f.ndim == 1, "wv_f must be a 1D array"
             if self.use_mask:
-                if self.wm_0 == None:
+                if self.wm_0 is None:
                     self.wm_0 = self.wv_0
                 if self.wm_p == []:
                     self.wm_p = self.wv_p.copy()
@@ -390,7 +386,7 @@ try:
         """
         :param season_size: number of images per year
         :param att_seas: dB of attenuation for images of opposite seasonality
-        :param att_env: dB of attenuation for temporarly far images
+        :param att_env: dB of attenuation for temporarily far images
         :param n_cpu: number of CPU to be used in parallel
         """
 
@@ -404,7 +400,7 @@ try:
             return_qa: bool = False,
             n_jobs: int = os.cpu_count(),
             verbose=False,
-        ):
+        ) -> None:
             super().__init__(name="seasconv", verbose=verbose, temporal=True)
             self.season_size = season_size
             self.return_qa = return_qa
@@ -472,7 +468,7 @@ try:
             try:
                 import mkl
 
-                mkl_threads = mkl.get_num_threads()
+                mkl.get_num_threads()
                 mkl.set_num_threads(self.n_jobs)
             except:
                 pass
@@ -515,7 +511,7 @@ try:
         https://github.com/mhvwerts/whittaker-eilers-smoother/blob/master/whittaker_smooth.py
         """
 
-        def __init__(self, lmbd=1, d=2, n_jobs: int = os.cpu_count(), verbose=False):
+        def __init__(self, lmbd=1, d=2, n_jobs: int = os.cpu_count(), verbose=False) -> None:
             super().__init__(name="whittaker", verbose=verbose, temporal=True)
 
             self.lmbd = lmbd
@@ -584,7 +580,7 @@ try:
             date_overlap: bool = False,
             n_jobs: int = os.cpu_count(),
             verbose=False,
-        ):
+        ) -> None:
             super().__init__(verbose=verbose, temporal=True)
 
             self.time = time
@@ -868,7 +864,7 @@ try:
             scale_expr: str = None,
             n_jobs: int = os.cpu_count(),
             verbose=False,
-        ):
+        ) -> None:
             super().__init__(verbose=verbose, temporal=True)
 
             self.season_size = season_size
@@ -925,7 +921,7 @@ try:
 
             return result
 
-        def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset):
+        def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
             result = np.apply_along_axis(self._find_peaks, 2, array[i0_0:i0_1, :, i2])
             o2 = list(range(idx_offset, idx_offset + result.shape[2]))
@@ -962,7 +958,6 @@ try:
 
             for group, ginfo in zip(group_list, ginfo_list):
                 rdata._active_group = group
-                array = rdata._array()
 
                 start_dt_min = ginfo[RasterData.START_DT_COL].min()
                 end_dt_max = ginfo[RasterData.END_DT_COL].max()
@@ -1013,7 +1008,7 @@ try:
             scaling: float = 1.0,
             n_jobs: int = os.cpu_count(),
             verbose=False,
-        ):
+        ) -> None:
             super().__init__(verbose=verbose, temporal=True)
 
             self.scale_expr = scale_expr
@@ -1037,7 +1032,7 @@ try:
             result[0] *= self.scaling
             return result
 
-        def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset):
+        def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
             result = np.apply_along_axis(self._theil_slopes, 2, array[i0_0:i0_1, :, i2])
             o2 = list(range(idx_offset, idx_offset + result.shape[2]))
@@ -1074,12 +1069,11 @@ try:
 
             for group, ginfo in zip(group_list, ginfo_list):
                 rdata._active_group = group
-                array = rdata._array()
 
                 start_dt_min = ginfo[RasterData.START_DT_COL].min()
                 end_dt_max = ginfo[RasterData.END_DT_COL].max()
 
-                ts_size = ginfo.shape[0]
+                ginfo.shape[0]
 
                 args = self._args(rdata, ginfo)
 
@@ -1119,7 +1113,7 @@ try:
             min_max: str = None,
             n_jobs: int = os.cpu_count(),
             verbose=False,
-        ):
+        ) -> None:
             super().__init__(verbose=verbose, temporal=True)
 
             self.scale_expr = scale_expr
@@ -1153,7 +1147,7 @@ try:
                 result[j] *= self.scaling
             return result
 
-        def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset):
+        def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
             result = np.apply_along_axis(self._find_min_max, 2, array[i0_0:i0_1, :, i2])
             o2 = list(range(idx_offset, idx_offset + result.shape[2]))
@@ -1190,7 +1184,6 @@ try:
 
             for group, ginfo in zip(group_list, ginfo_list):
                 rdata._active_group = group
-                array = rdata._array()
 
                 start_dt_min = ginfo[RasterData.START_DT_COL].min()
                 end_dt_max = ginfo[RasterData.END_DT_COL].max()
@@ -1241,7 +1234,7 @@ try:
             scale_factor: int = 10000,
             n_jobs: int = os.cpu_count(),
             verbose=False,
-        ):
+        ) -> None:
             super().__init__(verbose=verbose, temporal=True)
 
             self.season_size = season_size
@@ -1394,7 +1387,7 @@ try:
             mask_values: list = [],
             n_jobs: int = os.cpu_count(),
             verbose=False,
-        ):
+        ) -> None:
             self.n_jobs = n_jobs
 
             self.expressions = expressions
@@ -1431,7 +1424,7 @@ try:
 
         def run(self, rdata: RasterData, outname: str = "skmap_{gr}_{dt}"):
             self.groups = list(rdata.info[RasterData.GROUP_COL].unique())
-            n_dates = rdata.info[self.date_cols].value_counts().shape[0]
+            # n_dates = rdata.info[self.date_cols].value_counts().shape[0]
 
             self.new_groups = []
             for key in self.expressions.keys():

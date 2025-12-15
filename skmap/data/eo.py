@@ -53,7 +53,7 @@ class GLADLandsat:
         parallel_download: int = 4,
         filter_additional_qa: bool = True,
         verbose: bool = True,
-    ):
+    ) -> None:
         self.username = username
         self.password = password
         self.base_url = "https://glad.umd.edu/dataset/landsat_v1.1"
@@ -84,7 +84,7 @@ class GLADLandsat:
 
         return urls
 
-    def _verbose(self, *args, **kwargs):
+    def _verbose(self, *args, **kwargs) -> None:
         if self.verbose:
             ttprint(*args, **kwargs)
 
@@ -465,7 +465,7 @@ try:
             asset_id_fields=[0, 2, 4],
             catalogs=None,
             verbose=False,
-        ):
+        ) -> None:
             self.cog_level = cog_level
             self.thumb_overwrite = thumb_overwrite
             self.gsheet = gsheet
@@ -564,7 +564,7 @@ try:
             else:
                 self._populate()
 
-        def _verbose(self, *args, **kwargs):
+        def _verbose(self, *args, **kwargs) -> None:
             if self.verbose:
                 ttprint(*args, **kwargs)
 
@@ -635,7 +635,7 @@ try:
 
             return (key, row, items)
 
-        def _populate_vector(self):
+        def _populate_vector(self) -> None:
             self.new_collections = {}
 
             for rid, row in self.gsheet.collections.iterrows():
@@ -754,7 +754,7 @@ try:
 
                 self._verbose(f"Creating collection {collection.id} with {len(items)}")
 
-        def _populate(self):
+        def _populate(self) -> None:
             self.new_collections = {}
             dt_fmt = self.url_date_format
             groups = self.gsheet.collections.groupby("catalog")
@@ -836,13 +836,13 @@ try:
             else:
                 return None
 
-        def _is_data(self, asset):
+        def _is_data(self, asset) -> bool:
             for r in asset.roles:
                 if r == "data":
                     return True
             return False
 
-        def _generate_thumbs(self, output_dir="./stac", thumb_base_url=None):
+        def _generate_thumbs(self, output_dir="./stac", thumb_base_url=None) -> None:
             for key, colls in self.new_collections.items():
                 args = []
                 catalog = self.catalogs[key]
@@ -1187,7 +1187,7 @@ try:
                 self._verbose(f"The file {raster_fn} not exists")
                 return (None, None, None)
 
-            with rasterio.Env(**self.gdal_env) as rio_env:
+            with rasterio.Env(**self.gdal_env):
                 with rasterio.open(raster_fn) as ds:
                     transformer = Transformer.from_crs(
                         ds.crs, "epsg:4326", always_xy=True
@@ -1218,7 +1218,7 @@ try:
             output_dir: str = "stac",
             catalog_type=pystac.CatalogType.SELF_CONTAINED,
             thumb_base_url=None,
-        ):
+        ) -> None:
             """
 
             Save the STAC instance to local folder.
@@ -1258,7 +1258,7 @@ try:
                     catalog_type=catalog_type,
                 )
 
-        def _s3_fput_object(self, fpath, output_dir, client, s3_bucket_name, s3_prefix):
+        def _s3_fput_object(self, fpath, output_dir, client, s3_bucket_name, s3_prefix) -> bool:
             if fpath.is_file():
                 object_name = fpath.relative_to(output_dir.name)
                 if s3_prefix:
@@ -1283,7 +1283,7 @@ try:
             s3_prefix: str = "",
             output_dir: str = "stac",
             catalog_type=pystac.CatalogType.SELF_CONTAINED,
-        ):
+        ) -> None:
             """
 
             Save the STAC instance to local folder and upload all the files
@@ -1365,7 +1365,7 @@ try:
 
         """
 
-        def __init__(self, catalog: Catalog, index_dir="stac_index", verbose=False):
+        def __init__(self, catalog: Catalog, index_dir="stac_index", verbose=False) -> None:
             self.catalog = catalog
             self.index_dir = index_dir
             self.verbose = verbose
@@ -1421,7 +1421,7 @@ try:
 
             return result
 
-        def _verbose(self, *args, **kwargs):
+        def _verbose(self, *args, **kwargs) -> None:
             if self.verbose:
                 ttprint(*args, **kwargs)
 

@@ -14,7 +14,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Callable, List, Union
+from typing import Callable, List, Union, Optional
 from uuid import uuid4
 
 import numpy
@@ -333,7 +333,6 @@ def save_rasters_cpp(
 
     if window is None:
         ds = rasterio.open(base_raster)
-        shape = (ds.width, ds.height)
         window = rasterio.windows.Window(0, 0, ds.width, ds.height)
     if out_idx is None:
         out_idx = list(range(0, n_layers))
@@ -412,7 +411,6 @@ def read_rasters_cpp(
 
     if window is None:
         ds = rasterio.open(raster_files[0])
-        shape = (ds.width, ds.height)
         window = rasterio.windows.Window(0, 0, ds.width, ds.height)
     if out_data is None:
         out_data = np.empty((n_layers, window.width * window.height), dtype=dtype)
@@ -551,8 +549,7 @@ def read_rasters(
     if overview is not None:
         overviews = ds.overviews(band)
         if overview in overviews:
-            n_bands, height, width = (
-                ds.count,
+            height, width = (
                 math.ceil(ds.height // overview),
                 math.ceil(ds.width // overview),
             )
@@ -563,16 +560,14 @@ def read_rasters(
             )
     elif window is not None:
         (
-            n_bands,
             height,
             width,
-        ) = ds.count, window.height, window.width
+        ) = window.height, window.width
     else:
         (
-            n_bands,
             height,
             width,
-        ) = ds.count, ds.height, ds.width
+        ) = ds.height, ds.width
 
     ttprint("Start new_memmap")
     if max_rasters is not None:
@@ -715,8 +710,6 @@ def read_auth_rasters(
     for url_pos, data, ds_params in parallel.job(
         _read_auth_raster, args, n_jobs=n_jobs
     ):
-        url = raster_files[url_pos]
-
         if data is not None:
             raster_data[url_pos] = data
 
@@ -909,7 +902,7 @@ class RasterData(SKMapBase):
         raster_mask_val=np.nan,
         max_rasters: int = None,
         verbose=False,
-    ):
+    ) -> None:
         if isinstance(raster_files, str):
             raster_files = {"default": [raster_files]}
         elif isinstance(raster_files, list):
@@ -1195,7 +1188,7 @@ class RasterData(SKMapBase):
 
         return self
 
-    def _base_raster(self):
+    def _base_raster(self) -> Optional[bool]:
         for filepath in list(self.info[RasterData.PATH_COL]):
             if "http" in filepath:
                 res = requests.head(filepath)
@@ -1560,7 +1553,7 @@ class RasterData(SKMapBase):
             tmp_dir = Path(tempfile.TemporaryDirectory().name)
             tmp_dir = tmp_dir.joinpath(prefix)
 
-        def _to_s3(outfile):
+        def _to_s3(outfile) -> None:
             _host = host
             if isinstance(host, list):
                 ih = int.from_bytes(str(outfile.stem).encode(), "little") % len(host)
@@ -1594,7 +1587,7 @@ class RasterData(SKMapBase):
 
         return self
 
-    def __del__(self):
+    def __del__(self) -> None:
         print("Deleting")
         del_memmap(self.array)
 
@@ -1894,7 +1887,7 @@ class RasterData(SKMapBase):
 
         def gen_pane(
             ind, arr, ax, composite, matrix_params, img_title_text, img_title_fontsize
-        ):
+        ) -> None:
             try:
                 ax.pcolorfast(
                     _preprocess(arr, ind, composite=composite), **matrix_params
