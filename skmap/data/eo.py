@@ -2,15 +2,12 @@ import gc
 import hashlib
 import json
 import os
-import warnings
 from pathlib import Path
-from typing import List, Union
+from typing import List
 
 import bottleneck as bc
-import joblib
 import numpy as np
 import requests
-from dateutil.relativedelta import relativedelta
 from pystac.extensions.file import FileExtension
 
 from skmap import parallel
@@ -159,7 +156,7 @@ class GLADLandsat:
             self._verbose(f"Read data {data.shape}.")
 
             if clear_sky:
-                self._verbose(f"Removing cloud and cloud shadow pixels.")
+                self._verbose("Removing cloud and cloud shadow pixels.")
                 clear_sky_mask, clear_sky_pct = self._clear_sky_mask(data)
                 data[~clear_sky_mask] = np.nan
                 clear_sky_idx = np.where(clear_sky_pct >= min_clear_sky)[0]
@@ -258,7 +255,7 @@ class GLADLandsat:
 
         fn_raster = (
             output_dir.joinpath(f"{start}")
-            .joinpath(f"B1_COUNT")
+            .joinpath("B1_COUNT")
             .joinpath(f"{tile}.tif")
         )
 
@@ -385,7 +382,7 @@ class GLADLandsat:
                         result, base_raster, tile, start, p, output_dir, unit8
                     )
 
-                self._verbose(f"Counting clear_sky pixels")
+                self._verbose("Counting clear_sky pixels")
                 output_file_count = self._calc_save_count(
                     data, self.max_spectral_val, base_raster, tile, start, output_dir
                 )
@@ -420,7 +417,6 @@ try:
     from minio import Minio
     from PIL import Image
     from pyproj import Transformer
-    from pystac.extensions.item_assets import ItemAssetsExtension
     from shapely.geometry import Polygon, mapping, shape
 
     class STACGenerator:
@@ -1346,7 +1342,7 @@ try:
                 joblib_args={"backend": "threading"},
             ):
                 continue
-            self._verbose(f"End")
+            self._verbose("End")
 
 except Exception as e:
     _warn_deps(e, "eo.STACGenerator")

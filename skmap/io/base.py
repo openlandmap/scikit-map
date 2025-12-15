@@ -3,28 +3,20 @@ Raster data input and output
 """
 
 import copy
-import gc
 import math
 import os
-import re
-import shutil
 import tempfile
 import time
-import traceback
 from base64 import b64decode, encodebytes
 from contextlib import ExitStack
 from copy import deepcopy
 from datetime import datetime
-from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import MappingProxyType
-from typing import Callable, List, TypedDict, Union
+from typing import Callable, List, Union
 from uuid import uuid4
 
-import bottleneck as bn
-import matplotlib as mpl
 import numpy
 import numpy as np
 import pandas as pd
@@ -35,7 +27,6 @@ from dateutil.relativedelta import relativedelta
 from IPython.display import HTML
 from matplotlib import pyplot
 from matplotlib._animation_data import DISPLAY_TEMPLATE, JS_INCLUDE, STYLE_INCLUDE
-from matplotlib.animation import FuncAnimation
 from minio import Minio
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from osgeo import gdal
@@ -55,7 +46,6 @@ from skmap.misc import (
     new_memmap,
     ref_memmap,
     ttprint,
-    update_by_separator,
     vrt_warp,
 )
 
@@ -390,7 +380,7 @@ def save_rasters_cpp(
     )
 
     if verbose:
-        ttprint(f"End")
+        ttprint("End")
 
     if out_s3 is not None:
         return out_s3
@@ -452,7 +442,7 @@ def read_rasters_cpp(
     )
 
     if verbose:
-        ttprint(f"End")
+        ttprint("End")
 
     return out_data
 
@@ -584,12 +574,12 @@ def read_rasters(
             width,
         ) = ds.count, ds.height, ds.width
 
-    ttprint(f"Start new_memmap")
+    ttprint("Start new_memmap")
     if max_rasters is not None:
         array_mm = new_memmap(dtype, shape=(height, width, max_rasters))
     else:
         array_mm = new_memmap(dtype, shape=(height, width, len(raster_files) * 10))
-    ttprint(f"End new_memmap")
+    ttprint("End new_memmap")
 
     # ref_array = ref_memmap(array_mm)
     # print(ref_array)
@@ -1304,7 +1294,7 @@ class RasterData(SKMapBase):
                 self.info = pd.concat([self.info, new_info])
 
             self._verbose(
-                f"Execution"
+                "Execution"
                 + f" time for {process_name}: {(time.time() - start):.2f} segs"
             )
 
@@ -1353,7 +1343,7 @@ class RasterData(SKMapBase):
         to_add_info.append(new_info)
 
         self._verbose(
-            f"Execution" + f" time for {process_name}: {(time.time() - start):.2f} segs"
+            "Execution" + f" time for {process_name}: {(time.time() - start):.2f} segs"
         )
 
         self._active_group = None
@@ -1497,7 +1487,7 @@ class RasterData(SKMapBase):
             elif os.path.isfile(path):
                 return path
 
-        raise Exception(f"No base raster is available.")
+        raise Exception("No base raster is available.")
 
     def to_dir(
         self,

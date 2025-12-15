@@ -3,11 +3,8 @@ Parallelization helpers based in thread/process pools and joblib
 """
 
 import gc
-import math
 import multiprocessing
-import os.path
 import time
-import warnings
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, as_completed, wait
 from pathlib import Path
 from typing import Callable, Iterator, List, Union
@@ -17,9 +14,8 @@ import numpy
 import numpy as np
 import psutil
 import rasterio
-from osgeo import osr
 from rasterio.mask import mask
-from rasterio.windows import Window, from_bounds
+from rasterio.windows import from_bounds
 from shapely.geometry import Polygon
 
 from ..misc import ttprint
@@ -114,7 +110,6 @@ def ThreadGeneratorLazy(
 def ProcessGeneratorLazy2(worker: Callable, args: Iterator[tuple]):
     import concurrent.futures
     import multiprocessing
-    from itertools import islice
 
     global executor
 

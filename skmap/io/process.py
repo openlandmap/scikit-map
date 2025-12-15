@@ -2,7 +2,7 @@ import os
 import time
 import warnings
 from enum import Enum
-from typing import Callable, List, TypedDict, Union
+from typing import List
 
 from scipy.linalg import matmul_toeplitz
 

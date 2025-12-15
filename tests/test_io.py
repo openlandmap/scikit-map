@@ -1,13 +1,9 @@
-from pathlib import Path
 
 import numpy as np
-import pytest
-import rasterio
 from rasterio.windows import Window
 
 from skmap import io
 from skmap.data import toy
-from skmap.misc import make_tempdir
 
 
 class TestReadRaster:

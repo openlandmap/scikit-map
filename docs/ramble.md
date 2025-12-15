@@ -113,8 +113,6 @@ Integration with sphinx documentation is done with [Breathe](breathe.readthedocs
       - fill
       - masknan
       - fillnan
-      - spectral indices
-    
 
     - data_processing: gives different output (shape)
       - convolveRows
@@ -210,9 +208,7 @@ Forget that, I think we can just install everything with conda/micromamba and th
 pip install --no-build-isolation -e .[full]
 ```
 
-But then for some reason the `skmap.io.process.SeasConvFill` didn't exist???? even after adding `.[full]` in stead of `.`... whatevs...
-
-
+But then for some reason the `skmap.io.process.SeasConvFill` didn't exist???? even after adding `.[full]` in stead of `.`... whatevs... This was because modules and imports are in a huge try/except block
 
 ## memmap?
 

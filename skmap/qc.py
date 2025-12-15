@@ -2,7 +2,6 @@
 Dataset quality control utilities
 """
 
-import warnings
 from functools import reduce
 from operator import add
 from pathlib import Path

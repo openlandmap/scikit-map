@@ -2,7 +2,6 @@
 Miscellaneous utils
 """
 
-import math
 import os
 import random
 import tempfile
@@ -396,7 +395,6 @@ def ttprint(*args, **kwargs):
     [16:39:11] skmap rocks!
 
     """
-    import sys
     from datetime import datetime
 
     print(f"[{datetime.now():%H:%M:%S}] ", end="")

@@ -221,7 +221,6 @@ try:
             sources = {}
 
             def _read_worker(window: rio.windows.Window):
-                import threading
 
                 tname = threading.current_thread().name
                 if tname not in sources:

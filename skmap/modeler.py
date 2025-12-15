@@ -140,7 +140,7 @@ class Modeler:
                 with open(covs_path, "r") as file:
                     model_covs = [line.strip() for line in file]
             else:
-                raise ValueError(f"No feature names was found")
+                raise ValueError("No feature names was found")
         self.model_covs = model_covs
 
     def _prepare_covariates(self, data: TiledDataLoader):
@@ -200,10 +200,10 @@ class RFRegressor(Regressor):
 
     def predict(self, data: TiledData):
         # prepare input and output arrays
-        with TimeTracker(f"          Transpose data", False):
+        with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
         # predict
-        with TimeTracker(f"          Model prediction", False):
+        with TimeTracker("          Model prediction", False):
             result = TiledData(
                 self.n_responses, self.in_covs_valid.shape[0], data.tile_id
             )
@@ -235,10 +235,10 @@ class RFRegressorTrees(Regressor):
 
     def predict(self, data: TiledData):
         # prepare input and output arrays
-        with TimeTracker(f"          Transpose data", False):
+        with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
         # predict
-        with TimeTracker(f"          Model prediction", False):
+        with TimeTracker("          Model prediction", False):
 
             def _single_prediction(predict, X, out, i, lock):
                 prediction = predict(X, check_input=False)
@@ -299,10 +299,10 @@ class RFClassifier(Classifier):
 
     def predict(self, data: TiledData):
         # prepare input and output arrays
-        with TimeTracker(f"          Transpose data", False):
+        with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
         # predict
-        with TimeTracker(f"          Model prediction", False):
+        with TimeTracker("          Model prediction", False):
             result = TiledData(self.n_class, self.in_covs_valid.shape[0], data.tile_id)
             if self.n_class == 1:
                 result.array[0, :] = self.predict_fn(
@@ -311,7 +311,7 @@ class RFClassifier(Classifier):
             else:
                 tmp_res_t = self.predict_fn(self.model, self.in_covs_valid)
         if self.n_class != 1:
-            with TimeTracker(f"          Convert and back transpose data", False):
+            with TimeTracker("          Convert and back transpose data", False):
                 if tmp_res_t.dtype == np.float64:
                     tmp_res_cast_t = sb_arr(tmp_res_t.shape[0], tmp_res_t.shape[1])
                     sb.castFloat64ToFloat32(tmp_res_t, data.n_threads, tmp_res_cast_t)
