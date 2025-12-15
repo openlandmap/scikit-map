@@ -12,8 +12,6 @@ For reporting issues and making feature suggestions please refer to the [issue t
 
 ## Contributing code and documentation
 
-
-
 ### Initial setup
 
 1. Clone the repo: `git clone git@github.com:openlandmap/scikit-map.git`
@@ -76,7 +74,7 @@ Must be one of the following:
 
 Based on [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
-## Documentation
+### Documentation
 
 `scikit-map` is a mixed Python/C++ project. It auto-builds documentation from Python and C++ docstrings.
 
@@ -84,11 +82,15 @@ Based on [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
    ```bash
    sphinx-autobuild docs/ _build/ --watch xml/
    ```
-3. in the top-level directory, run `doxygen` to create xml documentation for `skmap_bindings`
+2. For C++: in the top-level directory, run `doxygen` to create xml documentation for `skmap_bindings`
+3. If you change C++ documentation, in a separate terminal run `doxygen` again and it will auto-update.
 
-5. If you change C++ documentation, in a separate terminal run `doxygen` again and it will auto-update.
+### Python code
 
-#### formatting
+
+#### Code conventions
+
+We strongly prefer to submit code to `scikit-map` with [type hints](https://docs.python.org/3/library/typing.html). Additionally, we support Python versions as low as 3.8 and no code that uses syntax introduced in later versions of Python (e.g. the walrus operator) will be accepted.
 
 Python code is formatted using ruff:
 
@@ -96,22 +98,38 @@ Python code is formatted using ruff:
 ruff format
 ```
 
+There are currently no style restrictions guidelines imposed upon code contributions. This may change at a later date.
+
+### C++ code
+
 C++ code is formatted with clang-format:
 
 ```bash
 # specify directories to omit build directory
 find {skmap/,tests/} -iname "*.cpp" -o -iname "*.h" | xargs clang-format --verbose -i
 ```
+#### Clangd language server
 
-### Code conventions
+For code completion and intellisense. It needs a `compile_commands.json` at top-level. generate with:
 
-We strongly prefer to submit code to `scikit-map` with [type hints](https://docs.python.org/3/library/typing.html). Additionally, we support Python versions as low as 3.8 and no code that uses syntax introduced in later versions of Python (e.g. the walrus operator) will be accepted.
+```bash
+cmake -B build -DTESTS=1 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 .
+mv build/compile_commands.json .
+```
+#### Unit tests
 
-There are currently no style restrictions guidelines imposed upon code contributions. This may change at a later date.
+Unit tests with [`gtest`](https://google.github.io/googletest/quickstart-cmake.html) are included.
+
+To run:
+
+```bash
+cmake -B build -DTESTS=1 . # only have to run once
+cmake --build build -j && ./build/tests/src/unit_tests 
+```
 
 ### Versioning
 
-We adthere to standard [semantic versioning](https://semver.org/). Since we release from `main` <!-- needs to be discussed -->
+We adhere to standard [semantic versioning](https://semver.org/). Since we release from `main` <!-- needs to be discussed -->
 all merge requests should be accompanied with a version increment and the responsibility for increasing the version number falls on the contributor merging a branch: when merging a request either increment the MINOR version and reset the PATCH version to zero (if the intent of the merge request is to add new features) or increment the PATCH version (if the merge request only contains bugfixes). When merging a branch made by another contributor (e.g. because they do not have the required permissions to do so) please confirm the intent of the merge request (i.e. which semver number needs to be incremented).
 
 When incrementing the version of `scikit-map` it is enough to write the version change into [`pyproject.toml`](./pyproject.toml) in the appropriate branch.
