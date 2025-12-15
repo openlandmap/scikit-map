@@ -15,8 +15,9 @@ import sys
 
 sys.path.insert(0, os.path.abspath("../"))  # Source code dir relative to this file
 
-import skmap
 import importlib.metadata as meta
+
+import skmap
 
 # -- Project information -----------------------------------------------------
 

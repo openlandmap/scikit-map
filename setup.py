@@ -1,9 +1,10 @@
 import os
+import shutil
 import subprocess
 import sys
-from setuptools import setup, Extension
+
+from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
-import shutil
 
 
 class CMakeExtension(Extension):

@@ -1,14 +1,13 @@
 from pathlib import Path
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-import geopandas as gpd
-
 import rasterio
 from rasterio.windows import Window, bounds
+from skmap.mapper import SpaceTimeOverlay
 
 from skmap.io import read_rasters, save_rasters
-from skmap.mapper import SpaceTimeOverlay
 from skmap.misc import ttprint
 
 DEFAULT = {

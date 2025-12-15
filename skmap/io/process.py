@@ -1,49 +1,47 @@
-import time
 import os
+import time
 import warnings
 from enum import Enum
-from typing import List, Union, TypedDict, Callable
+from typing import Callable, List, TypedDict, Union
+
 from scipy.linalg import matmul_toeplitz
 
 try:
+    import gc
+    import math
     from abc import ABC, abstractmethod
-    from skmap import parallel
+    from datetime import datetime
+
+    import bottleneck as bn
+    import numexpr as ne
+    import numpy as np
+    import pandas as pd
+    import pyfftw
+    import scipy.sparse as sparse
+    import statsmodels.api as sm
+    from dateutil.relativedelta import relativedelta
+    from pandas import DataFrame
+    from scipy.linalg import circulant, matmul_toeplitz
+    from scipy.ndimage import convolve1d
+    from scipy.signal import find_peaks
+    from scipy.sparse.linalg import splu
+    from scipy.special import log1p
+    from scipy.stats import theilslopes
+    from statsmodels.tsa.seasonal import STL
 
     from skmap import SKMapGroupRunner, SKMapRunner, parallel
-    from skmap.misc import date_range, nan_percentile
-    from skmap.misc import new_memmap, del_memmap, ref_memmap, load_memmap
     from skmap.io import RasterData
-
-    from scipy.linalg import circulant
-    from scipy.linalg import matmul_toeplitz
-    from scipy.ndimage import convolve1d
-
-    from scipy.signal import find_peaks
-    from scipy.special import log1p
-    from statsmodels.tsa.seasonal import STL
-    import statsmodels.api as sm
-    from scipy.stats import theilslopes
-    import scipy.sparse as sparse
-    from scipy.sparse.linalg import splu
-
-    import numpy as np
-    import bottleneck as bn
-    from datetime import datetime
-    from pandas import DataFrame
-    import pandas as pd
-    import math
-    import gc
-
-    from dateutil.relativedelta import relativedelta
-
-    import pyfftw
-
-    # os.environ['NUMEXPR_MAX_THREADS'] = '1'
-    # os.environ['NUMEXPR_NUM_THREADS'] = '1'
-    import numexpr as ne
+    from skmap.misc import (
+        date_range,
+        del_memmap,
+        load_memmap,
+        nan_percentile,
+        new_memmap,
+        ref_memmap,
+    )
 
     class Transformer(SKMapGroupRunner, ABC):
-        def __init__(self, name: str, verbose: bool = True, temporal=False):
+        def __init__(self, name: str, verbose: bool = True, temporal=False) -> None:
             super().__init__(verbose=verbose, temporal=temporal)
             self.name = name
             self.name_qa = f"{self.name}{RasterData.TRANSFORM_SEP}qa"

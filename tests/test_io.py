@@ -1,13 +1,13 @@
-import pytest
-
-from rasterio.windows import Window
 from pathlib import Path
-import rasterio
-import numpy as np
 
-from skmap.misc import make_tempdir
-from skmap.data import toy
+import numpy as np
+import pytest
+import rasterio
+from rasterio.windows import Window
+
 from skmap import io
+from skmap.data import toy
+from skmap.misc import make_tempdir
 
 
 class TestReadRaster:
@@ -48,15 +48,16 @@ class TestReadRaster:
         assert np.nanmax(out_data[2:3, :]) == 106.0
 
 
-class TestSaveRaster:
-    pass
-    # def test_001(self):
-    #   out_data = io.read_rasters_cpp(toy._static_raster())
-    #   base_raster = str(toy._static_raster()[0])
-    #   out_files = io.save_rasters_cpp(base_raster, out_data, 'test', str(make_tempdir()))
+# class TestSaveRaster:
+#     def test_001(self):
+#         out_data = io.read_rasters_cpp(toy._static_raster())
+#         base_raster = str(toy._static_raster()[0])
+#         out_files = io.save_rasters_cpp(
+#             base_raster, out_data, "test", str(make_tempdir())
+#         )
 
-    #   ds = rasterio.open(out_files[0])
-    #   dtype = ds.dtypes[0]
-    #   Path(out_files[0]).unlink()
+#         ds = rasterio.open(out_files[0])
+#         dtype = ds.dtypes[0]
+#         Path(out_files[0]).unlink()
 
-    #   assert (dtype == 'int16')
+#         assert dtype == "int16"
