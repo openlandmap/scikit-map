@@ -28,9 +28,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           activate-environment: "true"
-      - name: Test with python ${{ matrix.python-version }}
+      - name: install with python ${{ matrix.python-version }}
         run: |
           gdal-config --version
           uv pip install .[full,dev]
           . .venv/bin/activate
+      - name: Run format and tests
+        run: |
+          ruff format --check
           pytest
