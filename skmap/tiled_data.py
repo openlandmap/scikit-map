@@ -114,7 +114,7 @@ class TiledData:
     ) -> None:
         self.tile_id = tile_id
         self.n_threads = n_threads
-        if (n_layers != None) & (n_pixels != None):
+        if (n_layers is not None) & (n_pixels is not None):
             self.array = sb_arr(n_layers, n_pixels)
         else:
             self.array = None
@@ -125,10 +125,10 @@ class TiledData:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.array = None
 
-    def convert_nan_to_value(self, value):
+    def convert_nan_to_value(self, value) -> None:
         sb.maskNan(self.array, self.n_threads, range(self.array.shape[0]), value)
 
-    def convert_nan_to_median(self):
+    def convert_nan_to_median(self) -> None:
         medians = sb_arr(self.array.shape[0], 1)
         sb.computePercentiles(
             self.array, self.n_threads, range(self.array.shape[1]), medians, [0], [50.0]
@@ -191,7 +191,7 @@ class TiledDataLoader(TiledData):
         self.resampling_strategy = resampling_strategy
         self.gdal_opts = gdal_opts
         self.n_threads = n_threads
-        if n_threads_read == None:
+        if n_threads_read is None:
             self.n_threads_read = self.n_threads
         else:
             self.n_threads_read = n_threads_read
@@ -361,7 +361,7 @@ class TiledDataLoader(TiledData):
             run_whales(self.catalog, self.array, self.n_threads, lon_lat[1, :])
         return self
 
-    def convert_nan_to_median(self):
+    def convert_nan_to_median(self) -> None:
         medians = sb_arr(self.array.shape[0], 1)
         sb.computePercentiles(
             self.array, self.n_threads, range(self.array.shape[1]), medians, [0], [50.0]
@@ -378,13 +378,13 @@ class TiledDataLoader(TiledData):
             # raise Exception("scikit-map ERROR 101")
         sb.maskNanRows(self.array, self.n_threads, range(self.array.shape[0]), medians)
 
-    def filter_valid_pixels(self):
+    def filter_valid_pixels(self) -> None:
         self.array_valid = sb_arr(self.catalog.data_size, self.n_pixels_valid)
         sb.selArrayCols(
             self.array, self.n_threads, self.array_valid, self.pixels_valid_idx
         )
 
-    def expand_valid_pixels(self, array_valid, array_expanded):
+    def expand_valid_pixels(self, array_valid, array_expanded) -> None:
         sb.expandArrayCols(
             array_valid, self.n_threads, array_expanded, self.pixels_valid_idx
         )
@@ -394,7 +394,7 @@ class TiledDataLoader(TiledData):
             [self.pixels_valid_idx + self.n_pixels * i for i in range(n_groups)]
         ).tolist()
 
-    def fill_otf_constant(self, otf_name, otf_const):
+    def fill_otf_constant(self, otf_name, otf_const) -> None:
         otf_idx = self.catalog.get_otf_idx()
         assert otf_name in otf_idx
         otf_name_idx = otf_idx[otf_name]
@@ -451,27 +451,27 @@ class TiledDataExporter(TiledData):
         self.quantiles = quantiles
         self.save_hdf5 = save_hdf5
         if self.mode == "depths_years_quantiles_textures":
-            assert (years != None) & (depths != None) & (quantiles != None), (
+            assert (years is not None) & (depths is not None) & (quantiles is not None), (
                 "Need to provide years, depths, quantiles"
             )
         elif self.mode == "depths_years_quantiles":
-            assert (years != None) & (depths != None) & (quantiles != None), (
+            assert (years is not None) & (depths is not None) & (quantiles is not None), (
                 "Need to provide years, depths, quantiles"
             )
         elif self.mode == "static_depths_quantiles":
-            assert (depths != None) & (quantiles != None), (
+            assert (depths is not None) & (quantiles is not None), (
                 "Need to provide depths, quantiles"
             )
         elif self.mode == "static_quantiles":
-            assert quantiles != None, "Need to provide quantiles"
+            assert quantiles is not None, "Need to provide quantiles"
         elif self.mode == "depths_years":
-            assert (years != None) & (depths != None), "Need to provide years, depths"
+            assert (years is not None) & (depths is not None), "Need to provide years, depths"
         elif self.mode == "depths_years_textures":
-            assert (years != None) & (depths != None), "Need to provide years, depths"
+            assert (years is not None) & (depths is not None), "Need to provide years, depths"
         elif self.mode == "years":
-            assert years != None, "Need to provide years"
+            assert years is not None, "Need to provide years"
         elif self.mode == "probabilities":
-            assert legend != None, "Need to provide legend"
+            assert legend is not None, "Need to provide legend"
         elif (self.mode == "static") | (self.mode == "dominant_class"):
             pass
         else:
@@ -479,7 +479,7 @@ class TiledDataExporter(TiledData):
                 "Available modes: dominant_class, probabilities, depths_years_quantiles_textures, depths_years_quantiles, depths_years, depths_years_textures, years, static_depths_quantiles, static_quantiles, static"
             )
         self.n_layers = len(self._get_out_names("", ""))
-        if (self.n_layers != None) & (self.n_pixels != None):
+        if (self.n_layers is not None) & (self.n_pixels is not None):
             self.array = sb_arr(self.n_layers, n_pixels)
         else:
             self.array = None
@@ -623,7 +623,7 @@ class TiledDataExporter(TiledData):
         return out_files
 
     def check_all_exported(self, prefix, suffix, timeframe=None):
-        assert (self.s3_aliases != None) & (self.s3_prefix != None), (
+        assert (self.s3_aliases is not None) & (self.s3_prefix is not None), (
             "The check requires that S3 is properly set"
         )
         out_files = self._get_out_names(prefix, suffix, timeframe)
@@ -643,7 +643,7 @@ class TiledDataExporter(TiledData):
                         print(f"Missing file {s}")
         return flag
 
-    def derive_block_quantiles_and_mean(self, depths_trees_pred, expm1):
+    def derive_block_quantiles_and_mean(self, depths_trees_pred, expm1) -> None:
         assert self.mode == "depths_years_quantiles", (
             "Mode must be 'depths_years_quantiles'"
         )
@@ -684,7 +684,7 @@ class TiledDataExporter(TiledData):
                 array_t[:, offset_prop] = prop_mean
         sb.transposeArray(array_t, self.n_threads, self.array)
 
-    def derive_static_depths_quantiles_and_mean(self, depths_trees_pred, expm1):
+    def derive_static_depths_quantiles_and_mean(self, depths_trees_pred, expm1) -> None:
         assert self.mode == "static_depths_quantiles", (
             "Mode must be static_depths_quantiles"
         )
@@ -722,7 +722,7 @@ class TiledDataExporter(TiledData):
 
     def derive_block_quantiles_and_mean_textures(
         self, pred_depths_texture1, pred_depths_texture2, k=1.0, a=100.0
-    ):
+    ) -> None:
         assert self.mode == "depths_years_quantiles_textures", (
             "Mode must be 'depths_years_quantiles_textures'"
         )
@@ -858,7 +858,7 @@ class TiledDataExporter(TiledData):
 
     def derive_block_mean_textures(
         self, pred_depths_texture1, pred_depths_texture2, k=1.0, a=100.0
-    ):
+    ) -> None:
         assert self.mode == "depths_years_textures", (
             "Mode must be 'depths_years_textures'"
         )
@@ -922,7 +922,7 @@ class TiledDataExporter(TiledData):
                 array_t[:, offset_silt] = silt_mean[:, 0]
         sb.transposeArray(array_t, self.n_threads, self.array)
 
-    def derive_block_mean(self, depths_pred, expm1):
+    def derive_block_mean(self, depths_pred, expm1) -> None:
         assert self.mode == "depths_years", "Mode must be 'depths_years'"
         self.n_pixels = int(depths_pred[0].array.shape[1] / len(self.years))
         self.array = sb_arr(self.n_layers, self.n_pixels)
@@ -941,7 +941,7 @@ class TiledDataExporter(TiledData):
         if expm1:
             np.expm1(self.array, out=self.array)
 
-    def derive_dominant_class(self, probs):
+    def derive_dominant_class(self, probs) -> None:
         assert self.mode == "dominant_class", "Mode must be 'dominant_class'"
         self.array = sb_arr(1, probs.shape[1])
         legend_map = np.array(list(self.legend.keys()), dtype=int)
@@ -990,7 +990,7 @@ class TiledDataExporter(TiledData):
         },
         timeframe: int | None = None,
         n_threads_write: int | None = None,
-    ):
+    ) -> None:
         with TimeTracker(f"   Prepare data to export for {self.tile_id}", False):
             if scaling_metadata is None:
                 scaling_metadata = 1.0 / scaling

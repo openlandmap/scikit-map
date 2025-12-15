@@ -21,7 +21,7 @@ try:
             np.percentile(data, perc_max) - np.percentile(data, perc_min)
         )
 
-    def _plot_rgb(raster, perc_min=2, perc_max=98):
+    def _plot_rgb(raster, perc_min=2, perc_max=98) -> None:
         bands = range(0, raster.shape[2])
         data_equalized = []
         for band in bands:
@@ -32,7 +32,7 @@ try:
 
     def plot_stac_collection(
         collection, thumb_id="thumbnail", ncols=4, figsize=(15, 25), axes_pad=(0, 0.4)
-    ):
+    ) -> None:
         """
 
         Plot the asset thumbnails for all items of a STAC collection.
@@ -85,7 +85,7 @@ try:
         perc_clip: bool = False,
         perc_min: List[Union[int, float]] = 2,
         perc_max: List[Union[int, float]] = 98,
-    ):
+    ) -> None:
         """
         Plots data from one or more rasters.
 

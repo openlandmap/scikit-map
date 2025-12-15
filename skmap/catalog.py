@@ -12,7 +12,7 @@ from skmap.misc import mmdd_to_doy
 
 
 class DataCatalog:
-    def __init__(self, data, data_size):
+    def __init__(self, data, data_size) -> None:
         self.data = data
         self.data_size = data_size
 
@@ -356,7 +356,7 @@ class DataCatalog:
     def _get_whales(self):
         return self.get_whales(self.data)
 
-    def query(self, feature_names, groups=None):
+    def query(self, feature_names, groups=None) -> None:
         if groups is None:
             groups = self.get_groups()
         if not isinstance(groups, list):
@@ -392,7 +392,7 @@ class DataCatalog:
         if missing_features_names:
             self.add_otf_features(missing_features_names)
 
-    def add_otf_features(self, otf_features):
+    def add_otf_features(self, otf_features) -> None:
         if "otf" not in self.data:
             self.data["otf"] = {}
         for otf_feature in otf_features:
@@ -422,7 +422,7 @@ class DataCatalog:
                     data[dep_key][dep_name]["exec_order"] = dep_exec_order
         return data, data_size
 
-    def _expand_whales_dependencies(self, reference_catalog_data):
+    def _expand_whales_dependencies(self, reference_catalog_data) -> None:
         self.data, self.data_size = self.expand_whales_dependencies(
             reference_catalog_data, self.data, self.data_size
         )
@@ -453,7 +453,7 @@ class DataCatalog:
 
 
 #
-def print_catalog_statistics(catalog: DataCatalog):
+def print_catalog_statistics(catalog: DataCatalog) -> None:
     groups = list(catalog.data.keys())
     groups.sort()
     print(f"catalog groups: {groups}")
@@ -535,7 +535,7 @@ def parse_template_whale(whale):
     return func_name, params
 
 
-def run_whales(catalog: DataCatalog, array, n_threads, lat_info=None):
+def run_whales(catalog: DataCatalog, array, n_threads, lat_info=None) -> None:
     # Computing on the fly covariates
     whale_paths, whale_keys, whale_names = catalog._get_whales()
     max_exec_order = 0

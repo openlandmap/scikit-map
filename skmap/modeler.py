@@ -1,7 +1,7 @@
 import os
 import random
 import threading
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, NoReturn
 
 import joblib
 import numpy as np
@@ -58,7 +58,8 @@ def _get_out_files_depths(
 def _tree_based_load_model(model_path):
     if model_path.endswith((".joblib", ".lz4", ".pkl")):
         model = joblib.load(model_path)
-        predict_fn = lambda predictor, data: predictor.predict(data)
+        def predict_fn(predictor, data):
+            return predictor.predict(data)
     elif model_path.endswith(".so"):
         import tl2cgen
 
@@ -116,14 +117,14 @@ class Modeler:
         self.model = None
         self.model_covs = None
 
-    def _load_model(self):
+    def _load_model(self) -> None:
         if self.model_path.endswith((".joblib", ".lz4", ".pkl")):
             model = joblib.load(self.model_path)
         else:
             raise ValueError(f"Invalid model path extension '{self.model_path}'")
         self.model = model
 
-    def _load_covs(self):
+    def _load_covs(self) -> None:
         if self.model_covs_path is not None:
             with open(self.model_covs_path, "r") as file:
                 model_covs = [line.strip() for line in file]
@@ -143,7 +144,7 @@ class Modeler:
                 raise ValueError("No feature names was found")
         self.model_covs = model_covs
 
-    def _prepare_covariates(self, data: TiledDataLoader):
+    def _prepare_covariates(self, data: TiledDataLoader) -> None:
         # prepare input and output arrays
         n_groups = len(data.catalog.get_groups())
         n_samples = n_groups * data.n_pixels
@@ -162,7 +163,7 @@ class Modeler:
             data.get_pixels_valid_idx(n_groups),
         )
 
-    def predict():
+    def predict() -> NoReturn:
         raise NotImplementedError()
 
 
@@ -240,7 +241,7 @@ class RFRegressorTrees(Regressor):
         # predict
         with TimeTracker("          Model prediction", False):
 
-            def _single_prediction(predict, X, out, i, lock):
+            def _single_prediction(predict, X, out, i, lock) -> None:
                 prediction = predict(X, check_input=False)
                 with lock:
                     out[i, :] = prediction
@@ -373,7 +374,7 @@ class Predicted:
                 (self.n_groups, self.data.n_pixels_valid, self.n_depths, self.n_stats)
             )
 
-    def average_trees_depth_ranges(self):
+    def average_trees_depth_ranges(self) -> None:
         assert self.n_depths > 1
         self.n_depths -= 1
         for i in range(self.n_depths):
@@ -383,7 +384,7 @@ class Predicted:
             ]
             self._out_valid[i, :, : self.n_groups, :] /= 2
 
-    def average_trees_year_ranges(self):
+    def average_trees_year_ranges(self) -> None:
         assert self.n_groups > 1
         self.n_groups -= 1
         for j in range(self.n_groups):
@@ -393,7 +394,7 @@ class Predicted:
             ]
             self._out_valid[: self.n_depths, :, j, :] /= 2
 
-    def compute_stats(self, mean=True, quantiles=[0.025, 0.975], expm1=False, scale=1):
+    def compute_stats(self, mean=True, quantiles=[0.025, 0.975], expm1=False, scale=1) -> None:
         quantile_idx = 1 if mean else 0
         self.n_stats = quantile_idx + len(quantiles)
         assert self.n_stats > 0
@@ -609,12 +610,12 @@ class PredictedProbs:
     def predicted_class(self):
         return self._out_cls_valid.reshape((self.n_groups, self.data.n_pixels_valid))
 
-    def compute_class(self):
+    def compute_class(self) -> None:
         self._out_cls_valid[:, 0] = self.legend_codes[
             np.argmax(self._out_probs_valid[:, :], axis=-1).astype(int)
         ]
 
-    def compute_kl_divergence(self):
+    def compute_kl_divergence(self) -> None:
         adjusted_data = np.where(
             self._out_probs_valid[:, :] > 0,
             self._out_probs_valid[:, :],
