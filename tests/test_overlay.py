@@ -1,14 +1,6 @@
 from pathlib import Path
 
-import pandas as pd
-import pytest
 
-from skmap.overlay import (
-    SpaceOverlay as so,
-)
-from skmap.overlay import (
-    SpaceTimeOverlay as sto,
-)
 from skmap.overlay import (
     _ParallelOverlay as _po,
 )

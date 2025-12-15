@@ -7,8 +7,6 @@ data from GeoNetwork
 import base64
 import gzip
 import sys
-import tempfile
-from io import BytesIO
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent

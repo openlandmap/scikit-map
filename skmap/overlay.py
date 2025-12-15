@@ -1,7 +1,7 @@
 import hashlib
 import itertools
 from pathlib import Path
-from typing import List, Union
+from typing import Union
 
 import geopandas as gpd
 import numpy as np

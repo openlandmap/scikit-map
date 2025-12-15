@@ -1,5 +1,4 @@
 import json
-import os
 import random
 import re
 import sys
@@ -47,7 +46,7 @@ class DataCatalog:
         )
         data = {}
         years = [str(year) for year in years]
-        if not "common" in years:  # common is default
+        if "common" not in years:  # common is default
             years += ["common"]
 
         features_names = cls._get_feature_names(catalog_dict)
@@ -362,7 +361,7 @@ class DataCatalog:
             groups = self.get_groups()
         if not isinstance(groups, list):
             raise ValueError("Invalid `groups` parameter. Expecting a list.")
-        if not "common" in groups:  # include 'common' group by default
+        if "common" not in groups:  # include 'common' group by default
             groups = groups + ["common"]
         old_data = self.data.copy()
         self.data = {}

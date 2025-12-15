@@ -1,6 +1,5 @@
 from datetime import datetime
 
-import pytest
 
 from skmap.misc import date_range
 
