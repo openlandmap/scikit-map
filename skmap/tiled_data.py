@@ -451,13 +451,13 @@ class TiledDataExporter(TiledData):
         self.quantiles = quantiles
         self.save_hdf5 = save_hdf5
         if self.mode == "depths_years_quantiles_textures":
-            assert (years is not None) & (depths is not None) & (quantiles is not None), (
-                "Need to provide years, depths, quantiles"
-            )
+            assert (
+                (years is not None) & (depths is not None) & (quantiles is not None)
+            ), "Need to provide years, depths, quantiles"
         elif self.mode == "depths_years_quantiles":
-            assert (years is not None) & (depths is not None) & (quantiles is not None), (
-                "Need to provide years, depths, quantiles"
-            )
+            assert (
+                (years is not None) & (depths is not None) & (quantiles is not None)
+            ), "Need to provide years, depths, quantiles"
         elif self.mode == "static_depths_quantiles":
             assert (depths is not None) & (quantiles is not None), (
                 "Need to provide depths, quantiles"
@@ -465,9 +465,13 @@ class TiledDataExporter(TiledData):
         elif self.mode == "static_quantiles":
             assert quantiles is not None, "Need to provide quantiles"
         elif self.mode == "depths_years":
-            assert (years is not None) & (depths is not None), "Need to provide years, depths"
+            assert (years is not None) & (depths is not None), (
+                "Need to provide years, depths"
+            )
         elif self.mode == "depths_years_textures":
-            assert (years is not None) & (depths is not None), "Need to provide years, depths"
+            assert (years is not None) & (depths is not None), (
+                "Need to provide years, depths"
+            )
         elif self.mode == "years":
             assert years is not None, "Need to provide years"
         elif self.mode == "probabilities":

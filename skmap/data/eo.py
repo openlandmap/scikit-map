@@ -254,9 +254,7 @@ class GLADLandsat:
             output_dir = Path(output_dir)
 
         fn_raster = (
-            output_dir.joinpath(f"{start}")
-            .joinpath("B1_COUNT")
-            .joinpath(f"{tile}.tif")
+            output_dir.joinpath(f"{start}").joinpath("B1_COUNT").joinpath(f"{tile}.tif")
         )
 
         dtype = "uint8"
@@ -1258,7 +1256,9 @@ try:
                     catalog_type=catalog_type,
                 )
 
-        def _s3_fput_object(self, fpath, output_dir, client, s3_bucket_name, s3_prefix) -> bool:
+        def _s3_fput_object(
+            self, fpath, output_dir, client, s3_bucket_name, s3_prefix
+        ) -> bool:
             if fpath.is_file():
                 object_name = fpath.relative_to(output_dir.name)
                 if s3_prefix:
@@ -1365,7 +1365,9 @@ try:
 
         """
 
-        def __init__(self, catalog: Catalog, index_dir="stac_index", verbose=False) -> None:
+        def __init__(
+            self, catalog: Catalog, index_dir="stac_index", verbose=False
+        ) -> None:
             self.catalog = catalog
             self.index_dir = index_dir
             self.verbose = verbose

@@ -14,7 +14,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Callable, List, Union, Optional
+from typing import Callable, List, Optional, Union
 from uuid import uuid4
 
 import numpy
