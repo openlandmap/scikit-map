@@ -1,6 +1,5 @@
 from datetime import datetime
 
-
 from skmap.misc import date_range
 
 
@@ -16,21 +15,21 @@ class TestDateRange:
 
         return sep.join(result)
 
-    def test_001(self):
+    def test_001(self) -> None:
         assert self._pluck_year(
             date_range("2013-01-01", "2016-01-01", "months", 1, ignore_29feb=True)
         ) == self._pluck_year(
             date_range("2016-01-01", "2019-01-01", "months", 1, ignore_29feb=True)
         )
 
-    def test_002(self):
+    def test_002(self) -> None:
         assert self._pluck_year(
             date_range("2013-01-01", "2016-01-01", "months", 1, ignore_29feb=True)
         ) != self._pluck_year(
             date_range("2016-01-01", "2019-01-01", "months", 1, ignore_29feb=False)
         )
 
-    def test_003(self):
+    def test_003(self) -> None:
         assert self._pluck_year(
             date_range(
                 "2013001", "2016001", "months", 1, date_format="%Y%j", ignore_29feb=True
@@ -41,7 +40,7 @@ class TestDateRange:
             )
         )
 
-    def test_004(self):
+    def test_004(self) -> None:
         assert self._pluck_year(
             date_range(
                 "2013001", "2016001", "months", 1, date_format="%Y%j", ignore_29feb=True
@@ -57,7 +56,7 @@ class TestDateRange:
             )
         )
 
-    def test_005(self):
+    def test_005(self) -> None:
         date_step = ([16] * 22) + [13]
         assert self._pluck_year(
             date_range(
@@ -79,7 +78,7 @@ class TestDateRange:
             )
         )
 
-    def test_006(self):
+    def test_006(self) -> None:
         date_step = ([16] * 22) + [13]
         assert self._pluck_year(
             date_range(
@@ -101,7 +100,7 @@ class TestDateRange:
             )
         )
 
-    def test_007(self):
+    def test_007(self) -> None:
         date_step = ([16] * 22) + [13]
         assert self._pluck_year(
             date_range(
@@ -125,7 +124,7 @@ class TestDateRange:
             )
         )
 
-    def test_008(self):
+    def test_008(self) -> None:
         date_step = ([16] * 22) + [13]
         assert self._pluck_year(
             date_range(

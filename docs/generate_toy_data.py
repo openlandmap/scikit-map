@@ -246,7 +246,7 @@ def gen_dataset(
     swir1_outdir,
     ndvi_outdir,
     samples_outdir,
-):
+) -> None:
     ds = rasterio.open(ndvi_rasters[0])
 
     ttprint("Reading static rasters")

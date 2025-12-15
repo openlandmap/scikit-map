@@ -182,14 +182,15 @@ class _ParallelOverlay:
                     }
                 )
 
-        gdf_blocks: gpd.GeoDataFrame = gpd.GeoDataFrame(
-            gdf_blocks, crs=src.crs
-        ).reset_index(drop=True)
+        # convert list-of-dicts to gdf
+        gdf_blocks = gpd.GeoDataFrame(gdf_blocks, crs=src.crs).reset_index(drop=True)
 
         src.close()
 
         assert gdf_blocks.crs is not None, f"The layer {path} has not crs, need fix"
-        gdf_blocks: gpd.GeoDataFrame = (
+
+        # join with samples
+        gdf_blocks = (
             samples.to_crs(gdf_blocks.crs)
             .sjoin(gdf_blocks, how="inner")
             .rename(columns={"index_right": "block_id"})
@@ -534,7 +535,7 @@ class SpaceOverlay:
                 block_width_chunk = block_width_comb[
                     chunk_start : chunk_start + max_comb_chunk
                 ]
-                key_layer_nodatas_chunk = key_layer_nodatas_comb[
+                key_layer_nodatas_comb[
                     chunk_start : chunk_start + max_comb_chunk
                 ]
                 unique_blocks_ids_chunk = unique_blocks_ids_comb[
