@@ -530,6 +530,15 @@ void castFloat64ToFloat32(
  * @{
  */
 
+
+/** @brief see `TransArray::nanMean` */
+void nanMean(Eigen::Ref<MatFloat> data, const uint_t n_threads,
+             Eigen::Ref<VecFloat> out_data) {
+  TransArray transArray(data, n_threads);
+  transArray.nanMean(out_data);
+}
+
+/** @brief see `TransArray::blocksAverage` */
 void blocksAverage(Eigen::Ref<MatFloat> out, const uint_t n_threads,
                    Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2,
                    uint_t n_pix, uint_t y) {
@@ -571,13 +580,6 @@ void texturesBwTransform(Eigen::Ref<MatFloat> texture_1, const uint_t n_threads,
                          Eigen::Ref<MatFloat> clay) {
   TransArray transArray(texture_1, n_threads);
   transArray.texturesBwTransform(texture_2, k, a, sand, silt, clay);
-}
-
-/** @brief see `TransArray::nanMean` */
-void nanMean(Eigen::Ref<MatFloat> data, const uint_t n_threads,
-             Eigen::Ref<VecFloat> out_data) {
-  TransArray transArray(data, n_threads);
-  transArray.nanMean(out_data);
 }
 
 void linearRegression(Eigen::Ref<MatFloat> data, const uint_t n_threads,
@@ -842,10 +844,10 @@ PYBIND11_MODULE(skmap_bindings, m) {
         "Mask outliers by difference from a reference");
   m.def("extractIndicators", &extractIndicators, "Extract classes indicators");
   m.def("blocksAverage", &blocksAverage,
-        "Vecorized average of 4 neighbor elemnts");
+        "Vecorized average of 4 neighbor elements");
   m.def("texturesBwTransform", &texturesBwTransform, "Texture transformation");
   m.def("blocksAverageVecs", &blocksAverageVecs,
-        "Vecorized average of 4 neighbor elemnts");
+        "Vecorized average of 4 neighbor elements");
   m.def("elementwiseAverage", &elementwiseAverage,
         "Vecorized average between two arrays elements");
   m.def("extractOverlay", &extractOverlay, "Extract overlay data");

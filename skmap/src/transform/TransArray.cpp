@@ -216,6 +216,21 @@ void TransArray::slidingWindowClassMode(Eigen::Ref<MatFloat> out_data,
   this->parForRange(slidingWindowClassModeCol, m_data.cols());
 }
 
+void TransArray::elementwiseAverage(Eigen::Ref<MatFloat> in1,
+                                    Eigen::Ref<MatFloat> in2) {
+  skmapAssertIfTrue(((uint_t)in1.cols() != (uint_t)in2.cols()),
+                    "scikit-map ERROR 52: the two input arrays must have the "
+                    "same number of columns");
+  auto elementwiseAverageChunk = [&](Eigen::Ref<MatFloat> chunk,
+                                     uint_t row_start, uint_t row_end) {
+    chunk.array() =
+        0.5 *
+        (in1.block(row_start, 0, row_end - row_start, in1.cols()).array() +
+         in2.block(row_start, 0, row_end - row_start, in2.cols()).array());
+  };
+  this->parChunk(elementwiseAverageChunk);
+}
+
 void TransArray::blocksAverage(Eigen::Ref<MatFloat> in1,
                                Eigen::Ref<MatFloat> in2, uint_t n_pix,
                                uint_t y) {
@@ -246,21 +261,6 @@ void TransArray::blocksAverageVecs(Eigen::Ref<MatFloat> in1,
                 in2(0, i + y * n_pix) + in2(0, i + (y + 1) * n_pix));
   };
   this->parForRange(blocksAverageVecsElem, n_pix);
-}
-
-void TransArray::elementwiseAverage(Eigen::Ref<MatFloat> in1,
-                                    Eigen::Ref<MatFloat> in2) {
-  skmapAssertIfTrue(((uint_t)in1.cols() != (uint_t)in2.cols()),
-                    "scikit-map ERROR 52: the two input arrays must have the "
-                    "same number of columns");
-  auto elementwiseAverageChunk = [&](Eigen::Ref<MatFloat> chunk,
-                                     uint_t row_start, uint_t row_end) {
-    chunk.array() =
-        0.5 *
-        (in1.block(row_start, 0, row_end - row_start, in1.cols()).array() +
-         in2.block(row_start, 0, row_end - row_start, in2.cols()).array());
-  };
-  this->parChunk(elementwiseAverageChunk);
 }
 
 void TransArray::swapRowsValues(std::vector<uint_t> row_select,
