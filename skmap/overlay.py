@@ -463,7 +463,7 @@ class SpaceOverlay:
                 ttprint(
                     f"Loading and sampling {len(set(key_layer_ids))} raster layers for group {key}"
                 )
-            layer_nodata_dict = layers.set_index("layer_id")["nodata"].to_dict()
+            # layer_nodata_dict = layers.set_index("layer_id")["nodata"].to_dict()
             key_layer_ids_comb, unique_blocks_ids_comb = map(
                 list, zip(*itertools.product(key_layer_ids, unique_blocks_ids))
             )
@@ -486,10 +486,10 @@ class SpaceOverlay:
             key_layer_paths_comb = [
                 layer_path_dict[ulid] for ulid in key_layer_ids_comb
             ]
-            key_layer_nodatas_comb = [
-                np.nan if layer_nodata_dict[ulid] is None else layer_nodata_dict[ulid]
-                for ulid in key_layer_ids_comb
-            ]
+            # key_layer_nodatas_comb = [
+            #     np.nan if layer_nodata_dict[ulid] is None else layer_nodata_dict[ulid]
+            #     for ulid in key_layer_ids_comb
+            # ]
             n_comb = len(key_layer_paths_comb)
             bands_list = [1]
             if "tile_id" in query_pixels[key].columns:
@@ -535,9 +535,7 @@ class SpaceOverlay:
                 block_width_chunk = block_width_comb[
                     chunk_start : chunk_start + max_comb_chunk
                 ]
-                key_layer_nodatas_comb[
-                    chunk_start : chunk_start + max_comb_chunk
-                ]
+                # key_layer_nodatas_comb[chunk_start : chunk_start + max_comb_chunk]
                 unique_blocks_ids_chunk = unique_blocks_ids_comb[
                     chunk_start : chunk_start + max_comb_chunk
                 ]
