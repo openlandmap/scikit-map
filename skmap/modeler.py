@@ -1,31 +1,17 @@
-from typing import List, Callable, Optional
 import os
 import random
-from sklearn.ensemble import RandomForestRegressor
-import joblib
 import threading
-import numpy as np
-from joblib import Parallel, delayed
-from skmap.tiled_data import TiledData, TiledDataLoader
-import skmap_bindings as sb
-from skmap.misc import _make_dir, TimeTracker, _rm_dir, sb_arr
+from typing import Callable, List, Optional
 
-os.environ["USE_PYGEOS"] = "0"
-os.environ["PROJ_LIB"] = "/opt/conda/share/proj/"
-n_cpus = os.cpu_count()
-n_threads = n_cpus
-os.environ["OMPI_MCA_rmaps_base_oversubscribe"] = "1"
-os.environ["USE_PYGEOS"] = "0"
-os.environ["PROJ_LIB"] = "/opt/conda/share/proj/"
-os.environ["NUMEXPR_MAX_THREADS"] = f"{n_threads}"
-os.environ["NUMEXPR_NUM_THREADS"] = f"{n_threads}"
-os.environ["OMP_THREAD_LIMIT"] = f"{n_threads}"
-os.environ["OMP_NUM_THREADS"] = f"{n_threads}"
-os.environ["OPENBLAS_NUM_THREADS"] = f"{n_threads}"
-os.environ["MKL_NUM_THREADS"] = f"{n_threads}"
-os.environ["VECLIB_MAXIMUM_THREADS"] = f"{n_threads}"
-os.environ["OMP_DYNAMIC"] = f"TRUE"
-os.environ["TREELITE_BIND_THREADS"] = "0"
+import joblib
+import numpy as np
+import skmap_bindings as sb
+from joblib import Parallel, delayed
+from sklearn.ensemble import RandomForestRegressor
+
+import skmap.set_env  # noqa: F401
+from skmap.misc import TimeTracker, _make_dir, _rm_dir, sb_arr
+from skmap.tiled_data import TiledData, TiledDataLoader
 
 
 def _get_out_files_depths(
@@ -82,7 +68,7 @@ def _tree_based_load_model(model_path):
             print(
                 "The current installation of tl2cgen is not the one with parallel DMatrix and can be slow"
             )
-        model = tl2cgen.Predictor(model_path, nthread=n_cpus)
+        model = tl2cgen.Predictor(model_path, nthread=os.cpu_count())
 
         def predict_tl2cgen(predictor, data):
             dmat = tl2cgen.DMatrix(data, dtype="float32")
@@ -98,7 +84,6 @@ def _tree_based_load_model(model_path):
             return res
 
         predict_fn = predict_tl2cgen
-        os.environ["TREELITE_BIND_THREADS"] = "0"
     else:
         raise ValueError(f"Invalid model path extension '{model_path}'")
     return model, predict_fn
