@@ -8,13 +8,13 @@ from setuptools.command.build_ext import build_ext
 
 
 class CMakeExtension(Extension):
-    def __init__(self, name, sourcedir=""):
+    def __init__(self, name: str, sourcedir: str="") -> None:
         super().__init__(name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
 
 
 class CMakeBuild(build_ext):
-    def run(self):
+    def run(self) -> None:
         try:
             subprocess.check_output(["cmake", "--version"])
         except OSError:
@@ -25,7 +25,7 @@ class CMakeBuild(build_ext):
         for ext in self.extensions:
             self.build_extension(ext)
 
-    def build_extension(self, ext):
+    def build_extension(self, ext) -> None:
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         cfg = "Release" if not self.debug else "Debug"
         build_args = ["--config", cfg]

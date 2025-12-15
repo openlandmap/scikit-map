@@ -6,18 +6,18 @@ from skmap.catalog import DataCatalog as c
 
 
 class TestDataCatalog:
-    def test_path(self):
+    def test_path(self) -> None:
         print(Path(".").absolute())
         assert Path(
             "skmap/data/toy/ndvi/gappy/ndvi_landsat.ard1_p50_30m_s_20141202_20150320_nl_epsg.3035_v20230720.tif"
         ).exists()
 
-    def test__get_features_names(self):
+    def test__get_features_names(self) -> None:
         assert c._get_feature_names(
             {"a": {"hello": "hii"}, "b": {"world": "Gaia"}}
         ) == ["hello", "world"]
 
-    def test_get_whales(self):
+    def test_get_whales(self) -> None:
         assert c.get_whales(
             {
                 "common": {
@@ -35,7 +35,7 @@ class TestDataCatalog:
             }
         ) == (["/whale/expr"], ["common"], ["example"])
 
-    def test_create_catalog_minimal(self):
+    def test_create_catalog_minimal(self) -> None:
         catalog = c.create_catalog(
             catalog_def=pd.DataFrame(
                 {
@@ -65,7 +65,7 @@ class TestDataCatalog:
         )
         assert catalog.get_feature_names() == ["example", "layer"]
 
-    def test_create_catalog_year(self):
+    def test_create_catalog_year(self) -> None:
         catalog = c.create_catalog(
             pd.DataFrame(
                 {
@@ -118,7 +118,7 @@ class TestDataCatalog:
         )
         assert catalog.get_feature_names() == ["layer_YYYY"]
 
-    def test_create_catalog_year_plusminus(self):
+    def test_create_catalog_year_plusminus(self) -> None:
         catalog = c.create_catalog(
             pd.DataFrame(
                 {
@@ -171,7 +171,7 @@ class TestDataCatalog:
         )
         assert catalog.get_feature_names() == ["layer_YYMO-YYPO"]
 
-    def test_create_catalog_monthly(self):
+    def test_create_catalog_monthly(self) -> None:
         catalog = c.create_catalog(
             pd.DataFrame(
                 {
@@ -248,7 +248,7 @@ class TestDataCatalog:
             "layer_YYYY06-YYYY12",
         ]
 
-    def test_create_catalog_perc(self):
+    def test_create_catalog_perc(self) -> None:
         catalog = c.create_catalog(
             catalog_def=pd.DataFrame(
                 {
