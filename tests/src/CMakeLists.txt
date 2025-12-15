@@ -24,6 +24,7 @@ add_executable(unit_tests
     io/test_warp_tile.cpp
     transform/test_mangling.cpp
     transform/test_manipulation.cpp
+    transform/test_processing.cpp
 )
 
 target_link_libraries(unit_tests

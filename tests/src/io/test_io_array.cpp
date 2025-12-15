@@ -6,7 +6,6 @@
 using namespace skmap;
 
 TEST(Io, test_write_data) {
-
   std::vector<std::string> file_names = {"test"};
   std::string base_folder = std::filesystem::temp_directory_path();
   int16_t nodata = -1;
