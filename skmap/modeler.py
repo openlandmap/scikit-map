@@ -1,7 +1,7 @@
 import os
 import random
 import threading
-from typing import Callable, List, Optional, NoReturn
+from typing import Callable, List, NoReturn, Optional
 
 import joblib
 import numpy as np
@@ -58,6 +58,7 @@ def _get_out_files_depths(
 def _tree_based_load_model(model_path):
     if model_path.endswith((".joblib", ".lz4", ".pkl")):
         model = joblib.load(model_path)
+
         def predict_fn(predictor, data):
             return predictor.predict(data)
     elif model_path.endswith(".so"):
@@ -394,7 +395,9 @@ class Predicted:
             ]
             self._out_valid[: self.n_depths, :, j, :] /= 2
 
-    def compute_stats(self, mean=True, quantiles=[0.025, 0.975], expm1=False, scale=1) -> None:
+    def compute_stats(
+        self, mean=True, quantiles=[0.025, 0.975], expm1=False, scale=1
+    ) -> None:
         quantile_idx = 1 if mean else 0
         self.n_stats = quantile_idx + len(quantiles)
         assert self.n_stats > 0

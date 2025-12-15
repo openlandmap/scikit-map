@@ -511,7 +511,9 @@ try:
         https://github.com/mhvwerts/whittaker-eilers-smoother/blob/master/whittaker_smooth.py
         """
 
-        def __init__(self, lmbd=1, d=2, n_jobs: int = os.cpu_count(), verbose=False) -> None:
+        def __init__(
+            self, lmbd=1, d=2, n_jobs: int = os.cpu_count(), verbose=False
+        ) -> None:
             super().__init__(name="whittaker", verbose=verbose, temporal=True)
 
             self.lmbd = lmbd

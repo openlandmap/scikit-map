@@ -221,7 +221,6 @@ try:
             sources = {}
 
             def _read_worker(window: rio.windows.Window):
-
                 tname = threading.current_thread().name
                 if tname not in sources:
                     sources[tname] = [self._open(sp) for sp in src_path]

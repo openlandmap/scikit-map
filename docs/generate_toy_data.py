@@ -7,7 +7,7 @@ import rasterio
 from rasterio.windows import Window, bounds
 from skmap.mapper import SpaceTimeOverlay
 
-from skmap.io import save_rasters, read_rasters_cpp
+from skmap.io import read_rasters_cpp, save_rasters
 from skmap.misc import ttprint
 
 DEFAULT = {
