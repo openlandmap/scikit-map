@@ -10,8 +10,6 @@
 using namespace skmap;
 
 const uint_t THREADS = 42;
-constexpr float_t NAN_FLOAT = std::numeric_limits<float_t>::quiet_NaN();
-// constexpr float NAN_FLOAT = std::numeric_limits<float>::quiet_NaN();
 
 class TransArrayTest : public ::testing::Test {
 protected:
@@ -27,9 +25,9 @@ protected:
         9.0,10.,11.,12.;
     nanny.resize(3,3);
     nanny <<
-      NAN,1.0,NAN,
-      1.0,NAN,1.0,
-      NAN,1.0,NAN;
+      nan_v,  1.0,nan_v,
+        1.0,nan_v,  1.0,
+      nan_v,  1.0,nan_v;
     // clang-format on
   }
 };

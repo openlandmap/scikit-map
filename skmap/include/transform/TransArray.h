@@ -359,6 +359,19 @@ public:
                                    std::vector<uint_t> result_indices,
                                    std::vector<float_t> days_of_year);
 
+  /**
+   * @ingroup processing
+   * @brief Computes per-pixel percentiles across layers
+   *
+   * This works on transposed data where layers are columns and rows are pixels
+   *
+   * \image HTML compute_percentiles.svg
+   *
+   * @param col_in_select The columns to use for computing percentiles
+   * @param out_data Output array, should have `n_pix` rows
+   * @param col_out_select columns in Output array to fill
+   * @param percentiles List of percentiles `[0-100]`
+   */
   void computePercentiles(std::vector<uint_t> col_in_select,
                           Eigen::Ref<MatFloat> out_data,
                           std::vector<uint_t> col_out_select,
