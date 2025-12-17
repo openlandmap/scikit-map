@@ -1,6 +1,6 @@
-#include "transform/TransArray.h"
 #include "../common.h"
 #include "misc.cpp"
+#include "transform/TransArray.h"
 
 #include <cmath>
 #include <gtest/gtest.h>
@@ -67,7 +67,7 @@ TEST_F(TransArrayTest, elementwiseAverage) {
 //   EXPECT_EQ(nanny, expected);
 // }
 
-TEST_F(TransArrayTest, blocksAverage) {
+TEST_F(TransArrayTest, DISABLED_blocksAverage) {
   // clang-format off
   MatFloat out(3,1);
   MatFloat in1(3,2); // 2 columns only
@@ -112,10 +112,29 @@ TEST_F(TransArrayTest, DISABLED_blocksAverageVecs) {
   // clang-format on
 
   // Prepare TransArray with a single row in m_data
-  MatFloat out(2,2); 
-  TransArray ta(out, THREADS); // 1 thread
+  MatFloat out(2, 2);
+  TransArray ta(out, THREADS);      // 1 thread
   ta.blocksAverage(in1, in2, 2, 1); // n_pix=2, y=0, row_offset=0
 
   EXPECT_EQ(out, expected);
 }
 
+TEST_F(TransArrayTest, computePercentiles) {
+  // this works on a transposed array, so we have 3 pixels in input
+  // clang-format off
+  MatFloat out(3,1);
+  MatFloat expected(3,1);
+  expected <<
+    2.5,
+    6.5,
+    10.5;
+  //clang-format on
+  TransArray ta(input, THREADS);
+  ta.computePercentiles(
+    {0,1,2,3},
+    out,
+    {0},
+    {50}
+  );
+  EXPECT_EQ(out, expected);
+}

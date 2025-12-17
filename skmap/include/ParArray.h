@@ -47,8 +47,8 @@ public:
   /**
    * @brief Process row chunks in parallel by `f_in`
    *
-   * Will divide the matrix into approximately equal blocks, where the remainder is shared over the
-   * first number of chunks
+   * Will divide the matrix into approximately equal blocks, where the remainder
+   * is shared over the first number of chunks
    *
    * @param f_in The function to apply to each chunk
    */

@@ -684,14 +684,16 @@ void TransArray::computePercentiles(std::vector<uint_t> col_in_select,
   skmapAssertIfTrue(col_out_select.size() != percentiles.size(),
                     "scikit-map ERROR 19: out_data too small");
   // @FIXME: the clean way would be that also for out_data a ParArray object is
-  // created and that only the corresponding cunk is sent
+  // created and that only the corresponding chunk is sent
   auto computePercentilesChunk = [&](Eigen::Ref<MatFloat> rows_block,
                                      uint_t row_start, uint_t row_end) {
+    // copy the data for sorting
     MatFloat chunk(rows_block.rows(), col_in_select.size());
     for (size_t i = 0; i < col_in_select.size(); ++i) {
       chunk.col(i) = rows_block.col(col_in_select[i]);
     }
 
+    // sort the copied chunk
     MatFloat sorted_chunk(chunk);
     float_t max_float = std::numeric_limits<float_t>::max();
     sorted_chunk = sorted_chunk.array().isNaN().select(max_float, sorted_chunk);
@@ -707,7 +709,9 @@ void TransArray::computePercentiles(std::vector<uint_t> col_in_select,
       not_nan_count(i) = chunk.cols() - (chunk.row(i).array().isNaN()).count();
     }
 
+    // for all percentiles
     for (uint_t k = 0; k < percentiles.size(); ++k) {
+      // on all rows (which are pixels)
       for (uint_t i = 0; i < (uint_t)sorted_chunk.rows(); ++i) {
         if (not_nan_count(i) == 0) {
           out_data(row_start + i, col_out_select[k]) = nan_v;

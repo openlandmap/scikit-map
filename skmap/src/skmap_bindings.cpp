@@ -530,7 +530,6 @@ void castFloat64ToFloat32(
  * @{
  */
 
-
 /** @brief see `TransArray::nanMean` */
 void nanMean(Eigen::Ref<MatFloat> data, const uint_t n_threads,
              Eigen::Ref<VecFloat> out_data) {
@@ -699,6 +698,7 @@ void computeGeometricTemperature(
                                          days_of_year);
 }
 
+/** @brief see `TransArray::computePercentiles` */
 void computePercentiles(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                         std::vector<uint_t> col_in_select,
                         Eigen::Ref<MatFloat> out_data,
