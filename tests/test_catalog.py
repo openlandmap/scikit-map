@@ -64,6 +64,11 @@ class TestDataCatalog:
             [0, 1],
         )
         assert catalog.get_feature_names() == ["example", "layer"]
+        assert catalog.get_paths() == (
+            ["sample/path.tif", "wrong/file.tif"],
+            [0, 1],
+            ["example", "layer"],
+        )
 
     def test_create_catalog_year(self) -> None:
         catalog = c.create_catalog(
@@ -117,6 +122,15 @@ class TestDataCatalog:
             [0, 1, 2],
         )
         assert catalog.get_feature_names() == ["layer_YYYY"]
+        assert catalog.get_paths() == (
+            [
+                "path/to/param_2014.tif",
+                "path/to/param_2015.tif",
+                "path/to/param_2015.tif",
+            ],
+            [0, 1, 2],
+            ["layer_YYYY", "layer_YYYY", "layer_YYYY"],
+        )
 
     def test_create_catalog_year_plusminus(self) -> None:
         catalog = c.create_catalog(
@@ -170,6 +184,15 @@ class TestDataCatalog:
             [0, 1, 2],
         )
         assert catalog.get_feature_names() == ["layer_YYMO-YYPO"]
+        assert catalog.get_paths() == (
+            [
+                "path/to/param_2013-2015.tif",
+                "path/to/param_2014-2016.tif",
+                "path/to/param_2014-2016.tif",
+            ],
+            [0, 1, 2],
+            ["layer_YYMO-YYPO", "layer_YYMO-YYPO", "layer_YYMO-YYPO"],
+        )
 
     def test_create_catalog_monthly(self) -> None:
         catalog = c.create_catalog(
@@ -247,6 +270,25 @@ class TestDataCatalog:
             "layer_YYYY01-YYYY05",
             "layer_YYYY06-YYYY12",
         ]
+        assert catalog.get_paths() == (
+            [
+                "path/to/param_201401-201405.tif",
+                "path/to/param_201406-201412.tif",
+                "path/to/param_201501-201505.tif",
+                "path/to/param_201506-201512.tif",
+                "path/to/param_201501-201505.tif",
+                "path/to/param_201506-201512.tif",
+            ],
+            [0, 1, 2, 3, 4, 5],
+            [
+                "layer_YYYY01-YYYY05",
+                "layer_YYYY06-YYYY12",
+                "layer_YYYY01-YYYY05",
+                "layer_YYYY06-YYYY12",
+                "layer_YYYY01-YYYY05",
+                "layer_YYYY06-YYYY12",
+            ],
+        )
 
     def test_create_catalog_perc(self) -> None:
         catalog = c.create_catalog(
@@ -290,3 +332,13 @@ class TestDataCatalog:
             "layer_p75",
             "layer_sd",
         ]
+        assert catalog.get_paths() == (
+            [
+                "sample/path_p25.tif",
+                "sample/path_p50.tif",
+                "sample/path_p75.tif",
+                "sample/path_sd.tif",
+            ],
+            [0, 1, 2, 3],
+            ["layer_p25", "layer_p50", "layer_p75", "layer_sd"],
+        )

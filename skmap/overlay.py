@@ -1,12 +1,13 @@
 import hashlib
 import itertools
 from pathlib import Path
-from typing import Union
+from typing import Dict, List, Optional, Sequence, Union
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import rasterio
+import rasterio.windows
 import requests
 import skmap_bindings as sb
 from shapely import box
@@ -25,11 +26,11 @@ class _ParallelOverlay:
 
     def __init__(
         self,
-        points_x: np.ndarray,
-        points_y: np.ndarray,
-        raster_files: str,
-        points_crs: None,
-        raster_tiles: gpd.GeoDataFrame | str = None,
+        points_x: np.ndarray | Sequence[float],
+        points_y: np.ndarray | Sequence[float],
+        raster_files: Sequence[str | Path],
+        points_crs: str | None,
+        raster_tiles: gpd.GeoDataFrame | str | None = None,
         tile_id_col: str = "tile_id",
         n_threads: int = parallel.CPU_COUNT,
         verbose: bool = True,
@@ -43,22 +44,23 @@ class _ParallelOverlay:
             if not isinstance(raster_tiles, gpd.GeoDataFrame):
                 if self.verbose:
                     ttprint(f"Reading {raster_tiles}")
-                raster_tiles = gpd.read_file(raster_tiles)
+                raster_tiles: gpd.GeoDataFrame = gpd.read_file(raster_tiles)
 
-            self.default_tile_id = raster_tiles[self.tile_id_col].iloc[0]
+            self.default_tile_id: str = raster_tiles[self.tile_id_col].iloc[0]
 
         self.raster_tiles: gpd.GeoDataFrame = raster_tiles
 
         if points_crs is None:
             points_crs = rasterio.open(
-                raster_files[0].replace(
+                str(raster_files[0]).replace(
                     _ParallelOverlay.TILE_PLACEHOLDER, self.default_tile_id
                 )
             ).crs
 
         samples: gpd.GeoDataFrame = gpd.GeoDataFrame(
             geometry=gpd.points_from_xy(points_x, points_y), crs=points_crs
-        ).reset_index(drop=True)
+        )
+        samples.reset_index(drop=True, inplace=True)
 
         self.raster_files = raster_files
 
@@ -133,7 +135,9 @@ class _ParallelOverlay:
 
         return tile_blocks
 
-    def _find_blocks_for_src(self, path, samples: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    def _find_blocks_for_src(
+        self, path: str | Path, samples: gpd.GeoDataFrame
+    ) -> gpd.GeoDataFrame:
         gdf_blocks = []
 
         if _ParallelOverlay._is_tiled(path):
@@ -150,8 +154,12 @@ class _ParallelOverlay:
 
             for _, tile in raster_tiles.iterrows():
                 tile_id = tile[self.tile_id_col]
-                tile_path = path.replace(_ParallelOverlay.TILE_PLACEHOLDER, tile_id)
+                tile_path = str(path).replace(
+                    _ParallelOverlay.TILE_PLACEHOLDER, tile_id
+                )
                 src: rasterio.io.DatasetReader = rasterio.open(tile_path)
+                # read the raster's specific blocks and insert their dimensions into gdf
+                # see https://rasterio.readthedocs.io/en/latest/topics/windowed-rw.html#blocks
                 for (i, j), window in src.block_windows(1):
                     gdf_blocks.append(
                         {
@@ -183,7 +191,8 @@ class _ParallelOverlay:
                 )
 
         # convert list-of-dicts to gdf
-        gdf_blocks = gpd.GeoDataFrame(gdf_blocks, crs=src.crs).reset_index(drop=True)
+        gdf_blocks = gpd.GeoDataFrame(gdf_blocks, crs=src.crs)
+        gdf_blocks.reset_index(drop=True, inplace=True)
 
         src.close()
 
@@ -196,7 +205,7 @@ class _ParallelOverlay:
             .rename(columns={"index_right": "block_id"})
         )
 
-        query_pixels: [gpd.GeoDataFrame] = []
+        query_pixels: Sequence[gpd.GeoDataFrame] = []
 
         for ij, block in gdf_blocks.groupby("block_id"):
             inv_block_transform = block["inv_transform"].iloc[0]
@@ -265,15 +274,15 @@ class SpaceOverlay:
 
     def __init__(
         self,
-        points: Union[gpd.GeoDataFrame, str, pd.DataFrame],
-        catalog: DataCatalog = [],
-        raster_tiles: Union[gpd.GeoDataFrame, str] = None,
+        points: gpd.GeoDataFrame | str | pd.DataFrame,
+        catalog: DataCatalog,
+        raster_tiles: Optional[gpd.GeoDataFrame | str] = None,
         tile_id_col: Union[str] = "tile_id",
         n_threads: int = parallel.CPU_COUNT,
         verbose: bool = True,
     ) -> None:
-        self.verbose = verbose
-        self.catalog = catalog
+        self.verbose: bool = verbose
+        self.catalog: DataCatalog = catalog
         self.layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
 
         if raster_tiles is not None:
@@ -342,12 +351,10 @@ class SpaceOverlay:
             key_indices_to_drop = set(missing_indices) & set(
                 self.parallelOverlay.query_pixels[key].index
             )
-            self.parallelOverlay.query_pixels[key] = self.parallelOverlay.query_pixels[
-                key
-            ].drop(index=key_indices_to_drop)
-            self.parallelOverlay.query_pixels[key] = self.parallelOverlay.query_pixels[
-                key
-            ].sort_index(axis=0, ascending=True)
+            v = self.parallelOverlay.query_pixels[key]
+            v.drop(index=key_indices_to_drop, inplace=True)
+            v.sort_index(axis=0, ascending=True, inplace=True)
+            self.parallelOverlay.query_pixels[key] = v
 
         print(
             f"Dropping {len(list(set(missing_indices)))} points out of {self.pts.shape[0]} because out of extent"
@@ -359,8 +366,8 @@ class SpaceOverlay:
     def run(
         self,
         max_ram_mb: int,
-        out_file_name: str,
-        gdal_opts={
+        out_file_name: Path | None,
+        gdal_opts: Dict[str, str] = {
             "GDAL_HTTP_VERSION": "1.0",
             "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif",
         },
@@ -385,7 +392,9 @@ class SpaceOverlay:
             "Catalog data size should coincide with the number of features, something went wrong"
         )
 
-        self.ordered_feats_names = [s for _, s in sorted(zip(feats_idx, feats_names))]
+        self.ordered_feats_names: List[str] = [
+            s for _, s in sorted(zip(feats_idx, feats_names))
+        ]
 
         self.data_overlay = self.read_data(gdal_opts, max_ram_mb)
         self.data_array = np.empty(
@@ -407,7 +416,7 @@ class SpaceOverlay:
             lat_info=self.pts["lat"].to_numpy(),
         )
         # @FIXME check that all the filled flags are True or assert at this point
-        df = pd.DataFrame(self.data_array.T, columns=self.ordered_feats_names)
+        df = pd.DataFrame(self.data_array.T, columns=pd.Index(self.ordered_feats_names))
         if "lat" in df:
             self.pts = self.pts.drop(columns=["lat"])
         self.pts_out = pd.concat([self.pts, df.reset_index(drop=True)], axis=1)
@@ -604,11 +613,11 @@ class SpaceTimeOverlay:
 
     def __init__(
         self,
-        points: Union[gpd.GeoDataFrame, str, pd.DataFrame],
+        points: gpd.GeoDataFrame | pd.DataFrame | str,
         col_date: str,
-        catalog: DataCatalog = [],
-        raster_tiles: Union[gpd.GeoDataFrame, str] = None,
-        tile_id_col: Union[str] = "tile_id",
+        catalog: DataCatalog,
+        raster_tiles: gpd.GeoDataFrame | str,
+        tile_id_col: str = "tile_id",
         n_threads: int = parallel.CPU_COUNT,
         verbose: bool = False,
     ) -> None:
@@ -623,7 +632,9 @@ class SpaceTimeOverlay:
         self.n_threads = n_threads
 
         self.col_date = col_date
-        self.overlay_objs = {}
+        self.overlay_objs: Dict[
+            str, SpaceOverlay
+        ] = {}  # FIXME: Dict[int, SpaceOverlay]?
         self.year_catalogs = {}
         self.verbose = verbose
         self.catalog = catalog
@@ -662,12 +673,12 @@ class SpaceTimeOverlay:
     def run(
         self,
         max_ram_mb: int,
-        out_file_name: str,
-        gdal_opts={
+        out_file_name: Optional[Path],
+        gdal_opts: Dict[str, str] = {
             "GDAL_HTTP_VERSION": "1.0",
             "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif",
         },
-    ):
+    ) -> Optional[pd.DataFrame]:
         """
         Execute the spacetime overlay. It removes the year part from the column names.
         For example, the raster ``raster_20101202..20110320.tif`` results in the column
@@ -677,7 +688,7 @@ class SpaceTimeOverlay:
             column per raster).
         :rtype: geopandas.GeoDataFrame
         """
-        self.result = None
+        self.result: Optional[pd.DataFrame] = None
 
         for year in self.catalog.get_groups():
             if self.verbose:
@@ -687,7 +698,9 @@ class SpaceTimeOverlay:
             if self.result is None:
                 self.result = year_result
             else:
-                self.result = pd.concat([self.result, year_result], ignore_index=True)
+                self.result: pd.DataFrame = pd.concat(
+                    [self.result, year_result], ignore_index=True
+                )
 
             if out_file_name is not None:
                 self.result.to_parquet(out_file_name)
