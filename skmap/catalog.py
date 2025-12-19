@@ -2,7 +2,7 @@ import json
 import random
 import re
 import sys
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -271,7 +271,7 @@ class DataCatalog:
             with open(json_out_path, "w") as f:
                 json.dump(self.data, f, indent=4)
 
-    def get_groups(self) -> [str]:
+    def get_groups(self) -> List[str]:
         groups = sorted(
             list(set(self.data.keys()).difference(["common"]).difference(["otf"]))
         )  # by default don't return 'common' nor 'otf' group
@@ -283,7 +283,7 @@ class DataCatalog:
         return DataCatalog(self.data.copy(), int(self.data_size))
 
     @staticmethod
-    def _get_feature_names(catalog_dict: Dict) -> [str]:
+    def _get_feature_names(catalog_dict: Dict) -> List[str]:
         """Make a set of feature names
 
         :param catalog_dict: dict-of-dicts
@@ -299,17 +299,19 @@ class DataCatalog:
             }
         )
 
-    def find_group_and_feature_by_index(self, target_idx):
+    def find_group_and_feature_by_index(
+        self, target_idx: int
+    ) -> (Optional[str], Optional[str]):
         for group_name, features in self.data.items():
             for feature_name, feature_info in features.items():
                 if feature_info.get("idx") == target_idx:
                     return group_name, feature_name
         return None, None
 
-    def get_feature_names(self):
+    def get_feature_names(self) -> List[str]:
         return self._get_feature_names(self.data)
 
-    def get_paths(self):
+    def get_paths(self) -> Tuple[List[str], List[int], List[str]]:
         paths, idx, names = [], [], []
         for k in self.data:
             if k == "otf":
@@ -331,7 +333,7 @@ class DataCatalog:
         ]
         return paths, idx, names
 
-    def get_unrolled_catalog(self):
+    def get_unrolled_catalog(self) -> Tuple[List[str], List[str], List[int]]:
         names, paths, idx = [], [], []
         for k in self.data:
             for f in self.data[k]:
@@ -356,7 +358,7 @@ class DataCatalog:
     def _get_whales(self):
         return self.get_whales(self.data)
 
-    def query(self, feature_names, groups=None) -> None:
+    def query(self, feature_names, groups: Optional[Sequence[str]] = None) -> None:
         if groups is None:
             groups = self.get_groups()
         if not isinstance(groups, list):
@@ -535,7 +537,7 @@ def parse_template_whale(whale):
     return func_name, params
 
 
-def run_whales(catalog: DataCatalog, array, n_threads, lat_info=None) -> None:
+def run_whales(catalog: DataCatalog, array, n_threads: int, lat_info=None) -> None:
     # Computing on the fly covariates
     whale_paths, whale_keys, whale_names = catalog._get_whales()
     max_exec_order = 0
