@@ -5,7 +5,7 @@ Dataset quality control utilities
 from functools import reduce
 from operator import add
 from pathlib import Path
-from typing import Iterable, Union
+from typing import Any, Iterable, Union
 
 import geopandas as gp
 import numpy as np
@@ -20,7 +20,7 @@ from .parallel import blocks
 _LANDMASK_REF = "https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_land.mask_pflugmacher2019.landcover.12_f_30m_s0..0m_2014..2016_skmap_epsg3035_v0.1.tif"
 
 
-def _test_field_nonempty(val):
+def _test_field_nonempty(val: Any) -> bool:
     if isinstance(val, str):
         val = val.strip()
     return val not in ["", []]
@@ -112,7 +112,7 @@ class Test:
         with rio.open(dataset_path) as src:
             nodata = src.nodata
 
-        def _get_counts(landmask, data):
+        def _get_counts(landmask, data):  # noqa: ANN001, ANN202
             idx_landmask = landmask < 10
             if include_ice:
                 idx_landmask = idx_landmask | (landmask == 12)

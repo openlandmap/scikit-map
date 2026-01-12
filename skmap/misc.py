@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timedelta
 from functools import reduce
 from pathlib import Path
-from typing import Iterable, List, Union
+from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union
 
 import geopandas as gp
 import numpy as np
@@ -18,20 +18,24 @@ import rasterio
 from dateutil.relativedelta import relativedelta
 from minio import Minio
 from minio.error import S3Error
+from numpy.typing import NDArray
 from osgeo.gdal import BuildVRT, Warp
+from rasterio.crs import CRS
 from shapely.geometry import box, shape
 
 TMP_DIR = tempfile.gettempdir()
 
 
 class ControlS3:
-    def __init__(self, endpoint_url, access_key, secret_key) -> None:
+    def __init__(
+        self, endpoint_url: str, access_key: Optional[str], secret_key: Optional[str]
+    ) -> None:
         self.client = Minio(
             endpoint_url, access_key=access_key, secret_key=secret_key, secure=False
         )
         self.previous_tile = ""
 
-    def list(self, bucket_prefix, recursive=True):
+    def list(self, bucket_prefix: str, recursive: bool = True) -> List[str]:
         prefix = "/".join(bucket_prefix.split("/")[1:])
         bucket = bucket_prefix.split("/")[0]
         return [
@@ -41,7 +45,7 @@ class ControlS3:
             )
         ]
 
-    def push_file(self, file_path, bucket_prefix) -> None:
+    def push_file(self, file_path: str, bucket_prefix: str) -> None:
         object_name = (
             "/".join(bucket_prefix.split("/")[1:]) + "/" + file_path.split("/")[-1]
         )
@@ -54,14 +58,14 @@ class ControlS3:
             raise RuntimeError(f"Upload failed: {e}")
         os.remove(file_path)
 
-    def create_empty_file(self, file_path) -> None:
+    def create_empty_file(self, file_path: str) -> None:
         try:
             with open(file_path, "x") as f:
                 f.write("empty")
         except FileExistsError:
             print(f"File {file_path} already exists.")
 
-    def remove(self, objects_list) -> bool:
+    def remove(self, objects_list: Sequence[str]) -> bool:
         for bucket_key in objects_list:
             key = "/".join(bucket_key.split("/")[1:])
             bucket = bucket_key.split("/")[0]
@@ -77,8 +81,12 @@ class ControlS3:
         return True
 
     def select_slurm_tile(
-        self, bucket_prefix, server_name, deplete_doing=True, max_attempts=100
-    ):
+        self,
+        bucket_prefix: str,
+        server_name: str,
+        deplete_doing: bool = True,
+        max_attempts: int = 100,
+    ) -> Tuple[bool, Optional[str]]:
         """
         Seturn a slurm tile to compute if available, and move the tile in the doing folder.
 
@@ -129,7 +137,12 @@ class ControlS3:
         )
 
     def move_completed_tile(
-        self, bucket_prefix, server_name, tile_id, time_seconds, skipped
+        self,
+        bucket_prefix: str,
+        server_name: str,
+        tile_id: str,
+        time_seconds: Union[float, int],
+        skipped: bool,
     ) -> None:
         sub_prefix = "skipped" if skipped else "done"
         current_tile_name = tile_id + "..server." + server_name
@@ -190,7 +203,7 @@ def sb_vec(elems: int) -> np.ndarray:
     return np.empty((elems,), np.float32)
 
 
-def _warn_deps(e, module_name) -> None:
+def _warn_deps(e: ImportError, module_name: str) -> None:
     import warnings
 
     warnings.warn(
@@ -200,29 +213,31 @@ def _warn_deps(e, module_name) -> None:
     )
 
 
-def new_memmap(dtype, shape):
+def new_memmap(dtype, shape):  # noqa: ANN001, ANN201
     filename = str(make_tempfile(prefix="memmap", suffix=".npy", make_subdir=False))
     ttprint(f"Creating {filename}")
     return np.memmap(filename, dtype=dtype, shape=shape, mode="w+")
 
 
-def load_memmap(filename, dtype, shape):
+def load_memmap(
+    filename: Union[Path, str], dtype: Union[np.dtype, str], shape: Tuple[int, ...]
+) -> np.memmap:
     return np.memmap(filename, dtype=dtype, mode="r+", shape=shape)
     # return np.lib.format.open_memmap(filename, dtype=dtype, mode='w+', shape=shape)
 
 
-def is_memmap(array_mm):
+def is_memmap(array_mm: NDArray) -> bool:
     return hasattr(array_mm, "filename")
 
 
-def del_memmap(array_mm, return_array=False):
+def del_memmap(array_mm: np.memmap, return_array: bool = False) -> Optional[NDArray]:
     result = None
 
     if is_memmap(array_mm):
         if return_array:
             result = np.array(array_mm)  # test np.ascontiguousarray
 
-        os.remove(array_mm.filename)
+        os.remove(array_mm.filename)  # ty:ignore[invalid-argument-type]
         # temp_folder = Path(array_mm.filename).parent
         # try:
         #    shutil.rmtree(temp_folder)
@@ -235,12 +250,12 @@ def del_memmap(array_mm, return_array=False):
         del array_mm
 
 
-def ref_memmap(array):
+def ref_memmap(array: np.memmap) -> dict:
     array.flush()
     return {"filename": array.filename, "dtype": array.dtype, "shape": array.shape}
 
 
-def make_tempdir(basedir="skmap", make_subdir=True):
+def make_tempdir(basedir: str = "skmap", make_subdir: bool = True) -> Path:
     tempdir = Path(TMP_DIR).joinpath(basedir)
     if make_subdir:
         name = Path(tempfile.NamedTemporaryFile().name).name
@@ -249,14 +264,21 @@ def make_tempdir(basedir="skmap", make_subdir=True):
     return tempdir
 
 
-def make_tempfile(basedir="skmap", prefix="", suffix="", make_subdir=False):
+def make_tempfile(
+    basedir: str = "skmap",
+    prefix: str = "",
+    suffix: str = "",
+    make_subdir: bool = False,
+) -> Path:
     tempdir = make_tempdir(basedir, make_subdir=make_subdir)
     return tempdir.joinpath(
         Path(tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix).name).name
     )
 
 
-def _bounds_crs(raster_file, dst_crs):
+def _bounds_crs(
+    raster_file: Union[str, Path], dst_crs: Union[CRS, dict, str]
+) -> Tuple[Union[str, Path], Tuple[float, float, float, float], CRS, float]:
     with rasterio.open(raster_file) as ds:
         bounds = shape(
             rasterio.warp.transform_geom(
@@ -268,7 +290,16 @@ def _bounds_crs(raster_file, dst_crs):
         return raster_file, bounds, crs, tr
 
 
-def _build_vrt(raster_file, band, tr, dst_crs, r_method, outdir, te, tr_min):
+def _build_vrt(
+    raster_file: str,
+    band: int,
+    tr: float,
+    dst_crs: CRS,
+    r_method: str,
+    outdir: Union[Path, str],
+    te: Tuple[float, float, float, float],
+    tr_min: float,
+) -> Tuple[str, str]:
     outfile_1 = str(
         Path(outdir).joinpath(
             str(Path(raster_file.split("?")[0]).stem + f"_b{band}.vrt")
@@ -299,14 +330,14 @@ def _build_vrt(raster_file, band, tr, dst_crs, r_method, outdir, te, tr_min):
 
 
 def vrt_warp(
-    raster_files,
-    dst_crs="EPSG:4326",
-    band=1,
-    tr=None,
-    r_method="near",
-    outdir=None,
-    n_jobs=-1,
-    return_input_files=False,
+    raster_files: Sequence[str],
+    dst_crs: Union[CRS, dict, str]="EPSG:4326",
+    band: int=1,
+    tr: Optional[float]=None,
+    r_method: str="near",
+    outdir: Optional[Union[str, Path]]=None,
+    n_jobs: int=-1,
+    return_input_files: bool=False,
 ):
     from skmap import parallel
 
@@ -322,7 +353,7 @@ def vrt_warp(
     args_vrt = []
     tr_arr = []
     for raster_file, bounds, crs, tr1 in parallel.job(
-        _bounds_crs, args, n_jobs=n_jobs, joblib_args={"backend": "multiprocessing"}
+        _bounds_crs, args, n_jobs=n_jobs, joblib_args={"backend": "multiprocessing"}  # ty:ignore[invalid-argument-type]
     ):
         total_bounds.append(box(*bounds))
         tr_arr.append(tr1)
@@ -335,7 +366,7 @@ def vrt_warp(
     vrt_files = []
     input_files = []
     for input_file, vrt_file in parallel.job(
-        _build_vrt, args_vrt, n_jobs=-1, joblib_args={"backend": "multiprocessing"}
+        _build_vrt, args_vrt, n_jobs=-1, joblib_args={"backend": "multiprocessing"}  # ty:ignore[invalid-argument-type]
     ):
         input_files.append(input_file)
         vrt_files.append(vrt_file)
@@ -347,18 +378,18 @@ def vrt_warp(
 
 
 class TimeTracker(object):
-    def __init__(self, task, enter_enabled=False, exit_enabled=True) -> None:
+    def __init__(self, task, enter_enabled: bool=False, exit_enabled: bool=True) -> None:
         self.task = task
-        self.enter_enabled = enter_enabled
-        self.exit_enabled = exit_enabled
-        self.tracks = []
+        self.enter_enabled: bool = enter_enabled
+        self.exit_enabled: bool = exit_enabled
+        self.tracks: List[float] = []
 
     @staticmethod
-    def _print(*args, **kwargs) -> None:
+    def _print(*args: Any, **kwargs: Any) -> None:
         print(f"[{datetime.now():%H:%M:%S}] ", end="")
         print(*args, **kwargs, flush=True)
 
-    def __enter__(self):
+    def __enter__(self) -> float:
         self.tracks.append(time.time())
         if self.enter_enabled:
             print(f"{self.task}")
@@ -383,7 +414,7 @@ def _make_dir(path):
 #
 
 
-def ttprint(*args, **kwargs) -> None:
+def ttprint(*args: Any, **kwargs: Any) -> None:
     """
     A print function that displays the date and time.
 
@@ -401,7 +432,7 @@ def ttprint(*args, **kwargs) -> None:
     print(*args, **kwargs, flush=True)
 
 
-def find_files(dir_list: List, pattern: str = "*.*") -> [Path]:
+def find_files(dir_list: List, pattern: str = "*.*") -> List[Path]:
     """
     Recursively find files in multiple directories according to the
     specified pattern. It's basically a wrapper for
@@ -440,7 +471,7 @@ def find_files(dir_list: List, pattern: str = "*.*") -> [Path]:
     return files
 
 
-def nan_percentile(arr: np.array, q: List = [25, 50, 75], keep_original_vals=False):
+def nan_percentile(arr: NDArray, q: List = [25, 50, 75], keep_original_vals: bool=False) -> NDArray:
     """
     Optimized function to calculate percentiles ignoring ``np.nan``
     in a 3D Numpy array [1].
@@ -559,8 +590,8 @@ def _add_group_elements(a1, a2):
 def sample_groups(
     points: gp.GeoDataFrame,
     *group_element_columns: Iterable[str],
-    spatial_resolution: Union[int, float] = None,
-    temporal_resolution: timedelta = None,
+    spatial_resolution: Optional[Union[int, float]] = None,
+    temporal_resolution: Optional[timedelta] = None,
     date_column: str = "date",
 ) -> np.ndarray:
     """
@@ -703,24 +734,24 @@ def date_range(
     start_date: str,
     end_date: str,
     date_unit: str,
-    date_step: int,
+    date_step: Union[int, Sequence[int]],
     date_offset: int = 0,
-    date_format="%Y-%m-%d",
-    ignore_29feb=False,
-    return_str=False,
-):
-    start_date = datetime.strptime(start_date, date_format)
-    end_date = datetime.strptime(end_date, date_format)
+    date_format: str = "%Y-%m-%d",
+    ignore_29feb: bool = False,
+    return_str: bool = False,
+) -> List[Tuple[datetime, datetime]]:
+    start_dt = datetime.strptime(start_date, date_format)
+    end_dt = datetime.strptime(end_date, date_format)
 
     result = []
 
-    dt1 = start_date
+    dt1 = start_dt
     date_step_i, date_off_i = 0, 0
 
     watchdog = 0
     add_leapday = True
 
-    while dt1 <= end_date:
+    while dt1 <= end_dt:
         delta_args = {}
         date_step_i, date_step_cur = _date_step_off(date_step, date_step_i)
         delta_args[date_unit] = date_step_cur
@@ -790,8 +821,8 @@ def date_range(
 
 
 def update_by_separator(
-    text: str, separator: str, position: int, new_text: str, suffix=False
-):
+    text: str, separator: str, position: int, new_text: str, suffix: bool=False
+) -> str:
     split = text.split(separator)
     if suffix:
         new_text = split[position] + new_text
@@ -901,8 +932,6 @@ try:
             return df.drop(columns=to_drop)
 
 except ImportError as e:
-    from .misc import _warn_deps
-
     _warn_deps(e, "misc.GoogleSheet")
 
 

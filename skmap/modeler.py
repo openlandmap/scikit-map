@@ -5,11 +5,11 @@ from typing import Callable, List, NoReturn, Optional
 
 import joblib
 import numpy as np
-import skmap_bindings as sb
 from joblib import Parallel, delayed
 from sklearn.ensemble import RandomForestRegressor
 
 import skmap.set_env  # noqa: F401
+import skmap_bindings as sb
 from skmap.misc import TimeTracker, _make_dir, _rm_dir, sb_arr
 from skmap.tiled_data import TiledData, TiledDataLoader
 

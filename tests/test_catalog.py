@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from skmap.catalog import DataCatalog as c
+from skmap.catalog import DataCatalog
 
 
 class TestDataCatalog:
@@ -13,12 +13,12 @@ class TestDataCatalog:
         ).exists()
 
     def test__get_features_names(self) -> None:
-        assert c._get_feature_names(
+        assert DataCatalog._get_feature_names(
             {"a": {"hello": "hii"}, "b": {"world": "Gaia"}}
         ) == ["hello", "world"]
 
     def test_get_whales(self) -> None:
-        assert c.get_whales(
+        assert DataCatalog.get_whales(
             {
                 "common": {
                     "example": {
@@ -36,7 +36,7 @@ class TestDataCatalog:
         ) == (["/whale/expr"], ["common"], ["example"])
 
     def test_create_catalog_minimal(self) -> None:
-        catalog = c.create_catalog(
+        catalog = DataCatalog.create_catalog(
             catalog_def=pd.DataFrame(
                 {
                     "layer_name": ["layer", "example"],
@@ -48,7 +48,7 @@ class TestDataCatalog:
             base_path=str(Path(".").absolute()),
         )
         print(f"{catalog.data=!r}", repr(catalog), dir(catalog.data), range(2014, 2020))
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 2
         assert catalog.data == {
             "common": {
@@ -71,7 +71,7 @@ class TestDataCatalog:
         )
 
     def test_create_catalog_year(self) -> None:
-        catalog = c.create_catalog(
+        catalog = DataCatalog.create_catalog(
             pd.DataFrame(
                 {
                     "layer_name": ["layer_{year}"],
@@ -84,7 +84,7 @@ class TestDataCatalog:
             years=[2014, 2015, 2016],
             base_path=str(Path(".").absolute()),
         )
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 3
         assert catalog.data == {
             "2014": {
@@ -133,7 +133,7 @@ class TestDataCatalog:
         )
 
     def test_create_catalog_year_plusminus(self) -> None:
-        catalog = c.create_catalog(
+        catalog = DataCatalog.create_catalog(
             pd.DataFrame(
                 {
                     "layer_name": ["layer_{year_minus_one}-{year_plus_one}"],
@@ -146,7 +146,7 @@ class TestDataCatalog:
             years=[2014, 2015, 2016],
             base_path=str(Path(".").absolute()),
         )
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 3
         assert catalog.data == {
             "2014": {
@@ -195,7 +195,7 @@ class TestDataCatalog:
         )
 
     def test_create_catalog_monthly(self) -> None:
-        catalog = c.create_catalog(
+        catalog = DataCatalog.create_catalog(
             pd.DataFrame(
                 {
                     "layer_name": ["layer_{year}{start_month}-{year}{end_month}"],
@@ -210,7 +210,7 @@ class TestDataCatalog:
             years=[2014, 2015, 2016],
             base_path=str(Path(".").absolute()),
         )
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 6
         assert catalog.data == {
             "2014": {
@@ -291,7 +291,7 @@ class TestDataCatalog:
         )
 
     def test_create_catalog_perc(self) -> None:
-        catalog = c.create_catalog(
+        catalog = DataCatalog.create_catalog(
             catalog_def=pd.DataFrame(
                 {
                     "layer_name": ["layer_{perc}"],
@@ -304,7 +304,7 @@ class TestDataCatalog:
             base_path=str(Path(".").absolute()),
         )
         print(f"{catalog.data=!r}", repr(catalog), dir(catalog.data), range(2014, 2020))
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 4
         assert catalog.data == {
             "common": {

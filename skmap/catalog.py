@@ -6,8 +6,8 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import skmap_bindings as sb
 
+import skmap_bindings as sb
 from skmap.misc import mmdd_to_doy
 
 
@@ -20,7 +20,7 @@ class DataCatalog:
     def create_catalog(
         cls,
         catalog_def: Union[pd.DataFrame, str],
-        years: List[int],
+        years: List[str],
         base_path: Union[List[str], str],
         verbose: bool = True,
         replace_group_feat_name: bool = False,

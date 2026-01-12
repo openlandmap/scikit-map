@@ -1,6 +1,6 @@
 ![Scikit-map](./docs/img/scikit-map_small.png)
 ===========
-[![GitLab license](./docs/img/mit.svg)](./LICENSE)
+[![GitLab license (MIT)](./docs/img/mit.svg)](./LICENSE)
 
 <!--- Add small benchmark dataset in zenodo
 [![Zenodo dataset](https://zenodo.org/badge/DOI/10.5281/zenodo.4058447.svg)](http://doi.org/10.5281/zenodo.4058447)
@@ -99,7 +99,7 @@ $ sudo ln -sf eigen3/unsupported unsupported
 $ sudo apt install libproj-dev libgeos-dev gdal-bin libgdal-dev postgis
 $ sudo apt-get install python3-pybind11
 
-If you already have a working installation of `gdal`, `scikit-learn` and `numpy`, you can install `scikit-map` is using pip:
+If you already have a working installation of `gdal`, `scikit-learn` and `numpy`, you can install `scikit-map` using pip:
 
 ```bash
 pip install -e 'git+https://github.com/openlandmap/scikit-map#egg=scikit-map[full]'
