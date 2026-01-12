@@ -175,11 +175,11 @@ void extractOverlay(Eigen::Ref<MatFloat> data, const uint_t n_threads,
  * @deprecated Please use gdal VRTs
  */
 void warpTile(Eigen::Ref<MatFloat> data, const uint_t n_threads,
-              py::dict conf_GDAL, std::string tilePath, std::string mosaicPath,
+              py::dict conf_GDAL, std::string tile_path, std::string mosaic_path,
               std::string resample) {
   IoArray ioArray(data, n_threads);
   ioArray.setupGdal(convPyDict(conf_GDAL));
-  ioArray.warpTile(tilePath, mosaicPath, resample);
+  ioArray.warpTile(tile_path, mosaic_path, resample);
 }
 
 void getLatLonArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,

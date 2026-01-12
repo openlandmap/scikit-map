@@ -9,11 +9,11 @@ import pandas as pd
 import rasterio
 import rasterio.windows
 import requests
-import skmap_bindings as sb
 from shapely import box
 from shapely.geometry import Point
 
 import skmap.set_env  # noqa: F401
+import skmap_bindings as sb
 from skmap import parallel
 from skmap.catalog import DataCatalog, run_whales
 from skmap.misc import ttprint

@@ -32,6 +32,7 @@ class TestOverlayBase:
             points_crs=self.PTS_CRS,
         )
 
+
 class TestParallelOverlay(TestOverlayBase):
     def test__init__defaults(self, po: _ParallelOverlay) -> None:
         # initializing the overlay already does quite a lot of processing
@@ -102,6 +103,7 @@ class TestSpaceOverlay(TestOverlayBase):
             "geometry": {0: Point(4021600, 3216130), 1: Point(4024200, 3215420)}
         }
         assert so.n_threads == os.cpu_count()
+
     def test__init__paralleloverlay(self, po: _ParallelOverlay) -> None:
         spo = self.so.parallelOverlay
         assert spo.verbose
@@ -110,5 +112,5 @@ class TestSpaceOverlay(TestOverlayBase):
         assert spo.raster_tiles is None
         assert spo.raster_files == po.raster_files
         assert spo.layers.equals(po.layers)
-        for k,v in spo.query_pixels.items():
+        for k, v in spo.query_pixels.items():
             assert po.query_pixels[k].equals(v)

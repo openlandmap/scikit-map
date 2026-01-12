@@ -7,7 +7,7 @@ import multiprocessing
 import time
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, as_completed, wait
 from pathlib import Path
-from typing import Callable, Iterator, List, Union
+from typing import Any, Callable, Iterator, List, Union
 
 import geopandas as gpd
 import numpy
@@ -28,7 +28,7 @@ Number of CPU cores available.
 executor = None
 
 
-def _mem_usage():
+def _mem_usage() -> float:
     mem = psutil.virtual_memory()
     return mem.used / mem.total
 
@@ -736,7 +736,7 @@ class TaskSequencer:
         self.n_tasks = len(self.tasks)
         self.pipeline_futures = [set() for i in range(0, self.n_tasks)]
 
-    def _verbose(self, *args, **kwargs) -> None:
+    def _verbose(self, *args: Any, **kwargs: Any) -> None:
         if self.verbose:
             ttprint(*args, **kwargs)
 

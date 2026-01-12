@@ -14,7 +14,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 from uuid import uuid4
 
 import numpy
@@ -22,13 +22,13 @@ import numpy as np
 import pandas as pd
 import rasterio
 import requests
-import skmap_bindings as sb
 from dateutil.relativedelta import relativedelta
 from IPython.display import HTML
 from matplotlib import pyplot
 from matplotlib._animation_data import DISPLAY_TEMPLATE, JS_INCLUDE, STYLE_INCLUDE
 from minio import Minio
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from numpy.typing import NDArray
 from osgeo import gdal
 from pandas import DataFrame, Series, to_datetime
 from PIL import Image
@@ -36,6 +36,7 @@ from pystac.item import Item
 from rasterio.windows import Window, from_bounds
 from shapely.geometry import box, shape
 
+import skmap_bindings as sb
 from skmap import SKMapBase, SKMapGroupRunner, SKMapRunner, parallel
 from skmap.misc import (
     _eval,
@@ -63,14 +64,14 @@ _INT_DTYPE = (
 )
 
 
-def _nodata_replacement(dtype):
+def _nodata_replacement(dtype: str):
     if dtype in _INT_DTYPE:
         return np.iinfo(dtype).max
     else:
         return np.nan
 
 
-def _fit_in_dtype(data, dtype, nodata):
+def _fit_in_dtype(data: NDArray, dtype: str, nodata: int) -> NDArray:
     if dtype in _INT_DTYPE:
         data = np.rint(data)
 
@@ -447,7 +448,7 @@ def read_rasters_cpp(
 
 def read_rasters(
     raster_files: Union[List, str] = [],
-    band=1,
+    band: int = 1,
     window: Window = None,
     bounds: [] = None,
     dtype: str = "float32",
@@ -455,12 +456,12 @@ def read_rasters(
     data_mask: numpy.array = None,
     scale: float = 1.0,
     expected_shape=None,
-    try_without_window=False,
+    try_without_window: bool = False,
     gdal_opts: dict = {},
     overview=None,
     max_rasters=None,
     verbose=False,
-):
+) -> Tuple[NDArray[np.float32], List[Path]]:
     """
     Read raster files aggregating them into a single array.
     Only the first band of each raster is read.

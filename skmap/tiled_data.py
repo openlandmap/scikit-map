@@ -1,16 +1,21 @@
+# ruff: noqa: ANN001
+# ruff: noqa: ANN201
+# ruff: noqa: ANN202
+# ruff: noqa: ANN204
+# ruff: noqa: E722
 import os
 import random
 import re
 import subprocess
 import warnings
 from concurrent.futures import ProcessPoolExecutor
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
-import skmap_bindings as sb
 from osgeo import gdal
 
 import skmap.set_env  # noqa: F401
+import skmap_bindings as sb
 from skmap.catalog import DataCatalog, run_whales
 from skmap.misc import TimeTracker, sb_arr, sb_vec, ttprint
 
@@ -494,7 +499,9 @@ class TiledDataExporter(TiledData):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.array = None
 
-    def _get_out_names(self, prefix, suffix, time_frame=None):
+    def _get_out_names(
+        self, prefix: str, suffix: str, time_frame: Optional[str] = None
+    ):
         if self.save_hdf5:
             return [f"{prefix.format(CLASS='CLASS')}_{suffix}"]
         if self.mode == "depths_years_quantiles_textures":
@@ -985,9 +992,9 @@ class TiledDataExporter(TiledData):
         template_file,
         save_type,
         valid_idx,
-        write_folder=".",
-        scaling=1,
-        scaling_metadata=None,
+        write_folder: str = ".",
+        scaling: float = 1,
+        scaling_metadata: Optional[float] = None,
         gdal_opts: Dict[str, str] = {
             "GDAL_HTTP_VERSION": "1.0",
             "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif",

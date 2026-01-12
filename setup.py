@@ -89,6 +89,7 @@ setup(
     packages=["skmap"],
     ext_modules=[CMakeExtension("skmap_bindings", ".")],
     cmdclass={"build_ext": CMakeBuild},
+    data_files=[("", ["skmap_bindings.pyi"])],
     zip_safe=False,
     install_requires=install_requires,
 )
