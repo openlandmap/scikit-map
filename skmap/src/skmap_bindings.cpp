@@ -97,6 +97,8 @@ map_t convPyMap(py::dict in_map) {
 
 /**
  * @brief see `IoArray::readData`
+ *
+ * Currently only supports Float32 data
  */
 void readData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
               const std::vector<std::string> &file_locs,
@@ -764,9 +766,9 @@ PYBIND11_MODULE(skmap_bindings, m) {
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
-  m.def("readData", &readData, py::arg(), py::arg(), py::arg(), py::arg(),
-        py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
-        py::arg() = std::nullopt, py::arg() = std::nullopt,
+  m.def("readData", &readData, py::arg("data"), py::arg("n_threads"), py::arg("file_locs"), py::arg("perm_vec"),
+        py::arg("x_off"), py::arg("y_off"), py::arg("x_size"), py::arg("y_size"), py::arg("bands_list"), py::arg("conf_GDAL"),
+        py::arg("value_to_mask") = std::nullopt, py::arg("value_to_set") = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
   m.def("readDataBlocks", &readDataBlocks, py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),

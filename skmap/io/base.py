@@ -1,6 +1,8 @@
 """
 Raster data input and output
 """
+from decorator import contextmanager
+from rasterio.io import DatasetWriter
 
 import copy
 import math
@@ -228,7 +230,7 @@ def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, n
 
     return url_pos, data, ds_params
 
-
+@contextmanager
 def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=None):
     if not isinstance(raster_file, Path):
         raster_file = Path(raster_file)
@@ -252,7 +254,7 @@ def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=
         if window is not None:
             transform = rasterio.windows.transform(window, transform)
 
-        return rasterio.open(
+        with rasterio.open(
             raster_file,
             "w",
             driver="GTiff",
@@ -264,7 +266,8 @@ def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=
             compress="LZW",
             transform=transform,
             nodata=nodata,
-        )
+        ) as dataset:
+            yield dataset
 
 
 def _save_raster(
@@ -272,11 +275,11 @@ def _save_raster(
     raster_file: str,
     ref_array,
     i: int,
-    spatial_win: Window = None,
-    dtype: str = None,
+    spatial_win: Window | None = None,
+    dtype: str | None = None,
     nodata=None,
     fit_in_dtype=False,
-    on_each_outfile: Callable = None,
+    on_each_outfile: Callable | None = None,
 ):
     # if len(data.shape) < 3:
     #  data = np.stack([data], axis=2)
@@ -287,7 +290,7 @@ def _save_raster(
 
     with _new_raster(
         fn_base_raster, raster_file, array[:, :, i], spatial_win, dtype, nodata
-    ) as new_raster:
+    ) as new_raster: # type: DatasetWriter
         band_dtype = new_raster.dtypes[0]
 
         if fit_in_dtype:
@@ -449,7 +452,7 @@ def read_rasters_cpp(
 def read_rasters(
     raster_files: Union[List, str] = [],
     band: int = 1,
-    window: Window = None,
+    window: Window | None = None,
     bounds: [] = None,
     dtype: str = "float32",
     n_jobs: int = 8,
@@ -461,7 +464,7 @@ def read_rasters(
     overview=None,
     max_rasters=None,
     verbose=False,
-) -> Tuple[NDArray[np.float32], List[Path]]:
+) -> NDArray[np.float32]:
     """
     Read raster files aggregating them into a single array.
     Only the first band of each raster is read.
@@ -574,8 +577,9 @@ def read_rasters(
     if max_rasters is not None:
         array_mm = new_memmap(dtype, shape=(height, width, max_rasters))
     else:
-        array_mm = new_memmap(dtype, shape=(height, width, len(raster_files) * 10))
-    ttprint("End new_memmap")
+        # TOCHECK: this was multiplied by 10 before, but why?
+        array_mm = new_memmap(dtype, shape=(height, width, len(raster_files)))
+    ttprint(f"End new_memmap of shape {array_mm.shape}")
 
     # ref_array = ref_memmap(array_mm)
     # print(ref_array)
@@ -610,7 +614,7 @@ def read_rasters(
         #  'batch_size': math.floor(len(args) / n_jobs),
         #  'return_as': 'generator'
         # }):
-        print(array.shape)
+        ttprint(array.shape)
         array_mm[:, :, raster_idx] = array
         if not data_exists:
             raster_file = raster_files[raster_idx]
@@ -1808,8 +1812,8 @@ class RasterData(SKMapBase):
                     )
                 )
         else:
-            raise Exception("""The band count should either be one or three. 
-                      Current plotting capabilites are limited to single 
+            raise Exception("""The band count should either be one or three.
+                      Current plotting capabilites are limited to single
                       or composite image generation.""")
         return arr
 
