@@ -20,7 +20,7 @@ class DataCatalog:
     def create_catalog(
         cls,
         catalog_def: Union[pd.DataFrame, str],
-        years: List[str],
+        years: List[int],
         base_path: Union[List[str], str],
         verbose: bool = True,
         replace_group_feat_name: bool = False,
@@ -45,7 +45,7 @@ class DataCatalog:
             catalog_def, years, base_path, verbose, replace_group_feat_name
         )
         data = {}
-        years = [str(year) for year in years]
+        years: list[str] = [str(year) for year in years]
         if "common" not in years:  # common is default
             years += ["common"]
 
@@ -301,7 +301,7 @@ class DataCatalog:
 
     def find_group_and_feature_by_index(
         self, target_idx: int
-    ) -> (Optional[str], Optional[str]):
+    ) -> tuple[Optional[str], Optional[str]]:
         for group_name, features in self.data.items():
             for feature_name, feature_info in features.items():
                 if feature_info.get("idx") == target_idx:
@@ -358,7 +358,7 @@ class DataCatalog:
     def _get_whales(self):
         return self.get_whales(self.data)
 
-    def query(self, feature_names, groups: Optional[Sequence[str]] = None) -> None:
+    def query(self, feature_names, groups: Optional[list[str]] = None) -> None:
         if groups is None:
             groups = self.get_groups()
         if not isinstance(groups, list):
@@ -568,7 +568,7 @@ def run_whales(catalog: DataCatalog, array, n_threads: int, lat_info=None) -> No
                         (array_sb.shape[1], array_sb.shape[0]), dtype=np.float32
                     )
                     array_pct_t = np.empty((array_sb.shape[1], 1), dtype=np.float32)
-                    sb.extractArrayRows(array, n_threads, array_sb, in_idxs)
+                    sb.selArrayRows(array, n_threads, array_sb, in_idxs)
                     sb.transposeArray(array_sb, n_threads, array_sb_t)
                     sb.computePercentiles(
                         array_sb_t,
