@@ -10,7 +10,7 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN uv venv && uv pip install "scikit-map[full] @ git+https://github.com/openlandmap/scikit-map@setup_cmake"
+RUN uv venv && uv pip install "scikit-map[full] @ git+https://github.com/openlandmap/scikit-map@ci"
 
 RUN uv pip install jupyter
 
