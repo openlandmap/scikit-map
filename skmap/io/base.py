@@ -1009,9 +1009,11 @@ class RasterData(SKMapBase):
             lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]), axis=1
         )
         self.info[RasterData.NAME_COL] = self.info.apply(
-            lambda r: Path(str(r[RasterData.PATH_COL]).split("?")[0]).stem
-            if not r[RasterData.TEMPORAL_COL]
-            else None,
+            lambda r: (
+                Path(str(r[RasterData.PATH_COL]).split("?")[0]).stem
+                if not r[RasterData.TEMPORAL_COL]
+                else None
+            ),
             axis=1,
         )
 
