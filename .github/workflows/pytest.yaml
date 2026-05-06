@@ -3,12 +3,12 @@ name: PyTest
 on:
   push:
     paths:
-     - '.github/workflows/pytest.yaml'
-     - 'skmap/**'
-     - 'tests/**'
-     - 'CMakeLists.txt'
-     - 'setup.py'
-     - 'pyproject.toml'
+      - ".github/workflows/pytest.yaml"
+      - "skmap/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+      - "setup.py"
+      - "pyproject.toml"
 
 jobs:
   test:
@@ -35,5 +35,6 @@ jobs:
           . .venv/bin/activate
       - name: Run format and tests
         run: |
+          ruff --version
           ruff format --check
           pytest
