@@ -7,10 +7,10 @@
 -->
 <!---
 [Community](https://opendatascience.eu) |
-[Documentation](https://eumap.readthedocs.org) |
 [Resources](demo/README.md) |
-[Release Notes](NEWS.md)
 -->
+[Documentation](https://feefladder.github.io/scikit-map) |
+[Release Notes](CHANGELOG.md)
 
 `scikit-map` is a Python module to produce maps using machine learning, reference samples and raster data. It is fully compatible with [scikit-learn](https://github.com/openlandmap/scikit-learn) and distributed under the MIT license. 
 
