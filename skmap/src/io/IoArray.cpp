@@ -184,8 +184,7 @@ void IoArray::setupGdal(dict_t dict) {
 void IoArray::readDataCore(Eigen::Ref<MatFloat::RowXpr> row,
                            std::string file_loc, uint_t x_off, uint_t y_off,
                            uint_t x_size, uint_t y_size, GDALDataType read_type,
-                           std::vector<int> bands_list,
-                           std::optional<float_t> value_to_mask,
+                           int band, std::optional<float_t> value_to_mask,
                            std::optional<float_t> value_to_set) {
   GDALDataset *readDataset =
       (GDALDataset *)GDALOpen(file_loc.c_str(), GA_ReadOnly);
@@ -206,9 +205,10 @@ void IoArray::readDataCore(Eigen::Ref<MatFloat::RowXpr> row,
       value_to_mask = nodata_val;
   }
 
-  CPLErr outRead = readDataset->RasterIO(
-      GF_Read, x_off, y_off, x_size, y_size, row.data(), x_size, y_size,
-      read_type, bands_list.size(), &bands_list[0], 0, 0, 0);
+  // Read a single band with rasterio
+  CPLErr outRead =
+      readDataset->RasterIO(GF_Read, x_off, y_off, x_size, y_size, row.data(),
+                            x_size, y_size, read_type, 1, &band, 0, 0, 0);
   skmapAssertIfTrue(outRead != CE_None,
                     "Error 2: issues in reading the file with URL " + file_loc);
 
@@ -231,7 +231,7 @@ void IoArray::readData(std::vector<std::string> file_locs,
   auto readTiff = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
     std::string file_loc = file_locs[i];
     this->readDataCore(row, file_loc, x_off, y_off, x_size, y_size, read_type,
-                       bands_list, value_to_mask, value_to_set);
+                       bands_list[i], value_to_mask, value_to_set);
   };
   this->parRowPerm(readTiff, perm_vec);
 }
@@ -256,7 +256,7 @@ void IoArray::readDataBlocks(
             ? std::optional<float_t>(value_to_mask_vec.value()[i])
             : std::nullopt;
     this->readDataCore(row, file_loc, x_off_vec[i], y_off_vec[i], x_size_vec[i],
-                       y_size_vec[i], read_type, bands_list, value_to_mask,
+                       y_size_vec[i], read_type, bands_list[i], value_to_mask,
                        value_to_set);
   };
   this->parRowPerm(readTiffBlock, perm_vec);

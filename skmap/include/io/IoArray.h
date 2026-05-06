@@ -44,7 +44,7 @@ public:
    */
   void readDataCore(Eigen::Ref<MatFloat::RowXpr> row, std::string file_loc,
                     uint_t x_off, uint_t y_off, uint_t x_size, uint_t y_size,
-                    GDALDataType read_type, std::vector<int> bands_list,
+                    GDALDataType read_type, int band,
                     std::optional<float_t> value_to_mask,
                     std::optional<float_t> value_to_set);
 

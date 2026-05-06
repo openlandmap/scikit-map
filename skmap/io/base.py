@@ -1,6 +1,7 @@
 """
 Raster data input and output
 """
+
 from decorator import contextmanager
 from rasterio.io import DatasetWriter
 
@@ -230,6 +231,7 @@ def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, n
 
     return url_pos, data, ds_params
 
+
 @contextmanager
 def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=None):
     if not isinstance(raster_file, Path):
@@ -290,7 +292,7 @@ def _save_raster(
 
     with _new_raster(
         fn_base_raster, raster_file, array[:, :, i], spatial_win, dtype, nodata
-    ) as new_raster: # type: DatasetWriter
+    ) as new_raster:  # type: DatasetWriter
         band_dtype = new_raster.dtypes[0]
 
         if fit_in_dtype:
@@ -392,20 +394,74 @@ def save_rasters_cpp(
 
 
 def read_rasters_cpp(
-    raster_files: Union[List, str] = [],
-    band: Union[List, int] = 1,
-    window: Window = None,
+    raster_files: Union[List[Union[str, Path]], str, Path] = [],
+    band: Union[List[int], int] = 1,
+    window: Optional[Window] = None,
     n_jobs: int = 8,
-    out_data: numpy.array = None,
-    out_idx: List = None,
+    out_data: Optional[NDArray[np.float32]] = None,
+    out_idx: Optional[List] = None,
     dtype: type = np.float32,
     gdal_opts: dict = {},
     verbose=False,
 ):
-    if isinstance(raster_files, str):
+    """
+    Read rasters in parallel using the C++ backend, aggregating them into a single array.
+
+
+    :param raster_files: A list with the raster paths.
+    :param band: The band to be read from each raster file
+    :param window: The window (if any) to read from the raster
+    :param n_jobs: The number threads to read in parallel
+    :param out_data: a pre-allocated array to write into
+    :param out_idx: permutation array
+    :param dtype: Datatype (currently only `np.float32` is supported)
+    :param gdal_opts: additional options to be passed to GDAL
+    :param verbose: Whether to print extra output
+
+    :returns: A 2D array of ``n_bands`` by ``n_pixels``
+    :rtype: NDArray[np.float32]
+
+    Examples
+    ========
+
+    >>> import rasterio
+    >>> import tempfile
+    >>> import numpy as np
+    >>> from skmap.io.base import read_rasters_cpp
+    >>> from pathlib import Path
+    >>> # Create a dummy raster
+    >>> with tempfile.TemporaryDirectory() as tempdir:
+    ...     band_1 = np.random.rand(100,100).astype(np.float32)
+    ...     band_2 = np.random.rand(100,100).astype(np.float32)
+    ...     transform = rasterio.transform.from_origin(0,0,1,1)
+    ...     raster_name = Path(tempdir)/"example.tif"
+    ...     with rasterio.open(
+    ...         raster_name,
+    ...         "w",
+    ...         height=100,
+    ...         width=100,
+    ...         count=2,
+    ...         dtype=np.float32,
+    ...         crs="EPSG:4326",
+    ...         transform=transform
+    ...     ) as raster:
+    ...         raster.write(band_1, 1)
+    ...         raster.write(band_2, 2)
+    ...     # read the raster bands in parallel
+    ...     bands = read_rasters_cpp(raster_files=[raster_name, raster_name], band=[1,2])
+    ...     # the shape is bands x n_pix
+    ...     assert bands.shape == (2,100*100)
+    ...     # bands are selected as above
+    ...     np.testing.assert_equal(band_1.reshape(100*100), bands[0,:])
+    ...     np.testing.assert_equal(band_2.reshape(100*100), bands[1,:])
+    """
+    if isinstance(raster_files, str) or isinstance(raster_files, Path):
         raster_files = [raster_files]
     if isinstance(band, int):
         band = [band]
+    if len(raster_files) == 0:
+        ttprint("No raster files provided, nothing will be written")
+        raise ValueError(f"Should provide at least one raster file, got {raster_files}")
     if isinstance(raster_files[0], Path):
         raster_files = [str(r) for r in raster_files]
     if len(raster_files) < n_jobs:
@@ -456,7 +512,7 @@ def read_rasters(
     bounds: [] = None,
     dtype: str = "float32",
     n_jobs: int = 8,
-    data_mask: numpy.array = None,
+    data_mask: NDArray[np.float32] = None,
     scale: float = 1.0,
     expected_shape=None,
     try_without_window: bool = False,
