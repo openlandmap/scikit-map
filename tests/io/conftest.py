@@ -4,6 +4,7 @@ import rasterio
 from pathlib import Path
 from rasterio.windows import Window
 
+
 @pytest.fixture
 def temp_raster_file(tmp_path):
     """Create a temporary single-band raster file for testing."""
@@ -25,6 +26,7 @@ def temp_raster_file(tmp_path):
         dst.write(data, 1)
 
     return data, file_path
+
 
 @pytest.fixture
 def temp_multi_raster_files(tmp_path):

@@ -177,8 +177,8 @@ void extractOverlay(Eigen::Ref<MatFloat> data, const uint_t n_threads,
  * @deprecated Please use gdal VRTs
  */
 void warpTile(Eigen::Ref<MatFloat> data, const uint_t n_threads,
-              py::dict conf_GDAL, std::string tile_path, std::string mosaic_path,
-              std::string resample) {
+              py::dict conf_GDAL, std::string tile_path,
+              std::string mosaic_path, std::string resample) {
   IoArray ioArray(data, n_threads);
   ioArray.setupGdal(convPyDict(conf_GDAL));
   ioArray.warpTile(tile_path, mosaic_path, resample);
@@ -214,13 +214,13 @@ void readDataBlocks(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 void readDataCore(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   const std::string file_loc, const uint_t x_off,
                   const uint_t y_off, const uint_t x_size, const uint_t y_size,
-                  const std::vector<int> bands_list, py::dict conf_GDAL,
+                  int band, py::dict conf_GDAL,
                   std::optional<float_t> value_to_mask,
                   std::optional<float_t> value_to_set) {
   IoArray ioArray(data, n_threads);
   ioArray.setupGdal(convPyDict(conf_GDAL));
   ioArray.readDataCore(data.row(0), file_loc, x_off, y_off, x_size, y_size,
-                       GDALDataType::GDT_Float32, bands_list, value_to_mask,
+                       GDALDataType::GDT_Float32, band, value_to_mask,
                        value_to_set);
 }
 
@@ -766,9 +766,12 @@ PYBIND11_MODULE(skmap_bindings, m) {
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg() = std::nullopt, py::arg() = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
-  m.def("readData", &readData, py::arg("data"), py::arg("n_threads"), py::arg("file_locs"), py::arg("perm_vec"),
-        py::arg("x_off"), py::arg("y_off"), py::arg("x_size"), py::arg("y_size"), py::arg("bands_list"), py::arg("conf_GDAL"),
-        py::arg("value_to_mask") = std::nullopt, py::arg("value_to_set") = std::nullopt,
+  m.def("readData", &readData, py::arg("data"), py::arg("n_threads"),
+        py::arg("file_locs"), py::arg("perm_vec"), py::arg("x_off"),
+        py::arg("y_off"), py::arg("x_size"), py::arg("y_size"),
+        py::arg("bands_list"), py::arg("conf_GDAL"),
+        py::arg("value_to_mask") = std::nullopt,
+        py::arg("value_to_set") = std::nullopt,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
   m.def("readDataBlocks", &readDataBlocks, py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),

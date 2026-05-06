@@ -331,13 +331,13 @@ def _build_vrt(
 
 def vrt_warp(
     raster_files: Sequence[str],
-    dst_crs: Union[CRS, dict, str]="EPSG:4326",
-    band: int=1,
-    tr: Optional[float]=None,
-    r_method: str="near",
-    outdir: Optional[Union[str, Path]]=None,
-    n_jobs: int=-1,
-    return_input_files: bool=False,
+    dst_crs: Union[CRS, dict, str] = "EPSG:4326",
+    band: int = 1,
+    tr: Optional[float] = None,
+    r_method: str = "near",
+    outdir: Optional[Union[str, Path]] = None,
+    n_jobs: int = -1,
+    return_input_files: bool = False,
 ):
     from skmap import parallel
 
@@ -353,7 +353,10 @@ def vrt_warp(
     args_vrt = []
     tr_arr = []
     for raster_file, bounds, crs, tr1 in parallel.job(
-        _bounds_crs, args, n_jobs=n_jobs, joblib_args={"backend": "multiprocessing"}  # ty:ignore[invalid-argument-type]
+        _bounds_crs,
+        args,
+        n_jobs=n_jobs,
+        joblib_args={"backend": "multiprocessing"},  # ty:ignore[invalid-argument-type]
     ):
         total_bounds.append(box(*bounds))
         tr_arr.append(tr1)
@@ -366,7 +369,10 @@ def vrt_warp(
     vrt_files = []
     input_files = []
     for input_file, vrt_file in parallel.job(
-        _build_vrt, args_vrt, n_jobs=-1, joblib_args={"backend": "multiprocessing"}  # ty:ignore[invalid-argument-type]
+        _build_vrt,
+        args_vrt,
+        n_jobs=-1,
+        joblib_args={"backend": "multiprocessing"},  # ty:ignore[invalid-argument-type]
     ):
         input_files.append(input_file)
         vrt_files.append(vrt_file)
@@ -378,7 +384,9 @@ def vrt_warp(
 
 
 class TimeTracker(object):
-    def __init__(self, task, enter_enabled: bool=False, exit_enabled: bool=True) -> None:
+    def __init__(
+        self, task, enter_enabled: bool = False, exit_enabled: bool = True
+    ) -> None:
         self.task = task
         self.enter_enabled: bool = enter_enabled
         self.exit_enabled: bool = exit_enabled
@@ -471,7 +479,9 @@ def find_files(dir_list: List, pattern: str = "*.*") -> List[Path]:
     return files
 
 
-def nan_percentile(arr: NDArray, q: List = [25, 50, 75], keep_original_vals: bool=False) -> NDArray:
+def nan_percentile(
+    arr: NDArray, q: List = [25, 50, 75], keep_original_vals: bool = False
+) -> NDArray:
     """
     Optimized function to calculate percentiles ignoring ``np.nan``
     in a 3D Numpy array [1].
@@ -821,7 +831,7 @@ def date_range(
 
 
 def update_by_separator(
-    text: str, separator: str, position: int, new_text: str, suffix: bool=False
+    text: str, separator: str, position: int, new_text: str, suffix: bool = False
 ) -> str:
     split = text.split(separator)
     if suffix:

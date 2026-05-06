@@ -4,6 +4,7 @@ import pytest
 from rasterio.windows import Window
 from skmap.io.base import read_rasters, read_rasters_cpp
 
+
 def test_read_rasters_vs_cpp_single_file(temp_raster_file):
     """Compare outputs of read_rasters and read_rasters_cpp for a single file."""
     data, path = temp_raster_file
@@ -15,6 +16,7 @@ def test_read_rasters_vs_cpp_single_file(temp_raster_file):
 
     # Compare results
     assert_equal(data_py.reshape(data_cpp.shape), data_cpp)
+
 
 def test_read_rasters_vs_cpp_multiple_files(temp_multi_raster_files):
     """Compare outputs of read_rasters (Python) and read_rasters_cpp (C++).
@@ -41,6 +43,7 @@ def test_read_rasters_vs_cpp_multiple_files(temp_multi_raster_files):
 
     assert_equal(data_py_converted, data_cpp)
 
+
 # def test_read_rasters_vs_cpp_multiple_files(temp_multi_raster_files):
 #     """Compare outputs of read_rasters and read_rasters_cpp for multiple files."""
 #     datas, paths = temp_multi_raster_files
@@ -52,6 +55,7 @@ def test_read_rasters_vs_cpp_multiple_files(temp_multi_raster_files):
 
 #     # Compare results
 #     # assert_equal(data_py.reshape(data_cpp.shape), data_cpp)
+
 
 def test_read_rasters_vs_cpp_with_window(temp_raster_file):
     """Compare outputs of read_rasters and read_rasters_cpp with a window."""

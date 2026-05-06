@@ -8,7 +8,13 @@ import pytest
 # Import your _new_raster function
 from skmap.io.base import _new_raster
 
+
 def test_with_statement_closes_file(tmp_path):
+    """
+    This test exists because the _new_raster internal function had a somewhat weird return structure:
+    It returned a contextmanager, because of rasterio.open being the last value
+    but it was not annotated with @contextmanager, so ty didn't understand
+    """
     # Create a temporary base raster file
     base_file = tmp_path / "base.tif"
     data = np.random.rand(1, 10, 10).astype(np.float32)
@@ -47,6 +53,7 @@ def test_with_statement_closes_file(tmp_path):
         # If we get an error, the file was not closed
         pytest.fail(f"File was not closed: {e}")
 
+
 def test_new_raster_shape_roundtrip(tmp_path):
     """Verify that _new_raster preserves shape for non-square arrays.
 
@@ -61,8 +68,13 @@ def test_new_raster_shape_roundtrip(tmp_path):
 
     # Create a minimal base raster to satisfy _new_raster's base_raster param
     with rasterio.open(
-        base_raster_path, "w", driver="GTiff",
-        height=30, width=70, count=1, dtype="float32",
+        base_raster_path,
+        "w",
+        driver="GTiff",
+        height=30,
+        width=70,
+        count=1,
+        dtype="float32",
         crs="EPSG:4326",
         transform=rasterio.transform.from_origin(0, 0, 1, 1),
     ) as dst:
@@ -76,9 +88,11 @@ def test_new_raster_shape_roundtrip(tmp_path):
     with rasterio.open(output_path) as src:
         loaded = src.read(1)
 
-    assert loaded.shape == original.shape, \
+    assert loaded.shape == original.shape, (
         f"Shape mismatch: wrote {original.shape}, got {loaded.shape}"
+    )
     assert_array_equal(original, loaded)
+
 
 def test_save_read_rasters_roundtrip(tmp_path):
     """Round-trip test: save_rasters -> read_rasters on a non-square array.
@@ -101,8 +115,13 @@ def test_save_read_rasters_roundtrip(tmp_path):
 
     # Create base raster
     with rasterio.open(
-        base_raster_path, "w", driver="GTiff",
-        height=H, width=W, count=1, dtype="float32",
+        base_raster_path,
+        "w",
+        driver="GTiff",
+        height=H,
+        width=W,
+        count=1,
+        dtype="float32",
         crs="EPSG:4326",
         transform=rasterio.transform.from_origin(0, 0, 1, 1),
     ) as dst:
@@ -112,6 +131,7 @@ def test_save_read_rasters_roundtrip(tmp_path):
 
     loaded = read_rasters(raster_files=output_paths, n_jobs=1)
 
-    assert loaded.shape == original.shape, \
+    assert loaded.shape == original.shape, (
         f"Shape mismatch: saved {original.shape}, loaded {loaded.shape}"
+    )
     assert_array_equal(original, loaded)
