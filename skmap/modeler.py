@@ -250,18 +250,43 @@ class RFClassifier(Classifier):
         if predict_fn:
             self.predict_fn = predict_fn
         self._load_covs()
-        
-    def predict(self, data:TiledData):
-        # prepare input and output arrays
+
+    def predict(self, data: TiledData):
         with TimeTracker(f"          Transpose data", False):
             self._prepare_covariates(data)
         # predict
         with TimeTracker(f"          Model prediction", False):
             result = TiledData(self.n_class, self.in_covs_valid.shape[0], data.tile_id)
-            if self.n_class == 1:
-                result.array[0,:] = self.predict_fn(self.model, self.in_covs_valid).astype(np.float32)
-            else:
-                tmp_res_t = self.predict_fn(self.model, self.in_covs_valid)
+
+            tmp_res_t = self.predict_fn(self.model, self.in_covs_valid)
+
+        tmp_res_t = np.asarray(tmp_res_t)
+
+        # TL2cgen may return shape: (n_samples, 1, n_class)
+        # Convert it to:          (n_samples, n_class)
+        if tmp_res_t.ndim == 3 and tmp_res_t.shape[1] == 1:
+            tmp_res_t = tmp_res_t[:, 0, :]
+
+        # Single output model
+        if self.n_class == 1:
+            if tmp_res_t.ndim == 2 and tmp_res_t.shape[1] == 1:
+                tmp_res_t = tmp_res_t[:, 0]
+            if tmp_res_t.ndim != 1:
+                raise ValueError(
+                    f"Expected 1D predictions for n_class=1, got shape {tmp_res_t.shape}"
+                )
+            result.array[0, :] = np.asarray(tmp_res_t, dtype=np.float32)
+            return result
+        # Multi output model
+        if tmp_res_t.ndim != 2:
+            raise ValueError(
+                f"Expected 2D predictions for n_class={self.n_class}, got shape {tmp_res_t.shape}"
+            )
+        if tmp_res_t.shape[1] != self.n_class:
+            raise ValueError(
+                f"Expected predictions with {self.n_class} columns, got shape {tmp_res_t.shape}"
+            )
+        tmp_res_t = np.ascontiguousarray(tmp_res_t)
         if self.n_class != 1:
             with TimeTracker(f"          Convert and back transpose data", False):
                 if tmp_res_t.dtype == np.float64:
@@ -271,11 +296,40 @@ class RFClassifier(Classifier):
                 elif tmp_res_t.dtype == np.float32:
                     sb.transposeArray(tmp_res_t, data.n_threads, result.array)
                 else:
-                    print("Result prediction are not in float32 nor float64, converting with python (can be slow)")
-                    tmp_res_t = tmp_res_t.astype(np.float32)
+                    print(
+                        "Result predictions are not float32 nor float64, "
+                        "converting with Python (can be slow)"
+                    )
+                    tmp_res_t = np.ascontiguousarray(tmp_res_t, dtype=np.float32)
                     sb.transposeArray(tmp_res_t, data.n_threads, result.array)
+
+        return result  # shape: (n_class, n_samples)
+
+#     def predict(self, data:TiledData):
+#         # prepare input and output arrays
+#         with TimeTracker(f"          Transpose data", False):
+#             self._prepare_covariates(data)
+#         # predict
+#         with TimeTracker(f"          Model prediction", False):
+#             result = TiledData(self.n_class, self.in_covs_valid.shape[0], data.tile_id)
+#             if self.n_class == 1:
+#                 result.array[0,:] = self.predict_fn(self.model, self.in_covs_valid).astype(np.float32)
+#             else:
+#                 tmp_res_t = self.predict_fn(self.model, self.in_covs_valid)
+#         if self.n_class != 1:
+#             with TimeTracker(f"          Convert and back transpose data", False):
+#                 if tmp_res_t.dtype == np.float64:
+#                     tmp_res_cast_t = sb_arr(tmp_res_t.shape[0], tmp_res_t.shape[1])
+#                     sb.castFloat64ToFloat32(tmp_res_t, data.n_threads, tmp_res_cast_t)
+#                     sb.transposeArray(tmp_res_cast_t, data.n_threads, result.array)
+#                 elif tmp_res_t.dtype == np.float32:
+#                     sb.transposeArray(tmp_res_t, data.n_threads, result.array)
+#                 else:
+#                     print("Result prediction are not in float32 nor float64, converting with python (can be slow)")
+#                     tmp_res_t = tmp_res_t.astype(np.float32)
+#                     sb.transposeArray(tmp_res_t, data.n_threads, result.array)
                     
-        return result # shape: (n_class, n_samples)
+#         return result # shape: (n_class, n_samples)
         
 
     
