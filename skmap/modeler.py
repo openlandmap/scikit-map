@@ -189,7 +189,26 @@ class RFRegressor(Regressor):
         with TimeTracker(f"          Model prediction", False):
             result = TiledData(self.n_responses, self.in_covs_valid.shape[0], data.tile_id)
             assert self.n_responses == 1, "Do not yet manage the case for multiple respounces"
-            result.array[0,:] = self.predict_fn(self.model, self.in_covs_valid).astype(np.float32)
+            #result.array[0,:] = self.predict_fn(self.model, self.in_covs_valid).astype(np.float32)
+            pred = self.predict_fn(self.model, self.in_covs_valid)
+            pred = np.asarray(pred, dtype=np.float32)
+            # Needs proper check later (tcl2gen problem)
+            if pred.ndim > 1:
+                pred = np.squeeze(pred)
+
+            if pred.ndim != 1:
+                raise ValueError(
+                    f"RFRegressor expected prediction shape (n_samples,), "
+                    f"but got {pred.shape}"
+                )
+
+            if pred.shape[0] != self.in_covs_valid.shape[0]:
+                raise ValueError(
+                    f"RFRegressor prediction length mismatch: "
+                    f"expected {self.in_covs_valid.shape[0]}, got {pred.shape[0]}"
+                )
+
+            result.array[0, :] = pred
         return result # shape: (n_responses, n_samples)
 #
 class RFRegressorTrees(Regressor):
