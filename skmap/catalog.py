@@ -1,20 +1,18 @@
-from typing import List, Dict, Union, Optional
-import os
+import json
+import random
+import re
+import sys
+from typing import Dict, List, Optional, Sequence, Tuple, Union
+
 import numpy as np
 import pandas as pd
-import re
-import json
-import skmap_bindings as sb
-import sys
-import random
-from skmap.misc import mmdd_to_doy
 
-os.environ["USE_PYGEOS"] = "0"
-os.environ["PROJ_LIB"] = "/opt/conda/share/proj/"
+import skmap_bindings as sb
+from skmap.misc import mmdd_to_doy
 
 
 class DataCatalog:
-    def __init__(self, data, data_size):
+    def __init__(self, data, data_size) -> None:
         self.data = data
         self.data_size = data_size
 
@@ -46,10 +44,9 @@ class DataCatalog:
         catalog_dict = cls._create_dict_catalog(
             catalog_def, years, base_path, verbose, replace_group_feat_name
         )
-        print(catalog_dict)
         data = {}
-        years = [str(year) for year in years]
-        if not "common" in years:  # common is default
+        years: list[str] = [str(year) for year in years]
+        if "common" not in years:  # common is default
             years += ["common"]
 
         features_names = cls._get_feature_names(catalog_dict)
@@ -105,12 +102,10 @@ class DataCatalog:
                     value = value.replace(old, new)
             return value
 
-        print(covar)
         covar["layer_name"] = covar["layer_name"].apply(replace_layer_name_placeholders)
         covar["path"] = covar["path"].apply(
             lambda x: replace_layer_name_placeholders(x) if "/whale/" in x else x
         )
-        print(covar)
         perc_mask = covar["layer_name"].str.contains(r"\{perc\}") | covar[
             "path"
         ].str.contains(r"\{perc\}")
@@ -271,12 +266,12 @@ class DataCatalog:
 
         return catalog_dict
 
-    def save_json(self, json_out_path: Optional[str] = None):
+    def save_json(self, json_out_path: Optional[str] = None) -> None:
         if json_out_path is not None:
             with open(json_out_path, "w") as f:
                 json.dump(self.data, f, indent=4)
 
-    def get_groups(self):
+    def get_groups(self) -> List[str]:
         groups = sorted(
             list(set(self.data.keys()).difference(["common"]).difference(["otf"]))
         )  # by default don't return 'common' nor 'otf' group
@@ -288,7 +283,7 @@ class DataCatalog:
         return DataCatalog(self.data.copy(), int(self.data_size))
 
     @staticmethod
-    def _get_feature_names(catalog_dict: Dict) -> [str]:
+    def _get_feature_names(catalog_dict: Dict) -> List[str]:
         """Make a set of feature names
 
         :param catalog_dict: dict-of-dicts
@@ -304,17 +299,19 @@ class DataCatalog:
             }
         )
 
-    def find_group_and_feature_by_index(self, target_idx):
+    def find_group_and_feature_by_index(
+        self, target_idx: int
+    ) -> tuple[Optional[str], Optional[str]]:
         for group_name, features in self.data.items():
             for feature_name, feature_info in features.items():
                 if feature_info.get("idx") == target_idx:
                     return group_name, feature_name
         return None, None
 
-    def get_feature_names(self):
+    def get_feature_names(self) -> List[str]:
         return self._get_feature_names(self.data)
 
-    def get_paths(self):
+    def get_paths(self) -> Tuple[List[str], List[int], List[str]]:
         paths, idx, names = [], [], []
         for k in self.data:
             if k == "otf":
@@ -336,7 +333,7 @@ class DataCatalog:
         ]
         return paths, idx, names
 
-    def get_unrolled_catalog(self):
+    def get_unrolled_catalog(self) -> Tuple[List[str], List[str], List[int]]:
         names, paths, idx = [], [], []
         for k in self.data:
             for f in self.data[k]:
@@ -361,12 +358,12 @@ class DataCatalog:
     def _get_whales(self):
         return self.get_whales(self.data)
 
-    def query(self, feature_names, groups=None):
+    def query(self, feature_names, groups: Optional[list[str]] = None) -> None:
         if groups is None:
             groups = self.get_groups()
         if not isinstance(groups, list):
             raise ValueError("Invalid `groups` parameter. Expecting a list.")
-        if not "common" in groups:  # include 'common' group by default
+        if "common" not in groups:  # include 'common' group by default
             groups = groups + ["common"]
         old_data = self.data.copy()
         self.data = {}
@@ -397,7 +394,7 @@ class DataCatalog:
         if missing_features_names:
             self.add_otf_features(missing_features_names)
 
-    def add_otf_features(self, otf_features):
+    def add_otf_features(self, otf_features) -> None:
         if "otf" not in self.data:
             self.data["otf"] = {}
         for otf_feature in otf_features:
@@ -427,7 +424,7 @@ class DataCatalog:
                     data[dep_key][dep_name]["exec_order"] = dep_exec_order
         return data, data_size
 
-    def _expand_whales_dependencies(self, reference_catalog_data):
+    def _expand_whales_dependencies(self, reference_catalog_data) -> None:
         self.data, self.data_size = self.expand_whales_dependencies(
             reference_catalog_data, self.data, self.data_size
         )
@@ -458,7 +455,7 @@ class DataCatalog:
 
 
 #
-def print_catalog_statistics(catalog: DataCatalog):
+def print_catalog_statistics(catalog: DataCatalog) -> None:
     groups = list(catalog.data.keys())
     groups.sort()
     print(f"catalog groups: {groups}")
@@ -540,7 +537,7 @@ def parse_template_whale(whale):
     return func_name, params
 
 
-def run_whales(catalog: DataCatalog, array, n_threads, lat_info=None):
+def run_whales(catalog: DataCatalog, array, n_threads: int, lat_info=None) -> None:
     # Computing on the fly covariates
     whale_paths, whale_keys, whale_names = catalog._get_whales()
     max_exec_order = 0
@@ -571,7 +568,7 @@ def run_whales(catalog: DataCatalog, array, n_threads, lat_info=None):
                         (array_sb.shape[1], array_sb.shape[0]), dtype=np.float32
                     )
                     array_pct_t = np.empty((array_sb.shape[1], 1), dtype=np.float32)
-                    sb.extractArrayRows(array, n_threads, array_sb, in_idxs)
+                    sb.selArrayRows(array, n_threads, array_sb, in_idxs)
                     sb.transposeArray(array_sb, n_threads, array_sb_t)
                     sb.computePercentiles(
                         array_sb_t,

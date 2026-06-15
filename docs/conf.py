@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath("../"))  # Source code dir relative to this file
 
-import skmap
+import importlib.metadata as meta
 
 # -- Project information -----------------------------------------------------
 
@@ -24,9 +24,9 @@ copyright = "2019-2021, Geo-harmonizer project team"
 author = "Geo-harmonizer project team"
 
 # The short X.Y version
-version = ".".join(skmap.__version__.split(".")[:-1])
+version = ".".join(meta.version("scikit-map").split(".")[:-1])
 # The full version, including alpha/beta/rc tags
-release = skmap.__version__
+release = meta.version("scikit-map")
 
 # -- General configuration ---------------------------------------------------
 
@@ -36,10 +36,12 @@ release = skmap.__version__
 extensions = [
     "sphinx.ext.autodoc",  # Core Sphinx library for auto html doc generation from docstrings
     "sphinx.ext.autosummary",  # Create neat summary tables for modules/classes/methods etc
+    "sphinx.ext.graphviz",  # dot graphs in C++ documentation
     "sphinx.ext.intersphinx",  # Link to other project's documentation (see mapping below)
     "sphinx.ext.viewcode",  # Add a link to the Python source code for classes, functions etc.
     "sphinx.ext.doctest",  # run code snippets
     "sphinx_autodoc_typehints",  # Automatically document param types (less noise in class signature)
+    "breathe",  # Doxygen autodoc
     "nbsphinx",  # Integrate Jupyter Notebooks and Sphinx
     "numpydoc",
     "sphinx_copybutton",
@@ -67,6 +69,10 @@ set_type_checking_flag = True  # Enable 'expensive' imports for sphinx_autodoc_t
 nbsphinx_allow_errors = True  # Continue through Jupyter errors
 # autodoc_typehints = "description" # Sphinx-native method. Not as good as sphinx_autodoc_typehints
 add_module_names = False  # Remove namespaces from class/method signatures
+
+breathe_projects = {"skmap_bindings": "../xml"}
+breathe_default_project = "skmap_bindings"
+breathe_domain_by_extension = {"h": "cpp"}  # we don't do header files?
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -118,14 +124,14 @@ templates_path = ["_templates"]
 # Pydata theme
 html_theme = "pydata_sphinx_theme"
 # html_theme_options = { "show_prev_next": False}
-html_css_files = ['readthedocs-custom.css']
+html_css_files = ["readthedocs-custom.css"]
 html_theme_options = {
     "collapse_navigation": False,
     "icon_links": [
         {
-            "name": "GitLab",
-            "url": "https://gitlab.com/geoharmonizer_inea/skmap",
-            "icon": "fab fa-codeberg",
+            "name": "Repo",
+            "url": "https://github.com/openlandmap/scikit-map",
+            "icon": "fas fa-code-branch",
         }
     ],
     "external_links": [
@@ -133,9 +139,9 @@ html_theme_options = {
     ],
     "show_prev_next": False,
     "logo": {
-      "image_light": "logo/print_logo.svg",
-      "image_dark": "logo/print_logo_white.svg",
-   }
+        "image_light": "logo/print_logo.svg",
+        "image_dark": "logo/print_logo_white.svg",
+    },
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,

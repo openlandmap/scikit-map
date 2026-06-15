@@ -1,31 +1,17 @@
-from typing import List, Callable, Optional
 import os
 import random
-from sklearn.ensemble import RandomForestRegressor
-import joblib
 import threading
+from typing import Callable, List, NoReturn, Optional
+
+import joblib
 import numpy as np
 from joblib import Parallel, delayed
-from skmap.tiled_data import TiledData, TiledDataLoader
-import skmap_bindings as sb
-from skmap.misc import _make_dir, TimeTracker, _rm_dir, sb_arr
+from sklearn.ensemble import RandomForestRegressor
 
-os.environ["USE_PYGEOS"] = "0"
-os.environ["PROJ_LIB"] = "/opt/conda/share/proj/"
-n_cpus = os.cpu_count()
-n_threads = n_cpus
-os.environ["OMPI_MCA_rmaps_base_oversubscribe"] = "1"
-os.environ["USE_PYGEOS"] = "0"
-os.environ["PROJ_LIB"] = "/opt/conda/share/proj/"
-os.environ["NUMEXPR_MAX_THREADS"] = f"{n_threads}"
-os.environ["NUMEXPR_NUM_THREADS"] = f"{n_threads}"
-os.environ["OMP_THREAD_LIMIT"] = f"{n_threads}"
-os.environ["OMP_NUM_THREADS"] = f"{n_threads}"
-os.environ["OPENBLAS_NUM_THREADS"] = f"{n_threads}"
-os.environ["MKL_NUM_THREADS"] = f"{n_threads}"
-os.environ["VECLIB_MAXIMUM_THREADS"] = f"{n_threads}"
-os.environ["OMP_DYNAMIC"] = f"TRUE"
-os.environ["TREELITE_BIND_THREADS"] = "0"
+import skmap.set_env  # noqa: F401
+import skmap_bindings as sb
+from skmap.misc import TimeTracker, _make_dir, _rm_dir, sb_arr
+from skmap.tiled_data import TiledData, TiledDataLoader
 
 
 def _get_out_files_depths(
@@ -72,7 +58,9 @@ def _get_out_files_depths(
 def _tree_based_load_model(model_path):
     if model_path.endswith((".joblib", ".lz4", ".pkl")):
         model = joblib.load(model_path)
-        predict_fn = lambda predictor, data: predictor.predict(data)
+
+        def predict_fn(predictor, data):
+            return predictor.predict(data)
     elif model_path.endswith(".so"):
         import tl2cgen
 
@@ -82,7 +70,7 @@ def _tree_based_load_model(model_path):
             print(
                 "The current installation of tl2cgen is not the one with parallel DMatrix and can be slow"
             )
-        model = tl2cgen.Predictor(model_path, nthread=n_cpus)
+        model = tl2cgen.Predictor(model_path, nthread=os.cpu_count())
 
         def predict_tl2cgen(predictor, data):
             dmat = tl2cgen.DMatrix(data, dtype="float32")
@@ -98,7 +86,6 @@ def _tree_based_load_model(model_path):
             return res
 
         predict_fn = predict_tl2cgen
-        os.environ["TREELITE_BIND_THREADS"] = "0"
     else:
         raise ValueError(f"Invalid model path extension '{model_path}'")
     return model, predict_fn
@@ -131,14 +118,14 @@ class Modeler:
         self.model = None
         self.model_covs = None
 
-    def _load_model(self):
+    def _load_model(self) -> None:
         if self.model_path.endswith((".joblib", ".lz4", ".pkl")):
             model = joblib.load(self.model_path)
         else:
             raise ValueError(f"Invalid model path extension '{self.model_path}'")
         self.model = model
 
-    def _load_covs(self):
+    def _load_covs(self) -> None:
         if self.model_covs_path is not None:
             with open(self.model_covs_path, "r") as file:
                 model_covs = [line.strip() for line in file]
@@ -155,10 +142,10 @@ class Modeler:
                 with open(covs_path, "r") as file:
                     model_covs = [line.strip() for line in file]
             else:
-                raise ValueError(f"No feature names was found")
+                raise ValueError("No feature names was found")
         self.model_covs = model_covs
 
-    def _prepare_covariates(self, data: TiledDataLoader):
+    def _prepare_covariates(self, data: TiledDataLoader) -> None:
         # prepare input and output arrays
         n_groups = len(data.catalog.get_groups())
         n_samples = n_groups * data.n_pixels
@@ -177,7 +164,7 @@ class Modeler:
             data.get_pixels_valid_idx(n_groups),
         )
 
-    def predict():
+    def predict() -> NoReturn:
         raise NotImplementedError()
 
 
@@ -215,10 +202,10 @@ class RFRegressor(Regressor):
 
     def predict(self, data: TiledData):
         # prepare input and output arrays
-        with TimeTracker(f"          Transpose data", False):
+        with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
         # predict
-        with TimeTracker(f"          Model prediction", False):
+        with TimeTracker("          Model prediction", False):
             result = TiledData(
                 self.n_responses, self.in_covs_valid.shape[0], data.tile_id
             )
@@ -250,12 +237,12 @@ class RFRegressorTrees(Regressor):
 
     def predict(self, data: TiledData):
         # prepare input and output arrays
-        with TimeTracker(f"          Transpose data", False):
+        with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
         # predict
-        with TimeTracker(f"          Model prediction", False):
+        with TimeTracker("          Model prediction", False):
 
-            def _single_prediction(predict, X, out, i, lock):
+            def _single_prediction(predict, X, out, i, lock) -> None:
                 prediction = predict(X, check_input=False)
                 with lock:
                     out[i, :] = prediction
@@ -314,10 +301,10 @@ class RFClassifier(Classifier):
 
     def predict(self, data: TiledData):
         # prepare input and output arrays
-        with TimeTracker(f"          Transpose data", False):
+        with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
         # predict
-        with TimeTracker(f"          Model prediction", False):
+        with TimeTracker("          Model prediction", False):
             result = TiledData(self.n_class, self.in_covs_valid.shape[0], data.tile_id)
             if self.n_class == 1:
                 result.array[0, :] = self.predict_fn(
@@ -326,7 +313,7 @@ class RFClassifier(Classifier):
             else:
                 tmp_res_t = self.predict_fn(self.model, self.in_covs_valid)
         if self.n_class != 1:
-            with TimeTracker(f"          Convert and back transpose data", False):
+            with TimeTracker("          Convert and back transpose data", False):
                 if tmp_res_t.dtype == np.float64:
                     tmp_res_cast_t = sb_arr(tmp_res_t.shape[0], tmp_res_t.shape[1])
                     sb.castFloat64ToFloat32(tmp_res_t, data.n_threads, tmp_res_cast_t)
@@ -388,7 +375,7 @@ class Predicted:
                 (self.n_groups, self.data.n_pixels_valid, self.n_depths, self.n_stats)
             )
 
-    def average_trees_depth_ranges(self):
+    def average_trees_depth_ranges(self) -> None:
         assert self.n_depths > 1
         self.n_depths -= 1
         for i in range(self.n_depths):
@@ -398,7 +385,7 @@ class Predicted:
             ]
             self._out_valid[i, :, : self.n_groups, :] /= 2
 
-    def average_trees_year_ranges(self):
+    def average_trees_year_ranges(self) -> None:
         assert self.n_groups > 1
         self.n_groups -= 1
         for j in range(self.n_groups):
@@ -408,7 +395,9 @@ class Predicted:
             ]
             self._out_valid[: self.n_depths, :, j, :] /= 2
 
-    def compute_stats(self, mean=True, quantiles=[0.025, 0.975], expm1=False, scale=1):
+    def compute_stats(
+        self, mean=True, quantiles=[0.025, 0.975], expm1=False, scale=1
+    ) -> None:
         quantile_idx = 1 if mean else 0
         self.n_stats = quantile_idx + len(quantiles)
         assert self.n_stats > 0
@@ -624,12 +613,12 @@ class PredictedProbs:
     def predicted_class(self):
         return self._out_cls_valid.reshape((self.n_groups, self.data.n_pixels_valid))
 
-    def compute_class(self):
+    def compute_class(self) -> None:
         self._out_cls_valid[:, 0] = self.legend_codes[
             np.argmax(self._out_probs_valid[:, :], axis=-1).astype(int)
         ]
 
-    def compute_kl_divergence(self):
+    def compute_kl_divergence(self) -> None:
         adjusted_data = np.where(
             self._out_probs_valid[:, :] > 0,
             self._out_probs_valid[:, :],

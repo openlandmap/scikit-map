@@ -12,6 +12,7 @@ So the inkscape palette is in [scikit-map.gpl](./scikit-map.gpl). Just link it t
 
 ```bash
 ln -s ./scikit-map.gpl ~/.config/inkscape/palettes/scikit-map.gpl
+# ~/.var/app/org.inkscape.Inkscape/config/inkscape/palettes/
 ```
 
 then open and close inkscape.
@@ -36,10 +37,10 @@ color scheme is matched with this software-as-soil image:
 
 ## Fonts
 
-install [rockwell nova](https://www.cufonfonts.com/font/rockwell-nova):
+install [Roboto Slab](https://www.fontsquirrel.com/fonts/download/roboto-slab):
 
 ```bash
-unzip /tmp/rockwell-nova-cufonfonts.zip ~/.local/share/fonts
+unzip /tmp/roboto-slab.zip ~/.local/share/fonts/
 ```
 
 

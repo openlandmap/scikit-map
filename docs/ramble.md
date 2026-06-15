@@ -26,6 +26,8 @@ The design of RichDEM is guided by these principles:
 
 ## making documentation
 
+
+
 Index: what is this library? is it the right fit for me?
 
 ### Quickstart
@@ -84,13 +86,93 @@ RECURSIVE               = YES
 
 then again `doxygen Doxyfile` and refresh
 
+Integration with sphinx documentation is done with [Breathe](breathe.readthedocs.io). 
+
+- linking to C++ classes in docs see [here](https://breathe.readthedocs.io/en/latest/domains.html)
+- There's some mismatch going on between classes, python exposed functions and semantics (what the function does) This is where [groups](https://www.doxygen.nl/manual/grouping.html#memgroup) come in:
+  - `skmap_bindings.cpp` can only be included in full, which gives a lot of clutter, because for some reason I cannot say: only include documented functions. So we make [groups](https://breathe.readthedocs.io/en/latest/groups.html), and hopefully in those groups we can have classes and members and such
+  - `TransArray` has both data mangling and statistics, these are split into member groups
+  
+  So here's a short list of group names that I think make sense (sub-grouping?)
+    - IO
+        - overlays?: read points = read pixels from a block
+        - WarpTile: keep C++ function, but don't use in python
+        - ReadData; ReadDataCore
+        - WriteData
+    
+    - mangling
+      - ~~transposeReorder~~
+      - ~~transpose~~
+      - sel{Rows/Cols}
+      - expand{Rows/Cols} opposite of sel
+      - ~~reorder{Rows/Cols}~~
+      - ~~invreorder{Rows/Cols}~~
+
+    - data_manipulation
+      - offsetAndScale
+      - fill
+      - masknan
+      - fillnan
+
+    - data_processing: gives different output (shape)
+      - convolveRows
+      - Tsirf
+      - stats
+        - averages, quantiles
+        - blaAggregate
+      - spectral indices
+        - computeBla
+      
+#### formatting
+
+```bash
+# specify directories to omit build directory
+find {skmap/,tests/} -iname "*.cpp" -o -iname "*.h" | xargs clang-format --verbose -i
+```
+
 #### Clangd language server
 
-So I wanted to get nice code completion and such, so that's what clangd can help with, 
+For code completion and intellisense. It needs a `compile_commands.json` at top-level. generate with:
 
-#### Unit tests?
+```bash
+cmake -B build -DTESTS=1 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 .
+mv build/compile_commands.json .
+```
 
-Would be great to have like unit tests for most things
+#### Unit tests
+
+Unit tests with [`gtest`](https://google.github.io/googletest/quickstart-cmake.html) are included.
+
+To run:
+
+```bash
+cmake -B build -DTESTS=1 . # only have to run once
+cmake --build build -j && ./build/tests/src/unit_tests 
+```
+
+Some long-running tests have been disabled, to run those:
+
+```bash
+cmake --build build -j && ./build/tests/src/unit_tests --gtest_also_run_disabled_tests
+```
+
+##### Uglyness
+
+mangling:
+
+- `inverseReorderArray` does not apply a transpose
+  - ask, this is weird and in the python code, no separate transpose is applied
+- `transposeReorderArray` is weird, I could not get it to work and the code looks broken
+  - probably the working version did not get committed -> fix
+
+manipulation:
+
+- `maskData` and `maskDataRows` are semantically opposite to `maskNan`:  
+  In ??all?? other functions, `functionName` works on rows, and `functionNameRows` allows to change the input data per row. (`maskNan`)
+  - swap `maskData` and `maskDataRows` meanings?
+- `offsetAndScales` uses offsets and scales from data row index in stead of row_sel index
+  - make it match `functionNameRows`-type behaviour
+- Then also the `Rows` in `swapRowsValues` is weird, rename to `swapValues`?
 
 ## checking where `sb.` is called:
 
@@ -126,9 +208,7 @@ Forget that, I think we can just install everything with conda/micromamba and th
 pip install --no-build-isolation -e .[full]
 ```
 
-But then for some reason the `skmap.io.process.SeasConvFill` didn't exist???? even after adding `.[full]` in stead of `.`... whatevs...
-
-
+But then for some reason the `skmap.io.process.SeasConvFill` didn't exist???? even after adding `.[full]` in stead of `.`... whatevs... This was because modules and imports are in a huge try/except block
 
 ## memmap?
 

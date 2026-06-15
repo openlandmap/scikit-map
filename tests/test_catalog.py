@@ -1,23 +1,24 @@
-import pytest
-import pandas as pd
 from pathlib import Path
-from skmap.catalog import DataCatalog as c
+
+import pandas as pd
+
+from skmap.catalog import DataCatalog
 
 
 class TestDataCatalog:
-    def test_path(self):
+    def test_path(self) -> None:
         print(Path(".").absolute())
         assert Path(
             "skmap/data/toy/ndvi/gappy/ndvi_landsat.ard1_p50_30m_s_20141202_20150320_nl_epsg.3035_v20230720.tif"
         ).exists()
 
-    def test__get_features_names(self):
-        assert c._get_feature_names(
+    def test__get_features_names(self) -> None:
+        assert DataCatalog._get_feature_names(
             {"a": {"hello": "hii"}, "b": {"world": "Gaia"}}
         ) == ["hello", "world"]
 
-    def test_get_whales(self):
-        assert c.get_whales(
+    def test_get_whales(self) -> None:
+        assert DataCatalog.get_whales(
             {
                 "common": {
                     "example": {
@@ -34,8 +35,8 @@ class TestDataCatalog:
             }
         ) == (["/whale/expr"], ["common"], ["example"])
 
-    def test_create_catalog_minimal(self):
-        catalog = c.create_catalog(
+    def test_create_catalog_minimal(self) -> None:
+        catalog = DataCatalog.create_catalog(
             catalog_def=pd.DataFrame(
                 {
                     "layer_name": ["layer", "example"],
@@ -47,7 +48,7 @@ class TestDataCatalog:
             base_path=str(Path(".").absolute()),
         )
         print(f"{catalog.data=!r}", repr(catalog), dir(catalog.data), range(2014, 2020))
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 2
         assert catalog.data == {
             "common": {
@@ -63,9 +64,14 @@ class TestDataCatalog:
             [0, 1],
         )
         assert catalog.get_feature_names() == ["example", "layer"]
+        assert catalog.get_paths() == (
+            ["sample/path.tif", "wrong/file.tif"],
+            [0, 1],
+            ["example", "layer"],
+        )
 
-    def test_create_catalog_year(self):
-        catalog = c.create_catalog(
+    def test_create_catalog_year(self) -> None:
+        catalog = DataCatalog.create_catalog(
             pd.DataFrame(
                 {
                     "layer_name": ["layer_{year}"],
@@ -78,7 +84,7 @@ class TestDataCatalog:
             years=[2014, 2015, 2016],
             base_path=str(Path(".").absolute()),
         )
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 3
         assert catalog.data == {
             "2014": {
@@ -116,9 +122,18 @@ class TestDataCatalog:
             [0, 1, 2],
         )
         assert catalog.get_feature_names() == ["layer_YYYY"]
+        assert catalog.get_paths() == (
+            [
+                "path/to/param_2014.tif",
+                "path/to/param_2015.tif",
+                "path/to/param_2015.tif",
+            ],
+            [0, 1, 2],
+            ["layer_YYYY", "layer_YYYY", "layer_YYYY"],
+        )
 
-    def test_create_catalog_year_plusminus(self):
-        catalog = c.create_catalog(
+    def test_create_catalog_year_plusminus(self) -> None:
+        catalog = DataCatalog.create_catalog(
             pd.DataFrame(
                 {
                     "layer_name": ["layer_{year_minus_one}-{year_plus_one}"],
@@ -131,7 +146,7 @@ class TestDataCatalog:
             years=[2014, 2015, 2016],
             base_path=str(Path(".").absolute()),
         )
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 3
         assert catalog.data == {
             "2014": {
@@ -169,9 +184,18 @@ class TestDataCatalog:
             [0, 1, 2],
         )
         assert catalog.get_feature_names() == ["layer_YYMO-YYPO"]
+        assert catalog.get_paths() == (
+            [
+                "path/to/param_2013-2015.tif",
+                "path/to/param_2014-2016.tif",
+                "path/to/param_2014-2016.tif",
+            ],
+            [0, 1, 2],
+            ["layer_YYMO-YYPO", "layer_YYMO-YYPO", "layer_YYMO-YYPO"],
+        )
 
-    def test_create_catalog_monthly(self):
-        catalog = c.create_catalog(
+    def test_create_catalog_monthly(self) -> None:
+        catalog = DataCatalog.create_catalog(
             pd.DataFrame(
                 {
                     "layer_name": ["layer_{year}{start_month}-{year}{end_month}"],
@@ -186,7 +210,7 @@ class TestDataCatalog:
             years=[2014, 2015, 2016],
             base_path=str(Path(".").absolute()),
         )
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 6
         assert catalog.data == {
             "2014": {
@@ -246,9 +270,28 @@ class TestDataCatalog:
             "layer_YYYY01-YYYY05",
             "layer_YYYY06-YYYY12",
         ]
+        assert catalog.get_paths() == (
+            [
+                "path/to/param_201401-201405.tif",
+                "path/to/param_201406-201412.tif",
+                "path/to/param_201501-201505.tif",
+                "path/to/param_201506-201512.tif",
+                "path/to/param_201501-201505.tif",
+                "path/to/param_201506-201512.tif",
+            ],
+            [0, 1, 2, 3, 4, 5],
+            [
+                "layer_YYYY01-YYYY05",
+                "layer_YYYY06-YYYY12",
+                "layer_YYYY01-YYYY05",
+                "layer_YYYY06-YYYY12",
+                "layer_YYYY01-YYYY05",
+                "layer_YYYY06-YYYY12",
+            ],
+        )
 
-    def test_create_catalog_perc(self):
-        catalog = c.create_catalog(
+    def test_create_catalog_perc(self) -> None:
+        catalog = DataCatalog.create_catalog(
             catalog_def=pd.DataFrame(
                 {
                     "layer_name": ["layer_{perc}"],
@@ -261,7 +304,7 @@ class TestDataCatalog:
             base_path=str(Path(".").absolute()),
         )
         print(f"{catalog.data=!r}", repr(catalog), dir(catalog.data), range(2014, 2020))
-        assert isinstance(catalog, c)
+        assert isinstance(catalog, DataCatalog)
         assert catalog.data_size == 4
         assert catalog.data == {
             "common": {
@@ -289,3 +332,13 @@ class TestDataCatalog:
             "layer_p75",
             "layer_sd",
         ]
+        assert catalog.get_paths() == (
+            [
+                "sample/path_p25.tif",
+                "sample/path_p50.tif",
+                "sample/path_p75.tif",
+                "sample/path_sd.tif",
+            ],
+            [0, 1, 2, 3],
+            ["layer_p25", "layer_p50", "layer_p75", "layer_sd"],
+        )

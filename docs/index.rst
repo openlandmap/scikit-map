@@ -9,6 +9,7 @@
    Tutorials <tutorials>
    In-Depth <in-depth/in-depth>
    API Reference <_autosummary/skmap>
+   C++ API <cpp_api>
 
 Scikit-Map is a library to fill gaps in the Python machine learning ecosystem when dealing with geospatial data. It offers *parallel data access* and manipulation for **space-time overlays** and **large-scale predictions**.
 
@@ -43,7 +44,7 @@ Then create the container:
 
 .. code-block:: shell-session
 
-   docker run -d --restart=always --name opengeohub_pygeo_ide -v /mnt:/mnt -p 8888:8888 -e GRANT_SUDO=yes --user root opengeohub/pygeo-ide:v3.8.6-mkl-gdal314 start.sh jupyter lab --LabApp.token='opengeohub' --ServerApp.root_dir='/'
+   docker run -d --restart=always --name opengeohub_pygeo_ide -v /mnt:/mnt -p 8888:8888 --user root opengeohub/pygeo-ide:v3.8.6-mkl-gdal314 jupyter lab --LabApp.token='opengeohub' --ServerApp.root_dir='/' --ip=0.0.0.0 --allow-root
 
 
 As last step access the JupyterLab through http://localhost:8888 using the password **opengeohub**, open a terminal and install the last version of ``scikit-map``:
@@ -55,8 +56,17 @@ As last step access the JupyterLab through http://localhost:8888 using the passw
 
 .. image:: _static/docker_eumap.gif
 
-Conda
-=================
+Pip/`uv <https://docs.astral.sh/uv/>`_
+======================================
+
+``skmap`` can be installed with pip-compatible tooling. 
+
+.. code-block:: shell-session
+
+   sudo apt install libgdal-dev build-essential python3-dev git
+
+   pip install "scikit-map[full] @ git+https://github.com/openlandmap/scikit-map@develop"
+
 
 To install ``skmap`` using `conda <https://conda.io/projects/conda/en/latest/user-guide/install/index.html>`_, first it's necessary download the file `conda_env.yml <https://gitlab.com/geoharmonizer_inea/eumap/-/raw/master/conda_env.yml>`_:
 

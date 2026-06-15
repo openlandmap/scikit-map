@@ -1,27 +1,25 @@
-from typing import List, Union
-from dateutil.relativedelta import relativedelta
-
-import requests
-import numpy as np
-import bottleneck as bc
-import joblib
-from pathlib import Path
-from pystac.extensions.file import FileExtension
 import gc
+import hashlib
+import json
 import os
+from pathlib import Path
+from typing import List
 
-import warnings
-import hashlib, json
+import bottleneck as bc
+import numpy as np
+import requests
+from pystac.extensions.file import FileExtension
+
 from skmap import parallel
-from skmap.misc import date_range
 from skmap.io import read_auth_rasters, save_rasters
 from skmap.misc import (
-    _warn_deps,
+    GoogleSheet,
     _eval,
+    _warn_deps,
+    date_range,
+    find_files,
     nan_percentile,
     ttprint,
-    find_files,
-    GoogleSheet,
 )
 
 
@@ -55,7 +53,7 @@ class GLADLandsat:
         parallel_download: int = 4,
         filter_additional_qa: bool = True,
         verbose: bool = True,
-    ):
+    ) -> None:
         self.username = username
         self.password = password
         self.base_url = "https://glad.umd.edu/dataset/landsat_v1.1"
@@ -86,7 +84,7 @@ class GLADLandsat:
 
         return urls
 
-    def _verbose(self, *args, **kwargs):
+    def _verbose(self, *args, **kwargs) -> None:
         if self.verbose:
             ttprint(*args, **kwargs)
 
@@ -121,15 +119,15 @@ class GLADLandsat:
         Examples
         ========
 
-        >>> from skmap.datasets.eo import GLADLandsat
+        >>> from skmap.data.eo import GLADLandsat
         >>>
         >>> # Do the registration in
         >>> # https://glad.umd.edu/ard/user-registration
         >>> username = '<YOUR_USERNAME>'
         >>> password = '<YOUR_PASSWORD>'
         >>> glad_landsat = GLADLandsat(username, password, verbose=True)
-        >>> data, urls, base_raster = glad_landsat.read('092W_47N', '2020-6', '2020-10')
-        >>> print(f'Data shape: {data.shape}')
+        >>> data, urls, base_raster = glad_landsat.read('092W_47N', '2020-6', '2020-10') # doctest: +SKIP
+        >>> print(f'Data shape: {data.shape}') # doctest: +SKIP
 
         References
         ==========
@@ -158,7 +156,7 @@ class GLADLandsat:
             self._verbose(f"Read data {data.shape}.")
 
             if clear_sky:
-                self._verbose(f"Removing cloud and cloud shadow pixels.")
+                self._verbose("Removing cloud and cloud shadow pixels.")
                 clear_sky_mask, clear_sky_pct = self._clear_sky_mask(data)
                 data[~clear_sky_mask] = np.nan
                 clear_sky_idx = np.where(clear_sky_pct >= min_clear_sky)[0]
@@ -256,9 +254,7 @@ class GLADLandsat:
             output_dir = Path(output_dir)
 
         fn_raster = (
-            output_dir.joinpath(f"{start}")
-            .joinpath(f"B1_COUNT")
-            .joinpath(f"{tile}.tif")
+            output_dir.joinpath(f"{start}").joinpath("B1_COUNT").joinpath(f"{tile}.tif")
         )
 
         dtype = "uint8"
@@ -315,16 +311,22 @@ class GLADLandsat:
         Examples
         ========
 
-        >>> from skmap.datasets.eo import GLADLandsat
+        >>> from skmap.data.eo import GLADLandsat
         >>>
         >>> # Do the registration here
         >>> # https://glad.umd.edu/ard/user-registration
         >>> username = '<YOUR_USERNAME>'
         >>> password = '<YOUR_PASSWORD>'
+        >>>
         >>> glad_landsat = GLADLandsat(username, password, verbose=True)
-        >>> data, base_raster, _ = glad_landsat.percentile_agg('092W_47N', '2020-6', '2020-10',
-        >>>                         p=[25,50,75], output_dir='./glad_landsat_ard_percentiles')
-        >>> print(f'Shape of data: {data.shape}')
+        >>> data, base_raster, _ = glad_landsat.percentile_agg(
+        ...     '092W_47N',
+        ...     '2020-6',
+        ...     '2020-10',
+        ...     p=[25,50,75],
+        ...     output_dir='./glad_landsat_ard_percentiles'
+        ... ) # doctest: +SKIP
+        >>> print(f'Shape of data: {data.shape}') # doctest: +SKIP
 
         References
         ==========
@@ -378,7 +380,7 @@ class GLADLandsat:
                         result, base_raster, tile, start, p, output_dir, unit8
                     )
 
-                self._verbose(f"Counting clear_sky pixels")
+                self._verbose("Counting clear_sky pixels")
                 output_file_count = self._calc_save_count(
                     data, self.max_spectral_val, base_raster, tile, start, output_dir
                 )
@@ -399,22 +401,21 @@ class GLADLandsat:
 
 
 try:
+    import mimetypes
+    from datetime import datetime
+    from itertools import chain
+
+    import matplotlib.pyplot as plt
+    import pandas as pd
     import pystac
     import rasterio
     import requests
-    import mimetypes
-    import pandas as pd
-    import matplotlib.pyplot as plt
-
+    from bs4 import BeautifulSoup
+    from matplotlib.colors import ListedColormap
     from minio import Minio
     from PIL import Image
-    from itertools import chain
-    from datetime import datetime
-    from bs4 import BeautifulSoup
     from pyproj import Transformer
-    from matplotlib.colors import ListedColormap
     from shapely.geometry import Polygon, mapping, shape
-    from pystac.extensions.item_assets import ItemAssetsExtension
 
     class STACGenerator:
         """
@@ -462,7 +463,7 @@ try:
             asset_id_fields=[0, 2, 4],
             catalogs=None,
             verbose=False,
-        ):
+        ) -> None:
             self.cog_level = cog_level
             self.thumb_overwrite = thumb_overwrite
             self.gsheet = gsheet
@@ -561,7 +562,7 @@ try:
             else:
                 self._populate()
 
-        def _verbose(self, *args, **kwargs):
+        def _verbose(self, *args, **kwargs) -> None:
             if self.verbose:
                 ttprint(*args, **kwargs)
 
@@ -632,7 +633,7 @@ try:
 
             return (key, row, items)
 
-        def _populate_vector(self):
+        def _populate_vector(self) -> None:
             self.new_collections = {}
 
             for rid, row in self.gsheet.collections.iterrows():
@@ -751,7 +752,7 @@ try:
 
                 self._verbose(f"Creating collection {collection.id} with {len(items)}")
 
-        def _populate(self):
+        def _populate(self) -> None:
             self.new_collections = {}
             dt_fmt = self.url_date_format
             groups = self.gsheet.collections.groupby("catalog")
@@ -833,13 +834,13 @@ try:
             else:
                 return None
 
-        def _is_data(self, asset):
+        def _is_data(self, asset) -> bool:
             for r in asset.roles:
                 if r == "data":
                     return True
             return False
 
-        def _generate_thumbs(self, output_dir="./stac", thumb_base_url=None):
+        def _generate_thumbs(self, output_dir="./stac", thumb_base_url=None) -> None:
             for key, colls in self.new_collections.items():
                 args = []
                 catalog = self.catalogs[key]
@@ -1184,7 +1185,7 @@ try:
                 self._verbose(f"The file {raster_fn} not exists")
                 return (None, None, None)
 
-            with rasterio.Env(**self.gdal_env) as rio_env:
+            with rasterio.Env(**self.gdal_env):
                 with rasterio.open(raster_fn) as ds:
                     transformer = Transformer.from_crs(
                         ds.crs, "epsg:4326", always_xy=True
@@ -1215,7 +1216,7 @@ try:
             output_dir: str = "stac",
             catalog_type=pystac.CatalogType.SELF_CONTAINED,
             thumb_base_url=None,
-        ):
+        ) -> None:
             """
 
             Save the STAC instance to local folder.
@@ -1232,16 +1233,16 @@ try:
             ========
 
             >>> from skmap.misc import GoogleSheet
-            >>> from skmap.datasets.eo import STACGenerator
+            >>> from skmap.data.eo import STACGenerator
             >>>
             >>> # Generate your key follow the instructions in https://docs.gspread.org/en/latest/oauth2.html
             >>> key_file = '<GDRIVE_KEY>'
             >>> # Public accessible Google Spreadsheet (Anyone on the internet with this link can view)
             >>> url = 'https://docs.google.com/spreadsheets/d/10tAhEpZ7TYPD0UWhrI0LHcuIzGZNt5AgSjx2Bu-FciU'
             >>>
-            >>> gsheet = GoogleSheet(key_file, url, verbose=True)
-            >>> stac_generator = STACGenerator(gsheet, asset_id_fields=[1,2,3,5], catalogs=catalogs, verbose=True)
-            >>> stac_generator.save_all(output_dir='stac_odse', thumb_base_url=f'https://s3.eu-central-1.wasabisys.com/stac')
+            >>> gsheet = GoogleSheet(key_file, url, verbose=True) # doctest: +SKIP
+            >>> stac_generator = STACGenerator(gsheet, asset_id_fields=[1,2,3,5], catalogs=catalogs, verbose=True) # doctest: +SKIP
+            >>> stac_generator.save_all(output_dir='stac_odse', thumb_base_url=f'https://s3.eu-central-1.wasabisys.com/stac') # doctest: +SKIP
 
             """
 
@@ -1255,7 +1256,9 @@ try:
                     catalog_type=catalog_type,
                 )
 
-        def _s3_fput_object(self, fpath, output_dir, client, s3_bucket_name, s3_prefix):
+        def _s3_fput_object(
+            self, fpath, output_dir, client, s3_bucket_name, s3_prefix
+        ) -> bool:
             if fpath.is_file():
                 object_name = fpath.relative_to(output_dir.name)
                 if s3_prefix:
@@ -1280,7 +1283,7 @@ try:
             s3_prefix: str = "",
             output_dir: str = "stac",
             catalog_type=pystac.CatalogType.SELF_CONTAINED,
-        ):
+        ) -> None:
             """
 
             Save the STAC instance to local folder and upload all the files
@@ -1308,9 +1311,9 @@ try:
             >>> # Public accessible Google Spreadsheet (Anyone on the internet with this link can view)
             >>> url = 'https://docs.google.com/spreadsheets/d/10tAhEpZ7TYPD0UWhrI0LHcuIzGZNt5AgSjx2Bu-FciU'
             >>>
-            >>> gsheet = GoogleSheet(key_file, url)
-            >>> stac_generator = STACGenerator(gsheet, verbose=True)
-            >>> stac_generator.save_and_publish_all(s3_host, s3_access_key, s3_access_secret, s3_bucket_name)
+            >>> gsheet = GoogleSheet(key_file, url) # doctest: +SKIP
+            >>> stac_generator = STACGenerator(gsheet, verbose=True) # doctest: +SKIP
+            >>> stac_generator.save_and_publish_all(s3_host, s3_access_key, s3_access_secret, s3_bucket_name) # doctest: +SKIP
 
             """
 
@@ -1339,16 +1342,16 @@ try:
                 joblib_args={"backend": "threading"},
             ):
                 continue
-            self._verbose(f"End")
+            self._verbose("End")
 
 except Exception as e:
     _warn_deps(e, "eo.STACGenerator")
 
 try:
     from pystac import Catalog
-    from whoosh.qparser import QueryParser
-    from whoosh.index import create_in
     from whoosh import fields
+    from whoosh.index import create_in
+    from whoosh.qparser import QueryParser
 
     class STACIndex:
         """
@@ -1362,7 +1365,9 @@ try:
 
         """
 
-        def __init__(self, catalog: Catalog, index_dir="stac_index", verbose=False):
+        def __init__(
+            self, catalog: Catalog, index_dir="stac_index", verbose=False
+        ) -> None:
             self.catalog = catalog
             self.index_dir = index_dir
             self.verbose = verbose
@@ -1418,7 +1423,7 @@ try:
 
             return result
 
-        def _verbose(self, *args, **kwargs):
+        def _verbose(self, *args, **kwargs) -> None:
             if self.verbose:
                 ttprint(*args, **kwargs)
 

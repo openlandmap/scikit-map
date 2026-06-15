@@ -2,24 +2,25 @@
 Dataset quality control utilities
 """
 
-from typing import Iterable, Union
-import warnings
-from pathlib import Path
-import rasterio as rio
-from shapely import geometry as g
-import geopandas as gp
-import requests
-import numpy as np
-from operator import add
 from functools import reduce
+from operator import add
+from pathlib import Path
+from typing import Any, Iterable, Union
+
+import geopandas as gp
+import numpy as np
+import rasterio as rio
+import requests
+from shapely import geometry as g
 
 from .parallel import blocks
+
 # from .datasets.catalogue import _Resource
 
 _LANDMASK_REF = "https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_land.mask_pflugmacher2019.landcover.12_f_30m_s0..0m_2014..2016_skmap_epsg3035_v0.1.tif"
 
 
-def _test_field_nonempty(val):
+def _test_field_nonempty(val: Any) -> bool:
     if isinstance(val, str):
         val = val.strip()
     return val not in ["", []]
@@ -42,8 +43,8 @@ class Test:
     >>> test = Test(bounds, verbose=True)
     >>> dataset_url = 'https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_landcover.hcl_lucas.corine.rf_p_30m_0..0cm_2019_skmap_epsg3035_v0.1.tif'
     >>>
-    >>> available = test.availability(dataset_url)
-    >>> coverage_fraction = test.raster_land_coverage(dataset_url, include_ice=True, include_wetlands=True)
+    >>> available = test.availability(dataset_url) # doctest: +SKIP
+    >>> coverage_fraction = test.raster_land_coverage(dataset_url, include_ice=True, include_wetlands=True) # doctest: +SKIP
 
     """
 
@@ -52,7 +53,7 @@ class Test:
         bounds: Iterable,
         crs: bool = None,
         verbose: bool = False,
-    ):
+    ) -> None:
         self.bounds = bounds
         self.verbose = verbose
         self.crs = crs
@@ -111,7 +112,7 @@ class Test:
         with rio.open(dataset_path) as src:
             nodata = src.nodata
 
-        def _get_counts(landmask, data):
+        def _get_counts(landmask, data):  # noqa: ANN001, ANN202
             idx_landmask = landmask < 10
             if include_ice:
                 idx_landmask = idx_landmask | (landmask == 12)
