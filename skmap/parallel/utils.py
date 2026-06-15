@@ -2,26 +2,21 @@
 Parallelization helpers based in thread/process pools and joblib
 """
 
-import numpy
+import gc
 import multiprocessing
-from typing import Callable, Iterator, List, Union
-from concurrent.futures import as_completed, wait, FIRST_COMPLETED, ProcessPoolExecutor
-
-import warnings
+import time
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, as_completed, wait
 from pathlib import Path
+from typing import Any, Callable, Iterator, List, Union
+
 import geopandas as gpd
+import numpy
 import numpy as np
-import multiprocessing
-from osgeo import osr
-import math
+import psutil
 import rasterio
 from rasterio.mask import mask
+from rasterio.windows import from_bounds
 from shapely.geometry import Polygon
-from rasterio.windows import Window, from_bounds
-import os.path
-import psutil
-import time
-import gc
 
 from ..misc import ttprint
 
@@ -33,7 +28,7 @@ Number of CPU cores available.
 executor = None
 
 
-def _mem_usage():
+def _mem_usage() -> float:
     mem = psutil.virtual_memory()
     return mem.used / mem.total
 
@@ -76,14 +71,14 @@ def ThreadGeneratorLazy(
     >>> from skmap.parallel import ThreadGeneratorLazy
     >>>
     >>> def worker(i, msg):
-    >>>   print(f'{i}: {msg}')
-    >>>   return f'Worker {i} finished'
+    ...   print(f'{i}: {msg}')
+    ...   return f'Worker {i} finished'
     >>>
     >>> args = iter([ (i,) for i in range(0,5)])
     >>> fixed_args = ("I'm running in parallel", )
     >>>
-    >>> for result in ThreadGeneratorLazy(worker, args, fixed_args=fixed_args):
-    >>>   print(result)
+    >>> for result in ThreadGeneratorLazy(worker, args, fixed_args=fixed_args): # doctest: +SKIP
+    ...   print(result)
 
     References
     ==========
@@ -115,7 +110,6 @@ def ThreadGeneratorLazy(
 def ProcessGeneratorLazy2(worker: Callable, args: Iterator[tuple]):
     import concurrent.futures
     import multiprocessing
-    from itertools import islice
 
     global executor
 
@@ -163,14 +157,14 @@ def ProcessGeneratorLazy(
     >>> from skmap.parallel import ProcessGeneratorLazy
     >>>
     >>> def worker(i, msg):
-    >>>   print(f'{i}: {msg}')
-    >>>   return f'Worker {i} finished'
+    ...   print(f'{i}: {msg}')
+    ...   return f'Worker {i} finished'
     >>>
     >>> args = iter([ (i,) for i in range(0,5)])
     >>> fixed_args = ("I'm running in parallel", )
     >>>
-    >>> for result in ProcessGeneratorLazy(worker, args, fixed_args=fixed_args):
-    >>>   print(result)
+    >>> for result in ProcessGeneratorLazy(worker, args, fixed_args=fixed_args): # doctest: +SKIP
+    ...   print(result)
 
     References
     ==========
@@ -223,14 +217,14 @@ def job(
     >>> from skmap import parallel
     >>>
     >>> def worker(i, msg):
-    >>>   print(f'{i}: {msg}')
-    >>>   return f'Worker {i} finished'
+    ...   print(f'{i}: {msg}')
+    ...   return f'Worker {i} finished'
     >>>
     >>> msg = ("I'm running in parallel", )
     >>> args = iter([ (i,msg) for i in range(0,5)])
     >>>
-    >>> for result in parallel.job(worker, args, n_jobs=-1, joblib_args={'backend': 'threading'}):
-    >>>   print(result)
+    >>> for result in parallel.job(worker, args, n_jobs=-1, joblib_args={'backend': 'threading'}): # doctest: +SKIP
+    ...   print(result)
 
     References
     ==========
@@ -273,16 +267,18 @@ def apply_along_axis(
     Examples
     ========
 
+    >>> import multiprocessing
+    >>> import numpy as np
     >>> from skmap import parallel
     >>>
     >>> def fn(arr, const):
-    >>>   return np.sum(arr) + const
+    ...   return np.sum(arr) + const
     >>>
     >>> const = 1
     >>> arr = np.ones((100,100,100))
     >>>
-    >>> out = parallel.apply_along_axis(fn, 0, arr, const)
-    >>> print(arr.shape, out.shape)
+    >>> out = parallel.apply_along_axis(fn, 0, arr, 4, const) # doctest: +SKIP
+    >>> print(arr.shape, out.shape) # doctest: +SKIP
 
     References
     ==========
@@ -339,7 +335,7 @@ class TilingProcessing:
         base_raster_fn="http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif",
         verbose: bool = False,
         epsg_checking: bool = True,
-    ):
+    ) -> None:
         from pyproj import CRS
 
         self.tiles = gpd.read_file(tiling_system_fn)
@@ -383,21 +379,21 @@ class TilingProcessing:
         ========
 
         >>> from skmap.parallel import TilingProcessing
-        >>> from skmap.raster import read_rasters
+        >>> from skmap.io.base import read_rasters
         >>>
         >>> def run(idx, tile, window, raster_files):
-        >>>     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
-        >>>     print(f'Tile {idx}: data read {data.shape}')
+        ...     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
+        ...     print(f'Tile {idx}: data read {data.shape}')
         >>>
         >>> raster_files = [
-        >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
-        >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
-        >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
-        >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
-        >>> ]
+        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
+        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
+        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
+        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
+        ... ]
         >>>
-        >>> tiling= TilingProcessing(verbose=True)
-        >>> tiling.process_one(0, run, raster_files)
+        >>> tiling= TilingProcessing(verbose=True) # doctest: +SKIP
+        >>> tiling.process_one(0, run, raster_files) # doctest: +SKIP
 
         """
         tile, window = self._tile_window(idx)
@@ -430,22 +426,22 @@ class TilingProcessing:
         ========
 
         >>> from skmap.parallel import TilingProcessing
-        >>> from skmap.raster import read_rasters
+        >>> from skmap.io.base import read_rasters
         >>>
         >>> def run(idx, tile, window, raster_files):
-        >>>     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
-        >>>     print(f'Tile {idx}: data read {data.shape}')
+        ...     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)
+        ...     print(f'Tile {idx}: data read {data.shape}')
         >>>
         >>> raster_files = [
-        >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
-        >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
-        >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
-        >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
-        >>> ]
+        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
+        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
+        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
+        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
+        ... ]
         >>>
-        >>> tiling= TilingProcessing(verbose=True)
+        >>> tiling= TilingProcessing(verbose=True) # doctest: +SKIP
         >>> idx_list = [0,10,100]
-        >>> result = tiling.process_multiple(idx_list, run, raster_files)
+        >>> result = tiling.process_multiple(idx_list, run, raster_files) # doctest: +SKIP
 
         References
         ==========
@@ -510,14 +506,14 @@ class TilingProcessing:
         ========
 
         >>> from skmap.parallel import TilingProcessing
-        >>> from skmap.raster import read_rasters
+        >>> from skmap.io.base import read_rasters
         >>>
         >>> def run(idx, tile, window, msg):
-        >>>     print(f'Tile {idx} => {msg}')
+        ...     print(f'Tile {idx} => {msg}')
         >>>
-        >>> tiling= TilingProcessing(verbose=True)
+        >>> tiling= TilingProcessing(verbose=True) # doctest: +SKIP
         >>> msg = "Let's crunch some data."
-        >>> result = tiling.process_all(run)
+        >>> result = tiling.process_all(run) # doctest: +SKIP
 
         References
         ==========
@@ -567,9 +563,10 @@ class TilingProcessing:
         Examples
         ========
 
+        >>> from skmap.parallel.utils import TilingProcessing
         >>> skmap_extent = (900000, 930010, 6540000, 5460010)
         >>> tiling_system = TilingProcessing.generate_tiles(30000, skmap_extent, 'epsg:3035')
-        >>> tiling_system.to_file(tiling_system_fn,  driver="GPKG")
+        >>> tiling_system.to_file(tiling_system_fn,  driver="GPKG") # doctest: +SKIP
 
         """
 
@@ -679,22 +676,26 @@ class TaskSequencer:
     Examples
     ========
 
-    >>> from skmap.parallel import TaskSequencer
-    >>>
-    >>> output = TaskSequencer(
-    >>> tasks=[
-    >>>   task_1,
-    >>>   (task_2, 2)
-    >>> ]
+    .. testcode::
+       :skip:
 
-    Pipeline produced by this example code:
+       >>> from skmap.parallel import TaskSequencer
+       >>>
+       >>> output = TaskSequencer(
+       ...     tasks=[
+       ...       task_1,
+       ...       (task_2, 2)
+       ...     ]
+       ... ) # doctest: +SKIP
 
-    >>>                ----------      ----------
-    >>> input_data ->  | task_1 |  ->  | task_2 |  ->  output_data
-    >>>                 ----------      ----------
-    >>>                 |              |
-    >>>                 |-worker_1     |-worker_1
-    >>>                                |-worker_2
+    Pipeline produced by this example code::
+
+                       ----------      ----------
+        input_data ->  | task_1 |  ->  | task_2 |  ->  output_data
+                        ----------      ----------
+                        |              |
+                        |-worker_1     |-worker_1
+                                       |-worker_2
 
     """
 
@@ -704,7 +705,7 @@ class TaskSequencer:
         mem_usage_limit: float = 0.75,
         wait_timeout: int = 5,
         verbose: bool = False,
-    ):
+    ) -> None:
         self.wait_timeout = wait_timeout
         self.mem_usage_limit = mem_usage_limit
         self.verbose = verbose
@@ -735,7 +736,7 @@ class TaskSequencer:
         self.n_tasks = len(self.tasks)
         self.pipeline_futures = [set() for i in range(0, self.n_tasks)]
 
-    def _verbose(self, *args, **kwargs):
+    def _verbose(self, *args: Any, **kwargs: Any) -> None:
         if self.verbose:
             ttprint(*args, **kwargs)
 
@@ -757,26 +758,29 @@ class TaskSequencer:
         >>> import time
         >>>
         >>> def rnd_data(const, size):
-        >>>     data = np.random.rand(size, size, size)
-        >>>     time.sleep(2)
-        >>>     return (const, data)
+        ...     data = np.random.rand(size, size, size)
+        ...     time.sleep(2)
+        ...     return (const, data)
         >>>
         >>> def max_value(const, data):
-        >>>     ttprint(f'Calculating the max value over {data.shape}')
-        >>>     time.sleep(8)
-        >>>     result = np.max(data + const)
-        >>>     return result
+        ...     ttprint(f'Calculating the max value over {data.shape}')
+        ...     time.sleep(8)
+        ...     result = np.max(data + const)
+        ...     return result
         >>>
         >>> taskSeq = TaskSequencer(
-        >>> tasks=[
-        >>>      rnd_data,
-        >>>      (max_value, 2)
-        >>>  ],
-        >>>  verbose=True
-        >>> )
+        ...     tasks=[
+        ...         rnd_data,
+        ...         (max_value, 2)
+        ...     ],
+        ...     verbose=True
+        ... )
+        [...] Starting 1 worker(s) for rnd_data (mem_check=False)
+        [...] Starting 2 worker(s) for max_value (mem_check=False)
         >>>
-        >>> taskSeq.run(input_data=[ (const, 10) for const in range(0,3) ])
-        >>> taskSeq.run(input_data=[ (const, 20) for const in range(3,6) ])
+        >>> taskSeq.run(input_data=[ (const, 10) for const in range(0,3) ]) # doctest: +SKIP
+        >>> taskSeq.run(input_data=[ (const, 20) for const in range(3,6) ]) # doctest: +SKIP
+
 
         """
 

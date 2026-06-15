@@ -1,10 +1,13 @@
-import pytest
-from skmap.misc import date_range
 from datetime import datetime
+from typing import List, Tuple
+
+from skmap.misc import date_range
 
 
 class TestDateRange:
-    def _pluck_year(self, dates, sep="-"):
+    def _pluck_year(
+        self, dates: List[Tuple[datetime, datetime]], sep: str = "-"
+    ) -> str:
         result = []
 
         for dt1, dt2 in dates:
@@ -15,21 +18,21 @@ class TestDateRange:
 
         return sep.join(result)
 
-    def test_001(self):
+    def test_basic(self) -> None:
         assert self._pluck_year(
             date_range("2013-01-01", "2016-01-01", "months", 1, ignore_29feb=True)
         ) == self._pluck_year(
             date_range("2016-01-01", "2019-01-01", "months", 1, ignore_29feb=True)
         )
 
-    def test_002(self):
+    def test_leap_year(self) -> None:
         assert self._pluck_year(
             date_range("2013-01-01", "2016-01-01", "months", 1, ignore_29feb=True)
         ) != self._pluck_year(
             date_range("2016-01-01", "2019-01-01", "months", 1, ignore_29feb=False)
         )
 
-    def test_003(self):
+    def test_Yj_format(self) -> None:
         assert self._pluck_year(
             date_range(
                 "2013001", "2016001", "months", 1, date_format="%Y%j", ignore_29feb=True
@@ -40,7 +43,7 @@ class TestDateRange:
             )
         )
 
-    def test_004(self):
+    def test_Yj_leap_year(self) -> None:
         assert self._pluck_year(
             date_range(
                 "2013001", "2016001", "months", 1, date_format="%Y%j", ignore_29feb=True
@@ -56,7 +59,7 @@ class TestDateRange:
             )
         )
 
-    def test_005(self):
+    def test_date_step(self) -> None:
         date_step = ([16] * 22) + [13]
         assert self._pluck_year(
             date_range(
@@ -78,7 +81,7 @@ class TestDateRange:
             )
         )
 
-    def test_006(self):
+    def test_date_step_leap_year(self) -> None:
         date_step = ([16] * 22) + [13]
         assert self._pluck_year(
             date_range(
@@ -100,7 +103,7 @@ class TestDateRange:
             )
         )
 
-    def test_007(self):
+    def test_date_step_str(self) -> None:
         date_step = ([16] * 22) + [13]
         assert self._pluck_year(
             date_range(
@@ -124,7 +127,7 @@ class TestDateRange:
             )
         )
 
-    def test_008(self):
+    def test_date_step_str_leap_year(self) -> None:
         date_step = ([16] * 22) + [13]
         assert self._pluck_year(
             date_range(

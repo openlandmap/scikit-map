@@ -1,71 +1,56 @@
 """
 Raster data input and output
 """
+from decorator import contextmanager
+from rasterio.io import DatasetWriter
 
-from osgeo import gdal
-from pathlib import Path
-from hashlib import sha256
-from pandas import DataFrame, Series, to_datetime
-from types import MappingProxyType
-
-import shutil
 import copy
-import pandas as pd
+import math
+import os
+import tempfile
+import time
+from base64 import b64decode, encodebytes
+from contextlib import ExitStack
+from copy import deepcopy
+from datetime import datetime
+from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Callable, List, Optional, Tuple, Union
+from uuid import uuid4
+
 import numpy
 import numpy as np
+import pandas as pd
+import rasterio
 import requests
-import tempfile
-import traceback
-import math
-import re
-import os
-import time
-import gc
-import matplotlib as mpl
+from dateutil.relativedelta import relativedelta
+from IPython.display import HTML
 from matplotlib import pyplot
-from matplotlib.animation import FuncAnimation
-import traceback
-
+from matplotlib._animation_data import DISPLAY_TEMPLATE, JS_INCLUDE, STYLE_INCLUDE
+from minio import Minio
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from numpy.typing import NDArray
+from osgeo import gdal
+from pandas import DataFrame, Series, to_datetime
+from PIL import Image
+from pystac.item import Item
+from rasterio.windows import Window, from_bounds
 from shapely.geometry import box, shape
 
-from typing import List, Union, TypedDict, Callable
+import skmap_bindings as sb
+from skmap import SKMapBase, SKMapGroupRunner, SKMapRunner, parallel
 from skmap.misc import (
-    ttprint,
     _eval,
-    update_by_separator,
     date_range,
-    new_memmap,
     del_memmap,
-    ref_memmap,
     load_memmap,
+    make_tempdir,
+    new_memmap,
+    ref_memmap,
+    ttprint,
+    vrt_warp,
 )
-from skmap.misc import vrt_warp
-from skmap import SKMapGroupRunner, SKMapRunner, SKMapBase, parallel
-
-from dateutil.relativedelta import relativedelta
-from datetime import datetime
-from minio import Minio
-
-from pathlib import Path
-import rasterio
-from rasterio.windows import Window, from_bounds
-from pystac.item import Item
-
-import bottleneck as bn
-
-from IPython.display import HTML
-from tempfile import TemporaryDirectory
-from io import BytesIO
-from base64 import encodebytes, b64decode
-from uuid import uuid4
-from PIL import Image
-from contextlib import ExitStack
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib._animation_data import JS_INCLUDE, STYLE_INCLUDE, DISPLAY_TEMPLATE
-from copy import deepcopy
-
-import skmap_bindings
-from skmap.misc import make_tempdir
 
 _INT_DTYPE = (
     "uint8",
@@ -81,14 +66,14 @@ _INT_DTYPE = (
 )
 
 
-def _nodata_replacement(dtype):
+def _nodata_replacement(dtype: str):
     if dtype in _INT_DTYPE:
         return np.iinfo(dtype).max
     else:
         return np.nan
 
 
-def _fit_in_dtype(data, dtype, nodata):
+def _fit_in_dtype(data: NDArray, dtype: str, nodata: int) -> NDArray:
     if dtype in _INT_DTYPE:
         data = np.rint(data)
 
@@ -245,7 +230,7 @@ def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, n
 
     return url_pos, data, ds_params
 
-
+@contextmanager
 def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=None):
     if not isinstance(raster_file, Path):
         raster_file = Path(raster_file)
@@ -269,7 +254,7 @@ def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=
         if window is not None:
             transform = rasterio.windows.transform(window, transform)
 
-        return rasterio.open(
+        with rasterio.open(
             raster_file,
             "w",
             driver="GTiff",
@@ -281,7 +266,8 @@ def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=
             compress="LZW",
             transform=transform,
             nodata=nodata,
-        )
+        ) as dataset:
+            yield dataset
 
 
 def _save_raster(
@@ -289,11 +275,11 @@ def _save_raster(
     raster_file: str,
     ref_array,
     i: int,
-    spatial_win: Window = None,
-    dtype: str = None,
+    spatial_win: Window | None = None,
+    dtype: str | None = None,
     nodata=None,
     fit_in_dtype=False,
-    on_each_outfile: Callable = None,
+    on_each_outfile: Callable | None = None,
 ):
     # if len(data.shape) < 3:
     #  data = np.stack([data], axis=2)
@@ -304,7 +290,7 @@ def _save_raster(
 
     with _new_raster(
         fn_base_raster, raster_file, array[:, :, i], spatial_win, dtype, nodata
-    ) as new_raster:
+    ) as new_raster: # type: DatasetWriter
         band_dtype = new_raster.dtypes[0]
 
         if fit_in_dtype:
@@ -351,7 +337,6 @@ def save_rasters_cpp(
 
     if window is None:
         ds = rasterio.open(base_raster)
-        shape = (ds.width, ds.height)
         window = rasterio.windows.Window(0, 0, ds.width, ds.height)
     if out_idx is None:
         out_idx = list(range(0, n_layers))
@@ -369,13 +354,13 @@ def save_rasters_cpp(
     if isinstance(base_raster, str):
         base_raster = [base_raster for i in out_files]
 
-    write_fn = skmap_bindings.writeInt16Data
+    write_fn = sb.writeInt16Data
     if dtype == np.uint8:
-        write_fn = skmap_bindings.writeByteData
+        write_fn = sb.writeByteData
     elif dtype == np.uint16:
-        write_fn = skmap_bindings.writeUInt16Data
+        write_fn = sb.writeUInt16Data
     elif dtype == np.float32:
-        write_fn = skmap_bindings.writeData
+        write_fn = sb.writeData
 
     if verbose:
         ttprint(f"Saving {n_layers} layers using window={window} to ")
@@ -398,7 +383,7 @@ def save_rasters_cpp(
     )
 
     if verbose:
-        ttprint(f"End")
+        ttprint("End")
 
     if out_s3 is not None:
         return out_s3
@@ -430,7 +415,6 @@ def read_rasters_cpp(
 
     if window is None:
         ds = rasterio.open(raster_files[0])
-        shape = (ds.width, ds.height)
         window = rasterio.windows.Window(0, 0, ds.width, ds.height)
     if out_data is None:
         out_data = np.empty((n_layers, window.width * window.height), dtype=dtype)
@@ -444,7 +428,7 @@ def read_rasters_cpp(
             f"Reading {n_layers} layers using window={window} and array={out_data.shape}"
         )
 
-    skmap_bindings.readData(
+    sb.readData(
         out_data,
         n_jobs,
         raster_files,
@@ -460,27 +444,27 @@ def read_rasters_cpp(
     )
 
     if verbose:
-        ttprint(f"End")
+        ttprint("End")
 
     return out_data
 
 
 def read_rasters(
     raster_files: Union[List, str] = [],
-    band=1,
-    window: Window = None,
+    band: int = 1,
+    window: Window | None = None,
     bounds: [] = None,
     dtype: str = "float32",
     n_jobs: int = 8,
     data_mask: numpy.array = None,
     scale: float = 1.0,
     expected_shape=None,
-    try_without_window=False,
+    try_without_window: bool = False,
     gdal_opts: dict = {},
     overview=None,
     max_rasters=None,
     verbose=False,
-):
+) -> NDArray[np.float32]:
     """
     Read raster files aggregating them into a single array.
     Only the first band of each raster is read.
@@ -516,23 +500,24 @@ def read_rasters(
     ========
 
     >>> import rasterio
-    >>> from skmap.raster import read_rasters
+    >>> from skmap.io.base import read_rasters
     >>>
     >>> # skmap COG layers - NDVI seasons for 2000
+    >>> # these actually 404
     >>> raster_files = [
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200003_skmap_epsg3035_v1.0.tif', # winter
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200006_skmap_epsg3035_v1.0.tif', # spring
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200009_skmap_epsg3035_v1.0.tif', # summer
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200012_skmap_epsg3035_v1.0.tif'  # fall
-    >>> ]
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200003_skmap_epsg3035_v1.0.tif', # winter
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200006_skmap_epsg3035_v1.0.tif', # spring
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200009_skmap_epsg3035_v1.0.tif', # summer
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200012_skmap_epsg3035_v1.0.tif'  # fall
+    ... ]
     >>>
     >>> # Transform for the EPSG:3035
-    >>> eu_transform = rasterio.open(raster_files[0]).transform
+    >>> eu_transform = rasterio.open(raster_files[0]).transform # doctest: +SKIP
     >>> # Bounding box window over Wageningen, NL
-    >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform)
+    >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform) # doctest: +SKIP
     >>>
-    >>> data, _ = read_rasters(raster_files=raster_files, window=window, verbose=True)
-    >>> print(f'Data shape: {data.shape}')
+    >>> data, _ = read_rasters_cpp(raster_files=raster_files, window=window, verbose=True) # doctest: +SKIP
+    >>> print(f'Data shape: {data.shape}') # doctest: +SKIP
 
     References
     ==========
@@ -568,8 +553,7 @@ def read_rasters(
     if overview is not None:
         overviews = ds.overviews(band)
         if overview in overviews:
-            n_bands, height, width = (
-                ds.count,
+            height, width = (
                 math.ceil(ds.height // overview),
                 math.ceil(ds.width // overview),
             )
@@ -580,23 +564,22 @@ def read_rasters(
             )
     elif window is not None:
         (
-            n_bands,
             height,
             width,
-        ) = ds.count, window.height, window.width
+        ) = window.height, window.width
     else:
         (
-            n_bands,
             height,
             width,
-        ) = ds.count, ds.height, ds.width
+        ) = ds.height, ds.width
 
-    ttprint(f"Start new_memmap")
+    ttprint("Start new_memmap")
     if max_rasters is not None:
         array_mm = new_memmap(dtype, shape=(height, width, max_rasters))
     else:
-        array_mm = new_memmap(dtype, shape=(height, width, len(raster_files) * 10))
-    ttprint(f"End new_memmap")
+        # TOCHECK: this was multiplied by 10 before, but why?
+        array_mm = new_memmap(dtype, shape=(height, width, len(raster_files)))
+    ttprint(f"End new_memmap of shape {array_mm.shape}")
 
     # ref_array = ref_memmap(array_mm)
     # print(ref_array)
@@ -631,7 +614,7 @@ def read_rasters(
         #  'batch_size': math.floor(len(args) / n_jobs),
         #  'return_as': 'generator'
         # }):
-        print(array.shape)
+        ttprint(array.shape)
         array_mm[:, :, raster_idx] = array
         if not data_exists:
             raster_file = raster_files[raster_idx]
@@ -688,22 +671,27 @@ def read_auth_rasters(
     Examples
     ========
 
-    >>> from skmap.raster import read_auth_rasters
+    >>> from skmap.io.base import read_auth_rasters
     >>>
     >>> # Do the registration in
     >>> # https://glad.umd.edu/ard/user-registration
     >>> username = '<YOUR_USERNAME>'
     >>> password = '<YOUR_PASSWORD>'
     >>> raster_files = [
-    >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/850.tif',
-    >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/851.tif',
-    >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/852.tif',
-    >>>     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/853.tif'
-    >>> ]
+    ...     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/850.tif',
+    ...     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/851.tif',
+    ...     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/852.tif',
+    ...     'https://glad.umd.edu/dataset/landsat_v1.1/47N/092W_47N/853.tif'
+    ... ]
     >>>
-    >>> data, base_raster = read_auth_rasters(raster_files, username, password,
-    >>>                         return_base_raster=True, verbose=True)
-    >>> print(f'Data: shape={data.shape}, dtype={data.dtype} and base_raster={base_raster}')
+    >>> data, base_raster = read_auth_rasters(
+    ...     raster_files,
+    ...     username,
+    ...     password,
+    ...     return_base_raster=True,
+    ...     verbose=True
+    ... ) # doctest: +SKIP
+    >>> print(f'Data: shape={data.shape}, dtype={data.dtype} and base_raster={base_raster}') # doctest: +SKIP
 
     References
     ==========
@@ -727,8 +715,6 @@ def read_auth_rasters(
     for url_pos, data, ds_params in parallel.job(
         _read_auth_raster, args, n_jobs=n_jobs
     ):
-        url = raster_files[url_pos]
-
         if data is not None:
             raster_data[url_pos] = data
 
@@ -814,32 +800,32 @@ def save_rasters(
     ========
 
     >>> import rasterio
-    >>> from skmap.raster import read_rasters, save_rasters
+    >>> from skmap.io.base import read_rasters, save_rasters
     >>>
     >>> # skmap COG layers - NDVI seasons for 2019
     >>> raster_files = [
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
-    >>>     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
-    >>> ]
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer
+    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall
+    ... ]
     >>>
     >>> # Transform for the EPSG:3035
-    >>> eu_transform = rasterio.open(raster_files[0]).transform
+    >>> eu_transform = rasterio.open(raster_files[0]).transform # doctest: +SKIP
     >>> # Bounding box window over Wageningen, NL
-    >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform)
+    >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform) #doctest: +SKIP
     >>>
-    >>> data, _ = read_rasters(raster_files=raster_files, window=window, verbose=True)
+    >>> data, _ = read_rasters(raster_files=raster_files, window=window, verbose=True) #doctest: +SKIP
     >>>
     >>> # Save in the current execution folder
     >>> raster_files = [
-    >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_wageningen_epsg3035_v1.0.tif',
-    >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_wageningen_epsg3035_v1.0.tif',
-    >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_wageningen_epsg3035_v1.0.tif',
-    >>>     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_wageningen_epsg3035_v1.0.tif'
-    >>> ]
+    ...     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_wageningen_epsg3035_v1.0.tif',
+    ...     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_wageningen_epsg3035_v1.0.tif',
+    ...     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_wageningen_epsg3035_v1.0.tif',
+    ...     './lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_wageningen_epsg3035_v1.0.tif'
+    ... ] # doctest: +SKIP
     >>>
-    >>> save_rasters(raster_files[0], raster_files, data, window=window, verbose=True)
+    >>> save_rasters(raster_files[0], raster_files, data, window=window, verbose=True) #doctest: +SKIP
 
     """
 
@@ -921,7 +907,7 @@ class RasterData(SKMapBase):
         raster_mask_val=np.nan,
         max_rasters: int = None,
         verbose=False,
-    ):
+    ) -> None:
         if isinstance(raster_files, str):
             raster_files = {"default": [raster_files]}
         elif isinstance(raster_files, list):
@@ -1207,7 +1193,7 @@ class RasterData(SKMapBase):
 
         return self
 
-    def _base_raster(self):
+    def _base_raster(self) -> Optional[bool]:
         for filepath in list(self.info[RasterData.PATH_COL]):
             if "http" in filepath:
                 res = requests.head(filepath)
@@ -1306,7 +1292,7 @@ class RasterData(SKMapBase):
                 self.info = pd.concat([self.info, new_info])
 
             self._verbose(
-                f"Execution"
+                "Execution"
                 + f" time for {process_name}: {(time.time() - start):.2f} segs"
             )
 
@@ -1355,7 +1341,7 @@ class RasterData(SKMapBase):
         to_add_info.append(new_info)
 
         self._verbose(
-            f"Execution" + f" time for {process_name}: {(time.time() - start):.2f} segs"
+            "Execution" + f" time for {process_name}: {(time.time() - start):.2f} segs"
         )
 
         self._active_group = None
@@ -1499,7 +1485,7 @@ class RasterData(SKMapBase):
             elif os.path.isfile(path):
                 return path
 
-        raise Exception(f"No base raster is available.")
+        raise Exception("No base raster is available.")
 
     def to_dir(
         self,
@@ -1572,7 +1558,7 @@ class RasterData(SKMapBase):
             tmp_dir = Path(tempfile.TemporaryDirectory().name)
             tmp_dir = tmp_dir.joinpath(prefix)
 
-        def _to_s3(outfile):
+        def _to_s3(outfile) -> None:
             _host = host
             if isinstance(host, list):
                 ih = int.from_bytes(str(outfile.stem).encode(), "little") % len(host)
@@ -1606,7 +1592,7 @@ class RasterData(SKMapBase):
 
         return self
 
-    def __del__(self):
+    def __del__(self) -> None:
         print("Deleting")
         del_memmap(self.array)
 
@@ -1656,11 +1642,12 @@ class RasterData(SKMapBase):
 
         Examples
         ========
-        import geopandas as gpd
-        from skmap.data import toy
-        rasterdata = toy.ndvi_rdata(gappy=False)
-        points = gpd.read_file('./skmap/data/toy/samples/samples.gpkg')
-        rdata.point_query(x=points.geometry.x.to_list(), y=points.geometry.y.to_list() , label_xaxis='index', cols=3, titles=points.label)
+
+        >>> import geopandas as gpd
+        >>> from skmap.data import toy
+        >>> rasterdata = toy.ndvi_rdata(gappy=False) #doctest: +SKIP
+        >>> points = gpd.read_file('./skmap/data/toy/samples/samples.gpkg')
+        >>> rasterdata.point_query(x=points.geometry.x.to_list(), y=points.geometry.y.to_list() , label_xaxis='index', cols=3, titles=points.label) #doctest: +SKIP
         """
         df = pd.DataFrame()
         df["x"], df["y"], df["title"] = x, y, titles
@@ -1825,8 +1812,8 @@ class RasterData(SKMapBase):
                     )
                 )
         else:
-            raise Exception("""The band count should either be one or three. 
-                      Current plotting capabilites are limited to single 
+            raise Exception("""The band count should either be one or three.
+                      Current plotting capabilites are limited to single
                       or composite image generation.""")
         return arr
 
@@ -1905,7 +1892,7 @@ class RasterData(SKMapBase):
 
         def gen_pane(
             ind, arr, ax, composite, matrix_params, img_title_text, img_title_fontsize
-        ):
+        ) -> None:
             try:
                 ax.pcolorfast(
                     _preprocess(arr, ind, composite=composite), **matrix_params

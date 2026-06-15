@@ -7,6 +7,11 @@ sphinx:
 
 build:
    os: ubuntu-24.04
+   apt_packages:
+      - libproj-dev
+      - libgeos-dev
+      - gdal-bin
+      - libgdal-dev
    tools:
       python: "3.13"
    jobs:
@@ -17,5 +22,5 @@ build:
       create_environment:
          - uv venv "${READTHEDOCS_VIRTUALENV_PATH}"
       install:
-         - export UV_PROJECT_ENVIRONMENT="${READTHEDOCS_VIRTUALENV_PATH}" uv pip install . -r docs/requirements.txt 
-         - 
+         - UV_PROJECT_ENVIRONMENT="${READTHEDOCS_VIRTUALENV_PATH}" uv pip install .[full] -r docs/requirements.txt
+

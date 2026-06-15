@@ -1,14 +1,13 @@
 from pathlib import Path
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-import geopandas as gpd
-
 import rasterio
 from rasterio.windows import Window, bounds
-
-from skmap.io import read_rasters, save_rasters
 from skmap.mapper import SpaceTimeOverlay
+
+from skmap.io import read_rasters_cpp, save_rasters
 from skmap.misc import ttprint
 
 DEFAULT = {
@@ -247,19 +246,19 @@ def gen_dataset(
     swir1_outdir,
     ndvi_outdir,
     samples_outdir,
-):
+) -> None:
     ds = rasterio.open(ndvi_rasters[0])
 
     ttprint("Reading static rasters")
-    static_data = read_rasters(raster_files=static_rasters, window=window)
+    static_data = read_rasters_cpp(raster_files=static_rasters, window=window)
 
     ttprint("Reading temporal rasters")
-    swir1_data = read_rasters(raster_files=swir1_rasters, window=window)
+    swir1_data = read_rasters_cpp(raster_files=swir1_rasters, window=window)
 
-    ndvi_data = read_rasters(raster_files=ndvi_rasters, window=window)
+    ndvi_data = read_rasters_cpp(raster_files=ndvi_rasters, window=window)
     ndvi_data = np.where(ndvi_data < 100, 100, ndvi_data) - 100
 
-    qa_data = read_rasters(raster_files=qa_ndvi_rasters, window=window)
+    qa_data = read_rasters_cpp(raster_files=qa_ndvi_rasters, window=window)
     qa_mask = ~np.isnan(qa_data)
 
     ttprint("Saving static rasters")

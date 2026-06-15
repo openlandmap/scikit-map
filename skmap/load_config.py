@@ -1,13 +1,15 @@
-import yaml
 from types import SimpleNamespace
 from typing import Any, Dict
+
+import yaml
+
 from skmap.modeler import (
-    RFRegressor,
-    RFRegressorTrees,
+    Classifier,
     Modeler,
     Regressor,
-    Classifier,
     RFClassifier,
+    RFRegressor,
+    RFRegressorTrees,
 )
 
 MODEL_REGISTRY = {

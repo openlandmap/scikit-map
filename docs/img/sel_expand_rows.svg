@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="88.321007mm"
+   height="29.357353mm"
+   viewBox="0 0 88.321008 29.357354"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.2 (ebf0e940d0, 2025-05-08)"
+   sodipodi:docname="sel_expand_rows.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:document-units="mm"
+     showgrid="true"
+     inkscape:zoom="2.9228667"
+     inkscape:cx="164.3934"
+     inkscape:cy="90.664415"
+     inkscape:window-width="1920"
+     inkscape:window-height="1011"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1">
+    <inkscape:grid
+       id="grid1"
+       units="mm"
+       originx="-24.178996"
+       originy="-15.700525"
+       spacingx="2.5"
+       spacingy="2.5"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="5"
+       enabled="true"
+       visible="true" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1">
+    <marker
+       style="overflow:visible"
+       id="ArrowTriangleStylized"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Stylized triangle arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="m 6,0 c -3,1 -7,3 -9,5 0,0 0,-4 2,-5 -2,-1 -2,-5 -2,-5 2,2 6,4 9,5 z"
+         id="path4" />
+    </marker>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-24.178996,-15.700524)">
+    <g
+       id="g70">
+      <rect
+         style="fill:#1a5fb4;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect1"
+         width="20.000002"
+         height="4.9999995"
+         x="25"
+         y="25" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="29.999998"
+         id="text10"><tspan
+           sodipodi:role="line"
+           id="tspan10"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="29.999998">0</tspan></text>
+    </g>
+    <g
+       id="g78">
+      <rect
+         style="fill:#1c71d8;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect2"
+         width="20.000002"
+         height="4.9999995"
+         x="25"
+         y="30.000002" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="35"
+         id="text11"><tspan
+           sodipodi:role="line"
+           id="tspan11"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="35">1</tspan></text>
+    </g>
+    <g
+       id="g71">
+      <rect
+         style="fill:#3584e4;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect3"
+         width="20.000004"
+         height="4.9999995"
+         x="25"
+         y="35" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="40"
+         id="text12"><tspan
+           sodipodi:role="line"
+           id="tspan12"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="40">2</tspan></text>
+    </g>
+    <g
+       id="g79">
+      <rect
+         style="fill:#26a269;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect4"
+         width="20.000006"
+         height="4.9999995"
+         x="25"
+         y="39.999996" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="45"
+         id="text13"><tspan
+           sodipodi:role="line"
+           id="tspan13"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="45">3</tspan></text>
+    </g>
+    <g
+       id="g72"
+       transform="translate(30)">
+      <rect
+         style="fill:#1a5fb4;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect71"
+         width="20.000002"
+         height="4.9999995"
+         x="25"
+         y="25" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="29.999998"
+         id="text71"><tspan
+           sodipodi:role="line"
+           id="tspan71"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="29.999998">0</tspan></text>
+    </g>
+    <g
+       id="g73"
+       transform="translate(30,-4.9999998)">
+      <rect
+         style="fill:#3584e4;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect72"
+         width="20.000004"
+         height="4.9999995"
+         x="25"
+         y="35" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="40"
+         id="text72"><tspan
+           sodipodi:role="line"
+           id="tspan72"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="40">1</tspan></text>
+    </g>
+    <text
+       xml:space="preserve"
+       style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#62a0ea;stroke:none;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:0"
+       x="50"
+       y="25"
+       id="text73"><tspan
+         sodipodi:role="line"
+         id="tspan73"
+         style="fill:#62a0ea;stroke-width:0.25"
+         x="50"
+         y="25">0,2</tspan></text>
+    <path
+       style="fill:none;stroke:#62a0ea;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:0;marker-end:url(#ArrowTriangleStylized)"
+       d="M 45.000001,27.499999 H 55"
+       id="path73" />
+    <path
+       style="fill:none;stroke:#62a0ea;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:0;marker-end:url(#ArrowTriangleStylized)"
+       d="M 45.000001,37.5 C 50,37.5 50,32.5 55,32.5"
+       id="path74"
+       sodipodi:nodetypes="cc" />
+    <text
+       xml:space="preserve"
+       style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#62a0ea;stroke:none;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:0"
+       x="42.5"
+       y="20"
+       id="text74"><tspan
+         sodipodi:role="line"
+         id="tspan74"
+         style="fill:#62a0ea;stroke:none;stroke-width:0.25"
+         x="42.5"
+         y="20">selArrayRows</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#14498a;stroke:none;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:0"
+       x="87.5"
+       y="20"
+       id="text75"><tspan
+         sodipodi:role="line"
+         id="tspan75"
+         style="stroke-width:0.25;fill:#14498a"
+         x="87.5"
+         y="20">expandArrayRows</tspan></text>
+    <g
+       id="g80"
+       transform="translate(67.5)">
+      <rect
+         style="fill:#1a5fb4;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect79"
+         width="20.000002"
+         height="4.9999995"
+         x="25"
+         y="25" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="29.999998"
+         id="text79"><tspan
+           sodipodi:role="line"
+           id="tspan79"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="29.999998">0</tspan></text>
+    </g>
+    <g
+       id="g81"
+       transform="translate(67.5)">
+      <rect
+         style="fill:#1a5fb4;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect80"
+         width="20.000002"
+         height="4.9999995"
+         x="25"
+         y="30.000002" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="35"
+         id="text80"><tspan
+           sodipodi:role="line"
+           id="tspan80"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="35">1</tspan></text>
+    </g>
+    <g
+       id="g82"
+       transform="translate(67.5)">
+      <rect
+         style="fill:#3584e4;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect81"
+         width="20.000004"
+         height="4.9999995"
+         x="25"
+         y="35" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="40"
+         id="text81"><tspan
+           sodipodi:role="line"
+           id="tspan81"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="40">2</tspan></text>
+    </g>
+    <g
+       id="g83"
+       transform="translate(67.5)">
+      <rect
+         style="fill:#3584e4;fill-opacity:1;stroke-width:0.999996;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.999996, 3"
+         id="rect82"
+         width="20.000006"
+         height="4.9999995"
+         x="25"
+         y="39.999996" />
+      <text
+         xml:space="preserve"
+         style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#241f31;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1, 3"
+         x="35"
+         y="45"
+         id="text82"><tspan
+           sodipodi:role="line"
+           id="tspan82"
+           style="text-align:center;text-anchor:middle;fill:#241f31;stroke-width:1"
+           x="35"
+           y="45">3</tspan></text>
+    </g>
+    <text
+       xml:space="preserve"
+       style="font-size:5.64444px;font-family:'Roboto Slab';-inkscape-font-specification:'Roboto Slab';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#14498a;stroke:none;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:0"
+       x="82.5"
+       y="25"
+       id="text83"><tspan
+         sodipodi:role="line"
+         id="tspan83"
+         style="stroke-width:0.25;fill:#14498a"
+         x="82.5"
+         y="25">1,3</tspan></text>
+    <path
+       style="fill:none;fill-opacity:1;stroke:#14498a;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:0;marker-end:url(#ArrowTriangleStylized)"
+       d="m 74.999999,27.499999 c 3.5,0 12.250002,5.000001 17.500001,5.000001"
+       id="path83"
+       sodipodi:nodetypes="cc" />
+    <path
+       style="fill:none;fill-opacity:1;stroke:#14498a;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:0;marker-end:url(#ArrowTriangleStylized)"
+       d="m 74.999999,32.5 c 3.5,0 14,10.000001 17.500001,10.000001"
+       id="path84" />
+  </g>
+</svg>
