@@ -107,8 +107,12 @@ void readData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
               const std::vector<int> bands_list, py::dict conf_GDAL,
               std::optional<float_t> value_to_mask,
               std::optional<float_t> value_to_set) {
+  // Bug fix: convPyDict calls py::str() (Python C-API) and must run while the
+  // GIL is still held. Convert first, then release before GDAL/OMP work.
+  dict_t cpp_conf = convPyDict(conf_GDAL);
+  py::gil_scoped_release release;
   IoArray ioArray(data, n_threads);
-  ioArray.setupGdal(convPyDict(conf_GDAL));
+  ioArray.setupGdal(cpp_conf);
   ioArray.readData(file_locs, perm_vec, x_off, y_off, x_size, y_size,
                    GDALDataType::GDT_Float32, bands_list, value_to_mask,
                    value_to_set);
@@ -203,8 +207,10 @@ void readDataBlocks(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     const std::vector<int> bands_list, py::dict conf_GDAL,
                     std::optional<std::vector<float_t>> value_to_mask_vec,
                     std::optional<float_t> value_to_set) {
+  dict_t cpp_conf = convPyDict(conf_GDAL); // must run before GIL release
+  py::gil_scoped_release release;
   IoArray ioArray(data, n_threads);
-  ioArray.setupGdal(convPyDict(conf_GDAL));
+  ioArray.setupGdal(cpp_conf);
   ioArray.readDataBlocks(file_locs, perm_vec, x_off_vec, y_off_vec, x_size_vec,
                          y_size_vec, GDALDataType::GDT_Float32, bands_list,
                          value_to_mask_vec, value_to_set);
@@ -217,9 +223,13 @@ void readDataCore(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   const std::vector<int> bands_list, py::dict conf_GDAL,
                   std::optional<float_t> value_to_mask,
                   std::optional<float_t> value_to_set) {
+  dict_t cpp_conf = convPyDict(conf_GDAL); // must run before GIL release
+  py::gil_scoped_release release;
   IoArray ioArray(data, n_threads);
-  ioArray.setupGdal(convPyDict(conf_GDAL));
-  ioArray.readDataCore(data.row(0), file_loc, x_off, y_off, x_size, y_size,
+  ioArray.setupGdal(cpp_conf);
+  // Bug fix: pass raw pointer + size to match the updated readDataCore signature.
+  ioArray.readDataCore(data.row(0).data(), static_cast<uint_t>(data.cols()),
+                       file_loc, x_off, y_off, x_size, y_size,
                        GDALDataType::GDT_Float32, bands_list, value_to_mask,
                        value_to_set);
 }
@@ -406,6 +416,7 @@ void maskNanRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 void maskData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
               std::vector<uint_t> row_select, Eigen::Ref<MatFloat> mask,
               float_t value_of_mask_to_mask, float_t new_value_in_data) {
+  py::gil_scoped_release release; // release GIL before OMP work
   TransArray transArray(data, n_threads);
   transArray.maskData(row_select, mask, value_of_mask_to_mask,
                       new_value_in_data);
@@ -438,6 +449,7 @@ void hadamardProduct(Eigen::Ref<MatFloat> out, const uint_t n_threads,
 /** @brief see `TransArray::offsetAndScale` */
 void offsetAndScale(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     float_t offset, float_t scaling) {
+  py::gil_scoped_release release; // release GIL before OMP work
   TransArray transArray(data, n_threads);
   transArray.offsetAndScale(offset, scaling);
 }
