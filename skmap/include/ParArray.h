@@ -53,29 +53,21 @@ public:
    * @param f_in The function to apply to each chunk
    */
   template <typename F> void parChunk(F f_in) {
-    // rows per chunk: rows/threads
-    uint_t a = std::floor((float_t)m_data.rows() / (float_t)m_n_threads);
-    // "rows" from exact chunks
-    uint_t b = (uint_t)((float_t)a * (float_t)m_n_threads);
-    // remainder
-    uint_t c = (uint_t)((float_t)m_data.rows() - (float_t)b);
+    // Bug fix: use pure integer arithmetic so float32 rounding errors on large
+    // matrices (>~16M rows) never produce wrong chunk boundaries, which could
+    // make two threads cover the same row (data race) or access past the end.
+    const uint_t n_rows = static_cast<uint_t>(m_data.rows());
+    const uint_t a = n_rows / m_n_threads; // base rows per chunk
+    const uint_t c = n_rows % m_n_threads; // first `c` threads get one extra row
 
-    // divide the matrix into row chunks
     auto f_out = [&](uint_t i) {
-      uint_t row_start = i * (a + 1);
-      uint_t chunk_size = 0;
-      if (i >= c) {
-        // last rows-c chunks will be `a` long
-        chunk_size = a;
-        row_start = (uint_t)((float_t)row_start - (float_t)i + (float_t)c);
-      } else // first c chunks will be 1 larger to fill the remainder
-        chunk_size = a + 1;
-      uint_t row_end = row_start + chunk_size;
-      if (chunk_size > 0) // not sure if this ever happens?
-        f_in(m_data.block(row_start, 0, row_end - row_start, m_data.cols()),
+      const uint_t chunk_size = (i < c) ? (a + 1) : a;
+      const uint_t row_start  = (i < c) ? i * (a + 1)
+                                         : c * (a + 1) + (i - c) * a;
+      const uint_t row_end    = row_start + chunk_size;
+      if (chunk_size > 0)
+        f_in(m_data.block(row_start, 0, chunk_size, m_data.cols()),
              row_start, row_end);
-      else
-        std::cout << "zero-length chunk?" << std::endl;
     };
     this->parForRange(f_out, m_n_threads);
   }
