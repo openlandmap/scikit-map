@@ -42,9 +42,12 @@ public:
    * the function replaces all occurrences of `value_to_mask` in the buffer
    * with `value_to_set`.
    */
-  void readDataCore(Eigen::Ref<MatFloat::RowXpr> row, std::string file_loc,
-                    uint_t x_off, uint_t y_off, uint_t x_size, uint_t y_size,
-                    GDALDataType read_type, std::vector<int> bands_list,
+  // Bug fix: changed from Eigen::Ref<MatFloat::RowXpr> to a raw float_t*
+  // pointer + element count to avoid an implicit Eigen copy (see IoArray.cpp).
+  void readDataCore(float_t *row_ptr, uint_t row_n_elems,
+                    std::string file_loc, uint_t x_off, uint_t y_off,
+                    uint_t x_size, uint_t y_size, GDALDataType read_type,
+                    std::vector<int> bands_list,
                     std::optional<float_t> value_to_mask,
                     std::optional<float_t> value_to_set);
 
