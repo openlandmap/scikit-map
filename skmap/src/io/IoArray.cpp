@@ -1,8 +1,15 @@
 #include "io/IoArray.h"
 
 #include <fstream>
+#include <mutex>
 
 namespace skmap {
+
+// Bug fix: GDALAllRegister() must only be called once. Calling it on every
+// Python invocation stresses GDAL's driver-registry mutex and accumulates
+// internal state across loop iterations.
+static std::once_flag s_gdal_init_flag;
+static void initGdal() { GDALAllRegister(); }
 
 GDALResampleAlg hashResample(std::string const &inString) {
   if (inString == "GRA_CubicSpline")
@@ -169,9 +176,8 @@ void IoArray::setupGdal(dict_t dict) {
   for (auto &pair : dict) {
     CPLSetConfigOption(pair.first.c_str(), pair.second.c_str());
   }
-  GDALAllRegister(); // Initialize GDAL
+  std::call_once(s_gdal_init_flag, initGdal); // Bug fix: initialise only once
 
-  // CPLPushErrorHandler(CPLDefaultErrorHandler);
   std::ofstream nullStream("/dev/null");
   if (nullStream.is_open()) {
     CPLSetErrorHandler(CPLLoggingErrorHandler);
@@ -181,42 +187,63 @@ void IoArray::setupGdal(dict_t dict) {
   }
 }
 
-void IoArray::readDataCore(Eigen::Ref<MatFloat::RowXpr> row,
+// Bug fix: signature changed from Eigen::Ref<MatFloat::RowXpr> to
+// (float_t* row_ptr, uint_t row_n_elems).
+//
+// m_data is stored as Eigen::Ref<MatFloat>, so m_data.row(i) returns
+// Block<Ref<MatFloat>,1,Dyn,true> — a different type from MatFloat::RowXpr
+// (= Block<MatFloat,1,Dyn,true>). Eigen's Ref constructor silently evaluates
+// a temporary copy when these types don't match exactly, so GDAL was writing
+// into a temporary that was discarded when the lambda returned, causing heap
+// corruption and a delayed SIGSEGV on subsequent loop iterations.
+// Using a raw pointer guarantees GDAL always writes directly into m_data's
+// backing buffer. Post-read masking uses Eigen::Map over the same pointer.
+void IoArray::readDataCore(float_t *row_ptr, uint_t row_n_elems,
                            std::string file_loc, uint_t x_off, uint_t y_off,
                            uint_t x_size, uint_t y_size, GDALDataType read_type,
                            std::vector<int> bands_list,
                            std::optional<float_t> value_to_mask,
                            std::optional<float_t> value_to_set) {
+  // Bug fix: GDAL writes x_size*y_size*n_bands floats with default band
+  // spacing (nBandSpace=0). The old guard only checked x_size*y_size, missing
+  // the band multiplier and silently overflowing the buffer for multi-band reads.
+  skmapAssertIfTrue(
+      row_n_elems < x_size * y_size * (uint_t)bands_list.size(),
+      "scikit-map ERROR 1B: row buffer too small for the requested bands "
+      "(need " + std::to_string(x_size * y_size * bands_list.size()) +
+      " elements, got " + std::to_string(row_n_elems) + ")");
+
   GDALDataset *readDataset =
       (GDALDataset *)GDALOpen(file_loc.c_str(), GA_ReadOnly);
   skmapAssertIfTrue(
       readDataset == nullptr,
       "scikit-map ERROR 1: issues in opening the file with path " + file_loc);
-  // It is assumed that the X/Y buffers size is equevalent to the portion of
-  // data to read
-  if (!(value_to_mask.has_value()) && value_to_set.has_value()) {
-    // GDALRasterBand *rasterBand = (GDALRasterBand*)
-    // readDataset->GetRasterBand(1); // First band
+
+  if (!value_to_mask.has_value() && value_to_set.has_value()) {
     int bSuccess = FALSE;
     GDALRasterBandH band = GDALGetRasterBand(readDataset, 1);
     const double nodata_val = GDALGetRasterNoDataValue(band, &bSuccess);
-    // const double nodata_val = (float_t)
-    // readDataset->GetRasterBand(1)->GetNoDataValue(&bSuccess);
     if (bSuccess == TRUE)
-      value_to_mask = nodata_val;
+      value_to_mask = static_cast<float_t>(nodata_val);
   }
 
   CPLErr outRead = readDataset->RasterIO(
-      GF_Read, x_off, y_off, x_size, y_size, row.data(), x_size, y_size,
-      read_type, bands_list.size(), &bands_list[0], 0, 0, 0);
+      GF_Read, x_off, y_off, x_size, y_size, row_ptr, x_size, y_size,
+      read_type, static_cast<int>(bands_list.size()), bands_list.data(),
+      0, 0, 0);
   skmapAssertIfTrue(outRead != CE_None,
-                    "Error 2: issues in reading the file with URL " + file_loc);
+                    "scikit-map ERROR 2: issues in reading the file with URL " +
+                        file_loc);
 
   GDALClose(readDataset);
-  if (value_to_mask.has_value() && value_to_set.has_value())
-    if (value_to_mask.value() != value_to_set.value())
-      row = (row.array() == value_to_mask.value())
-                .select(value_to_set.value(), row);
+
+  if (value_to_mask.has_value() && value_to_set.has_value() &&
+      value_to_mask.value() != value_to_set.value()) {
+    Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>>
+        row_map(row_ptr, row_n_elems);
+    row_map = (row_map.array() == value_to_mask.value())
+                  .select(value_to_set.value(), row_map);
+  }
 }
 
 void IoArray::readData(std::vector<std::string> file_locs,
@@ -225,13 +252,17 @@ void IoArray::readData(std::vector<std::string> file_locs,
                        std::vector<int> bands_list,
                        std::optional<float_t> value_to_mask,
                        std::optional<float_t> value_to_set) {
-  skmapAssertIfTrue((uint_t)m_data.cols() < x_size * y_size,
-                    "scikit-map ERROR 0A: reading region size smaller then the "
-                    "number of columns");
-  auto readTiff = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
+  // Bug fix: guard updated to include the band multiplier.
+  skmapAssertIfTrue(
+      (uint_t)m_data.cols() < x_size * y_size * (uint_t)bands_list.size(),
+      "scikit-map ERROR 0A: row buffer smaller than x_size * y_size * n_bands");
+  // Bug fix: lambda uses auto&& and passes row.data()/row.size() so that
+  // readDataCore always writes directly into m_data's buffer (no Eigen copy).
+  auto readTiff = [&](uint_t i, auto &&row) {
     std::string file_loc = file_locs[i];
-    this->readDataCore(row, file_loc, x_off, y_off, x_size, y_size, read_type,
-                       bands_list, value_to_mask, value_to_set);
+    this->readDataCore(row.data(), static_cast<uint_t>(row.size()), file_loc,
+                       x_off, y_off, x_size, y_size, read_type, bands_list,
+                       value_to_mask, value_to_set);
   };
   this->parRowPerm(readTiff, perm_vec);
 }
@@ -243,21 +274,23 @@ void IoArray::readDataBlocks(
     GDALDataType read_type, std::vector<int> bands_list,
     std::optional<std::vector<float_t>> value_to_mask_vec,
     std::optional<float_t> value_to_set) {
+  // Bug fix: guard updated to include the band multiplier.
   skmapAssertIfTrue(
       (uint_t)m_data.cols() <
           (*std::max_element(x_size_vec.begin(), x_size_vec.end())) *
-              (*std::max_element(y_size_vec.begin(), y_size_vec.end())),
-      "scikit-map ERROR 0B: reading region size smaller then the number of "
-      "columns");
-  auto readTiffBlock = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
+              (*std::max_element(y_size_vec.begin(), y_size_vec.end())) *
+              (uint_t)bands_list.size(),
+      "scikit-map ERROR 0B: row buffer smaller than max(x_size)*max(y_size)*n_bands");
+  // Bug fix: same auto&& / raw-pointer approach as readData.
+  auto readTiffBlock = [&](uint_t i, auto &&row) {
     std::string file_loc = file_locs[i];
-    std::optional<float_t> value_to_mask =
+    std::optional<float_t> value_to_mask_i =
         (value_to_mask_vec.has_value() && value_to_mask_vec->size() > i)
             ? std::optional<float_t>(value_to_mask_vec.value()[i])
             : std::nullopt;
-    this->readDataCore(row, file_loc, x_off_vec[i], y_off_vec[i], x_size_vec[i],
-                       y_size_vec[i], read_type, bands_list, value_to_mask,
-                       value_to_set);
+    this->readDataCore(row.data(), static_cast<uint_t>(row.size()), file_loc,
+                       x_off_vec[i], y_off_vec[i], x_size_vec[i], y_size_vec[i],
+                       read_type, bands_list, value_to_mask_i, value_to_set);
   };
   this->parRowPerm(readTiffBlock, perm_vec);
 }
