@@ -297,6 +297,21 @@ void TransArray::maskData(std::vector<uint_t> row_select,
                           Eigen::Ref<MatFloat> masks,
                           float_t value_of_mask_to_mask,
                           float_t new_value_in_data) {
+  // Bug fix: masks.row(i) was accessed for i up to row_select.size() without
+  // verifying i < masks.rows(), causing an out-of-bounds Eigen access and
+  // undefined behaviour / SIGSEGV when masks has fewer rows than row_select.
+  skmapAssertIfTrue(
+      (uint_t)masks.rows() < row_select.size(),
+      "scikit-map ERROR 54: mask has fewer rows (" +
+          std::to_string(masks.rows()) + ") than row_select size (" +
+          std::to_string(row_select.size()) + ")");
+  for (uint_t i = 0; i < row_select.size(); ++i)
+    skmapAssertIfTrue(
+        row_select[i] >= (uint_t)m_data.rows(),
+        "scikit-map ERROR 55: row_select[" + std::to_string(i) + "] = " +
+            std::to_string(row_select[i]) + " is out of bounds (data has " +
+            std::to_string(m_data.rows()) + " rows)");
+
   auto maskDataRow = [&](uint_t i) {
     m_data.row(row_select[i]) =
         (masks.row(i).array() == value_of_mask_to_mask)
