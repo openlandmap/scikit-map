@@ -44,6 +44,8 @@ full = [
   "numexpr",
   "psutil",
   "statsmodels",
+  "gsheets",
+  "pytz",
 ]
 dev = [
   "pytest",

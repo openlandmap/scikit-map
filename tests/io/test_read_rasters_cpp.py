@@ -1,3 +1,4 @@
+from pathlib import Path
 import rasterio
 from numpy.testing import assert_equal
 import numpy as np
@@ -17,11 +18,30 @@ def test_read_rasters_cpp_single_file(temp_raster_file):
     assert res.dtype == np.float32
     assert_equal(res, data.reshape(res.shape))
 
+def test_read_rasters_cpp_multiple_files_smoketest():
+    repo_root = Path(__file__).resolve().parents[2]
+    swir1_dir = repo_root / "skmap" / "data" / "toy" / "swir1"
+    assert swir1_dir.is_dir()
+
+    paths = sorted(str(p) for p in swir1_dir.glob("*.tif"))
+    assert len(paths) > 0
+
+    res = read_rasters_cpp(raster_files=paths, verbose=True, n_jobs=1)
+
+    n_files = len(paths)
+    n_pixels = 100 * 100
+
+    assert res.shape == (n_files, n_pixels)
+    assert res.dtype == np.float32
+
+    # smoke checks (not exact correctness)
+    assert np.isfinite(res).all()
+    assert not np.all(res == 0)
 
 def test_read_rasters_cpp_multiple_files(temp_multi_raster_files):
     """Test reading multiple raster files."""
     datas, paths = temp_multi_raster_files
-    res = read_rasters_cpp(raster_files=paths, verbose=True)
+    res = read_rasters_cpp(raster_files=paths, verbose=True, n_jobs=1)
     assert res.shape == (
         3,
         100 * 100,

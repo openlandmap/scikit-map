@@ -394,7 +394,7 @@ def save_rasters_cpp(
 
 
 def read_rasters_cpp(
-    raster_files: Union[List[Union[str, Path]], str, Path] = [],
+    raster_files: Union[List[str], List[Path], str, Path] = [],
     band: Union[List[int], int] = 1,
     window: Optional[Window] = None,
     n_jobs: int = 8,
@@ -474,6 +474,7 @@ def read_rasters_cpp(
         window = rasterio.windows.Window(0, 0, ds.width, ds.height)
     if out_data is None:
         out_data = np.empty((n_layers, window.width * window.height), dtype=dtype)
+        print("created out array with flags: ", out_data.flags)
     if out_idx is None:
         out_idx = list(range(0, n_layers))
 

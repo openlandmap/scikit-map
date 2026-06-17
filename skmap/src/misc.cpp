@@ -2,7 +2,6 @@
 #define MISC_CPP
 
 #define _USE_MATH_DEFINES
-#include <iostream>
 
 #ifdef HAVE_AVX512
 #define EIGEN_VECTORIZE_AVX512
@@ -19,6 +18,7 @@
 #include <map>
 #include <math.h>
 #include <omp.h>
+#include <stdexcept>
 #include <stdlib.h>
 #include <unordered_map>
 #include <vector>

@@ -29,7 +29,7 @@ def temp_raster_file(tmp_path):
 
 
 @pytest.fixture
-def temp_multi_raster_files(tmp_path):
+def temp_multi_raster_files(tmp_path: Path):
     """Create multiple temporary raster files for testing."""
     file_paths = []
     datas = []
@@ -50,7 +50,7 @@ def temp_multi_raster_files(tmp_path):
             transform=transform,
         ) as dst:
             dst.write(data, 1)
-        file_paths.append(file_path)
+        file_paths.append(str(file_path))
         datas.append(data)
 
     return datas, file_paths
