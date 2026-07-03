@@ -10,7 +10,13 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+<<<<<<< HEAD:docker/minimal/Dockerfile
 RUN uv venv && uv pip install "scikit-map[full] @ git+https://github.com/openlandmap/scikit-map@ci"
+=======
+RUN uv venv && \
+    uv pip install --no-binary rasterio rasterio && \
+    uv pip install "scikit-map @ git+https://github.com/openlandmap/scikit-map@v0.9.2"
+>>>>>>> ac25638 (restrict pyts to newer versions so it doesn't get stuck in old numba):docker/minimal-debian/Dockerfile
 
 RUN uv pip install jupyter
 
