@@ -1,10 +1,7 @@
 #include "io/IoArray.h"
 
 #include <filesystem>
-#include <numeric>
-#include <thread>
 #include <gtest/gtest.h>
-
 
 using namespace skmap;
 

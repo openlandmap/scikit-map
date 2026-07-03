@@ -15,7 +15,7 @@ RUN dnf install -y\
 RUN GDAL_CONFIG=$(which gdal-config) \
     uv venv && \
     uv pip install --no-binary rasterio rasterio && \
-    uv pip install "scikit-map @ git+https://github.com/openlandmap/scikit-map@v0.9.2"
+    uv pip install "scikit-map @ git+https://github.com/openlandmap/scikit-map@v0.9.3"
 
 FROM fedora:44
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
