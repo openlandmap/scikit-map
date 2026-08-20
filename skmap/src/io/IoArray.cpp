@@ -307,15 +307,32 @@ void IoArray::getLatLonArray(std::string file_loc, uint_t x_off, uint_t y_off,
   double geotransform[6];
   readDataset->GetGeoTransform(geotransform);
 
+  // Vectorized affine transform. For each pixel (i, j) in the window:
+  //   x = gt[0] + (x_off + j) * gt[1] + (y_off + i) * gt[2]
+  //   y = gt[3] + (x_off + j) * gt[4] + (y_off + i) * gt[5]
+  // The per-column contribution is computed once as a vector; the per-row
+  // contribution is a scalar added per row. Both rows use `i * x_size` as the
+  // column offset (the old code used `i * y_size` for latitude, which
+  // scrambled/overflowed on non-square windows).
+  const float_t gt0 = (float_t)geotransform[0];
+  const float_t gt1 = (float_t)geotransform[1];
+  const float_t gt2 = (float_t)geotransform[2];
+  const float_t gt3 = (float_t)geotransform[3];
+  const float_t gt4 = (float_t)geotransform[4];
+  const float_t gt5 = (float_t)geotransform[5];
+  const float_t x_off_f = (float_t)x_off;
+  const float_t y_off_f = (float_t)y_off;
+
+  Eigen::RowVectorXf col_idx =
+      Eigen::RowVectorXf::LinSpaced(x_size, 0, x_size - 1);
+
   auto getLatLonArrayRow = [&](uint_t i) {
-    for (uint_t j = 0; j < x_size; j++) {
-      double x = geotransform[0] + (x_off + j) * geotransform[1] +
-                 (y_off + i) * geotransform[2];
-      double y = geotransform[3] + (x_off + j) * geotransform[4] +
-                 (y_off + i) * geotransform[5];
-      m_data(0, i * x_size + j) = (float_t)x; // Longitude
-      m_data(1, i * y_size + j) = (float_t)y; // Latitude
-    }
+    float_t x_base = gt0 + (y_off_f + (float_t)i) * gt2;
+    float_t y_base = gt3 + (y_off_f + (float_t)i) * gt5;
+    m_data.block(0, i * x_size, 1, x_size) =
+        (x_base + (x_off_f + col_idx.array()) * gt1).matrix();
+    m_data.block(1, i * x_size, 1, x_size) =
+        (y_base + (x_off_f + col_idx.array()) * gt4).matrix();
   };
   this->parForRange(getLatLonArrayRow, y_size);
 }
