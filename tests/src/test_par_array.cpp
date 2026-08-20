@@ -1,7 +1,9 @@
 #include "ParArray.h"
 #include "common.h"
 #include "misc.h"
+#include <algorithm>
 #include <gtest/gtest.h>
+#include <mutex>
 #include <omp.h>
 
 // child class so we can add dummy lambda functions for parForRange
@@ -201,4 +203,30 @@ TEST_F(TransArrayTest, parChunkFillRemainder) {
   ParArrayHelper pah(input, 5);
   pah.testParChunk();
   EXPECT_EQ(input, expected);
+}
+
+TEST_F(TransArrayTest, parChunkLargeRowCount) {
+  // Regression: the old float32 chunk arithmetic rounded incorrectly for
+  // matrices with > 2^24 rows, producing overlapping/missing rows. The fix
+  // uses pure integer division. Verify chunks tile [0, n_rows) exactly once.
+  const uint_t n_rows = (1u << 24) + 1; // 16,777,217
+  MatFloat big(n_rows, 1);
+  big.setZero();
+  ParArray pa(big, 4);
+
+  std::vector<std::pair<uint_t, uint_t>> ranges;
+  std::mutex mtx;
+  auto f = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start, uint_t row_end) {
+    std::lock_guard<std::mutex> lock(mtx);
+    ranges.emplace_back(row_start, row_end);
+  };
+  pa.parChunk(f);
+
+  std::sort(ranges.begin(), ranges.end());
+  uint_t expected = 0;
+  for (const auto &r : ranges) {
+    EXPECT_EQ(r.first, expected);
+    expected = r.second;
+  }
+  EXPECT_EQ(expected, n_rows);
 }

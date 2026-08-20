@@ -20,7 +20,6 @@ jobs:
           sudo apt-get install -y libgdal-dev build-essential
       - name: run tests
         run: |
-          cmake -B build -DTESTS=1 .
+          cmake -B build -DTESTS=1 -DSKMAP_EXPECTED_GDAL_VERSION=$(gdal-config --version) .
           cmake --build build -j
           ./build/tests/src/unit_tests
-      

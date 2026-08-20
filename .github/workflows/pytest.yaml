@@ -33,7 +33,12 @@ jobs:
           gdal-config --version
           uv pip install .[full,dev]
           . .venv/bin/activate
+      - name: Build and run C++ unit tests (same bindings as Python)
+        run: |
+          cmake -B build -DTESTS=1 -DSKMAP_EXPECTED_GDAL_VERSION=$(gdal-config --version) .
+          cmake --build build -j
+          ./build/tests/src/unit_tests
       - name: Run format and tests
         run: |
           ruff format --check
-          pytest
+          pytest --cov=skmap --cov-report=xml

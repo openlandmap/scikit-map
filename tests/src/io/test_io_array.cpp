@@ -70,3 +70,35 @@ TEST(Io, test_get_lat_lon_array_non_square) {
     }
   }
 }
+
+TEST(Io, test_read_data_core_multiband) {
+  std::filesystem::path src_path = __FILE__;
+  std::filesystem::path repo_root =
+      src_path.parent_path().parent_path().parent_path().parent_path();
+  std::filesystem::path ref_rel = repo_root / "skmap" / "data" / "toy" /
+                                  "swir1" /
+                                  "swir1_landsat.ard1_p50_30m_s_20141202_"
+                                  "20150320_nl_epsg.3035_v20230720.tif";
+  std::string ref_tile_path = ref_rel.string();
+
+  uint_t x_size = 10, y_size = 10, n_bands = 2;
+  // Regression: the old guard only checked x_size*y_size, missing the band
+  // multiplier, so a multi-band read silently overflowed the row buffer.
+  MatFloat data(1, x_size * y_size * n_bands);
+  dict_t conf_GDAL;
+  IoArray ioArray(data, 1);
+  ioArray.setupGdal(conf_GDAL);
+  ioArray.readDataCore(data.data(), data.cols(), ref_tile_path, 0, 0, x_size,
+                       y_size, GDT_Float32, {1, 1}, std::nullopt, std::nullopt);
+  EXPECT_TRUE(data.array().isFinite().all());
+
+  // A too-small buffer must throw (ERROR 1B) instead of overflowing.
+  MatFloat small(1, x_size * y_size); // missing the band multiplier
+  IoArray ioArraySmall(small, 1);
+  ioArraySmall.setupGdal(conf_GDAL);
+  EXPECT_THROW(ioArraySmall.readDataCore(small.data(), small.cols(),
+                                         ref_tile_path, 0, 0, x_size, y_size,
+                                         GDT_Float32, {1, 1}, std::nullopt,
+                                         std::nullopt),
+               std::runtime_error);
+}

@@ -77,6 +77,24 @@ TEST_F(TransArrayTest, maskDataRows) {
   EXPECT_EQ(input, expected);
 }
 
+TEST_F(TransArrayTest, maskDataBoundsCheck) {
+  // Regression: maskData used to access masks.row(i) for i up to
+  // row_select.size() without checking masks.rows(), causing an out-of-bounds
+  // Eigen access / SIGSEGV when masks has fewer rows than row_select.
+  MatFloat mask(1, 4); // only 1 row, but row_select has 2 entries
+  mask << 0.0, 0.0, 1.0, 0.0;
+  TransArray ta(input, THREADS);
+  EXPECT_THROW(ta.maskData({0, 2}, mask, 1.0, 14.), std::runtime_error);
+}
+
+TEST_F(TransArrayTest, maskDataRowSelectBoundsCheck) {
+  // Regression: row_select indices must be validated against m_data.rows().
+  MatFloat mask(2, 4);
+  mask.setZero();
+  TransArray ta(input, THREADS);
+  EXPECT_THROW(ta.maskData({0, 99}, mask, 1.0, 14.), std::runtime_error);
+}
+
 TEST_F(TransArrayTest, swapRowsValues) {
   // clang-format off
   MatFloat expected(3,4);
