@@ -367,7 +367,10 @@ void TransArray::scaleAndOffset(float_t offset, float_t scaling) {
 void TransArray::offsetsAndScales(std::vector<uint_t> row_select,
                                   Eigen::Ref<VecFloat> offsets,
                                   Eigen::Ref<VecFloat> scalings) {
-  auto offsetsAndScalesRow = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
+  auto offsetsAndScalesRow = [&](uint_t i, float_t *row_ptr,
+                                  uint_t row_n_elems) {
+    Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>> row(
+        row_ptr, row_n_elems);
     row = (row.array() + offsets(row_select[i])) * scalings(row_select[i]);
   };
   this->parRowPerm(offsetsAndScalesRow, row_select);
@@ -524,7 +527,9 @@ void TransArray::computeBsi(std::vector<uint_t> swir1_indices,
                             float_t nir_scaling, float_t blue_scaling,
                             float_t result_scaling, float_t result_offset,
                             std::vector<float_t> clip_value) {
-  auto computeBsiRow = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
+  auto computeBsiRow = [&](uint_t i, float_t *row_ptr, uint_t row_n_elems) {
+    Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>> row(
+        row_ptr, row_n_elems);
     uint_t swir1_i = swir1_indices[i];
     uint_t red_i = red_indices[i];
     uint_t nir_i = nir_indices[i];
@@ -556,7 +561,9 @@ void TransArray::computeEvi(std::vector<uint_t> red_indices,
                             float_t blue_scaling, float_t result_scaling,
                             float_t result_offset,
                             std::vector<float_t> clip_value) {
-  auto computeEviRow = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
+  auto computeEviRow = [&](uint_t i, float_t *row_ptr, uint_t row_n_elems) {
+    Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>> row(
+        row_ptr, row_n_elems);
     uint_t red_i = red_indices[i];
     uint_t nir_i = nir_indices[i];
     uint_t blue_i = blue_indices[i];
@@ -586,7 +593,9 @@ void TransArray::computeFapar(std::vector<uint_t> red_indices,
                               float_t red_scaling, float_t nir_scaling,
                               float_t result_scaling, float_t result_offset,
                               std::vector<float_t> clip_value) {
-  auto computeFaparRow = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
+  auto computeFaparRow = [&](uint_t i, float_t *row_ptr, uint_t row_n_elems) {
+    Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>> row(
+        row_ptr, row_n_elems);
     uint_t red_i = red_indices[i];
     uint_t nir_i = nir_indices[i];
     row =
@@ -652,8 +661,10 @@ void TransArray::computeGeometricTemperature(
       days_of_year.size() != result_indices.size(),
       "scikit-map ERROR 8: result_indices must be same size of days_of_year");
 
-  auto computeGeometricTemperatureRow = [&](uint_t i,
-                                            Eigen::Ref<MatFloat::RowXpr> row) {
+  auto computeGeometricTemperatureRow = [&](uint_t i, float_t *row_ptr,
+                                             uint_t row_n_elems) {
+    Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>> row(
+        row_ptr, row_n_elems);
     float_t day_of_year = days_of_year[i];
     row = latitude
               .unaryExpr([&day_of_year, &a, &b](float_t lat) {

@@ -256,9 +256,9 @@ void IoArray::readData(std::vector<std::string> file_locs,
       "scikit-map ERROR 0A: row buffer smaller than x_size * y_size * n_bands");
   // Bug fix: lambda uses auto&& and passes row.data()/row.size() so that
   // readDataCore always writes directly into m_data's buffer (no Eigen copy).
-  auto readTiff = [&](uint_t i, auto &&row) {
+  auto readTiff = [&](uint_t i, float_t *row_ptr, uint_t row_n_elems) {
     std::string file_loc = file_locs[i];
-    this->readDataCore(row.data(), static_cast<uint_t>(row.size()), file_loc,
+    this->readDataCore(row_ptr, row_n_elems, file_loc,
                        x_off, y_off, x_size, y_size, read_type, bands_list,
                        value_to_mask, value_to_set);
   };
@@ -280,13 +280,13 @@ void IoArray::readDataBlocks(
               (uint_t)bands_list.size(),
       "scikit-map ERROR 0B: row buffer smaller than max(x_size)*max(y_size)*n_bands");
   // Bug fix: same auto&& / raw-pointer approach as readData.
-  auto readTiffBlock = [&](uint_t i, auto &&row) {
+  auto readTiffBlock = [&](uint_t i, float_t *row_ptr, uint_t row_n_elems) {
     std::string file_loc = file_locs[i];
     std::optional<float_t> value_to_mask_i =
         (value_to_mask_vec.has_value() && value_to_mask_vec->size() > i)
             ? std::optional<float_t>(value_to_mask_vec.value()[i])
             : std::nullopt;
-    this->readDataCore(row.data(), static_cast<uint_t>(row.size()), file_loc,
+    this->readDataCore(row_ptr, row_n_elems, file_loc,
                        x_off_vec[i], y_off_vec[i], x_size_vec[i], y_size_vec[i],
                        read_type, bands_list, value_to_mask_i, value_to_set);
   };

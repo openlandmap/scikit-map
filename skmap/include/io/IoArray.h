@@ -138,7 +138,7 @@ public:
                  T no_data_value,
                  std::vector<std::string> creation_options, double scale) {
 
-    auto writeTiff = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
+    auto writeTiff = [&](uint_t i, float_t *row_ptr, uint_t row_n_elems) {
       if ((uint_t)m_data.cols() < x_size * y_size) {
         throw std::runtime_error("scikit-map ERROR 9: reading region size "
                                  "smaller than the number of columns");
@@ -175,9 +175,11 @@ public:
         layer_name = layer_name.substr(0, layer_name.size() - suffix.size());
       }
       GDALDriver *driver = GetGDALDriverManager()->GetDriverByName("GTiff");
-      row =
-          row.array().isNaN().select(static_cast<float_t>(no_data_value), row);
-      Eigen::RowVectorX<T> casted_row = row.cast<T>();
+      Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>>
+          row_map(row_ptr, row_n_elems);
+      row_map = row_map.array().isNaN().select(
+          static_cast<float_t>(no_data_value), row_map);
+      Eigen::RowVectorX<T> casted_row = row_map.cast<T>();
       std::string file_name = base_folder + "/" + layer_name + ".tif";
       // Build a char** of creation options for GDALCreate (no shell-outs).
       std::vector<char *> co_ptrs;

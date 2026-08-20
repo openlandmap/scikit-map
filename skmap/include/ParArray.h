@@ -40,7 +40,17 @@ public:
    * @param perm_vec vector with row indices
    */
   template <typename F> void parRowPerm(F f_in, std::vector<uint_t> perm_vec) {
-    auto f_out = [&](uint_t i) { f_in(i, m_data.row(perm_vec[i])); };
+    // Pass a raw pointer + element count instead of an Eigen row expression.
+    // m_data is an Eigen::Ref<MatFloat>, so m_data.row(i) is a
+    // Block<Ref<MatFloat>,1,-1> — a different type from MatFloat::RowXpr.
+    // Binding that to Eigen::Ref<MatFloat::RowXpr> makes Eigen silently
+    // evaluate a temporary copy, so writes through `row` would be discarded
+    // (the segfault class fixed in readDataCore). Raw pointers guarantee the
+    // callback always operates on m_data's backing buffer.
+    auto f_out = [&](uint_t i) {
+      auto row = m_data.row(perm_vec[i]);
+      f_in(i, row.data(), static_cast<uint_t>(row.size()));
+    };
     this->parForRange(f_out, perm_vec.size());
   }
 

@@ -94,8 +94,10 @@ TEST_F(TransArrayTest, parRowPerm) {
     9.0,10.,11.,12.; // 1 in perm_vec => *1
   //clang-format on
 
-  auto f = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
-      row = row*i; // multiply by perm_vec index
+  auto f = [&](uint_t i, float_t *row_ptr, uint_t row_n_elems) {
+    Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>> row(
+        row_ptr, row_n_elems);
+    row = row * i; // multiply by perm_vec index
   };
 
   TransArray ta(input, THREADS);
@@ -115,8 +117,10 @@ TEST_F(TransArrayTest, parRowPermIncomplete) {
     9.0,10.,11.,12.; // 1 in perm_vec => *1
   //clang-format on
 
-  auto f = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
-      row = row*i; // multiply by perm_vec index
+  auto f = [&](uint_t i, float_t *row_ptr, uint_t row_n_elems) {
+    Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>> row(
+        row_ptr, row_n_elems);
+    row = row * i; // multiply by perm_vec index
   };
 
   ParArray pa(input, THREADS);
@@ -134,8 +138,10 @@ TEST_F(TransArrayTest, DISABLED_parRowPermDataRace) {
     9.0,10.,11.,12.;
   //clang-format on
 
-  auto f = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
-      row.array() += i; // add perm_vec index
+  auto f = [&](uint_t i, float_t *row_ptr, uint_t row_n_elems) {
+    Eigen::Map<Eigen::Matrix<float_t, 1, Eigen::Dynamic, Eigen::RowMajor>> row(
+        row_ptr, row_n_elems);
+    row.array() += i; // add perm_vec index
   };
 
   TransArray ta(input, THREADS);
