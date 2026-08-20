@@ -6,6 +6,7 @@ from typing import Callable, List, NoReturn, Optional
 import joblib
 import numpy as np
 from joblib import Parallel, delayed
+from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.ensemble import RandomForestRegressor
 
 import skmap.set_env  # noqa: F401
@@ -75,6 +76,75 @@ def _s3_upload_outputs(
     if temp_tif is not None:
         os.remove(temp_tif)
     return s3_out
+
+
+def _write_output_layers(
+    data_gdal,
+    out_dir,
+    out_files,
+    base_files,
+    threads,
+    gdal_opts,
+    nodata,
+    dtype,
+    x_size,
+    y_size,
+    s3_prefix,
+    s3_clients,
+    tile_id,
+    temp_file=None,
+):
+    """Write a (layers x pixels) array to GeoTIFFs and optionally upload to S3.
+
+    Shared by ``Predicted``, ``PredictedProbs`` and ``ReducedValues``; the five
+    ``save_*_layer`` methods only differ in how they build ``out_files`` and
+    ``base_files``.
+    """
+    creation_options = [
+        "COMPRESS=deflate",
+        "PREDICTOR=2",
+        "TILED=TRUE",
+        "BLOCKXSIZE=2048",
+        "BLOCKYSIZE=2048",
+    ]
+    write_idx = range(data_gdal.shape[0])
+    if dtype == "int16":
+        sb.writeInt16Data(
+            data_gdal,
+            threads,
+            gdal_opts,
+            base_files,
+            out_dir,
+            out_files,
+            write_idx,
+            0,
+            0,
+            x_size,
+            y_size,
+            int(nodata),
+            creation_options,
+        )
+    elif dtype == "uint8":
+        sb.writeByteData(
+            data_gdal,
+            threads,
+            gdal_opts,
+            base_files,
+            out_dir,
+            out_files,
+            write_idx,
+            0,
+            0,
+            x_size,
+            y_size,
+            int(nodata),
+            creation_options,
+        )
+    if s3_prefix is not None:
+        return _s3_upload_outputs(
+            s3_clients, s3_prefix, tile_id, out_dir, out_files, temp_file
+        )
+    return [f"{out_dir}/{file}" for file in out_files]
 
 
 def _tree_based_load_model(model_path):
@@ -166,6 +236,8 @@ class Modeler:
             else:
                 raise ValueError("No feature names was found")
         self.model_covs = model_covs
+        # sklearn convention: expose the feature names seen during fit.
+        self.feature_names_in_ = np.asarray(model_covs, dtype=object)
 
     def _prepare_covariates(self, data: TiledDataLoader) -> None:
         # prepare input and output arrays
@@ -186,7 +258,15 @@ class Modeler:
             data.get_pixels_valid_idx(n_groups),
         )
 
-    def predict() -> NoReturn:
+    def predict(self, X) -> np.ndarray:
+        """sklearn-style prediction on a 2D array of covariates.
+
+        Tile-oriented prediction (which reads rasters and transposes data) is
+        available as ``predict_tile`` on the concrete subclasses.
+        """
+        return self.predict_fn(self.model, X)
+
+    def predict_tile(self, data: TiledData) -> NoReturn:
         raise NotImplementedError()
 
 
@@ -195,7 +275,7 @@ class Modeler:
 #################################################################################################################################
 
 
-class Regressor(Modeler):
+class Regressor(Modeler, RegressorMixin, BaseEstimator):
     def __init__(
         self,
         model_path: str,
@@ -222,7 +302,7 @@ class RFRegressor(Regressor):
             self.predict_fn = predict_fn
         self._load_covs()
 
-    def predict(self, data: TiledData):
+    def predict_tile(self, data: TiledData):
         # prepare input and output arrays
         with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
@@ -257,7 +337,7 @@ class RFRegressorTrees(Regressor):
         self.n_trees = self.model.n_estimators
         self._load_covs()
 
-    def predict(self, data: TiledData):
+    def predict_tile(self, data: TiledData):
         # prepare input and output arrays
         with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
@@ -294,7 +374,7 @@ class RFRegressorTrees(Regressor):
 #################################################################################################################################
 
 
-class Classifier(Modeler):
+class Classifier(Modeler, ClassifierMixin, BaseEstimator):
     def __init__(
         self,
         model_path: str,
@@ -321,7 +401,7 @@ class RFClassifier(Classifier):
             self.predict_fn = predict_fn
         self._load_covs()
 
-    def predict(self, data: TiledData):
+    def predict_tile(self, data: TiledData):
         # prepare input and output arrays
         with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
@@ -524,52 +604,22 @@ class Predicted:
             # TODO change the need for base image in sb.writeByteData and sb.writeInt16Data
             temp_dir = f"{base_dir}/.skmap"
             temp_tif = self.data.create_image_template(dtype, nodata, temp_dir)
-            write_idx = range(self.n_depths * self.n_stats * self.n_groups)
-            creation_options = [
-                "COMPRESS=deflate",
-                "PREDICTOR=2",
-                "TILED=TRUE",
-                "BLOCKXSIZE=2048",
-                "BLOCKYSIZE=2048",
-            ]
-            if dtype == "int16":
-                sb.writeInt16Data(
-                    self._out_stats_gdal,
-                    threads,
-                    gdal_opts,
-                    [temp_tif for _ in range(len(out_files))],
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-            elif dtype == "uint8":
-                sb.writeByteData(
-                    self._out_stats_gdal,
-                    threads,
-                    gdal_opts,
-                    [temp_tif for _ in range(len(out_files))],
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-        # show final message and remove local files after sent to s3 backend
-        if s3_prefix is not None:
-            return _s3_upload_outputs(
-                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files, temp_tif
+            return _write_output_layers(
+                self._out_stats_gdal,
+                out_dir,
+                out_files,
+                [temp_tif for _ in range(len(out_files))],
+                threads,
+                gdal_opts,
+                nodata,
+                dtype,
+                self.data.x_size,
+                self.data.y_size,
+                s3_prefix,
+                s3_clients,
+                self.data.tile_id,
+                temp_file=temp_tif,
             )
-        return [f"{out_dir}/{file}" for file in out_files]
 
 
 #
@@ -703,51 +753,22 @@ class PredictedProbs:
             out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
-            write_idx = list(range(self._out_cls_gdal.shape[0]))
-            creation_options = [
-                "COMPRESS=deflate",
-                "PREDICTOR=2",
-                "TILED=TRUE",
-                "BLOCKXSIZE=2048",
-                "BLOCKYSIZE=2048",
-            ]
-            if dtype == "int16":
-                sb.writeInt16Data(
-                    self._out_cls_gdal,
-                    n_threads,
-                    gdal_opts,
-                    temp_tif,
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-            elif dtype == "uint8":
-                sb.writeByteData(
-                    self._out_cls_gdal,
-                    n_threads,
-                    gdal_opts,
-                    temp_tif,
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-        if s3_prefix is not None:
-            return _s3_upload_outputs(
-                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files
+            return _write_output_layers(
+                self._out_cls_gdal,
+                out_dir,
+                out_files,
+                temp_tif,
+                n_threads,
+                gdal_opts,
+                nodata,
+                dtype,
+                self.data.x_size,
+                self.data.y_size,
+                s3_prefix,
+                s3_clients,
+                self.data.tile_id,
+                temp_file=None,
             )
-        return [f"{out_dir}/{file}" for file in out_files]
 
     def save_kl_divergence_layer(
         self,
@@ -810,51 +831,22 @@ class PredictedProbs:
             out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
-            write_idx = list(range(self._out_kld_gdal.shape[0]))
-            creation_options = [
-                "COMPRESS=deflate",
-                "PREDICTOR=2",
-                "TILED=TRUE",
-                "BLOCKXSIZE=2048",
-                "BLOCKYSIZE=2048",
-            ]
-            if dtype == "int16":
-                sb.writeInt16Data(
-                    self._out_kld_gdal,
-                    n_threads,
-                    gdal_opts,
-                    temp_tif,
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-            elif dtype == "uint8":
-                sb.writeByteData(
-                    self._out_kld_gdal,
-                    n_threads,
-                    gdal_opts,
-                    temp_tif,
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-        if s3_prefix is not None:
-            return _s3_upload_outputs(
-                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files
+            return _write_output_layers(
+                self._out_kld_gdal,
+                out_dir,
+                out_files,
+                temp_tif,
+                n_threads,
+                gdal_opts,
+                nodata,
+                dtype,
+                self.data.x_size,
+                self.data.y_size,
+                s3_prefix,
+                s3_clients,
+                self.data.tile_id,
+                temp_file=None,
             )
-        return [f"{out_dir}/{file}" for file in out_files]
 
     def save_probs_layers(
         self,
@@ -916,51 +908,22 @@ class PredictedProbs:
                 out_files_prefix, out_files_suffix, self.groups, self.n_class
             )
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
-            write_idx = list(range(self._out_probs_gdal.shape[0]))
-            creation_options = [
-                "COMPRESS=deflate",
-                "PREDICTOR=2",
-                "TILED=TRUE",
-                "BLOCKXSIZE=2048",
-                "BLOCKYSIZE=2048",
-            ]
-            if dtype == "int16":
-                sb.writeInt16Data(
-                    self._out_probs_gdal,
-                    n_threads,
-                    gdal_opts,
-                    temp_tif,
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-            elif dtype == "uint8":
-                sb.writeByteData(
-                    self._out_probs_gdal,
-                    n_threads,
-                    gdal_opts,
-                    temp_tif,
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-        if s3_prefix is not None:
-            return _s3_upload_outputs(
-                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files
+            return _write_output_layers(
+                self._out_probs_gdal,
+                out_dir,
+                out_files,
+                temp_tif,
+                n_threads,
+                gdal_opts,
+                nodata,
+                dtype,
+                self.data.x_size,
+                self.data.y_size,
+                s3_prefix,
+                s3_clients,
+                self.data.tile_id,
+                temp_file=None,
             )
-        return [f"{out_dir}/{file}" for file in out_files]
 
 
 #
@@ -1102,51 +1065,22 @@ class ReducedValues:
             out_dir = _make_dir(f"{base_dir}/{self.data.tile_id}")
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
-            write_idx = list(range(self._out_reduc_gdal.shape[0]))
-            creation_options = [
-                "COMPRESS=deflate",
-                "PREDICTOR=2",
-                "TILED=TRUE",
-                "BLOCKXSIZE=2048",
-                "BLOCKYSIZE=2048",
-            ]
-            if dtype == "int16":
-                sb.writeInt16Data(
-                    self._out_reduc_gdal,
-                    threads,
-                    gdal_opts,
-                    temp_tif,
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-            elif dtype == "uint8":
-                sb.writeByteData(
-                    self._out_reduc_gdal,
-                    threads,
-                    gdal_opts,
-                    temp_tif,
-                    out_dir,
-                    out_files,
-                    write_idx,
-                    0,
-                    0,
-                    self.data.x_size,
-                    self.data.y_size,
-                    int(nodata),
-                    creation_options,
-                )
-        if s3_prefix is not None:
-            return _s3_upload_outputs(
-                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files
+            return _write_output_layers(
+                self._out_reduc_gdal,
+                out_dir,
+                out_files,
+                temp_tif,
+                threads,
+                gdal_opts,
+                nodata,
+                dtype,
+                self.data.x_size,
+                self.data.y_size,
+                s3_prefix,
+                s3_clients,
+                self.data.tile_id,
+                temp_file=None,
             )
-        return [f"{out_dir}/{file}" for file in out_files]
 
 
 #
