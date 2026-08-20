@@ -18,7 +18,12 @@ class _FakeClient:
         self._objects = objects
 
     def list_objects(self, bucket, prefix, recursive):
-        return [type("Obj", (), {"object_name": o})() for o in self._objects]
+        # Match MinIO semantics: only objects whose name starts with `prefix`.
+        return [
+            type("Obj", (), {"object_name": o})()
+            for o in self._objects
+            if o.startswith(prefix)
+        ]
 
 
 def test_s3_list_files():
