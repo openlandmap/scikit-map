@@ -30,8 +30,7 @@ TEST(Io, test_write_data) {
   IoArray ioArray(data, 1);
   ioArray.setupGdal(conf_GDAL);
   ioArray.writeData(base_files, base_folder, file_names, {0}, x_offset,
-                    y_offset, x_size, y_size, GDT_Int16, -1, std::nullopt,
-                    std::nullopt);
+                    y_offset, x_size, y_size, GDT_Int16, -1, {}, 1.0);
 
   ASSERT_TRUE(
       std::filesystem::exists(base_folder + "/" + file_names[0] + ".tif"));

@@ -501,6 +501,6 @@ def writeData(
     y_size: int,
     no_data_value: float,
     gdal_data_type_str: str,
-    bash_compression_command: str | None = None,
-    seaweed_path: Sequence[str] | None = None,
+    creation_options: Sequence[str] = (),
+    scale: float = 1.0,
 ) -> None: ...

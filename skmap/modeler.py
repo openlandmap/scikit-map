@@ -10,7 +10,7 @@ from sklearn.ensemble import RandomForestRegressor
 
 import skmap.set_env  # noqa: F401
 import skmap_bindings as sb
-from skmap.misc import TimeTracker, _make_dir, _rm_dir, sb_arr
+from skmap.misc import TimeTracker, _make_dir, _rm_dir, s3_upload_file, sb_arr
 from skmap.tiled_data import TiledData, TiledDataLoader
 
 
@@ -53,6 +53,28 @@ def _get_out_files_depths(
                         file = f"{out_files_prefix[k]}_b{d1}cm_{y1}0101_{y1}1231_tile.{tile_id}_{out_files_suffix[k]}"
                 out_files.append(file)
     return out_files
+
+
+def _s3_upload_outputs(
+    s3_clients, s3_prefix, tile_id, out_dir, out_files, temp_tif=None
+):
+    """Upload written GeoTIFFs to S3 via the MinIO client and clean up local files."""
+    client = random.choice(s3_clients)
+    bucket, prefix_path = s3_prefix.partition("/")
+    s3_out = []
+    for out_file in out_files:
+        local = f"{out_dir}/{out_file}.tif"
+        object_name = (
+            f"{prefix_path}/{tile_id}/{out_file}.tif"
+            if prefix_path
+            else f"{tile_id}/{out_file}.tif"
+        )
+        s3_upload_file(client, bucket, object_name, local)
+        s3_out.append(object_name)
+    _rm_dir(out_dir)
+    if temp_tif is not None:
+        os.remove(temp_tif)
+    return s3_out
 
 
 def _tree_based_load_model(model_path):
@@ -434,7 +456,7 @@ class Predicted:
         out_files_prefix,
         out_files_suffix,
         s3_prefix,
-        s3_aliases,
+        s3_clients,
         gdal_opts,
         threads,
     ):
@@ -442,7 +464,7 @@ class Predicted:
         assert dtype == "int16" or dtype == "uint8"
         assert len(out_files_prefix) == len(out_files_suffix)
         assert len(out_files_prefix) == self.n_stats
-        assert s3_prefix is None or len(s3_aliases) > 0
+        assert s3_prefix is None or len(s3_clients) > 0
         # create and transpose output
         with TimeTracker(
             f"    Tile {self.data.tile_id} - transpose data for final output ({threads} threads)"
@@ -503,13 +525,13 @@ class Predicted:
             temp_dir = f"{base_dir}/.skmap"
             temp_tif = self.data.create_image_template(dtype, nodata, temp_dir)
             write_idx = range(self.n_depths * self.n_stats * self.n_groups)
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
-            s3_out = None
-            if s3_prefix is not None:
-                s3_out = [
-                    f"{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}"
-                    for _ in range(len(out_files))
-                ]
+            creation_options = [
+                "COMPRESS=deflate",
+                "PREDICTOR=2",
+                "TILED=TRUE",
+                "BLOCKXSIZE=2048",
+                "BLOCKYSIZE=2048",
+            ]
             if dtype == "int16":
                 sb.writeInt16Data(
                     self._out_stats_gdal,
@@ -524,8 +546,7 @@ class Predicted:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
             elif dtype == "uint8":
                 sb.writeByteData(
@@ -541,18 +562,13 @@ class Predicted:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
         # show final message and remove local files after sent to s3 backend
         if s3_prefix is not None:
-            for k in range(self.n_stats):
-                print(
-                    f"List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self.data.tile_id}/{out_files_prefix[k]}_`"
-                )
-            _rm_dir(out_dir)
-            os.remove(temp_tif)
-            return s3_out
+            return _s3_upload_outputs(
+                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files, temp_tif
+            )
         return [f"{out_dir}/{file}" for file in out_files]
 
 
@@ -636,7 +652,7 @@ class PredictedProbs:
         out_files_prefix,
         out_files_suffix,
         s3_prefix,
-        s3_aliases,
+        s3_clients,
         gdal_opts,
         n_threads,
     ):
@@ -645,7 +661,7 @@ class PredictedProbs:
         assert dtype == "int16" or dtype == "uint8"
         assert len(out_files_prefix) == len(out_files_suffix)
         assert len(out_files_prefix) == 1
-        assert s3_prefix is None or len(s3_aliases) > 0
+        assert s3_prefix is None or len(s3_clients) > 0
         # create and transpose output
         with TimeTracker(
             f"    Tile {self.data.tile_id} - transpose data for final output"
@@ -688,13 +704,13 @@ class PredictedProbs:
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
             write_idx = list(range(self._out_cls_gdal.shape[0]))
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
-            s3_out = None
-            if s3_prefix is not None:
-                s3_out = [
-                    f"{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}"
-                    for _ in range(len(out_files))
-                ]
+            creation_options = [
+                "COMPRESS=deflate",
+                "PREDICTOR=2",
+                "TILED=TRUE",
+                "BLOCKXSIZE=2048",
+                "BLOCKYSIZE=2048",
+            ]
             if dtype == "int16":
                 sb.writeInt16Data(
                     self._out_cls_gdal,
@@ -709,8 +725,7 @@ class PredictedProbs:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
             elif dtype == "uint8":
                 sb.writeByteData(
@@ -726,15 +741,12 @@ class PredictedProbs:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
         if s3_prefix is not None:
-            print(
-                f"List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self.data.tile_id}/{out_files_prefix[0]}_`"
+            return _s3_upload_outputs(
+                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files
             )
-            _rm_dir(out_dir)
-            return s3_out
         return [f"{out_dir}/{file}" for file in out_files]
 
     def save_kl_divergence_layer(
@@ -746,7 +758,7 @@ class PredictedProbs:
         out_files_prefix,
         out_files_suffix,
         s3_prefix,
-        s3_aliases,
+        s3_clients,
         gdal_opts,
         n_threads,
     ):
@@ -755,7 +767,7 @@ class PredictedProbs:
         assert dtype == "int16" or dtype == "uint8"
         assert len(out_files_prefix) == len(out_files_suffix)
         assert len(out_files_prefix) == 1
-        assert s3_prefix is None or len(s3_aliases) > 0
+        assert s3_prefix is None or len(s3_clients) > 0
         # create and transpose output
         with TimeTracker(f"tile {self.data.tile_id} - transpose data for final output"):
             sb.offsetAndScale(self._out_kld_valid, n_threads, 0.5 / scale, scale)
@@ -799,13 +811,13 @@ class PredictedProbs:
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
             write_idx = list(range(self._out_kld_gdal.shape[0]))
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
-            s3_out = None
-            if s3_prefix is not None:
-                s3_out = [
-                    f"{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}"
-                    for _ in range(len(out_files))
-                ]
+            creation_options = [
+                "COMPRESS=deflate",
+                "PREDICTOR=2",
+                "TILED=TRUE",
+                "BLOCKXSIZE=2048",
+                "BLOCKYSIZE=2048",
+            ]
             if dtype == "int16":
                 sb.writeInt16Data(
                     self._out_kld_gdal,
@@ -820,8 +832,7 @@ class PredictedProbs:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
             elif dtype == "uint8":
                 sb.writeByteData(
@@ -837,15 +848,12 @@ class PredictedProbs:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
         if s3_prefix is not None:
-            print(
-                f"List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self.data.tile_id}/{out_files_prefix[0]}_`"
+            return _s3_upload_outputs(
+                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files
             )
-            _rm_dir(out_dir)
-            return s3_out
         return [f"{out_dir}/{file}" for file in out_files]
 
     def save_probs_layers(
@@ -857,7 +865,7 @@ class PredictedProbs:
         out_files_prefix,
         out_files_suffix,
         s3_prefix,
-        s3_aliases,
+        s3_clients,
         gdal_opts,
         n_threads,
     ):
@@ -865,7 +873,7 @@ class PredictedProbs:
         assert dtype == "int16" or dtype == "uint8"
         assert len(out_files_prefix) == len(out_files_suffix)
         assert len(out_files_prefix) == self.n_class
-        assert s3_prefix is None or len(s3_aliases) > 0
+        assert s3_prefix is None or len(s3_clients) > 0
         # create and transpose output
         with TimeTracker(
             f"    Tile {self.data.tile_id} - transpose data for final output"
@@ -909,13 +917,13 @@ class PredictedProbs:
             )
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
             write_idx = list(range(self._out_probs_gdal.shape[0]))
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
-            s3_out = None
-            if s3_prefix is not None:
-                s3_out = [
-                    f"{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}"
-                    for _ in range(len(out_files))
-                ]
+            creation_options = [
+                "COMPRESS=deflate",
+                "PREDICTOR=2",
+                "TILED=TRUE",
+                "BLOCKXSIZE=2048",
+                "BLOCKYSIZE=2048",
+            ]
             if dtype == "int16":
                 sb.writeInt16Data(
                     self._out_probs_gdal,
@@ -930,8 +938,7 @@ class PredictedProbs:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
             elif dtype == "uint8":
                 sb.writeByteData(
@@ -947,15 +954,12 @@ class PredictedProbs:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
         if s3_prefix is not None:
-            print(
-                f"List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self.data.tile_id}/{out_files_prefix[0]}_`"
+            return _s3_upload_outputs(
+                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files
             )
-            _rm_dir(out_dir)
-            return s3_out
         return [f"{out_dir}/{file}" for file in out_files]
 
 
@@ -1048,7 +1052,7 @@ class ReducedValues:
         out_files_prefix,
         out_files_suffix,
         s3_prefix,
-        s3_aliases,
+        s3_clients,
         gdal_opts,
         threads,
     ):
@@ -1056,7 +1060,7 @@ class ReducedValues:
         assert dtype == "int16" or dtype == "uint8"
         assert len(out_files_prefix) == len(out_files_suffix)
         assert len(out_files_prefix) == 1
-        assert s3_prefix is None or len(s3_aliases) > 0
+        assert s3_prefix is None or len(s3_clients) > 0
         # create and transpose output
         with TimeTracker(
             f"    Tile {self.data.tile_id} - transpose data for final output ({threads} threads)"
@@ -1099,13 +1103,13 @@ class ReducedValues:
             out_files = _get_out_files(out_files_prefix, out_files_suffix, self.groups)
             temp_tif = [self.data.mask_path for _ in range(len(out_files))]
             write_idx = list(range(self._out_reduc_gdal.shape[0]))
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
-            s3_out = None
-            if s3_prefix is not None:
-                s3_out = [
-                    f"{s3_aliases[random.randint(0, len(s3_aliases) - 1)]}{s3_prefix}/{self.data.tile_id}"
-                    for _ in range(len(out_files))
-                ]
+            creation_options = [
+                "COMPRESS=deflate",
+                "PREDICTOR=2",
+                "TILED=TRUE",
+                "BLOCKXSIZE=2048",
+                "BLOCKYSIZE=2048",
+            ]
             if dtype == "int16":
                 sb.writeInt16Data(
                     self._out_reduc_gdal,
@@ -1120,8 +1124,7 @@ class ReducedValues:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
             elif dtype == "uint8":
                 sb.writeByteData(
@@ -1137,15 +1140,12 @@ class ReducedValues:
                     self.data.x_size,
                     self.data.y_size,
                     int(nodata),
-                    compress_cmd,
-                    s3_out,
+                    creation_options,
                 )
         if s3_prefix is not None:
-            print(
-                f"List results with `mc ls {s3_aliases[0]}{s3_prefix}/{self.data.tile_id}/{out_files_prefix[0]}_`"
+            return _s3_upload_outputs(
+                s3_clients, s3_prefix, self.data.tile_id, out_dir, out_files
             )
-            _rm_dir(out_dir)
-            return s3_out
         return [f"{out_dir}/{file}" for file in out_files]
 
 

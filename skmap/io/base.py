@@ -346,10 +346,7 @@ def save_rasters_cpp(
         ds = rasterio.open(base_raster)
         nodata = int(ds.nodatavals[0])
 
-    gdal_co = "-co " + " -co ".join(
-        [f"{k}={v}" for k, v in zip(gdal_co.keys(), gdal_co.values())]
-    )
-    gdal_cmd = f"gdal_translate -a_nodata {nodata} {gdal_co}"
+    creation_options = [f"{k}={v}" for k, v in gdal_co.items()]
 
     if isinstance(base_raster, str):
         base_raster = [base_raster for i in out_files]
@@ -378,14 +375,15 @@ def save_rasters_cpp(
         window.width,
         window.height,
         nodata,
-        gdal_cmd,
-        out_s3,
+        creation_options,
     )
 
     if verbose:
         ttprint("End")
 
     if out_s3 is not None:
+        # S3 upload is now handled by the caller via the MinIO client
+        # (skmap.misc.s3_upload_file); the C++ bindings no longer shell out.
         return out_s3
     else:
         return [str(Path(out_dir).joinpath(f"{o}.tif")) for o in out_files]

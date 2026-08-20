@@ -12,12 +12,21 @@ from concurrent.futures import ProcessPoolExecutor
 from typing import Dict, Optional
 
 import numpy as np
+import requests
+from minio import Minio
 from osgeo import gdal
 
 import skmap.set_env  # noqa: F401
 import skmap_bindings as sb
 from skmap.catalog import DataCatalog, run_whales
-from skmap.misc import TimeTracker, sb_arr, sb_vec, ttprint
+from skmap.misc import (
+    TimeTracker,
+    s3_list_objects,
+    s3_upload_file,
+    sb_arr,
+    sb_vec,
+    ttprint,
+)
 
 mask_aggregation_bash_script = """#!/bin/bash
     if [ -z "$1" ]; then
@@ -73,35 +82,28 @@ def warp_tile(tile_file, mosaic_paths, n_pix, resample):
     return warp_data
 
 
-def s3_list_files(s3_aliases, s3_prefix, tile_id, file_pattern=None):
-    if len(s3_aliases) == 0:
+def s3_list_files(s3_clients, s3_prefix, tile_id, file_pattern=None):
+    if len(s3_clients) == 0:
         return []
-    bash_cmd = f"mc find {s3_aliases[0]}/{s3_prefix}/{tile_id}"
-    process = subprocess.Popen(
-        bash_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
-    )
-    stdout, stderr = process.communicate()
-    # stderr = stderr.decode('utf-8')
-    # assert stderr == '', f"Error listing S3 `{s3_aliases[0]}{s3_prefix}/{tile_id}`. \nError: {stderr}"
-    stdout = stdout.decode("utf-8")
-    lines = stdout.splitlines()
+    bucket, _, prefix = s3_prefix.partition("/")
+    base = f"{prefix}/{tile_id}" if prefix else tile_id
+    lines = s3_list_objects(s3_clients[0], bucket, base)
     if file_pattern is not None:
         pattern = re.compile(file_pattern)
         lines = [line for line in lines if pattern.search(line)]
     return lines
 
 
+def s3_split_prefix(s3_prefix):
+    """Split an S3 prefix of the form 'bucket/path' into (bucket, path)."""
+    bucket, _, prefix = s3_prefix.partition("/")
+    return bucket, prefix
+
+
 #
 def s3_setup(access_key, secret_key, gaia_addrs):
-    s3_aliases = []
-    s3_aliases = [f"g{i + 1}" for i, _ in enumerate(gaia_addrs)]
-    commands = [
-        f"mc alias set g{i + 1} {addr} {access_key} {secret_key} --api S3v4 > /dev/null"
-        for i, addr in enumerate(gaia_addrs)
-    ]
-    for cmd in commands:
-        subprocess.run(cmd, shell=True, capture_output=False, text=True, check=True)
-    return s3_aliases
+    """Create MinIO clients for each S3 endpoint (replaces `mc alias set`)."""
+    return [Minio(addr, access_key, secret_key, secure=True) for addr in gaia_addrs]
 
 
 #
@@ -226,9 +228,12 @@ class TiledDataLoader(TiledData):
         self.mask_path = (
             f"/tmp/tmp_mask_{tmp_mask_path.split('/')[-1].split('.')[0]}.tif"
         )
-        subprocess.run(
-            f"wget {tmp_mask_path} -q -O {self.mask_path}", shell=True, check=True
-        )
+        # Download the mask with requests instead of shelling out to wget.
+        with requests.get(tmp_mask_path, stream=True) as r:
+            r.raise_for_status()
+            with open(self.mask_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
         # @FIXME: this only work with our setting of Landsat data
         if self.spatial_aggregation:
             if self.verbose:
@@ -435,14 +440,14 @@ class TiledDataExporter(TiledData):
         n_threads: int = os.cpu_count(),
     ) -> None:
         if s3_params:
-            self.s3_aliases = s3_setup(
+            self.s3_clients = s3_setup(
                 s3_params["s3_access_key"],
                 s3_params["s3_secret_key"],
                 s3_params["s3_addresses"],
             )
             self.s3_prefix = s3_params["s3_prefix"]
         else:
-            self.s3_aliases = None
+            self.s3_clients = None
             self.s3_prefix = None
         self.spatial_res = spatial_res
         self.n_pixels = n_pixels
@@ -634,11 +639,11 @@ class TiledDataExporter(TiledData):
         return out_files
 
     def check_all_exported(self, prefix, suffix, timeframe=None):
-        assert (self.s3_aliases is not None) & (self.s3_prefix is not None), (
+        assert (self.s3_clients is not None) & (self.s3_prefix is not None), (
             "The check requires that S3 is properly set"
         )
         out_files = self._get_out_names(prefix, suffix, timeframe)
-        files_in_s3 = s3_list_files(self.s3_aliases, self.s3_prefix, self.tile_id)
+        files_in_s3 = s3_list_files(self.s3_clients, self.s3_prefix, self.tile_id)
         basename_files_in_s3 = [os.path.basename(f) for f in files_in_s3]
         flag = True
         for s in out_files:
@@ -1032,68 +1037,68 @@ class TiledDataExporter(TiledData):
             tile_dir = write_folder + f"/{self.tile_id}"
             os.makedirs(write_folder, exist_ok=True)
             os.makedirs(tile_dir, exist_ok=True)
-            compress_cmd = f"gdal_translate -a_nodata {nodata} -a_scale {scaling_metadata} -co COMPRESS=deflate -co PREDICTOR=2 -co TILED=TRUE -co BLOCKXSIZE=2048 -co BLOCKYSIZE=2048"
+            creation_options = [
+                "COMPRESS=deflate",
+                "PREDICTOR=2",
+                "TILED=TRUE",
+                "BLOCKXSIZE=2048",
+                "BLOCKYSIZE=2048",
+            ]
         with TimeTracker(f"   Exporting data for {self.tile_id}", False):
             if self.save_hdf5:
                 import h5py
 
-                s3_out = (
-                    f"{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}"
-                )
                 with h5py.File(f"{tile_dir}/{out_files[0]}.h5", "w") as f:
                     if save_type == "byte":
                         save_type = "uint8"
                     f.create_dataset(
                         "data", data=write_data, dtype=save_type, compression="lzf"
                     )
-                subprocess.run(
-                    f"mc cp {tile_dir}/{out_files[0]}.h5 {s3_out}/{out_files[0]}.h5",
-                    shell=True,
-                    check=True,
-                )
-                subprocess.run(
-                    f"rm {tile_dir}/{out_files[0]}.h5", shell=True, check=True
-                )
-                ttprint(f"Export complete, check mc ls {s3_out}/{out_files[0]}")
-            else:
                 if self.s3_prefix:
-                    s3_out = [
-                        f"{random.choice(self.s3_aliases)}/{self.s3_prefix}/{self.tile_id}"
-                        for _ in range(len(out_files))
-                    ]
-                    sb.writeData(
-                        write_data,
-                        n_threads_write,
-                        gdal_opts,
-                        [template_file for _ in range(n_files)],
-                        tile_dir,
-                        out_files,
-                        range(n_files),
-                        0,
-                        0,
-                        x_size,
-                        y_size,
-                        nodata,
-                        save_type,
-                        compress_cmd,
-                        s3_out,
+                    client = random.choice(self.s3_clients)
+                    bucket, prefix_path = s3_split_prefix(self.s3_prefix)
+                    object_name = (
+                        f"{prefix_path}/{self.tile_id}/{out_files[0]}.h5"
+                        if prefix_path
+                        else f"{self.tile_id}/{out_files[0]}.h5"
                     )
-                    ttprint(f"Export complete, check mc ls {s3_out[0]}/{out_files[0]}")
+                    s3_upload_file(
+                        client, bucket, object_name, f"{tile_dir}/{out_files[0]}.h5"
+                    )
+                    os.remove(f"{tile_dir}/{out_files[0]}.h5")
+                    ttprint(f"Export complete, check {bucket}/{object_name}")
+            else:
+                sb.writeData(
+                    write_data,
+                    n_threads_write,
+                    gdal_opts,
+                    [template_file for _ in range(n_files)],
+                    tile_dir,
+                    out_files,
+                    range(n_files),
+                    0,
+                    0,
+                    x_size,
+                    y_size,
+                    nodata,
+                    save_type,
+                    creation_options,
+                    scaling_metadata,
+                )
+                if self.s3_prefix:
+                    client = random.choice(self.s3_clients)
+                    bucket, prefix_path = s3_split_prefix(self.s3_prefix)
+                    for out_file in out_files:
+                        local = f"{tile_dir}/{out_file}.tif"
+                        object_name = (
+                            f"{prefix_path}/{self.tile_id}/{out_file}.tif"
+                            if prefix_path
+                            else f"{self.tile_id}/{out_file}.tif"
+                        )
+                        s3_upload_file(client, bucket, object_name, local)
+                        os.remove(local)
+                    ttprint(
+                        f"Export complete, check {bucket}/{prefix_path}/{self.tile_id}"
+                    )
                 else:
-                    sb.writeData(
-                        write_data,
-                        n_threads_write,
-                        gdal_opts,
-                        [template_file for _ in range(n_files)],
-                        tile_dir,
-                        out_files,
-                        range(n_files),
-                        0,
-                        0,
-                        x_size,
-                        y_size,
-                        nodata,
-                        save_type,
-                        compress_cmd,
-                    )
-                    ttprint(f"Export complete, check mc {tile_dir}")
+                    ttprint(f"Export complete, check {tile_dir}")

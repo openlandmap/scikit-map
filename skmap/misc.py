@@ -944,3 +944,16 @@ def _rm_dir(path) -> None:
             else:
                 os.remove(item_path)
         os.rmdir(path)
+
+
+def s3_upload_file(client: Minio, bucket: str, object_name: str, file_path: str) -> None:
+    """Upload a local file to an S3-compatible bucket using the MinIO client."""
+    client.fput_object(bucket, object_name, file_path)
+
+
+def s3_list_objects(client: Minio, bucket: str, prefix: str) -> List[str]:
+    """List object names under a prefix using the MinIO client."""
+    return [
+        obj.object_name
+        for obj in client.list_objects(bucket, prefix=prefix, recursive=True)
+    ]

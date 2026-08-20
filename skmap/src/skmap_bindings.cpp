@@ -132,6 +132,8 @@ void readData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
  * @param data      Eigen::matrix reference containing the data to write.
  * @param n_threads Number of threads for parallel I/O operations.
  * @param conf_GDAL Python dictionary of GDAL configuration options.
+ * @param creation_options Vector of "KEY=VALUE" GDAL driver creation options.
+ * @param scale Band scale metadata (equivalent to gdal_translate -a_scale).
  *
  * Other parameters are passed to `IoArray::WriteData`: @ref IoArray::WriteData
  */
@@ -141,8 +143,7 @@ void writeData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                std::vector<uint_t> data_indices, uint_t x_off, uint_t y_off,
                uint_t x_size, uint_t y_size, float_t no_data_value,
                std::string gdal_data_type_str,
-               std::optional<std::string> bash_compression_command,
-               std::optional<std::vector<std::string>> seaweed_path) {
+               std::vector<std::string> creation_options, double scale) {
   IoArray ioArray(data, n_threads);
   ioArray.setupGdal(convPyDict(conf_GDAL));
   GDALDataType gdal_data_type = GetGDALDataTypeFromString(gdal_data_type_str);
@@ -155,8 +156,7 @@ void writeData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
       [&](auto &&casted_nodata) {
         ioArray.writeData(base_files, base_folder, file_names, data_indices,
                           x_off, y_off, x_size, y_size, gdal_data_type,
-                          casted_nodata, bash_compression_command,
-                          seaweed_path);
+                          casted_nodata, creation_options, scale);
       },
       *no_data_variant);
 }
@@ -244,11 +244,10 @@ void writeInt16Data(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     std::vector<uint_t> data_indices, uint_t x_off,
                     uint_t y_off, uint_t x_size, uint_t y_size,
                     int16_t no_data_value,
-                    std::optional<std::string> bash_compression_command,
-                    std::optional<std::vector<std::string>> seaweed_path) {
+                    std::vector<std::string> creation_options, double scale) {
   writeData(data, n_threads, conf_GDAL, base_files, base_folder, file_names,
             data_indices, x_off, y_off, x_size, y_size, no_data_value, "int16",
-            bash_compression_command, seaweed_path);
+            creation_options, scale);
 }
 
 /**
@@ -261,11 +260,10 @@ void writeUInt16Data(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                      std::vector<uint_t> data_indices, uint_t x_off,
                      uint_t y_off, uint_t x_size, uint_t y_size,
                      uint16_t no_data_value,
-                     std::optional<std::string> bash_compression_command,
-                     std::optional<std::vector<std::string>> seaweed_path) {
+                     std::vector<std::string> creation_options, double scale) {
   writeData(data, n_threads, conf_GDAL, base_files, base_folder, file_names,
             data_indices, x_off, y_off, x_size, y_size, no_data_value, "uint16",
-            bash_compression_command, seaweed_path);
+            creation_options, scale);
 }
 
 /**
@@ -276,11 +274,10 @@ void writeByteData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                    std::string base_folder, std::vector<std::string> file_names,
                    std::vector<uint_t> data_indices, uint_t x_off, uint_t y_off,
                    uint_t x_size, uint_t y_size, byte_t no_data_value,
-                   std::optional<std::string> bash_compression_command,
-                   std::optional<std::vector<std::string>> seaweed_path) {
+                   std::vector<std::string> creation_options, double scale) {
   writeData(data, n_threads, conf_GDAL, base_files, base_folder, file_names,
             data_indices, x_off, y_off, x_size, y_size, no_data_value, "byte",
-            bash_compression_command, seaweed_path);
+            creation_options, scale);
 }
 
 /**
@@ -811,20 +808,23 @@ PYBIND11_MODULE(skmap_bindings, m) {
         "Reorder and transpose an array into a new one");
   m.def("writeByteData", &writeByteData, py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
-        py::arg(), py::arg(), py::arg(), py::arg() = std::nullopt,
-        py::arg() = std::nullopt, "Write data in Byte format");
+        py::arg(), py::arg(), py::arg(),
+        py::arg() = std::vector<std::string>(), py::arg() = 1.0,
+        "Write data in Byte format");
   m.def("writeInt16Data", &writeInt16Data, py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
-        py::arg(), py::arg(), py::arg(), py::arg() = std::nullopt,
-        py::arg() = std::nullopt, "Write data in Int16 format");
+        py::arg(), py::arg(), py::arg(),
+        py::arg() = std::vector<std::string>(), py::arg() = 1.0,
+        "Write data in Int16 format");
   m.def("writeUInt16Data", &writeUInt16Data, py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
-        py::arg(), py::arg(), py::arg(), py::arg() = std::nullopt,
-        py::arg() = std::nullopt, "Write data in Int16 format");
+        py::arg(), py::arg(), py::arg(),
+        py::arg() = std::vector<std::string>(), py::arg() = 1.0,
+        "Write data in Int16 format");
   m.def("writeData", &writeData, py::arg(), py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
-        py::arg(), py::arg(), py::arg(), py::arg() = std::nullopt,
-        py::arg() = std::nullopt, "Write data");
+        py::arg(), py::arg(), py::arg(),
+        py::arg() = std::vector<std::string>(), py::arg() = 1.0, "Write data");
   m.def("getLatLonArray", &getLatLonArray,
         "Compute latitude and longitude for each pixel of a GeoTIFF");
   m.def("computeNormalizedDifference", &computeNormalizedDifference,

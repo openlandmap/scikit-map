@@ -102,8 +102,7 @@ public:
    *
    * This function writes selected rows of the `m_data` matrix into GeoTIFF
    * files based on a set of base files and offsets. It supports in-place row
-   * casting, NoData masking, optional bash compression commands, and optional
-   * uploading to a remote storage (e.g., SeaweedFS).
+   * casting, NoData masking, and GDAL creation options (e.g. compression).
    *
    * @tparam T The data type to write to disk (e.g., float, double).
    *
@@ -119,21 +118,17 @@ public:
    * @param y_size Height of the region to write.
    * @param write_type GDAL data type to write (e.g., GDT_Float32).
    * @param no_data_value Value to use for missing or NaN cells.
-   * @param bash_compression_command Optional: shell command to compress the
-   * output files (e.g., gdal_translate or gzip).
-   * @param seaweed_path Optional: vector of remote storage paths to upload each
-   * output file.
+   * @param creation_options Vector of "KEY=VALUE" GDAL driver creation
+   * options (e.g. "COMPRESS=deflate", "TILED=TRUE").
+   * @param scale Band scale metadata (equivalent to gdal_translate -a_scale).
    *
    * @details
    * For each row specified in `data_indices`, the function:
    * 1. Opens the corresponding base file and copies geotransform, projection,
    * and spatial reference.
    * 2. Masks NaN values with `no_data_value`.
-   * 3. Writes the row to a temporary raster if compression is requested,
-   * otherwise directly to the final file.
-   * 4. Applies optional bash compression.
-   * 5. Uploads the file to `seaweed_path` if provided and removes local copies
-   * as needed.
+   * 3. Writes the row directly to the final GeoTIFF with the given creation
+   * options (no shell-outs; compression is applied by the GTiff driver).
    */
   template <typename T>
   void writeData(std::vector<std::string> base_files, std::string base_folder,
@@ -141,8 +136,7 @@ public:
                  std::vector<uint_t> data_indices, uint_t x_off, uint_t y_off,
                  uint_t x_size, uint_t y_size, GDALDataType write_type,
                  T no_data_value,
-                 std::optional<std::string> bash_compression_command,
-                 std::optional<std::vector<std::string>> seaweed_path) {
+                 std::vector<std::string> creation_options, double scale) {
 
     auto writeTiff = [&](uint_t i, Eigen::Ref<MatFloat::RowXpr> row) {
       if ((uint_t)m_data.cols() < x_size * y_size) {
@@ -184,17 +178,20 @@ public:
       row =
           row.array().isNaN().select(static_cast<float_t>(no_data_value), row);
       Eigen::RowVectorX<T> casted_row = row.cast<T>();
-      std::string file_name = base_folder + "/" + layer_name;
-      std::string ending =
-          bash_compression_command.has_value() ? "_tmp.tif" : ".tif";
-      std::string tmp_file_name = file_name + ending;
+      std::string file_name = base_folder + "/" + layer_name + ".tif";
+      // Build a char** of creation options for GDALCreate (no shell-outs).
+      std::vector<char *> co_ptrs;
+      co_ptrs.reserve(creation_options.size() + 1);
+      for (const auto &opt : creation_options)
+        co_ptrs.push_back(const_cast<char *>(opt.c_str()));
+      co_ptrs.push_back(nullptr);
+      char **papszOptions = co_ptrs.data();
       GDALDataset *writeDataset_raw = driver->Create(
-          tmp_file_name.c_str(), inputDataset->GetRasterXSize(),
-          inputDataset->GetRasterYSize(), 1, write_type, nullptr);
+          file_name.c_str(), inputDataset->GetRasterXSize(),
+          inputDataset->GetRasterYSize(), 1, write_type, papszOptions);
       if (writeDataset_raw == nullptr) {
         throw std::runtime_error(
-            "scikit-map ERROR 10: issues in creating the file " +
-            tmp_file_name);
+            "scikit-map ERROR 10: issues in creating the file " + file_name);
       }
       GdalDatasetGuard writeDataset(writeDataset_raw);
       writeDataset->SetGeoTransform(geotransform);
@@ -202,6 +199,7 @@ public:
       writeDataset->SetProjection(projection);
       GDALRasterBand *writeBand = writeDataset->GetRasterBand(1);
       writeBand->SetNoDataValue(static_cast<double>(no_data_value));
+      writeBand->SetScale(scale);
       using MatType =
           Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
       MatType init_raster =
@@ -220,16 +218,6 @@ public:
                             layer_name);
       // inputDataset / writeDataset are closed by GdalDatasetGuard on every
       // path, including the throws above.
-      if (bash_compression_command.has_value()) {
-        runBashCommand(bash_compression_command.value() + " " + tmp_file_name +
-                       " " + file_name + ".tif");
-        runBashCommand("rm " + tmp_file_name);
-      }
-      if (seaweed_path.has_value()) {
-        runBashCommand("mc cp " + file_name + ".tif " +
-                       seaweed_path.value()[i] + "/" + layer_name + ".tif ");
-        runBashCommand("rm " + file_name + ".tif");
-      }
     };
     this->parRowPerm(writeTiff, data_indices);
   }

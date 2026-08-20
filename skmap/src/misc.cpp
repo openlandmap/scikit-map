@@ -41,14 +41,6 @@ inline void skmapAssertIfTrue(bool cond, std::string message) {
   }
 }
 
-inline void runBashCommand(std::string command) {
-  command += " > /dev/null 2>&1";
-  int result = system(command.c_str());
-  skmapAssertIfTrue(result != 0,
-                    "scikit-map ERROR 10: issues running the command " +
-                        command);
-}
-
 inline float_t signFunc(float_t x) {
   if (x > 0.)
     return +1.;
