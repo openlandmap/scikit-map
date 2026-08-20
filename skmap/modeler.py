@@ -184,6 +184,8 @@ def _tree_based_load_model(model_path):
 
 
 class Modeler:
+    """Base class wrapping a fitted model, its covariate names, and tile/feature preparation."""
+
     def __init__(
         self,
         model_path: str,
@@ -267,6 +269,8 @@ class Modeler:
         return self.predict_fn(self.model, X)
 
     def predict_tile(self, data: TiledData) -> NoReturn:
+        """Run the model over a :class:`TiledData` tile and return a :class:`TiledData` of predictions."""
+
         raise NotImplementedError()
 
 
@@ -276,6 +280,8 @@ class Modeler:
 
 
 class Regressor(Modeler, RegressorMixin, BaseEstimator):
+    """Base regressor wrapping a fitted model (inherits scikit-learn :class:`RegressorMixin`)."""
+
     def __init__(
         self,
         model_path: str,
@@ -289,6 +295,8 @@ class Regressor(Modeler, RegressorMixin, BaseEstimator):
 
 #
 class RFRegressor(Regressor):
+    """Tree-based regressor (joblib or tl2cgen) predicting a single response per tile."""
+
     def __init__(
         self,
         model_path: str,
@@ -304,6 +312,8 @@ class RFRegressor(Regressor):
 
     def predict_tile(self, data: TiledData):
         # prepare input and output arrays
+        """Predict one response for every valid pixel of ``data`` and return a :class:`TiledData`."""
+
         with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
         # predict
@@ -322,6 +332,8 @@ class RFRegressor(Regressor):
 
 #
 class RFRegressorTrees(Regressor):
+    """Regressor returning per-tree predictions of a scikit-learn ``RandomForestRegressor``."""
+
     def __init__(
         self,
         model_path: str,
@@ -339,6 +351,8 @@ class RFRegressorTrees(Regressor):
 
     def predict_tile(self, data: TiledData):
         # prepare input and output arrays
+        """Predict one row per tree for every valid pixel of ``data`` and return a :class:`TiledData`."""
+
         with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
         # predict
@@ -375,6 +389,8 @@ class RFRegressorTrees(Regressor):
 
 
 class Classifier(Modeler, ClassifierMixin, BaseEstimator):
+    """Base classifier wrapping a fitted model (inherits scikit-learn :class:`ClassifierMixin`)."""
+
     def __init__(
         self,
         model_path: str,
@@ -388,6 +404,8 @@ class Classifier(Modeler, ClassifierMixin, BaseEstimator):
 
 #
 class RFClassifier(Classifier):
+    """Tree-based classifier (joblib or tl2cgen) returning class labels or probabilities."""
+
     def __init__(
         self,
         model_path: str,
@@ -403,6 +421,8 @@ class RFClassifier(Classifier):
 
     def predict_tile(self, data: TiledData):
         # prepare input and output arrays
+        """Predict class labels (or probabilities) for every valid pixel of ``data`` and return a :class:`TiledData`."""
+
         with TimeTracker("          Transpose data", False):
             self._prepare_covariates(data)
         # predict
@@ -438,6 +458,8 @@ class RFClassifier(Classifier):
 
 
 class Predicted:
+    """Container for tree-level predictions, used to derive per-depth/year statistics."""
+
     def __init__(self, data: TiledDataLoader, depths) -> None:
         self.data = data
         assert self.data is not None
@@ -467,17 +489,23 @@ class Predicted:
     @property
     def predicted_trees(self):
         # self.predicted_trees shape: (n_depths, n_trees, n_years, n_pixels_valid)
+        """Per-depth tree predictions reshaped as ``(n_depths, n_trees, n_years, n_pixels_valid)``."""
+
         return self._out_valid[: self.n_depths, :, : self.n_groups, :]
 
     @property
     def predicted_stats(self):
         # self.predicted_stats shape: (n_years, n_pixels_valid, n_depths, n_stats)
+        """Per-year statistics reshaped as ``(n_years, n_pixels_valid, n_depths, n_stats)``."""
+
         if self._out_stats_valid is not None:
             return self._out_stats_valid.reshape(
                 (self.n_groups, self.data.n_pixels_valid, self.n_depths, self.n_stats)
             )
 
     def average_trees_depth_ranges(self) -> None:
+        """Average tree predictions across consecutive depth ranges (in place)."""
+
         assert self.n_depths > 1
         self.n_depths -= 1
         for i in range(self.n_depths):
@@ -488,6 +516,8 @@ class Predicted:
             self._out_valid[i, :, : self.n_groups, :] /= 2
 
     def average_trees_year_ranges(self) -> None:
+        """Average tree predictions across consecutive year ranges (in place)."""
+
         assert self.n_groups > 1
         self.n_groups -= 1
         for j in range(self.n_groups):
@@ -500,6 +530,8 @@ class Predicted:
     def compute_stats(
         self, mean=True, quantiles=[0.025, 0.975], expm1=False, scale=1
     ) -> None:
+        """Compute mean and quantile statistics over the tree predictions."""
+
         quantile_idx = 1 if mean else 0
         self.n_stats = quantile_idx + len(quantiles)
         assert self.n_stats > 0
@@ -540,6 +572,8 @@ class Predicted:
         gdal_opts,
         threads,
     ):
+        """Write the computed statistics to GeoTIFF layers (and optionally upload to S3)."""
+
         assert self._out_stats_valid is not None
         assert dtype == "int16" or dtype == "uint8"
         assert len(out_files_prefix) == len(out_files_suffix)
@@ -624,6 +658,8 @@ class Predicted:
 
 #
 class PredictedProbs:
+    """Container for class probability predictions and derived class/KL-divergence outputs."""
+
     def __init__(self, data: TiledDataLoader, legend) -> None:
         self.data = data
         assert self.data is not None
@@ -671,20 +707,28 @@ class PredictedProbs:
 
     @property
     def predicted_probs(self):
+        """Class probabilities reshaped as ``(n_groups, n_pixels_valid, n_class)``."""
+
         return self._out_probs_valid.reshape(
             (self.n_groups, self.data.n_pixels_valid, self.n_class)
         )
 
     @property
     def predicted_class(self):
+        """Dominant class per pixel reshaped as ``(n_groups, n_pixels_valid)``."""
+
         return self._out_cls_valid.reshape((self.n_groups, self.data.n_pixels_valid))
 
     def compute_class(self) -> None:
+        """Compute the dominant class per pixel from the predicted probabilities."""
+
         self._out_cls_valid[:, 0] = self.legend_codes[
             np.argmax(self._out_probs_valid[:, :], axis=-1).astype(int)
         ]
 
     def compute_kl_divergence(self) -> None:
+        """Compute the per-pixel Kullback-Leibler divergence of the predicted probabilities."""
+
         adjusted_data = np.where(
             self._out_probs_valid[:, :] > 0,
             self._out_probs_valid[:, :],
@@ -706,6 +750,8 @@ class PredictedProbs:
         gdal_opts,
         n_threads,
     ):
+        """Write the dominant-class layer to a GeoTIFF (and optionally upload to S3)."""
+
         self.compute_class()
         assert self._out_cls_valid is not None
         assert dtype == "int16" or dtype == "uint8"
@@ -783,6 +829,8 @@ class PredictedProbs:
         gdal_opts,
         n_threads,
     ):
+        """Write the KL-divergence layer to a GeoTIFF (and optionally upload to S3)."""
+
         self.compute_kl_divergence()
         assert self._out_kld_valid is not None
         assert dtype == "int16" or dtype == "uint8"
@@ -861,6 +909,8 @@ class PredictedProbs:
         gdal_opts,
         n_threads,
     ):
+        """Write the per-class probability layers to GeoTIFFs (and optionally upload to S3)."""
+
         assert self._out_probs_valid is not None
         assert dtype == "int16" or dtype == "uint8"
         assert len(out_files_prefix) == len(out_files_suffix)
@@ -928,6 +978,8 @@ class PredictedProbs:
 
 #
 class Reducer:
+    """Apply a user-defined reduction function over the prepared covariates of a tile."""
+
     def __init__(self, reducer_features: List[str], reducer_fn: Callable) -> None:
         self.reducer_features = reducer_features
         self.reducer_fn = reducer_fn
@@ -944,6 +996,8 @@ class Reducer:
         self.in_covs_valid = None
 
     def reduce(self, data: TiledDataLoader):
+        """Prepare the tile covariates and apply ``reducer_fn`` to the valid-pixel matrix."""
+
         with TimeTracker(
             f"    Tile {data.tile_id} - predict ({len(self.reducer_features)} input features)",
             True,
@@ -982,6 +1036,8 @@ class Reducer:
 
 #
 class ReducedValues:
+    """Container for the scalar output of a :class:`Reducer` run, ready to be saved."""
+
     def __init__(self, data: TiledDataLoader) -> None:
         self.data = data
         assert self.data is not None
@@ -1005,6 +1061,8 @@ class ReducedValues:
 
     @property
     def reduced_values(self):
+        """Reduced values reshaped as ``(n_groups, n_pixels_valid)``."""
+
         return self._out_reduc_valid.reshape((self.n_groups, self.data.n_pixels_valid))
 
     def save_reduced_layer(
@@ -1019,6 +1077,8 @@ class ReducedValues:
         gdal_opts,
         threads,
     ):
+        """Write the reduced values to a GeoTIFF layer (and optionally upload to S3)."""
+
         assert self._out_reduc_valid is not None
         assert dtype == "int16" or dtype == "uint8"
         assert len(out_files_prefix) == len(out_files_suffix)

@@ -598,7 +598,9 @@ class SpaceTimeOverlay:
     :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
         the points.
     :param col_date: Date column to retrieve the year information.
-    :param  catalog.
+    :param catalog: ``DataCatalog`` with the raster layers to overlay.
+    :param raster_tiles: ``geopandas.GeoDataFrame`` or path describing the raster tiles.
+    :param tile_id_col: Column name in ``raster_tiles`` holding the tile identifier.
     :param n_threads: Number of CPU cores to be used in parallel. By default all cores
         are used.
     :param verbose: Use ``True`` to print the overlay progress.

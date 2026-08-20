@@ -83,6 +83,8 @@ def warp_tile(tile_file, mosaic_paths, n_pix, resample):
 
 
 def s3_list_files(s3_clients, s3_prefix, tile_id, file_pattern=None):
+    """List object names under ``{s3_prefix}/{tile_id}`` via the MinIO client, optionally filtered by a regex."""
+
     if len(s3_clients) == 0:
         return []
     bucket, _, prefix = s3_prefix.partition("/")
@@ -133,9 +135,13 @@ class TiledData:
         self.array = None
 
     def convert_nan_to_value(self, value) -> None:
+        """Replace all ``NaN`` values in the tile array with a constant."""
+
         sb.maskNan(self.array, self.n_threads, range(self.array.shape[0]), value)
 
     def convert_nan_to_median(self) -> None:
+        """Replace ``NaN`` values in each layer with that layer's median (computed via percentiles)."""
+
         medians = sb_arr(self.array.shape[0], 1)
         sb.computePercentiles(
             self.array, self.n_threads, range(self.array.shape[1]), medians, [0], [50.0]
@@ -223,6 +229,8 @@ class TiledDataLoader(TiledData):
             ttprint(f"Temporary mask data {self.mask_path} has been deleted.")
 
     def load_tile_data(self, tile_id):
+        """Load all catalog layers for a tile: download the mask, read tiled/mosaic rasters, and run whales."""
+
         self.tile_id = tile_id
         tmp_mask_path = self.mask_template_path.format(tile_id=tile_id)
         self.mask_path = (
@@ -372,6 +380,8 @@ class TiledDataLoader(TiledData):
         return self
 
     def convert_nan_to_median(self) -> None:
+        """Replace ``NaN`` values in each layer with that layer's median, logging all-NaN layers."""
+
         medians = sb_arr(self.array.shape[0], 1)
         sb.computePercentiles(
             self.array, self.n_threads, range(self.array.shape[1]), medians, [0], [50.0]
@@ -389,22 +399,30 @@ class TiledDataLoader(TiledData):
         sb.maskNanRows(self.array, self.n_threads, range(self.array.shape[0]), medians)
 
     def filter_valid_pixels(self) -> None:
+        """Select only the valid-pixel columns of the loaded array into ``array_valid``."""
+
         self.array_valid = sb_arr(self.catalog.data_size, self.n_pixels_valid)
         sb.selArrayCols(
             self.array, self.n_threads, self.array_valid, self.pixels_valid_idx
         )
 
     def expand_valid_pixels(self, array_valid, array_expanded) -> None:
+        """Expand a valid-pixels array back to full tile width using the valid-pixel indices."""
+
         sb.expandArrayCols(
             array_valid, self.n_threads, array_expanded, self.pixels_valid_idx
         )
 
     def get_pixels_valid_idx(self, n_groups):
+        """Return the flat valid-pixel indices repeated for ``n_groups`` groups."""
+
         return np.concatenate(
             [self.pixels_valid_idx + self.n_pixels * i for i in range(n_groups)]
         ).tolist()
 
     def fill_otf_constant(self, otf_name, otf_const) -> None:
+        """Fill an on-the-fly covariate layer with a constant value."""
+
         otf_idx = self.catalog.get_otf_idx()
         assert otf_name in otf_idx
         otf_name_idx = otf_idx[otf_name]
@@ -412,6 +430,8 @@ class TiledDataLoader(TiledData):
 
 
 def get_percentiele_string(q):
+    """Format a quantile ``q`` in ``[0, 1]`` as a short percentile label string (e.g. ``p50``)."""
+
     if int(q / 0.1) == float(q / 0.1):
         formatted_p = (
             "p0" if (q == 0) else ("p100" if (q == 1) else f"p{int(q / 0.1)}0")
@@ -424,6 +444,8 @@ def get_percentiele_string(q):
 
 
 class TiledDataExporter(TiledData):
+    """Derive and export per-tile output layers (quantiles, means, textures, classes, probabilities)."""
+
     def __init__(
         self,
         n_pixels: int = None,
@@ -639,6 +661,8 @@ class TiledDataExporter(TiledData):
         return out_files
 
     def check_all_exported(self, prefix, suffix, timeframe=None):
+        """Return ``True`` if all expected output files for this tile exist in S3."""
+
         assert (self.s3_clients is not None) & (self.s3_prefix is not None), (
             "The check requires that S3 is properly set"
         )
@@ -660,6 +684,8 @@ class TiledDataExporter(TiledData):
         return flag
 
     def derive_block_quantiles_and_mean(self, depths_trees_pred, expm1) -> None:
+        """Derive per-depth/year block-averaged tree quantiles and mean for the ``depths_years_quantiles`` mode."""
+
         assert self.mode == "depths_years_quantiles", (
             "Mode must be 'depths_years_quantiles'"
         )
@@ -701,6 +727,8 @@ class TiledDataExporter(TiledData):
         sb.transposeArray(array_t, self.n_threads, self.array)
 
     def derive_static_depths_quantiles_and_mean(self, depths_trees_pred, expm1) -> None:
+        """Derive per-depth (static) elementwise-averaged tree quantiles and mean for ``static_depths_quantiles``."""
+
         assert self.mode == "static_depths_quantiles", (
             "Mode must be static_depths_quantiles"
         )
@@ -739,6 +767,8 @@ class TiledDataExporter(TiledData):
     def derive_block_quantiles_and_mean_textures(
         self, pred_depths_texture1, pred_depths_texture2, k=1.0, a=100.0
     ) -> None:
+        """Derive per-depth/year block-averaged soil-texture (clay/sand/silt) quantiles and mean."""
+
         assert self.mode == "depths_years_quantiles_textures", (
             "Mode must be 'depths_years_quantiles_textures'"
         )
@@ -875,6 +905,8 @@ class TiledDataExporter(TiledData):
     def derive_block_mean_textures(
         self, pred_depths_texture1, pred_depths_texture2, k=1.0, a=100.0
     ) -> None:
+        """Derive per-depth/year block-averaged soil-texture (clay/sand/silt) means."""
+
         assert self.mode == "depths_years_textures", (
             "Mode must be 'depths_years_textures'"
         )
@@ -939,6 +971,8 @@ class TiledDataExporter(TiledData):
         sb.transposeArray(array_t, self.n_threads, self.array)
 
     def derive_block_mean(self, depths_pred, expm1) -> None:
+        """Derive per-depth/year block-averaged means for the ``depths_years`` mode."""
+
         assert self.mode == "depths_years", "Mode must be 'depths_years'"
         self.n_pixels = int(depths_pred[0].array.shape[1] / len(self.years))
         self.array = sb_arr(self.n_layers, self.n_pixels)
@@ -958,6 +992,8 @@ class TiledDataExporter(TiledData):
             np.expm1(self.array, out=self.array)
 
     def derive_dominant_class(self, probs) -> None:
+        """Derive the dominant class per pixel from a probability array for the ``dominant_class`` mode."""
+
         assert self.mode == "dominant_class", "Mode must be 'dominant_class'"
         self.array = sb_arr(1, probs.shape[1])
         legend_map = np.array(list(self.legend.keys()), dtype=int)
@@ -966,6 +1002,8 @@ class TiledDataExporter(TiledData):
         ].astype(np.float32)
 
     def fit_probabilities(self, in_probs, input_scaling, target_scaling):
+        """Fit scaled integer probabilities summing to a target for the ``probabilities`` mode."""
+
         assert self.mode == "probabilities", "Mode must be 'probabilities'"
         n_classes = in_probs.shape[0]
         n_pix = in_probs.shape[1]
@@ -1007,6 +1045,8 @@ class TiledDataExporter(TiledData):
         timeframe: int | None = None,
         n_threads_write: int | None = None,
     ) -> None:
+        """Transpose, expand and write the derived layers to GeoTIFFs (and optionally upload to S3)."""
+
         with TimeTracker(f"   Prepare data to export for {self.tile_id}", False):
             if scaling_metadata is None:
                 scaling_metadata = 1.0 / scaling

@@ -100,7 +100,7 @@ def plot_rasters(
 
     Uses ``matplotlib.pyplot.imshow`` [1].
 
-    :param *rasters:        List of rasters, passed as either data or file paths. If 3D (multiband) data is passed (as ``numpy`` array(s)), the first axis of the array must correspond to the band index.
+    :param rasters:        List of rasters, passed as either data or file paths. If 3D (multiband) data is passed (as ``numpy`` array(s)), the first axis of the array must correspond to the band index.
     :param out_file:        Path to save figure if not ``None``.
     :param vertical_layout: Produces a vertical array of plots if ``True``, horizontal if ``False`` (default).
     :param figsize:         Print size of the horizontal axis of the plot (passed to ``matplotlib``). The vertical size is calculated automatically.

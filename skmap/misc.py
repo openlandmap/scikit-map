@@ -27,6 +27,8 @@ TMP_DIR = tempfile.gettempdir()
 
 
 class ControlS3:
+    """MinIO/S3 controller for tracking completed tiles in a job queue directory layout."""
+
     def __init__(
         self, endpoint_url: str, access_key: Optional[str], secret_key: Optional[str]
     ) -> None:
@@ -36,6 +38,8 @@ class ControlS3:
         self.previous_tile = ""
 
     def list(self, bucket_prefix: str, recursive: bool = True) -> List[str]:
+        """List objects in the S3 bucket under a prefix."""
+
         prefix = "/".join(bucket_prefix.split("/")[1:])
         bucket = bucket_prefix.split("/")[0]
         return [
@@ -46,6 +50,8 @@ class ControlS3:
         ]
 
     def push_file(self, file_path: str, bucket_prefix: str) -> None:
+        """Upload a local file to the S3 bucket."""
+
         object_name = (
             "/".join(bucket_prefix.split("/")[1:]) + "/" + file_path.split("/")[-1]
         )
@@ -59,6 +65,8 @@ class ControlS3:
         os.remove(file_path)
 
     def create_empty_file(self, file_path: str) -> None:
+        """Create an empty marker object in the S3 bucket."""
+
         try:
             with open(file_path, "x") as f:
                 f.write("empty")
@@ -66,6 +74,8 @@ class ControlS3:
             print(f"File {file_path} already exists.")
 
     def remove(self, objects_list: Sequence[str]) -> bool:
+        """Remove an object from the S3 bucket."""
+
         for bucket_key in objects_list:
             key = "/".join(bucket_key.split("/")[1:])
             bucket = bucket_key.split("/")[0]
@@ -144,6 +154,8 @@ class ControlS3:
         time_seconds: Union[float, int],
         skipped: bool,
     ) -> None:
+        """Move a tile key from the 'todo' to the 'doing' (or 'done') S3 folder."""
+
         sub_prefix = "skipped" if skipped else "done"
         current_tile_name = tile_id + "..server." + server_name
         # Attempt to remove the primary 'doing' tile
@@ -191,15 +203,21 @@ class ControlS3:
 
 
 def mmdd_to_doy(mmdd: str) -> int:
+    """Convert a ``MMDD`` string to a day-of-year integer."""
+
     date = datetime.strptime(mmdd, "%m%d")
     return date.timetuple().tm_yday
 
 
 def sb_arr(rows: int, cols: int) -> np.ndarray:
+    """Allocate a contiguous float32 ``numpy`` array of shape ``(rows, cols)`` for the C++ bindings."""
+
     return np.empty((rows, cols), np.float32)
 
 
 def sb_vec(elems: int) -> np.ndarray:
+    """Allocate a contiguous float32 ``numpy`` vector of ``elems`` elements for the C++ bindings."""
+
     return np.empty((elems,), np.float32)
 
 
@@ -214,6 +232,8 @@ def _warn_deps(e: ImportError, module_name: str) -> None:
 
 
 def new_memmap(dtype, shape):  # noqa: ANN001, ANN201
+    """Create a new memory-mapped ``numpy`` array backed by a temp ``.npy`` file."""
+
     filename = str(make_tempfile(prefix="memmap", suffix=".npy", make_subdir=False))
     ttprint(f"Creating {filename}")
     return np.memmap(filename, dtype=dtype, shape=shape, mode="w+")
@@ -222,15 +242,21 @@ def new_memmap(dtype, shape):  # noqa: ANN001, ANN201
 def load_memmap(
     filename: Union[Path, str], dtype: Union[np.dtype, str], shape: Tuple[int, ...]
 ) -> np.memmap:
+    """Open an existing memory-mapped ``numpy`` array for read/write access."""
+
     return np.memmap(filename, dtype=dtype, mode="r+", shape=shape)
     # return np.lib.format.open_memmap(filename, dtype=dtype, mode='w+', shape=shape)
 
 
 def is_memmap(array_mm: NDArray) -> bool:
+    """Return ``True`` if the array is a memory-mapped array."""
+
     return hasattr(array_mm, "filename")
 
 
 def del_memmap(array_mm: np.memmap, return_array: bool = False) -> Optional[NDArray]:
+    """Delete a memory-mapped array (and its backing file), optionally returning an in-memory copy."""
+
     result = None
 
     if is_memmap(array_mm):
@@ -251,11 +277,15 @@ def del_memmap(array_mm: np.memmap, return_array: bool = False) -> Optional[NDAr
 
 
 def ref_memmap(array: np.memmap) -> dict:
+    """Return a memory-mapped array reference, creating one if given a plain array."""
+
     array.flush()
     return {"filename": array.filename, "dtype": array.dtype, "shape": array.shape}
 
 
 def make_tempdir(basedir: str = "skmap", make_subdir: bool = True) -> Path:
+    """Create and return a unique temporary directory path."""
+
     tempdir = Path(TMP_DIR).joinpath(basedir)
     if make_subdir:
         name = Path(tempfile.NamedTemporaryFile().name).name
@@ -270,6 +300,8 @@ def make_tempfile(
     suffix: str = "",
     make_subdir: bool = False,
 ) -> Path:
+    """Create and return a unique temporary file path."""
+
     tempdir = make_tempdir(basedir, make_subdir=make_subdir)
     return tempdir.joinpath(
         Path(tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix).name).name
@@ -339,6 +371,8 @@ def vrt_warp(
     n_jobs: int=-1,
     return_input_files: bool=False,
 ):
+    """Build a VRT-based warp of a source raster to a target geometry/crs and return the path."""
+
     from skmap import parallel
 
     if outdir is None:
@@ -378,6 +412,8 @@ def vrt_warp(
 
 
 class TimeTracker(object):
+    """Context manager that prints elapsed wall-clock time for a labelled block."""
+
     def __init__(self, task, enter_enabled: bool=False, exit_enabled: bool=True) -> None:
         self.task = task
         self.enter_enabled: bool = enter_enabled
@@ -602,7 +638,7 @@ def sample_groups(
     `group_element_columns` are also concatenated into the final group ID of each sample.
 
     :param points: GeoDataFrame containing point samples.
-    :param *group_element_columns: Names of additional columns to be concatenated into the final group IDs.
+    :param group_element_columns: Names of additional columns to be concatenated into the final group IDs.
     :param spatial_resolution: Tile size (both x and y) for grouping, in sample CRS units.
     :param temporal_resolution: Interval size for grouping.
     :param date_column: Name of the column containing sample timestamps (as datetime objects).
@@ -740,6 +776,8 @@ def date_range(
     ignore_29feb: bool = False,
     return_str: bool = False,
 ) -> List[Tuple[datetime, datetime]]:
+    """Generate a list of ``(start, end)`` date intervals between two dates at a given resolution."""
+
     start_dt = datetime.strptime(start_date, date_format)
     end_dt = datetime.strptime(end_date, date_format)
 
@@ -823,6 +861,8 @@ def date_range(
 def update_by_separator(
     text: str, separator: str, position: int, new_text: str, suffix: bool=False
 ) -> str:
+    """Replace (or append to) the field at ``position`` in a separator-delimited string."""
+
     split = text.split(separator)
     if suffix:
         new_text = split[position] + new_text
@@ -863,9 +903,7 @@ try:
         References
         ==========
 
-            [1] `Authentication - gspread <https://docs.gspread.org/en/latest/oauth2.html>`_
-
-
+        `[1] Authentication - gspread <https://docs.gspread.org/en/latest/oauth2.html>`_
         """
 
         def __init__(

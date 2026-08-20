@@ -12,6 +12,8 @@ from skmap.misc import mmdd_to_doy
 
 
 class DataCatalog:
+    """A catalog of raster covariate layers, organised by groups, that drives tile-based reading and on-the-fly feature derivation (whales)."""
+
     def __init__(self, data, data_size) -> None:
         self.data = data
         self.data_size = data_size
@@ -267,11 +269,15 @@ class DataCatalog:
         return catalog_dict
 
     def save_json(self, json_out_path: Optional[str] = None) -> None:
+        """Serialize this catalog to a JSON file."""
+
         if json_out_path is not None:
             with open(json_out_path, "w") as f:
                 json.dump(self.data, f, indent=4)
 
     def get_groups(self) -> List[str]:
+        """Return the list of group names (e.g. years) in the catalog."""
+
         groups = sorted(
             list(set(self.data.keys()).difference(["common"]).difference(["otf"]))
         )  # by default don't return 'common' nor 'otf' group
@@ -280,6 +286,8 @@ class DataCatalog:
         return groups
 
     def copy(self):
+        """Return a deep copy of this catalog."""
+
         return DataCatalog(self.data.copy(), int(self.data_size))
 
     @staticmethod
@@ -302,6 +310,8 @@ class DataCatalog:
     def find_group_and_feature_by_index(
         self, target_idx: int
     ) -> tuple[Optional[str], Optional[str]]:
+        """Return the ``(group_name, feature_name)`` for a flat covariate index."""
+
         for group_name, features in self.data.items():
             for feature_name, feature_info in features.items():
                 if feature_info.get("idx") == target_idx:
@@ -309,9 +319,13 @@ class DataCatalog:
         return None, None
 
     def get_feature_names(self) -> List[str]:
+        """Return the ordered list of all feature (covariate) names in the catalog."""
+
         return self._get_feature_names(self.data)
 
     def get_paths(self) -> Tuple[List[str], List[int], List[str]]:
+        """Return ``(paths, paths_idx, spatial_paths)`` describing where each covariate is read from."""
+
         paths, idx, names = [], [], []
         for k in self.data:
             if k == "otf":
@@ -334,6 +348,8 @@ class DataCatalog:
         return paths, idx, names
 
     def get_unrolled_catalog(self) -> Tuple[List[str], List[str], List[int]]:
+        """Return a flat ``pandas.DataFrame`` with one row per covariate layer."""
+
         names, paths, idx = [], [], []
         for k in self.data:
             for f in self.data[k]:
@@ -344,6 +360,8 @@ class DataCatalog:
 
     @staticmethod
     def get_whales(data):
+        """Return the on-the-fly feature (whale) definitions derived from the catalog."""
+
         whale_paths, whale_keys, whale_layer_names = [], [], []
         for k in data:
             if k == "otf":
@@ -359,6 +377,8 @@ class DataCatalog:
         return self.get_whales(self.data)
 
     def query(self, feature_names, groups: Optional[list[str]] = None) -> None:
+        """Return a filtered copy of the catalog matching a query expression on its columns."""
+
         if groups is None:
             groups = self.get_groups()
         if not isinstance(groups, list):
@@ -395,6 +415,8 @@ class DataCatalog:
             self.add_otf_features(missing_features_names)
 
     def add_otf_features(self, otf_features) -> None:
+        """Add on-the-fly (derived) features to the catalog from a definition list."""
+
         if "otf" not in self.data:
             self.data["otf"] = {}
         for otf_feature in otf_features:
@@ -403,6 +425,8 @@ class DataCatalog:
 
     @classmethod
     def expand_whales_dependencies(cls, reference_catalog_data, data, data_size):
+        """Expand whale definitions to include the base covariates they depend on."""
+
         whale_paths, groups, whale_layer_names = cls.get_whales(data)
         for i, (whale_path, whale_layer_name) in enumerate(
             zip(whale_paths, whale_layer_names)
@@ -430,6 +454,8 @@ class DataCatalog:
         )
 
     def get_otf_idx(self):
+        """Return a mapping of on-the-fly feature name to its covariate index."""
+
         otf_idx = {}
         if "otf" in self.data:
             for f in self.data["otf"]:
@@ -456,6 +482,8 @@ class DataCatalog:
 
 #
 def print_catalog_statistics(catalog: DataCatalog) -> None:
+    """Print a summary of the catalog contents (groups, layers, resolutions)."""
+
     groups = list(catalog.data.keys())
     groups.sort()
     print(f"catalog groups: {groups}")
@@ -473,6 +501,8 @@ def print_catalog_statistics(catalog: DataCatalog) -> None:
 
 
 def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
+    """Return the base covariate dependencies for a set of whale definitions."""
+
     func_name, params = parse_template_whale(whale)
     dep_tags, dep_names, dep_paths, dep_exec_orders, dep_keys = [], [], [], [], []
     if func_name == "percentileAggregation":
@@ -521,6 +551,8 @@ def get_whale_dependencies(whale, key, main_catalog, whale_layer_name):
 
 
 def parse_template_whale(whale):
+    """Parse a whale definition template string into its component expressions."""
+
     func_name_match = re.search(r"/whale/([^?]+)", whale)
     func_name = func_name_match.group(1) if func_name_match else None
     query_params_string = whale.split("?")[1]
@@ -539,6 +571,8 @@ def parse_template_whale(whale):
 
 def run_whales(catalog: DataCatalog, array, n_threads: int, lat_info=None) -> None:
     # Computing on the fly covariates
+    """Compute on-the-fly (whale) features over a loaded tile array using the catalog."""
+
     whale_paths, whale_keys, whale_names = catalog._get_whales()
     max_exec_order = 0
     for whale_key, whale_name in zip(whale_keys, whale_names):

@@ -30,6 +30,8 @@ def _temporal_raster(type, subpath=None):
 
 
 def rdata(verbose=True):
+    """Return a small example static raster array (two layers) for testing and demos."""
+
     return (
         RasterData(
             {
@@ -45,6 +47,8 @@ def rdata(verbose=True):
 
 
 def ndvi_rdata(gappy=False, verbose=True):
+    """Return a small example quarterly NDVI time-series raster, optionally with gaps."""
+
     subpath = "gappy" if gappy else "filled"
     return (
         RasterData({"ndvi": _temporal_raster("ndvi", subpath)}, verbose=verbose)
@@ -54,4 +58,6 @@ def ndvi_rdata(gappy=False, verbose=True):
 
 
 def lc_samples():
+    """Return a small example land-cover sample ``GeoDataFrame`` for testing and demos."""
+
     return read_file(DATA_DIR.joinpath("samples").joinpath("samples.gpkg"))

@@ -108,6 +108,8 @@ def ThreadGeneratorLazy(
 
 
 def ProcessGeneratorLazy2(worker: Callable, args: Iterator[tuple]):
+    """Lazy generator executing a function across processes with backpressure and a fixed-size pool."""
+
     import concurrent.futures
     import multiprocessing
 
@@ -676,17 +678,16 @@ class TaskSequencer:
     Examples
     ========
 
-    .. testcode::
-       :skip:
+    .. code-block:: python
 
-       >>> from skmap.parallel import TaskSequencer
-       >>>
-       >>> output = TaskSequencer(
-       ...     tasks=[
-       ...       task_1,
-       ...       (task_2, 2)
-       ...     ]
-       ... ) # doctest: +SKIP
+       from skmap.parallel import TaskSequencer
+
+       output = TaskSequencer(
+           tasks=[
+             task_1,
+             (task_2, 2)
+           ]
+       )
 
     Pipeline produced by this example code::
 

@@ -327,6 +327,8 @@ def save_rasters_cpp(
     },
     verbose=False,
 ):
+    """Write a stack of 2D raster arrays to GeoTIFF files in parallel via the C++ bindings."""
+
     if isinstance(out_files, str):
         out_files = [out_files]
     if len(out_files) < n_jobs:
@@ -399,6 +401,8 @@ def read_rasters_cpp(
     gdal_opts: dict = {},
     verbose=False,
 ):
+    """Read a stack of raster files into a 2D array in parallel via the C++ bindings."""
+
     if isinstance(raster_files, str):
         raster_files = [raster_files]
     if isinstance(band, int):
@@ -883,6 +887,8 @@ def save_rasters(
 
 
 class RasterData(SKMapBase):
+    """High-level accessor over a catalog of raster layers with spatial/temporal filtering and I/O."""
+
     PLACEHOLDER_DT = "{dt}"
     INTERVAL_DT_SEP = "_"
 
@@ -1034,6 +1040,8 @@ class RasterData(SKMapBase):
         n_jobs: int = 10,
         verbose=False,
     ):
+        """Build a :class:`RasterData` from a list of STAC items (classmethod)."""
+
         all_bands = list(stac_items[0].assets.keys())
         if bands is None:
             if verbose:
@@ -1123,6 +1131,8 @@ class RasterData(SKMapBase):
         ignore_29feb=True,
         group: [list, str] = [],
     ):
+        """Return the ``(start_date, end_date)`` span covered by the loaded layers."""
+
         if isinstance(group, str):
             group = [group]
 
@@ -1211,6 +1221,8 @@ class RasterData(SKMapBase):
         scale: float = 1,
         gdal_opts: dict = {},
     ):
+        """Read the selected layers into memory (or a memmap) and return the data array."""
+
         self.window = window
         self.bounds = bounds
 
@@ -1269,6 +1281,8 @@ class RasterData(SKMapBase):
         outname: str = None,
         drop_input: bool = False,
     ):
+        """Execute a function over the loaded raster data, yielding per-tile results."""
+
         if isinstance(process, SKMapGroupRunner):
             self._group_run(process, group, outname)
         else:
@@ -1353,6 +1367,8 @@ class RasterData(SKMapBase):
         return self
 
     def drop(self, group):
+        """Return a copy with the named layers removed."""
+
         if isinstance(group, str):
             group = [group]
 
@@ -1363,6 +1379,8 @@ class RasterData(SKMapBase):
         return self
 
     def rename(self, groups: dict):
+        """Return a copy with layers renamed according to a mapping."""
+
         self.info[RasterData.GROUP_COL] = self.info[RasterData.GROUP_COL].replace(
             groups
         )
@@ -1383,6 +1401,8 @@ class RasterData(SKMapBase):
         return_copy=True,
         return_idx=False,
     ):
+        """Return a copy keeping only layers whose date falls within ``[start, end]``."""
+
         start_dt_col, end_dt_col = (RasterData.START_DT_COL, RasterData.END_DT_COL)
         info_main = self.info
 
@@ -1423,6 +1443,8 @@ class RasterData(SKMapBase):
     def filter_contains(
         self, text, return_array=False, return_copy=True, return_idx=False
     ):
+        """Return a copy keeping only layers whose name contains the given substring(s)."""
+
         return self.filter(
             f'{self.NAME_COL}.str.contains("{text}")',
             return_array=return_array,
@@ -1431,6 +1453,8 @@ class RasterData(SKMapBase):
         )
 
     def filter(self, expr, return_array=False, return_copy=True, return_idx=False):
+        """Return a copy keeping only layers matching a boolean/query expression."""
+
         return self._filter(
             self.info.query(expr),
             return_array=return_array,
@@ -1495,6 +1519,8 @@ class RasterData(SKMapBase):
         return_outfiles=False,
         on_each_outfile: Callable = None,
     ):
+        """Write the selected layers to a local directory as GeoTIFFs."""
+
         if isinstance(out_dir, str):
             out_dir = Path(out_dir)
 
@@ -1548,6 +1574,8 @@ class RasterData(SKMapBase):
         n_jobs: int = None,
         verbose_cp=False,
     ):
+        """Write the selected layers to an S3-compatible bucket as GeoTIFFs."""
+
         bucket = path.split("/")[0]
         prefix = "/".join(path.split("/")[1:])
 
@@ -1964,11 +1992,20 @@ class RasterData(SKMapBase):
     ):
         """
         Generates an animation with the given band(s) and saves it.
-        :param cmap: colormap name that will derived from `matplotlib.colormaps()`
-        :param groups: this is used for to select the band(s) or to generate a composite images,
-          that will be used as animation frame. Default is None but it will select the first band on RasterData.
-        :param scaling: scaling can be used to increase/decrease the frame size. Default is 2.
-        :param cbar_title:
+
+        :param cmap: colormap name that will derived from ``matplotlib.colormaps()``
+        :param groups: used to select the band(s) or to generate a composite
+            image that will be used as animation frame. Default is ``None``,
+            which selects the first band on ``RasterData``.
+        :param scaling: scaling can be used to increase/decrease the frame size.
+            Default is 2.
+        :param cbar_title: title for the colorbar.
+        :param img_title_text: title text for each frame, or ``"index"``.
+        :param img_title_fontsize: font size for the image title.
+        :param vminmax: ``(vmin, vmax)`` tuple for clipping.
+        :param interval: frame interval in milliseconds.
+        :param to_gif: path to save a GIF if not ``None``.
+        :param n_jobs: number of parallel jobs.
         """
 
         if not groups:
