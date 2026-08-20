@@ -30,6 +30,19 @@ find_package(OpenMP REQUIRED)
 message(STATUS "GDAL library: ${GDAL_LIBRARIES}")
 message(STATUS "GDAL headers: ${GDAL_INCLUDE_DIRS}")
 
+# If setup.py detected a system GDAL version (via gdal-config), verify that the
+# C++ libgdal found here matches it. A mismatch between the C++ libgdal and the
+# Python GDAL/rasterio wheels causes ABI-level runtime crashes.
+if(DEFINED SKMAP_EXPECTED_GDAL_VERSION AND NOT SKMAP_EXPECTED_GDAL_VERSION STREQUAL "")
+    if(NOT SKMAP_EXPECTED_GDAL_VERSION STREQUAL GDAL_VERSION)
+        message(FATAL_ERROR
+            "GDAL version mismatch: setup.py detected ${SKMAP_EXPECTED_GDAL_VERSION} "
+            "but CMake found ${GDAL_VERSION}. Install a matching libgdal-dev or "
+            "rebuild the Python GDAL/rasterio wheels.")
+    endif()
+    message(STATUS "GDAL version check passed: ${GDAL_VERSION}")
+endif()
+
 include(CheckCXXCompilerFlag)
 
 # List of AVX-512 flags to test

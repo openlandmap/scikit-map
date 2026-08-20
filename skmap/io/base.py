@@ -1,7 +1,7 @@
 """
 Raster data input and output
 """
-from decorator import contextmanager
+from contextlib import ExitStack, contextmanager
 from rasterio.io import DatasetWriter
 
 import copy
@@ -10,7 +10,6 @@ import os
 import tempfile
 import time
 from base64 import b64decode, encodebytes
-from contextlib import ExitStack
 from copy import deepcopy
 from datetime import datetime
 from io import BytesIO

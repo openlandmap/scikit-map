@@ -36,6 +36,12 @@ class CMakeBuild(build_ext):
             f"-DCMAKE_BUILD_TYPE={cfg}",
         ]
 
+        # Propagate the detected system GDAL version so CMake can verify that
+        # the C++ libgdal it links against matches the Python GDAL/rasterio
+        # wheels (an ABI mismatch here causes hard-to-debug runtime crashes).
+        if _sys_gdal_version:
+            cmake_args.append(f"-DSKMAP_EXPECTED_GDAL_VERSION={_sys_gdal_version}")
+
         build_temp = os.path.join(self.build_temp, ext.name)
         os.makedirs(build_temp, exist_ok=True)
 
