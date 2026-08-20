@@ -43,43 +43,6 @@ if(DEFINED SKMAP_EXPECTED_GDAL_VERSION AND NOT SKMAP_EXPECTED_GDAL_VERSION STREQ
     message(STATUS "GDAL version check passed: ${GDAL_VERSION}")
 endif()
 
-include(CheckCXXCompilerFlag)
-
-# List of AVX-512 flags to test
-set(AVX512_CANDIDATES avx512f avx512dq avx512cd avx512bw avx512vl)
-set(AVX512_FLAGS "")
-
-foreach(FLAG IN LISTS AVX512_CANDIDATES)
-    set(CXX_FLAG "-m${FLAG}")
-    set(VAR_NAME "COMPILER_SUPPORTS_${FLAG}")
-
-    # Check if compiler supports this flag
-    check_cxx_compiler_flag("${CXX_FLAG}" ${VAR_NAME})
-
-    # Check CPU support individually via /proc/cpuinfo
-    execute_process(
-        COMMAND bash -c "grep -m1 -o ${FLAG} /proc/cpuinfo || true"
-        OUTPUT_VARIABLE CPU_HAS_FLAG
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-
-    # Only append if both compiler and CPU support it
-    if(${VAR_NAME} AND CPU_HAS_FLAG)
-        list(APPEND AVX512_FLAGS "${CXX_FLAG}")
-        message(STATUS "Enabling AVX-512 flag: ${CXX_FLAG}")
-    else()
-        message(STATUS "Skipping ${CXX_FLAG} (compiler or CPU does not support it)")
-    endif()
-endforeach()
-
-# Add all supported flags at once
-if(AVX512_FLAGS)
-    # Always append -mfma when using AVX-512
-    list(APPEND AVX512_FLAGS -mfma)
-    add_compile_options(${AVX512_FLAGS})
-    message(STATUS "Final AVX-512 compile options: ${AVX512_FLAGS}")
-endif()
-
 # -------------------------
 # LIBRARIES AND EXECS
 # -------------------------
@@ -104,9 +67,6 @@ target_include_directories(skmap PUBLIC
     skmap/src
 )
 target_link_libraries(skmap PUBLIC ${GDAL_LIBRARIES} OpenMP::OpenMP_CXX)
-if(AVX512_FLAGS)
-    target_compile_options(skmap PUBLIC ${AVX512_FLAGS})
-endif()
 
 # -------------------------
 # Python bindings

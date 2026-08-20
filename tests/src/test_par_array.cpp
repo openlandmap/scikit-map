@@ -1,6 +1,6 @@
 #include "ParArray.h"
 #include "common.h"
-#include "misc.cpp"
+#include "misc.h"
 #include <gtest/gtest.h>
 #include <omp.h>
 

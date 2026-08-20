@@ -1,7 +1,7 @@
 #ifndef PARARRAY_H
 #define PARARRAY_H
 
-#include "misc.cpp"
+#include "misc.h"
 
 namespace skmap {
 

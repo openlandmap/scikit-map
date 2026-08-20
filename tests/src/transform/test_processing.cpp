@@ -1,5 +1,5 @@
 #include "../common.h"
-#include "misc.cpp"
+#include "misc.h"
 #include "transform/TransArray.h"
 
 #include <cmath>

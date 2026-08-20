@@ -1,12 +1,8 @@
-#ifndef MISC_CPP
-#define MISC_CPP
+#ifndef MISC_H
+#define MISC_H
 
 #define _USE_MATH_DEFINES
 #include <iostream>
-
-#ifdef HAVE_AVX512
-#define EIGEN_VECTORIZE_AVX512
-#endif
 
 #include <Eigen/Dense>
 #include <cassert>
@@ -16,10 +12,12 @@
 #include <gdal/gdal_priv.h>
 #include <gdal/gdalwarper.h>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <math.h>
 #include <omp.h>
 #include <stdlib.h>
+#include <string>
 #include <unordered_map>
 #include <vector>
 

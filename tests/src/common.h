@@ -1,5 +1,5 @@
 
-#include "misc.cpp"
+#include "misc.h"
 #include "transform/TransArray.h"
 #include <Eigen/Core>
 #include <Eigen/Dense>
