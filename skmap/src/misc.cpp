@@ -96,6 +96,46 @@ using VecFloat = Eigen::Vector<float_t, Eigen::Dynamic>;
 using VecUint = Eigen::Vector<uint_t, Eigen::Dynamic>;
 using VecBool = Eigen::Vector<bool, Eigen::Dynamic>;
 
+// RAII guards for GDAL/CPL resources. GDAL returns raw pointers that must be
+// released with GDALClose / CPLFree / GDALDestroyWarpOptions; these guards make
+// every early-throw path leak-free (the class of bug behind the segfault branch).
+struct GdalDatasetGuard {
+  GDALDataset *ds;
+  explicit GdalDatasetGuard(GDALDataset *d = nullptr) : ds(d) {}
+  ~GdalDatasetGuard() {
+    if (ds)
+      GDALClose(ds);
+  }
+  GDALDataset *get() const { return ds; }
+  GDALDataset *operator->() const { return ds; }
+  GdalDatasetGuard(const GdalDatasetGuard &) = delete;
+  GdalDatasetGuard &operator=(const GdalDatasetGuard &) = delete;
+};
+
+struct CplMemGuard {
+  void *p;
+  explicit CplMemGuard(void *ptr = nullptr) : p(ptr) {}
+  ~CplMemGuard() {
+    if (p)
+      CPLFree(p);
+  }
+  void *get() const { return p; }
+  CplMemGuard(const CplMemGuard &) = delete;
+  CplMemGuard &operator=(const CplMemGuard &) = delete;
+};
+
+struct GdalWarpOptionsGuard {
+  GDALWarpOptions *opts;
+  explicit GdalWarpOptionsGuard(GDALWarpOptions *o = nullptr) : opts(o) {}
+  ~GdalWarpOptionsGuard() {
+    if (opts)
+      GDALDestroyWarpOptions(opts);
+  }
+  GDALWarpOptions *get() const { return opts; }
+  GdalWarpOptionsGuard(const GdalWarpOptionsGuard &) = delete;
+  GdalWarpOptionsGuard &operator=(const GdalWarpOptionsGuard &) = delete;
+};
+
 } // namespace skmap
 
 #endif

@@ -7,9 +7,20 @@ namespace skmap {
 
 // Bug fix: GDALAllRegister() must only be called once. Calling it on every
 // Python invocation stresses GDAL's driver-registry mutex and accumulates
-// internal state across loop iterations.
+// internal state across loop iterations. The error-handler setup is also
+// global state (CPLPushErrorHandler grows a stack on every call), so it is
+// gated behind the same once_flag.
 static std::once_flag s_gdal_init_flag;
-static void initGdal() { GDALAllRegister(); }
+static void initGdal() {
+  GDALAllRegister();
+  std::ofstream nullStream("/dev/null");
+  if (nullStream.is_open()) {
+    CPLSetErrorHandler(CPLLoggingErrorHandler);
+    CPLSetConfigOption("CPL_LOG", "/dev/null");
+  } else {
+    CPLPushErrorHandler(CPLQuietErrorHandler);
+  }
+}
 
 GDALResampleAlg hashResample(std::string const &inString) {
   if (inString == "GRA_CubicSpline")
@@ -51,10 +62,10 @@ void IoArray::warpTile(std::string ref_tile_path, std::string mosaic_path,
 
   // @FIXME: this function assumes that the data is single band
   // Extracting reference metadata
-  GDALDataset *refTileDataset =
-      (GDALDataset *)GDALOpen(ref_tile_path.c_str(), GA_ReadOnly);
+  GdalDatasetGuard refTileDataset(
+      (GDALDataset *)GDALOpen(ref_tile_path.c_str(), GA_ReadOnly));
   skmapAssertIfTrue(
-      refTileDataset == nullptr,
+      refTileDataset.get() == nullptr,
       "scikit-map ERROR 24: issues in opening ref_tile_path with path " +
           ref_tile_path);
 
@@ -94,58 +105,59 @@ void IoArray::warpTile(std::string ref_tile_path, std::string mosaic_path,
   skmapAssertIfTrue(
       ret_osrs_import != OGRERR_NONE,
       "scikit-map ERROR 28: to import projection system from WKT");
-  char *pszSRS_WKT = nullptr;
-  auto ret_osrs_export = oSRS.exportToWkt(&pszSRS_WKT);
+  char *pszSRS_WKT_raw = nullptr;
+  auto ret_osrs_export = oSRS.exportToWkt(&pszSRS_WKT_raw);
   skmapAssertIfTrue(ret_osrs_export != OGRERR_NONE,
                     "scikit-map ERROR 29: to export projection system to WKT");
+  CplMemGuard pszSRS_WKT(pszSRS_WKT_raw);
 
   // Setting source warp options
-  GDALDataset *mosaicDataset =
-      (GDALDataset *)GDALOpen(mosaic_path.c_str(), GA_ReadOnly);
+  GdalDatasetGuard mosaicDataset(
+      (GDALDataset *)GDALOpen(mosaic_path.c_str(), GA_ReadOnly));
   skmapAssertIfTrue(
-      mosaicDataset == nullptr,
+      mosaicDataset.get() == nullptr,
       "scikit-map ERROR 30: issues in opening mosaic_path with path " +
           mosaic_path);
 
   // Retrieve NoData value from the mosaic
-  GDALRasterBandH band = GDALGetRasterBand(mosaicDataset, 1);
+  GDALRasterBandH band = GDALGetRasterBand(mosaicDataset.get(), 1);
   int bSuccess = FALSE;
   double nodata_val = GDALGetRasterNoDataValue(band, &bSuccess);
 
-  GDALWarpOptions *psWarpOptions = GDALCreateWarpOptions();
-  psWarpOptions->hSrcDS = mosaicDataset;
-  psWarpOptions->nBandCount = 1;
+  GdalWarpOptionsGuard psWarpOptions(GDALCreateWarpOptions());
+  psWarpOptions.get()->hSrcDS = mosaicDataset.get();
+  psWarpOptions.get()->nBandCount = 1;
   // @FIXME: check if this works in general
-  psWarpOptions->panSrcBands = (int *)CPLMalloc(sizeof(int));
-  psWarpOptions->panDstBands = (int *)CPLMalloc(sizeof(int));
-  psWarpOptions->panSrcBands[0] = 1;
-  psWarpOptions->panDstBands[0] = 1;
+  psWarpOptions.get()->panSrcBands = (int *)CPLMalloc(sizeof(int));
+  psWarpOptions.get()->panDstBands = (int *)CPLMalloc(sizeof(int));
+  psWarpOptions.get()->panSrcBands[0] = 1;
+  psWarpOptions.get()->panDstBands[0] = 1;
 
   // Set NoData value in warp options
   if (bSuccess) {
     GDALSetRasterNoDataValue(band, nodata_val);
-    psWarpOptions->padfSrcNoDataReal = (double *)CPLMalloc(sizeof(double));
-    psWarpOptions->padfSrcNoDataReal[0] = nodata_val;
+    psWarpOptions.get()->padfSrcNoDataReal = (double *)CPLMalloc(sizeof(double));
+    psWarpOptions.get()->padfSrcNoDataReal[0] = nodata_val;
   }
 
   // Setting target warp options
   // @FIXME: this currently work only for float32, specialize the function with
   // a template based on the type of float_t
-  GDALDataset *dstDataset =
+  GdalDatasetGuard dstDataset(
       GetGDALDriverManager()->GetDriverByName("MEM")->Create(
-          "", target_x_size, target_y_size, 1, GDT_Float32, nullptr);
+          "", target_x_size, target_y_size, 1, GDT_Float32, nullptr));
   dstDataset->SetGeoTransform(target_geotransform);
-  dstDataset->SetProjection(pszSRS_WKT);
-  psWarpOptions->hDstDS = dstDataset;
-  psWarpOptions->pTransformerArg = GDALCreateGenImgProjTransformer(
-      mosaicDataset, mosaicDataset->GetProjectionRef(), dstDataset, pszSRS_WKT,
-      FALSE, 0.0, 1);
-  psWarpOptions->pfnTransformer = GDALGenImgProjTransform;
-  psWarpOptions->eResampleAlg = hashResample(resample);
+  dstDataset->SetProjection((const char *)pszSRS_WKT.get());
+  psWarpOptions.get()->hDstDS = dstDataset.get();
+  psWarpOptions.get()->pTransformerArg = GDALCreateGenImgProjTransformer(
+      mosaicDataset.get(), mosaicDataset->GetProjectionRef(), dstDataset.get(),
+      (const char *)pszSRS_WKT.get(), FALSE, 0.0, 1);
+  psWarpOptions.get()->pfnTransformer = GDALGenImgProjTransform;
+  psWarpOptions.get()->eResampleAlg = hashResample(resample);
 
   GDALRasterBand *poBand = dstDataset->GetRasterBand(1);
   GDALWarpOperation operation;
-  operation.Initialize(psWarpOptions);
+  operation.Initialize(psWarpOptions.get());
   operation.ChunkAndWarpImage(0, 0, dstDataset->GetRasterXSize(),
                               dstDataset->GetRasterYSize());
   CPLErr outRead = poBand->RasterIO(GF_Read, 0, 0, target_x_size, target_y_size,
@@ -161,12 +173,8 @@ void IoArray::warpTile(std::string ref_tile_path, std::string mosaic_path,
                  .select(nan_v, m_data);
   }
 
-  // Cleanup
-  GDALDestroyWarpOptions(psWarpOptions);
-  GDALClose(mosaicDataset);
-  GDALClose(dstDataset);
-  CPLFree(pszSRS_WKT);
-  GDALClose(refTileDataset);
+  // Cleanup is handled by the RAII guards above (GdalDatasetGuard,
+  // GdalWarpOptionsGuard, CplMemGuard) on every path, including throws.
 }
 
 IoArray::IoArray(Eigen::Ref<MatFloat> data, const uint_t n_threads)
@@ -177,14 +185,6 @@ void IoArray::setupGdal(dict_t dict) {
     CPLSetConfigOption(pair.first.c_str(), pair.second.c_str());
   }
   std::call_once(s_gdal_init_flag, initGdal); // Bug fix: initialise only once
-
-  std::ofstream nullStream("/dev/null");
-  if (nullStream.is_open()) {
-    CPLSetErrorHandler(CPLLoggingErrorHandler);
-    CPLSetConfigOption("CPL_LOG", "/dev/null");
-  } else {
-    CPLPushErrorHandler(CPLQuietErrorHandler);
-  }
 }
 
 // Bug fix: signature changed from Eigen::Ref<MatFloat::RowXpr> to
@@ -213,15 +213,15 @@ void IoArray::readDataCore(float_t *row_ptr, uint_t row_n_elems,
       "(need " + std::to_string(x_size * y_size * bands_list.size()) +
       " elements, got " + std::to_string(row_n_elems) + ")");
 
-  GDALDataset *readDataset =
-      (GDALDataset *)GDALOpen(file_loc.c_str(), GA_ReadOnly);
+  GdalDatasetGuard readDataset(
+      (GDALDataset *)GDALOpen(file_loc.c_str(), GA_ReadOnly));
   skmapAssertIfTrue(
-      readDataset == nullptr,
+      readDataset.get() == nullptr,
       "scikit-map ERROR 1: issues in opening the file with path " + file_loc);
 
   if (!value_to_mask.has_value() && value_to_set.has_value()) {
     int bSuccess = FALSE;
-    GDALRasterBandH band = GDALGetRasterBand(readDataset, 1);
+    GDALRasterBandH band = GDALGetRasterBand(readDataset.get(), 1);
     const double nodata_val = GDALGetRasterNoDataValue(band, &bSuccess);
     if (bSuccess == TRUE)
       value_to_mask = static_cast<float_t>(nodata_val);
@@ -234,8 +234,6 @@ void IoArray::readDataCore(float_t *row_ptr, uint_t row_n_elems,
   skmapAssertIfTrue(outRead != CE_None,
                     "scikit-map ERROR 2: issues in reading the file with URL " +
                         file_loc);
-
-  GDALClose(readDataset);
 
   if (value_to_mask.has_value() && value_to_set.has_value() &&
       value_to_mask.value() != value_to_set.value()) {
@@ -297,9 +295,9 @@ void IoArray::readDataBlocks(
 
 void IoArray::getLatLonArray(std::string file_loc, uint_t x_off, uint_t y_off,
                              uint_t x_size, uint_t y_size) {
-  GDALDataset *readDataset =
-      (GDALDataset *)GDALOpen(file_loc.c_str(), GA_ReadOnly);
-  skmapAssertIfTrue(readDataset == nullptr,
+  GdalDatasetGuard readDataset(
+      (GDALDataset *)GDALOpen(file_loc.c_str(), GA_ReadOnly));
+  skmapAssertIfTrue(readDataset.get() == nullptr,
                     "scikit-map ERROR 6: issues in opening the file with URL " +
                         file_loc);
   skmapAssertIfTrue(((uint_t)m_data.cols() != x_size * y_size),
@@ -320,8 +318,6 @@ void IoArray::getLatLonArray(std::string file_loc, uint_t x_off, uint_t y_off,
     }
   };
   this->parForRange(getLatLonArrayRow, y_size);
-
-  GDALClose(readDataset);
 }
 
 void IoArray::extractOverlay(std::vector<uint_t> pix_block_ids,

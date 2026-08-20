@@ -149,12 +149,13 @@ public:
         throw std::runtime_error("scikit-map ERROR 9: reading region size "
                                  "smaller than the number of columns");
       }
-      GDALDataset *inputDataset =
+      GDALDataset *inputDataset_raw =
           (GDALDataset *)GDALOpen(base_files[i].c_str(), GA_ReadOnly);
-      if (inputDataset == nullptr) {
+      if (inputDataset_raw == nullptr) {
         throw std::runtime_error(
             "scikit-map ERROR 10: issues in reading the file " + base_files[i]);
       }
+      GdalDatasetGuard inputDataset(inputDataset_raw);
       double geotransform[6];
       if (inputDataset->GetGeoTransform(geotransform) != CE_None) {
         throw std::runtime_error(
@@ -187,14 +188,15 @@ public:
       std::string ending =
           bash_compression_command.has_value() ? "_tmp.tif" : ".tif";
       std::string tmp_file_name = file_name + ending;
-      GDALDataset *writeDataset = driver->Create(
+      GDALDataset *writeDataset_raw = driver->Create(
           tmp_file_name.c_str(), inputDataset->GetRasterXSize(),
           inputDataset->GetRasterYSize(), 1, write_type, nullptr);
-      if (writeDataset == nullptr) {
+      if (writeDataset_raw == nullptr) {
         throw std::runtime_error(
             "scikit-map ERROR 10: issues in creating the file " +
             tmp_file_name);
       }
+      GdalDatasetGuard writeDataset(writeDataset_raw);
       writeDataset->SetGeoTransform(geotransform);
       writeDataset->SetSpatialRef(spatial_ref);
       writeDataset->SetProjection(projection);
@@ -216,8 +218,8 @@ public:
       skmapAssertIfTrue(out_write2 != CE_None,
                         "scikit-map ERROR 11: issues in writing the file " +
                             layer_name);
-      GDALClose(inputDataset);
-      GDALClose(writeDataset);
+      // inputDataset / writeDataset are closed by GdalDatasetGuard on every
+      // path, including the throws above.
       if (bash_compression_command.has_value()) {
         runBashCommand(bash_compression_command.value() + " " + tmp_file_name +
                        " " + file_name + ".tif");
