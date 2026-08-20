@@ -4,6 +4,36 @@
 
 namespace skmap {
 
+// Sparse circular convolution with the TSIRF kernel.
+//
+// The old code materialised a dense n_s x n_s circulant matrix W and computed
+// `chunk * W` (O(n_s^2) memory, O(n_s^3) work). The kernel w_e is non-zero
+// only at indices {0, 1..n_f, n_e-n_p..n_e-1}, so the same result is a FIR
+// filter with n_f + n_p + 1 taps: O(n_s * n_taps) work, O(1) memory.
+//
+//   out(r, j) = w_0 * in(r, j)
+//             + sum_{k=1..n_f} w_f[k-1] * in(r, j+k)   (j+k < n_s)
+//             + sum_{k=1..n_p} w_p[n_p-k] * in(r, j-k) (j >= k)
+static void tsirfConvolve(const Eigen::Ref<const MatFloat> &in, float_t w_0,
+                          const Eigen::Ref<const VecFloat> &w_p,
+                          const Eigen::Ref<const VecFloat> &w_f,
+                          Eigen::Ref<MatFloat> out) {
+  const uint_t n_s = in.cols();
+  const uint_t n_f = w_f.size();
+  const uint_t n_p = w_p.size();
+  for (uint_t r = 0; r < (uint_t)in.rows(); ++r) {
+    out.row(r) = w_0 * in.row(r);
+    // w_f looks forward: in(r, j+k)
+    for (uint_t k = 1; k <= n_f; ++k)
+      out.row(r).segment(0, n_s - k) +=
+          w_f(k - 1) * in.row(r).segment(k, n_s - k);
+    // w_p looks backward: in(r, j-k), with reversed weights
+    for (uint_t k = 1; k <= n_p; ++k)
+      out.row(r).segment(k, n_s - k) +=
+          w_p(n_p - k) * in.row(r).segment(0, n_s - k);
+  }
+}
+
 void argsortMatrixAscending(Eigen::Ref<MatFloat> in_matrix,
                             Eigen::Ref<MatUint> perm_matrix,
                             bool sort_each_row_true_sort_each_col_false) {
@@ -896,18 +926,15 @@ void TransArray::applyTsirf(Eigen::Ref<MatFloat> out_data,
     w_e.segment(n_e - w_p.size(), w_p.size()) = w_p;
     auto out_block = out_data.block(out_index_offset + row_start, 0,
                                     row_end - row_start, n_s);
-    MatFloat W(n_s, n_s);
-    for (uint_t i = 0; i < n_s; ++i) {
-      for (uint_t j = 0; j < n_s; ++j) {
-        W(j, i) = w_e((-i + j + n_e) % n_e);
-      }
-    }
     MatBool gaps_mask = chunk.array().isNaN();
     MatBool valid_mask = chunk.array().isFinite();
     MatFloat chunk_masked = chunk;
     chunk_masked = gaps_mask.select(0.0, chunk_masked);
-    MatFloat den = valid_mask.cast<float_t>() * W;
-    out_block = (chunk_masked * W).array() / den.array();
+    MatFloat num(chunk.rows(), n_s);
+    MatFloat den(chunk.rows(), n_s);
+    tsirfConvolve(chunk_masked, w_0, w_p, w_f, num);
+    tsirfConvolve(valid_mask.cast<float_t>(), w_0, w_p, w_f, den);
+    out_block = num.array() / den.array();
     MatFloat NaNs =
         MatFloat::Constant(out_block.rows(), out_block.cols(), nan_v);
     out_block = (den.array() < w_e.minCoeff()).select(NaNs, out_block);
@@ -922,20 +949,9 @@ void TransArray::convolveRows(Eigen::Ref<MatFloat> out_data, float_t w_0,
 
   auto convolveRowsChunk = [&](Eigen::Ref<MatFloat> chunk, uint_t row_start,
                                uint_t row_end) {
-    uint_t n_s = chunk.cols();
-    uint_t n_e = n_s + std::max(w_p.size(), w_f.size());
-    VecFloat w_e = VecFloat::Zero(n_e);
-    w_e(0) = w_0;
-    w_e.segment(1, w_f.size()) = w_f;
-    w_e.segment(n_e - w_p.size(), w_p.size()) = w_p;
-    auto out_block = out_data.block(row_start, 0, row_end - row_start, n_s);
-    MatFloat W(n_s, n_s);
-    for (uint_t i = 0; i < n_s; ++i) {
-      for (uint_t j = 0; j < n_s; ++j) {
-        W(j, i) = w_e((-i + j + n_e) % n_e);
-      }
-    }
-    out_block = chunk * W;
+    auto out_block =
+        out_data.block(row_start, 0, row_end - row_start, chunk.cols());
+    tsirfConvolve(chunk, w_0, w_p, w_f, out_block);
   };
   this->parChunk(convolveRowsChunk);
 }
@@ -1003,18 +1019,21 @@ void TransArray::nanMean(Eigen::Ref<VecFloat> out_data) {
 void TransArray::computeMannKendallPValues(Eigen::Ref<VecFloat> out_data) {
   auto computeMannKendallPValuesChunk = [&](Eigen::Ref<MatFloat> chunk,
                                             uint_t row_start, uint_t row_end) {
-    float_t n_cols = chunk.cols();
+    uint_t n_cols = chunk.cols();
     float_t n = (float_t)n_cols;
     float_t var_s = (n * (n - 1.) * (2. * n + 5.)) / 18.;
     for (uint_t i = 0; i < (uint_t)chunk.rows(); i++) {
-      // Vectorized computation of differences
-      MatFloat mat = MatFloat::Zero(n_cols, n_cols);
-      mat.triangularView<Eigen::Upper>() =
-          chunk.row(i).transpose().replicate(n_cols, 1) -
-          chunk.row(i).replicate(1, n_cols);
-      // Mann-Kendal's score
-      float_t s =
-          mat.unaryExpr([](float_t v) { return signFunc(v); }).array().sum();
+      // Mann-Kendall score S = sum_{j<k} sign(x_j - x_k). The old code
+      // materialised a dense n_cols x n_cols difference matrix per pixel
+      // (O(n^2) memory); this computes the same sum with O(1) memory and a
+      // vectorised inner loop over the trailing segment.
+      float_t s = 0.;
+      for (uint_t j = 0; j + 1 < n_cols; ++j) {
+        float_t xj = chunk(i, j);
+        s += (xj - chunk.row(i).segment(j + 1, n_cols - j - 1).array())
+                 .unaryExpr([](float_t v) { return signFunc(v); })
+                 .sum();
+      }
       float_t z_score = 0.;
       if (s > 0.)
         z_score = (s - 1.) / std::sqrt(var_s);

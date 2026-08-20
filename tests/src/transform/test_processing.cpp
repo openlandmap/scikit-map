@@ -138,3 +138,54 @@ TEST_F(TransArrayTest, computePercentiles) {
   );
   EXPECT_EQ(out, expected);
 }
+
+TEST_F(TransArrayTest, convolveRows) {
+  // clang-format off
+  MatFloat in(2, 5);
+  in <<
+    1, 2, 3, 4, 5,
+    6, 7, 8, 9, 10;
+  // clang-format on
+  MatFloat out(2, 5);
+  float_t w_0 = 0.5;
+  VecFloat w_p(2);
+  w_p << 0.2, 0.1; // past weights (look forward)
+  VecFloat w_f(1);
+  w_f << 0.3; // future weights (look back)
+
+  TransArray ta(in, 1);
+  ta.convolveRows(out, w_0, w_p, w_f);
+
+  // Reference: the old dense circulant matrix W.
+  uint_t n_s = 5;
+  uint_t n_e = n_s + std::max(w_p.size(), w_f.size());
+  VecFloat w_e = VecFloat::Zero(n_e);
+  w_e(0) = w_0;
+  w_e.segment(1, w_f.size()) = w_f;
+  w_e.segment(n_e - w_p.size(), w_p.size()) = w_p;
+  MatFloat W(n_s, n_s);
+  for (uint_t i = 0; i < n_s; ++i)
+    for (uint_t j = 0; j < n_s; ++j)
+      W(j, i) = w_e((-i + j + n_e) % n_e);
+  MatFloat expected = in * W;
+
+  EXPECT_TRUE(out.isApprox(expected, 1e-5));
+}
+
+TEST_F(TransArrayTest, computeMannKendallPValues) {
+  // clang-format off
+  MatFloat in(2, 4);
+  in <<
+    1, 2, 3, 4, // increasing -> S = -6
+    4, 3, 2, 1; // decreasing -> S = +6
+  // clang-format on
+  VecFloat out(2);
+  TransArray ta(in, 1);
+  ta.computeMannKendallPValues(out);
+
+  // n=4 -> var_s = 4*3*13/18 = 8.6667, sqrt = 2.9439
+  // z = (|S|-1)/sqrt(var_s) = 5/2.9439 = 1.6984
+  // p = 2*(1 - Phi(1.6984)) = 0.0897
+  EXPECT_NEAR(out(0), 0.0897, 1e-3);
+  EXPECT_NEAR(out(1), 0.0897, 1e-3);
+}
