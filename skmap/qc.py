@@ -13,8 +13,6 @@ import rasterio as rio
 import requests
 from shapely import geometry as g
 
-from .parallel import blocks
-
 # from .datasets.catalogue import _Resource
 
 _LANDMASK_REF = "https://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_land.mask_pflugmacher2019.landcover.12_f_30m_s0..0m_2014..2016_skmap_epsg3035_v0.1.tif"
@@ -108,6 +106,10 @@ class Test:
         [1] `Pan-European land cover map 2015 (Pflugmacher et al., 2019) <https://doi.pangaea.de/10.1594/PANGAEA.896282>`_
 
         """
+
+        raise RuntimeError(
+            "raster_land_coverage is disabled: skmap.parallel.blocks was removed."
+        )
 
         with rio.open(dataset_path) as src:
             nodata = src.nodata
