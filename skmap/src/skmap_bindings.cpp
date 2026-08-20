@@ -144,8 +144,10 @@ void writeData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                uint_t x_size, uint_t y_size, float_t no_data_value,
                std::string gdal_data_type_str,
                std::vector<std::string> creation_options, double scale) {
+  dict_t cpp_conf = convPyDict(conf_GDAL);
+  py::gil_scoped_release release;
   IoArray ioArray(data, n_threads);
-  ioArray.setupGdal(convPyDict(conf_GDAL));
+  ioArray.setupGdal(cpp_conf);
   GDALDataType gdal_data_type = GetGDALDataTypeFromString(gdal_data_type_str);
   auto no_data_variant = getNodataVariant(gdal_data_type_str, no_data_value);
   if (!no_data_variant)
@@ -171,6 +173,7 @@ void extractOverlay(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     const std::vector<uint_t> key_layer_ids_comb,
                     Eigen::Ref<MatFloat> data_overlay) {
   IoArray ioArray(data, n_threads);
+  py::gil_scoped_release release;
   ioArray.extractOverlay(pix_block_ids, pix_inblock_idxs,
                          unique_blocks_ids_comb, key_layer_ids_comb,
                          data_overlay);
@@ -183,16 +186,20 @@ void extractOverlay(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 void warpTile(Eigen::Ref<MatFloat> data, const uint_t n_threads,
               py::dict conf_GDAL, std::string tile_path, std::string mosaic_path,
               std::string resample) {
+  dict_t cpp_conf = convPyDict(conf_GDAL);
+  py::gil_scoped_release release;
   IoArray ioArray(data, n_threads);
-  ioArray.setupGdal(convPyDict(conf_GDAL));
+  ioArray.setupGdal(cpp_conf);
   ioArray.warpTile(tile_path, mosaic_path, resample);
 }
 
 void getLatLonArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     py::dict conf_GDAL, std::string file_loc, uint_t x_off,
                     uint_t y_off, uint_t x_size, uint_t y_size) {
+  dict_t cpp_conf = convPyDict(conf_GDAL);
+  py::gil_scoped_release release;
   IoArray ioArray(data, n_threads);
-  ioArray.setupGdal(convPyDict(conf_GDAL));
+  ioArray.setupGdal(cpp_conf);
   ioArray.getLatLonArray(file_loc, x_off, y_off, x_size, y_size);
 }
 /** @} */ // end of io group
@@ -294,6 +301,7 @@ void writeByteData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 void copyVecInMatrixRow(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                         Eigen::Ref<VecFloat> in_vec, uint_t row_idx) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.copyVecInMatrixRow(in_vec, row_idx);
 }
 
@@ -302,6 +310,7 @@ void selArrayRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
                   std::vector<uint_t> row_select) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.selArrayRows(out_data, row_select);
 }
 
@@ -310,6 +319,7 @@ void selArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
                   std::vector<uint_t> col_select) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.selArrayCols(out_data, col_select);
 }
 
@@ -318,6 +328,7 @@ void expandArrayRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                      Eigen::Ref<MatFloat> out_data,
                      std::vector<uint_t> row_select) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.expandArrayRows(out_data, row_select);
 }
 
@@ -326,6 +337,7 @@ void expandArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                      Eigen::Ref<MatFloat> out_data,
                      std::vector<uint_t> col_select) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.expandArrayCols(out_data, col_select);
 }
 
@@ -334,6 +346,7 @@ void reorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data,
                   std::vector<std::vector<uint_t>> indices_matrix) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.reorderArray(out_data, indices_matrix);
 }
 
@@ -341,6 +354,7 @@ void reorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 void transposeArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     Eigen::Ref<MatFloat> out_data) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.transposeArray(out_data);
 }
 
@@ -350,6 +364,7 @@ void transposeReorderArray(
     Eigen::Ref<MatFloat> out_data,
     std::vector<std::vector<uint_t>> permutation_matrix) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.transposeReorderArray(out_data, permutation_matrix);
 }
 
@@ -358,6 +373,7 @@ void inverseReorderArray(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                          Eigen::Ref<MatFloat> out_data,
                          std::vector<std::vector<uint_t>> indices_matrix) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.inverseReorderArray(out_data, indices_matrix);
 }
 /** @} */ // endgroup mangling
@@ -369,6 +385,7 @@ void extractArrayRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                       Eigen::Ref<MatFloat> out_data,
                       std::vector<uint_t> row_select) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.selArrayRows(out_data, row_select);
 }
 
@@ -379,6 +396,7 @@ void extractArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                       Eigen::Ref<MatFloat> out_data,
                       std::vector<uint_t> col_select) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.selArrayCols(out_data, col_select);
 }
 
@@ -391,6 +409,7 @@ void extractArrayCols(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 /** @brief see `TransArray::fillArray` */
 void fillArray(Eigen::Ref<MatFloat> data, const uint_t n_threads, float_t val) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.fillArray(val);
 }
 
@@ -398,6 +417,7 @@ void fillArray(Eigen::Ref<MatFloat> data, const uint_t n_threads, float_t val) {
 void maskNan(Eigen::Ref<MatFloat> data, const uint_t n_threads,
              std::vector<uint_t> row_select, float_t new_value_in_data) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.maskNan(row_select, new_value_in_data);
 }
 
@@ -406,6 +426,7 @@ void maskNanRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                  std::vector<uint_t> row_select,
                  Eigen::Ref<VecFloat> new_value_vec) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.maskNanRows(row_select, new_value_vec);
 }
 
@@ -424,6 +445,7 @@ void maskDataRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   std::vector<uint_t> row_select, Eigen::Ref<MatFloat> mask,
                   float_t value_of_mask_to_mask, float_t new_value_in_data) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.maskDataRows(row_select, mask, value_of_mask_to_mask,
                           new_value_in_data);
 }
@@ -433,6 +455,7 @@ void swapRowsValues(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     std::vector<uint_t> row_select, float_t value_to_mask,
                     float_t new_value) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.swapRowsValues(row_select, value_to_mask, new_value);
 }
 
@@ -440,6 +463,7 @@ void swapRowsValues(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 void hadamardProduct(Eigen::Ref<MatFloat> out, const uint_t n_threads,
                      Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2) {
   TransArray transArray(out, n_threads);
+  py::gil_scoped_release release;
   transArray.hadamardProduct(in1, in2);
 }
 
@@ -455,6 +479,7 @@ void offsetAndScale(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 void scaleAndOffset(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     float_t offset, float_t scaling) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.scaleAndOffset(offset, scaling);
 }
 
@@ -464,6 +489,7 @@ void offsetsAndScales(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                       Eigen::Ref<VecFloat> offsets,
                       Eigen::Ref<VecFloat> scalings) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.offsetsAndScales(row_select, offsets, scalings);
 }
 
@@ -491,13 +517,11 @@ void castFloat32ToFloat64(
                     "scikit-map ERROR 53: cols of the new array does not match "
                     "the size of selected");
 
+  py::gil_scoped_release release;
   omp_set_num_threads(n_threads);
   Eigen::initParallel();
   Eigen::setNbThreads(n_threads);
-#pragma omp parallel for
-  for (uint_t i = 0; i < (uint_t)data.rows(); ++i) {
-    out_data.row(i) = data.row(i).cast<double>();
-  }
+  out_data = data.cast<double>();
 }
 
 /**
@@ -524,13 +548,11 @@ void castFloat64ToFloat32(
                     "scikit-map ERROR 53: cols of the new array does not match "
                     "the size of selected");
 
+  py::gil_scoped_release release;
   omp_set_num_threads(n_threads);
   Eigen::initParallel();
   Eigen::setNbThreads(n_threads);
-#pragma omp parallel for
-  for (uint_t i = 0; i < (uint_t)data.rows(); ++i) {
-    out_data.row(i) = data.row(i).cast<float>();
-  }
+  out_data = data.cast<float>();
 }
 
 /** @} */ // endgroup manipulation
@@ -545,6 +567,7 @@ void castFloat64ToFloat32(
 void nanMean(Eigen::Ref<MatFloat> data, const uint_t n_threads,
              Eigen::Ref<VecFloat> out_data) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.nanMean(out_data);
 }
 
@@ -553,6 +576,7 @@ void blocksAverage(Eigen::Ref<MatFloat> out, const uint_t n_threads,
                    Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2,
                    uint_t n_pix, uint_t y) {
   TransArray transArray(out, n_threads);
+  py::gil_scoped_release release;
   transArray.blocksAverage(in1, in2, n_pix, y);
 }
 
@@ -560,12 +584,14 @@ void blocksAverageVecs(Eigen::Ref<MatFloat> out, const uint_t n_threads,
                        Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2,
                        uint_t n_pix, uint_t y, uint_t row_offset) {
   TransArray transArray(out, n_threads);
+  py::gil_scoped_release release;
   transArray.blocksAverageVecs(in1, in2, n_pix, y, row_offset);
 }
 
 void elementwiseAverage(Eigen::Ref<MatFloat> out, const uint_t n_threads,
                         Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2) {
   TransArray transArray(out, n_threads);
+  py::gil_scoped_release release;
   transArray.elementwiseAverage(in1, in2);
 }
 
@@ -574,6 +600,7 @@ void extractIndicators(Eigen::Ref<MatFloat> data_in, const uint_t n_threads,
                        std::vector<uint_t> col_out_select,
                        std::vector<uint_t> classes) {
   TransArray transArray(data_in, n_threads);
+  py::gil_scoped_release release;
   transArray.extractIndicators(data_out, col_in_select, col_out_select,
                                classes);
 }
@@ -581,6 +608,7 @@ void extractIndicators(Eigen::Ref<MatFloat> data_in, const uint_t n_threads,
 void fitPercentage(Eigen::Ref<MatFloat> out, const uint_t n_threads,
                    Eigen::Ref<MatFloat> in1, Eigen::Ref<MatFloat> in2) {
   TransArray transArray(out, n_threads);
+  py::gil_scoped_release release;
   transArray.fitPercentage(in1, in2);
 }
 
@@ -589,6 +617,7 @@ void texturesBwTransform(Eigen::Ref<MatFloat> texture_1, const uint_t n_threads,
                          Eigen::Ref<MatFloat> sand, Eigen::Ref<MatFloat> silt,
                          Eigen::Ref<MatFloat> clay) {
   TransArray transArray(texture_1, n_threads);
+  py::gil_scoped_release release;
   transArray.texturesBwTransform(texture_2, k, a, sand, silt, clay);
 }
 
@@ -596,6 +625,7 @@ void linearRegression(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                       Eigen::Ref<VecFloat> x, Eigen::Ref<VecFloat> beta_0,
                       Eigen::Ref<VecFloat> beta_1) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.linearRegression(x, beta_0, beta_1);
 }
 
@@ -603,12 +633,14 @@ void computeMannKendallPValues(Eigen::Ref<MatFloat> data,
                                const uint_t n_threads,
                                Eigen::Ref<VecFloat> out_data) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.computeMannKendallPValues(out_data);
 }
 
 void averageAggregate(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                       Eigen::Ref<MatFloat> out_data, uint_t agg_factor) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.averageAggregate(out_data, agg_factor);
 }
 
@@ -617,6 +649,7 @@ void maskDifference(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                     Eigen::Ref<MatFloat> ref_data,
                     Eigen::Ref<MatFloat> mask_out) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.maskDifference(diff_th, count_th, ref_data, mask_out);
 }
 
@@ -627,6 +660,7 @@ void computeNormalizedDifference(
     float_t negative_scaling, float_t result_scaling, float_t result_offset,
     std::vector<float_t> clip_value) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.computeNormalizedDifference(
       positive_indices, negative_indices, result_indices, positive_scaling,
       negative_scaling, result_scaling, result_offset, clip_value);
@@ -639,6 +673,7 @@ void computeNirv(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                  float_t red_scaling, float_t result_scaling,
                  float_t result_offset, std::vector<float_t> clip_value) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.computeNirv(nir_indices, red_indices, result_indices, nir_scaling,
                          red_scaling, result_scaling, result_offset,
                          clip_value);
@@ -654,6 +689,7 @@ void computeBsi(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                 float_t result_scaling, float_t result_offset,
                 std::vector<float_t> clip_value) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.computeBsi(swir1_indices, red_indices, nir_indices, blue_indices,
                         result_indices, swir1_scaling, red_scaling, nir_scaling,
                         blue_scaling, result_scaling, result_offset,
@@ -669,6 +705,7 @@ void computeEvi(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                 float_t result_scaling, float_t result_offset,
                 std::vector<float_t> clip_value) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.computeEvi(red_indices, nir_indices, blue_indices, result_indices,
                         red_scaling, nir_scaling, blue_scaling, result_scaling,
                         result_offset, clip_value);
@@ -681,6 +718,7 @@ void computeFapar(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   float_t nir_scaling, float_t result_scaling,
                   float_t result_offset, std::vector<float_t> clip_value) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.computeFapar(red_indices, nir_indices, result_indices, red_scaling,
                           nir_scaling, result_scaling, result_offset,
                           clip_value);
@@ -693,6 +731,7 @@ void computeSavi(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                  float_t nir_scaling, float_t result_scaling,
                  float_t result_offset, std::vector<float_t> clip_value) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.computeSavi(red_indices, nir_indices, result_indices, red_scaling,
                          nir_scaling, result_scaling, result_offset,
                          clip_value);
@@ -704,6 +743,7 @@ void computeGeometricTemperature(
     float_t elevation_scaling, float_t a, float_t b, float_t result_scaling,
     std::vector<uint_t> result_indices, std::vector<float_t> days_of_year) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.computeGeometricTemperature(latitude, elevation, elevation_scaling,
                                          a, b, result_scaling, result_indices,
                                          days_of_year);
@@ -716,6 +756,7 @@ void computePercentiles(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                         std::vector<uint_t> col_out_select,
                         std::vector<float_t> percentiles) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.computePercentiles(col_in_select, out_data, col_out_select,
                                 percentiles);
 }
@@ -726,6 +767,7 @@ void fitProbabilities(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                       Eigen::Ref<MatFloat> best_classes_data,
                       uint_t n_best_classes) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.fitProbabilities(out_data, input_scaling, target_scaling,
                               best_classes_data, n_best_classes);
 }
@@ -738,6 +780,7 @@ void applyTsirf(Eigen::Ref<MatFloat> data, const uint_t n_threads,
 
 {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.applyTsirf(out_data, out_index_offset, w_0, w_p, w_f,
                         keep_original_values, version, backend);
 }
@@ -746,6 +789,7 @@ void nanMeanAggregatePattern(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                              Eigen::Ref<MatFloat> out_data,
                              std::vector<std::vector<uint_t>> &agg_pattern) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.nanMeanAggregatePattern(out_data, agg_pattern);
 }
 
@@ -753,12 +797,14 @@ void convolveRows(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   Eigen::Ref<MatFloat> out_data, float_t w_0,
                   Eigen::Ref<VecFloat> w_p, Eigen::Ref<VecFloat> w_f) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.convolveRows(out_data, w_0, w_p, w_f);
 }
 
 void slidingWindowClassMode(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                             Eigen::Ref<MatFloat> out_data, size_t window_size) {
   TransArray transArray(data, n_threads);
+  py::gil_scoped_release release;
   transArray.slidingWindowClassMode(out_data, window_size);
 }
 

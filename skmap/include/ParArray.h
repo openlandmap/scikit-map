@@ -20,9 +20,6 @@ public:
   // A simple threaded parallel execution of the input function(i) for from 0 to
   // n_max-1
   template <typename F> void parForRange(F f, uint_t n_max) {
-    omp_set_num_threads(m_n_threads);
-    Eigen::initParallel();
-    Eigen::setNbThreads(m_n_threads);
 #pragma omp parallel for
     for (uint_t i = 0; i < n_max; ++i) {
       f(i);
