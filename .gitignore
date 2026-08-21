@@ -23,3 +23,5 @@ xml/
 .*_cache/
 .venv/
 compile_commands.json
+docs/notebooks/*.joblib
+docs/notebooks/*.png
