@@ -14,7 +14,7 @@ from rasterio.mask import mask
 from rasterio.windows import from_bounds
 from shapely.geometry import Polygon
 
-from ..misc import ttprint
+from .misc import ttprint
 
 CPU_COUNT = multiprocessing.cpu_count()
 """
@@ -375,7 +375,7 @@ class TilingProcessing:
         Examples
         ========
 
-        >>> from skmap.parallel.utils import TilingProcessing
+        >>> from skmap.parallel import TilingProcessing
         >>> skmap_extent = (900000, 930010, 6540000, 5460010)
         >>> tiling_system = TilingProcessing.generate_tiles(30000, skmap_extent, 'epsg:3035')
         >>> tiling_system.to_file(tiling_system_fn,  driver="GPKG") # doctest: +SKIP
