@@ -1,5 +1,5 @@
 """
-Parallelization helpers based in thread/process pools and joblib
+Parallelization helpers based on Ray
 """
 
 import multiprocessing
@@ -99,8 +99,7 @@ def apply_along_axis(
 ):
     """
     Execute a function through a ``numpy.array`` axis in parallel [1].
-    It uses joblib and ``backend=loky``, so avoid to send shared
-    memory objects as arguments.
+    It uses Ray, so avoid to send shared memory objects as arguments.
 
     :param worker: Function to execute in parallel. It needs to have
       at least one argument (``numpy.array``).
