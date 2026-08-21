@@ -125,3 +125,13 @@ class NumpyBackend(ComputeBackend):
         if keep_original_values:
             filled[valid_mask] = masked[valid_mask]
         return filled
+
+    def fft_convolve(self, data, kernel, n_s):
+        # Per-row FFT convolution: ifft(fft(kernel) * fft(row))[:n_s]
+        data = np.asarray(data, dtype=np.float64)
+        kernel = np.asarray(kernel, dtype=np.float64)
+        n_e = data.shape[1]
+        W = np.fft.rfft(kernel, n_e)
+        V = np.fft.rfft(data, n_e, axis=1)
+        out = np.fft.irfft(V * W, n_e, axis=1)[:, :n_s]
+        return out

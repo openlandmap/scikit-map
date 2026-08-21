@@ -375,3 +375,13 @@ class NumbaBackend(ComputeBackend):
             valid = ~np.isnan(data64)
             out[valid] = data64[valid]
         return out
+
+    def fft_convolve(self, data, kernel, n_s):
+        # Use the vectorised numpy FFT -- numba's numpy.fft support is limited
+        # and per-row jitting loses to the vectorised BLAS path here.
+        data = np.asarray(data, dtype=np.float64)
+        kernel = np.asarray(kernel, dtype=np.float64)
+        n_e = data.shape[1]
+        W = np.fft.rfft(kernel, n_e)
+        V = np.fft.rfft(data, n_e, axis=1)
+        return np.fft.irfft(V * W, n_e, axis=1)[:, :n_s]

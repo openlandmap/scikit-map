@@ -47,8 +47,9 @@ def test_seasconvfill_fills_gaps():
     assert after < before
 
 
-def test_sircletransformer_backends_match():
-    """SircleTransformer sparse conv_backend across compute backends."""
+@pytest.mark.parametrize("conv_backend", ["dense", "sparse", "FFT"])
+def test_sircletransformer_backends_match(conv_backend):
+    """SircleTransformer conv_backend across compute backends."""
     wv_0 = 1.0
     wv_p = np.array([0.5, 0.25], dtype=np.float64)
     wv_f = np.array([0.5, 0.25], dtype=np.float64)
@@ -61,7 +62,7 @@ def test_sircletransformer_backends_match():
                 wv_0=wv_0,
                 wv_f=wv_f,
                 wv_p=wv_p,
-                conv_backend="sparse",
+                conv_backend=conv_backend,
                 verbose=False,
             )
         )

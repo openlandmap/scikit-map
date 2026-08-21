@@ -251,12 +251,6 @@ try:
 
         def _run(self, data):
             # Convolution and normalization
-            try:
-                import mkl
-
-                mkl.set_num_threads(self.n_jobs)
-            except ImportError:
-                pass
             np.seterr(divide="ignore", invalid="ignore")
             orig_shape = data.shape
             data = np.reshape(data, (data.shape[0] * data.shape[1], data.shape[2]))
@@ -303,21 +297,20 @@ try:
                 M_e = valid_mask.astype(np.float64)
 
             if self.conv_backend == "dense":
-                wv_e = np.zeros((n_e,))
-                wv_e[0] = self.wv_0
-                wv_e[1 : n_f + 1] = self.wv_f
-                if n_p > 0:
-                    wv_e[-n_p:] = self.wv_p
-                Wv_e = circulant(wv_e)
-                Vt_e = np.dot(V_e, Wv_e)[:, 0:n_s]
+                # The dense circulant matmul is a zero-padded convolution;
+                # route it through the backend FIR op (same maths, no circulant).
+                n_pad = max(n_f, n_p)
+                wv_e = np.zeros(n_pad * 2 + 1)
+                wv_e[n_pad] = self.wv_0
+                wv_e[n_pad - n_f : n_pad] = self.wv_f[::-1]
+                wv_e[n_pad + 1 : n_pad + 1 + n_p] = self.wv_p[::-1]
+                Vt_e = self.backend.convolve1d(V_e[:, 0:n_s], wv_e, axis=-1, mode="constant", cval=0)
                 if self.use_mask:
-                    wm_e = np.zeros((n_e,))
-                    wm_e[0] = self.wm_0
-                    wm_e[1 : n_f + 1] = self.wm_f
-                    if n_p > 0:
-                        wm_e[-n_p:] = self.wm_p
-                    Wm_e = circulant(wm_e)
-                    Mt_e = np.dot(M_e, Wm_e)[:, 0:n_s]
+                    wm_e = np.zeros(n_pad * 2 + 1)
+                    wm_e[n_pad] = self.wm_0
+                    wm_e[n_pad - n_f : n_pad] = self.wm_f[::-1]
+                    wm_e[n_pad + 1 : n_pad + 1 + n_p] = self.wm_p[::-1]
+                    Mt_e = self.backend.convolve1d(M_e[:, 0:n_s], wm_e, axis=-1, mode="constant", cval=0)
 
             elif self.conv_backend == "sparse":
                 n_pad = max(len(self.wv_f), len(self.wv_p))
@@ -341,43 +334,15 @@ try:
                 wv_e[1 : n_p + 1] = self.wv_p[::-1]
                 if n_f > 0:
                     wv_e[-n_f:] = self.wv_f[::-1]
+                Vt_e = self.backend.fft_convolve(V_e, wv_e, n_s)
                 if self.use_mask:
                     wm_e = np.zeros((n_e,))
                     wm_e[0] = self.wm_0
                     wm_e[1 : n_p + 1] = self.wm_p[::-1]
                     if n_f > 0:
                         wm_e[-n_f:] = self.wm_f[::-1]
+                    Mt_e = self.backend.fft_convolve(M_e, wm_e, n_s)
 
-                def parallel_calculation(i):
-                    pyfftw.config.NUM_THREADS = self.n_jobs
-                    in_fft = pyfftw.empty_aligned(n_e, dtype="float64")
-                    in_ifft = pyfftw.empty_aligned(n_e, dtype="complex128")
-                    in_fft[:] = wv_e
-                    Wv_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
-                    in_fft[:] = V_e[i, :]
-                    V_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
-                    in_ifft[:] = V_fft * Wv_fft
-                    return pyfftw.interfaces.numpy_fft.ifft(in_ifft).real
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    results = list(executor.map(parallel_calculation, range(n_t)))
-                Vt_e = np.array(results)[:, 0:n_s]
-                if self.use_mask:
-
-                    def parallel_calculation(i):
-                        pyfftw.config.NUM_THREADS = self.n_jobs
-                        in_fft = pyfftw.empty_aligned(n_e, dtype="float64")
-                        in_ifft = pyfftw.empty_aligned(n_e, dtype="complex128")
-                        in_fft[:] = wm_e
-                        Wm_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
-                        in_fft[:] = M_e[i, :]
-                        M_fft = pyfftw.interfaces.numpy_fft.fft(in_fft)
-                        in_ifft[:] = M_fft * Wm_fft
-                        return pyfftw.interfaces.numpy_fft.ifft(in_ifft).real
-
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        results = list(executor.map(parallel_calculation, range(n_t)))
-                    Mt_e = np.array(results)[:, 0:n_s]
             else:
                 raise ValueError("Invalid backend specified")
 

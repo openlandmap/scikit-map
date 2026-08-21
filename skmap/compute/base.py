@@ -67,6 +67,11 @@ class ComputeBackend(ABC):
         """Toeplitz matrix-vector product: first column ``c``, first row ``r``."""
 
     @abstractmethod
+    def fft_convolve(self, data, kernel, n_s):
+        """Per-row FFT convolution of ``data`` (n_rows, n_e) with 1-D ``kernel``
+        (length n_e); return the first ``n_s`` columns of each row's result."""
+
+    @abstractmethod
     def apply_along_axis(self, func, axis, arr, *args, n_jobs=1, **kwargs):
         """Apply ``func`` along ``axis`` (optionally parallel)."""
 

@@ -155,6 +155,10 @@ class CppBackend(ComputeBackend):
         )
         return out
 
+    def fft_convolve(self, data, kernel, n_s):
+        # No C++ FFT kernel; fall back to the numpy vectorised FFT.
+        return self._fallback.fft_convolve(data, kernel, n_s)
+
     def tsirf(self, data, conv_vect_past, conv_vect_future, keep_original_values=True):
         # C++ applyTsirf operates on (rows=pixels, cols=time) float32 and uses
         # w_0 (center) + w_p (past taps, applied reversed) + w_f (future taps).
