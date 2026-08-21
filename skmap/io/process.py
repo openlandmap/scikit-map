@@ -487,22 +487,11 @@ try:
             return filled, filled_qa
 
         def _gapfill(self, data):
-            # Convolution and normalization
-            try:
-                import mkl
-
-                mkl.get_num_threads()
-                mkl.set_num_threads(self.n_jobs)
-            except:
-                pass
-
             np.seterr(divide="ignore", invalid="ignore")
             orig_shape = data.shape
             data = np.reshape(
                 data, (data.shape[0] * data.shape[1], data.shape[2])
             ).T.copy()
-            valid_mask = ~np.isnan(data)
-            data[~valid_mask] = 0.0
             n_imag = data.shape[0]
             if self.season_size * 2 > n_imag:
                 warnings.warn(
@@ -514,20 +503,28 @@ try:
             if len(self.conv_vect_past) == 0:
                 self.conv_vect_past = half_conv_vect
 
-            filled, filled_qa = self._fftw_toeplitz_matmul(
-                data, valid_mask.astype(float)
-            )
-            filled[valid_mask] = data[valid_mask]
-            filled_qa[valid_mask] = 1.0
-            filled_qa = filled_qa * 100
-            filled_qa[filled_qa == 0.0] = np.nan
-            # Return the reconstructed time series and the quality assesment layer
             if self.return_qa:
+                # QA needs the convolved mask; the C++ tsirf kernel does not
+                # expose QA, so this falls back to the numpy/scipy Toeplitz
+                # implementation on every backend.
+                valid_mask = ~np.isnan(data)
+                data[~valid_mask] = 0.0
+                filled, filled_qa = self._fftw_toeplitz_matmul(
+                    data, valid_mask.astype(float)
+                )
+                filled[valid_mask] = data[valid_mask]
+                filled_qa[valid_mask] = 1.0
+                filled_qa = filled_qa * 100
+                filled_qa[filled_qa == 0.0] = np.nan
                 return np.reshape(filled.T, orig_shape), np.reshape(
                     filled_qa.T, orig_shape
                 )
-            else:
-                return np.reshape(filled.T, orig_shape)
+
+            filled = self.backend.tsirf(
+                data, self.conv_vect_past, self.conv_vect_future,
+                keep_original_values=True,
+            )
+            return np.reshape(filled.T, orig_shape)
 
     class WhittakerSmooth(Transformer):
         """
