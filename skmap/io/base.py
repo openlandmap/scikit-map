@@ -902,7 +902,12 @@ class RasterData(SKMapBase):
         raster_mask_val=np.nan,
         max_rasters: int = None,
         verbose=False,
+        backend: Union[str, "ComputeBackend"] = "numpy",
     ) -> None:
+        from skmap.compute import get_backend
+
+        self.backend = get_backend(backend)
+
         if isinstance(raster_files, str):
             raster_files = {"default": [raster_files]}
         elif isinstance(raster_files, list):
@@ -1274,6 +1279,10 @@ class RasterData(SKMapBase):
         drop_input: bool = False,
     ):
         """Execute a function over the loaded raster data, yielding per-tile results."""
+
+        # Propagate the compute backend so the runner uses it instead of
+        # hardcoded libraries.
+        process.backend = self.backend
 
         if isinstance(process, SKMapGroupRunner):
             if drop_input:

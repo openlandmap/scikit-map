@@ -9,6 +9,7 @@ def test__static_raster() -> None:
 def test_ndvi_rdata() -> None:
     rdata: RasterData = toy.ndvi_rdata()
     assert list(vars(rdata).keys()) == [
+        "backend",
         "raster_files",
         "verbose",
         "raster_mask",

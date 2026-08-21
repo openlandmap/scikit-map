@@ -19,6 +19,9 @@ class SKMapRunner(SKMapBase, ABC):
         verbose: bool = True,
     ) -> None:
         self.verbose = verbose
+        from skmap.compute import NumpyBackend
+
+        self.backend = NumpyBackend()
 
     @abstractmethod
     def run(self, data, outname: str):
@@ -32,6 +35,9 @@ class SKMapGroupRunner(SKMapBase, ABC):
     def __init__(self, verbose: bool = True, temporal: bool = False) -> None:
         self.verbose = verbose
         self.temporal = temporal
+        from skmap.compute import NumpyBackend
+
+        self.backend = NumpyBackend()
 
         temporal: bool = False
 
