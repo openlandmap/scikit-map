@@ -1276,7 +1276,13 @@ class RasterData(SKMapBase):
         """Execute a function over the loaded raster data, yielding per-tile results."""
 
         if isinstance(process, SKMapGroupRunner):
+            if drop_input:
+                input_groups = self.info[
+                    self.info[RasterData.TEMPORAL_COL] == process.temporal
+                ][RasterData.GROUP_COL].unique().tolist()
             self._group_run(process, group, outname)
+            if drop_input:
+                self.drop(input_groups)
         else:
             process_name = process.__class__.__name__
 
@@ -1726,6 +1732,16 @@ class RasterData(SKMapBase):
         img64 = encodebytes(buffer.getvalue()).decode("ascii")
         return img64
 
+    def _mutate_and_save(self, img, arr, titletext, textfontsize):
+        """Mutate a base shot and render it to PNG in a single worker call.
+
+        Keeps the mutated figure inside the worker process so it is never
+        pickled back to the caller (unpickled matplotlib figures have
+        read-only spines and fail on ``savefig``).
+        """
+
+        return self._op_io(self._mutate_baseshot(img, arr, titletext, textfontsize))
+
     def _percent_clip(self, arr):
         """
         To calculate and scale the band upper and lower limits to generate a composite
@@ -2031,11 +2047,10 @@ class RasterData(SKMapBase):
                 for i in range(img_cnt)
             ]
 
-        int_fig = [f for f in parallel.job(self._mutate_baseshot, args, n_jobs=n_jobs)]
         int_img = [
             j
             for j in parallel.job(
-                self._op_io, [(fig,) for fig in int_fig], n_jobs=n_jobs
+                self._mutate_and_save, args, n_jobs=n_jobs
             )
         ]
 
