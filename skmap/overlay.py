@@ -570,7 +570,12 @@ class SpaceOverlay:
                     chunk_start : chunk_start + max_comb_chunk
                 ]
                 chunk_size = len(key_layer_paths_chunk)
-                data_array = np.empty((chunk_size, n_block_pix), dtype=np.float32)
+                n_block_pix_chunk = np.max(block_height_chunk) * np.max(
+                    block_width_chunk
+                )
+                data_array = np.empty(
+                    (chunk_size, n_block_pix_chunk), dtype=np.float32
+                )
                 perm_vec = range(chunk_size)
                 sb.readDataBlocks(
                     data_array,
