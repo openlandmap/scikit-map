@@ -608,12 +608,6 @@ def read_rasters(
         args,
         n_jobs=n_jobs,
     ):
-        # joblib_args={
-        #  'backend': 'threading',
-        #  'pre_dispatch': math.ceil(n_jobs / 3),
-        #  'batch_size': math.floor(len(args) / n_jobs),
-        #  'return_as': 'generator'
-        # }):
         ttprint(array.shape)
         array_mm[:, :, raster_idx] = array
         if not data_exists:
