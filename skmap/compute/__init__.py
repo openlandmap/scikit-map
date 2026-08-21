@@ -18,8 +18,9 @@ per backend.
 
 from .base import ComputeBackend
 from .numpy_backend import NumpyBackend
+from .numba_backend import NumbaBackend
 
-__all__ = ["ComputeBackend", "NumpyBackend"]
+__all__ = ["ComputeBackend", "NumpyBackend", "NumbaBackend"]
 
 
 def get_backend(name_or_obj):
