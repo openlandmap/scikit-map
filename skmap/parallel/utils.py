@@ -188,20 +188,22 @@ class TilingProcessing:
 
         self.tiles = gpd.read_file(tiling_system_fn)
         self.num_tiles = self.tiles.shape[0]
-        self.base_raster = rasterio.open(base_raster_fn)
+        with rasterio.open(base_raster_fn) as base_raster:
+            self.base_transform = base_raster.transform
+            base_crs = base_raster.crs
 
         tile_epsg = CRS(self.tiles.crs.to_wkt()).to_epsg()
-        raster_epsg = CRS(self.base_raster.crs.to_wkt()).to_epsg()
+        raster_epsg = CRS(base_crs.to_wkt()).to_epsg()
 
         if epsg_checking and tile_epsg != raster_epsg:
             raise Exception(
                 "Different SpatialReference"
                 + f"\n tiling_system_fn:\n{self.tiles.crs.to_wkt()}"
-                + f"\n base_raster_fn:\n{self.base_raster.crs.to_wkt()}"
+                + f"\n base_raster_fn:\n{base_crs.to_wkt()}"
             )
 
         if verbose:
-            pixel_size = self.base_raster.transform[0]
+            pixel_size = self.base_transform[0]
             ttprint(f"Pixel size equal {pixel_size} in {Path(base_raster_fn).name}")
             ttprint(
                 f"{self.num_tiles} tiles available in {Path(tiling_system_fn).name}"
@@ -212,7 +214,7 @@ class TilingProcessing:
         tile = self.tiles.iloc[idx]
         left, bottom, right, top = tile.geometry.bounds
 
-        return tile, from_bounds(left, bottom, right, top, self.base_raster.transform)
+        return tile, from_bounds(left, bottom, right, top, self.base_transform)
 
     def process_one(self, idx: int, func: Callable, *args: any):
         """
@@ -265,10 +267,8 @@ class TilingProcessing:
         :param args: Additional arguments to send to the function.
         :param max_workers: Number of CPU cores to use in the parallelization.
           By default all cores are used.
-        :param use_threads: If ``True`` the parallel processing uses ``ThreadGeneratorLazy``,
-          otherwise it uses ProcessGeneratorLazy.
-        :param progress_bar: If ``True`` the parallel processing uses ``pqdm`` [1] presenting
-          a progress bar and ignoring the ``use_threads``.
+        :param use_threads: Deprecated and ignored (Ray always uses processes).
+        :param progress_bar: Deprecated and ignored.
 
         Examples
         ========
@@ -291,11 +291,6 @@ class TilingProcessing:
         >>> idx_list = [0,10,100]
         >>> result = tiling.process_multiple(idx_list, run, raster_files) # doctest: +SKIP
 
-        References
-        ==========
-
-        [1] `Parallel TQDM <https://pqdm.readthedocs.io/en/latest/readme.html>`_
-
         """
 
         _args = []
@@ -304,31 +299,7 @@ class TilingProcessing:
             tile, window = self._tile_window(idx)
             _args.append((idx, tile, window, *args))
 
-        if progress_bar:
-            try:
-                from pqdm.processes import pqdm as ppqdm
-                from pqdm.threads import pqdm as tpqdm
-
-                pqdm = tpqdm if use_threads else ppqdm
-                results = pqdm(
-                    iter(_args), func, n_jobs=max_workers, argument_type="args"
-                )
-            except ImportError as e:
-                from ..misc import _warn_deps
-
-                _warn_deps(e, "progress bar")
-                progress_bar = False
-
-        if not progress_bar:
-            WorkerPool = ThreadGeneratorLazy if use_threads else ProcessGeneratorLazy
-
-            results = []
-            for r in WorkerPool(
-                func, iter(_args), max_workers=max_workers, chunk=max_workers * 2
-            ):
-                results.append(r)
-
-        return results
+        return list(job(func, iter(_args), n_jobs=max_workers))
 
     def process_all(
         self,
@@ -345,10 +316,8 @@ class TilingProcessing:
         :param args: Additional arguments to send to the function.
         :param max_workers: Number of CPU cores to use in the parallelization.
           By default all cores are used.
-        :param use_threads: If ``True`` the parallel processing uses ``ThreadGeneratorLazy``,
-          otherwise it uses ProcessGeneratorLazy.
-        :param progress_bar: If ``True`` the parallel processing uses ``pqdm`` [1] presenting
-          a progress bar, ignoring the ``use_threads``.
+        :param use_threads: Deprecated and ignored (Ray always uses processes).
+        :param progress_bar: Deprecated and ignored.
 
         Examples
         ========
@@ -363,10 +332,6 @@ class TilingProcessing:
         >>> msg = "Let's crunch some data."
         >>> result = tiling.process_all(run) # doctest: +SKIP
 
-        References
-        ==========
-
-        [1] `Parallel TQDM <https://pqdm.readthedocs.io/en/latest/readme.html>`_
         """
 
         idx_list = range(0, self.num_tiles)
