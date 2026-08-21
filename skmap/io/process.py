@@ -70,28 +70,44 @@ try:
 
             return new_info
 
-        # FIXME: adapt for group_list, ginfo_list
         def run(
-            self, rdata: RasterData, group: str, outname: str = "skmap_{nm}_{gr}_{dt}"
+            self,
+            rdata: RasterData,
+            group_list: list,
+            ginfo_list: list,
+            outname: str = None,
         ):
             if outname is None:
                 outname = "skmap_{nm}_{gr}_{dt}"
 
-            array = rdata._array()
+            new_arrays = []
+            new_infos = []
 
-            result = self._run(array)
+            for group in group_list:
+                rdata._active_group = group
+                array = rdata._array()
 
-            if isinstance(result, tuple) and len(result) >= 2:
-                new_array, new_array_qa = result[0], result[1]
-            else:
-                new_array, new_array_qa = result, None
+                result = self._run(array)
 
-            new_info = self._new_info(rdata, group, outname, self.name)
-            if new_array_qa is not None:
-                new_info += self._new_info(rdata, group, outname, self.name_qa)
-                new_array = np.concatenate([new_array, new_array_qa], axis=-1)
+                if isinstance(result, tuple) and len(result) >= 2:
+                    new_array, new_array_qa = result[0], result[1]
+                else:
+                    new_array, new_array_qa = result, None
 
-            return new_array, DataFrame(new_info)
+                new_info = self._new_info(rdata, group, outname, self.name)
+                if new_array_qa is not None:
+                    new_info += self._new_info(rdata, group, outname, self.name_qa)
+                    new_array = np.concatenate([new_array, new_array_qa], axis=-1)
+
+                new_arrays.append(new_array)
+                new_infos.append(DataFrame(new_info))
+
+            rdata._active_group = None
+
+            new_array = np.concatenate(new_arrays, axis=-1)
+            new_info = pd.concat(new_infos)
+
+            return new_array, new_info
 
         @abstractmethod
         def _run(self, data):
