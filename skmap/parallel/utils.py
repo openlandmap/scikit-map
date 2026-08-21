@@ -199,18 +199,17 @@ def job(
     worker: Callable,
     worker_args: Iterator[tuple],
     n_jobs: int = -1,
-    joblib_args: set = {},
+    **kwargs,
 ):
     """
-    Execute a function in parallel using joblib [1].
+    Execute a function in parallel using Ray [1].
 
     :param worker: Function to execute in parallel.
     :param worker_args: Argument iterator where each element is send
       to separate job.
-    :param joblib_args: Number of CPU cores to use in the parallelization.
+    :param n_jobs: Number of parallel jobs to run the worker function.
       By default all cores are used.
-    :param joblib_args: Joblib argumets to send to ``Parallel class`` [1].
-    :returns: A generator with the return of all workers
+    :returns: A generator with the return of all workers, in submission order.
     :rtype: Generator
 
     Examples
@@ -225,22 +224,42 @@ def job(
     >>> msg = ("I'm running in parallel", )
     >>> args = iter([ (i,msg) for i in range(0,5)])
     >>>
-    >>> for result in parallel.job(worker, args, n_jobs=-1, joblib_args={'backend': 'threading'}): # doctest: +SKIP
+    >>> for result in parallel.job(worker, args): # doctest: +SKIP
     ...   print(result)
 
     References
     ==========
 
-    [1] `joblib.Parallel class <https://joblib.readthedocs.io/en/latest/generated/joblib.Parallel.html#joblib.Parallel>`_
+    [1] `Ray Core <https://docs.ray.io/en/latest/ray-core/walkthrough.html>`_
 
     """
-    from joblib import Parallel, delayed
+    import warnings
 
-    joblib_args["n_jobs"] = n_jobs
+    import ray
 
-    with Parallel(**joblib_args) as parallel:
-        for worker_result in parallel(delayed(worker)(*args) for args in worker_args):
-            yield worker_result
+    if "joblib_args" in kwargs:
+        warnings.warn(
+            "joblib_args is deprecated and ignored; Ray is the only backend",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    ray.init(ignore_reinit_error=True)
+
+    # Map n_jobs to a per-task CPU allocation so that at most n_jobs tasks
+    # run concurrently (n_jobs=-1 uses all available CPUs).
+    total_cpus = int(ray.cluster_resources().get("CPU", CPU_COUNT))
+    if n_jobs <= 0 or n_jobs >= total_cpus:
+        num_cpus = 1
+    else:
+        num_cpus = max(1, total_cpus // n_jobs)
+
+    remote_worker = ray.remote(num_cpus=num_cpus)(worker)
+    refs = [remote_worker.remote(*args) for args in worker_args]
+
+    # ray.get preserves submission order
+    for result in ray.get(refs):
+        yield result
 
 
 def apply_along_axis(
