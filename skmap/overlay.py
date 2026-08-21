@@ -641,15 +641,17 @@ class SpaceTimeOverlay:
         self.verbose = verbose
         self.catalog = catalog
 
-        self.pts[self.col_date] = self.pts[self.col_date].astype(int)
+        if pd.api.types.is_datetime64_any_dtype(self.pts[self.col_date]):
+            year_series = self.pts[self.col_date].dt.year
+        else:
+            year_series = self.pts[self.col_date].astype(int)
         self.year_points = {}
 
         for year in self.catalog.get_groups():
-            self.year_points[year] = self.pts[self.pts[self.col_date] == int(year)]
+            self.year_points[year] = self.pts[year_series == int(year)]
             if len(self.year_points[year]) > 0:
-                year_catalog = catalog.copy()
-                year_catalog.query(
-                    catalog.get_feature_names(), [year]
+                year_catalog = self.catalog.query(
+                    self.catalog.get_feature_names(), [year]
                 )  # 'common' group is retrieved by default
                 self.year_catalogs[year] = year_catalog
 
@@ -667,10 +669,7 @@ class SpaceTimeOverlay:
                     verbose=verbose,
                 )
             else:
-                print(
-                    f"No points to overlay for year {year}, removing it from the catalog"
-                )
-                del catalog.data[year]
+                print(f"No points to overlay for year {year}, skipping it")
 
     def run(
         self,
@@ -692,7 +691,7 @@ class SpaceTimeOverlay:
         """
         self.result: Optional[pd.DataFrame] = None
 
-        for year in self.catalog.get_groups():
+        for year in self.overlay_objs:
             if self.verbose:
                 ttprint(f"Running the overlay for {year}")
             year_result = self.overlay_objs[year].run(max_ram_mb, None, gdal_opts)
