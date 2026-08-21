@@ -376,7 +376,7 @@ class DataCatalog:
     def _get_whales(self):
         return self.get_whales(self.data)
 
-    def query(self, feature_names, groups: Optional[list[str]] = None) -> None:
+    def query(self, feature_names, groups: Optional[list[str]] = None) -> "DataCatalog":
         """Return a filtered copy of the catalog matching a query expression on its columns."""
 
         if groups is None:
@@ -385,34 +385,36 @@ class DataCatalog:
             raise ValueError("Invalid `groups` parameter. Expecting a list.")
         if "common" not in groups:  # include 'common' group by default
             groups = groups + ["common"]
-        old_data = self.data.copy()
-        self.data = {}
-        self.data_size = 0
+        old_data = self.data
+        new_data = {}
+        new_data_size = 0
         for k in groups:
             if k in old_data:
                 for f in feature_names:
                     if f in old_data[k]:
-                        if k not in self.data:
-                            self.data[k] = {}
-                        self.data[k][f] = {
+                        if k not in new_data:
+                            new_data[k] = {}
+                        new_data[k][f] = {
                             "path": old_data[k][f]["path"],
-                            "idx": self.data_size,
+                            "idx": new_data_size,
                         }
-                        self.data_size += 1
+                        new_data_size += 1
             else:
                 print(f"Group {k} is missing from original catalog, skipping it")
-        self._expand_whales_dependencies(old_data)
+        new_catalog = DataCatalog(new_data, new_data_size)
+        new_catalog._expand_whales_dependencies(old_data)
         missing_features_names = [
             feature
             for feature in feature_names
-            if feature not in set(self.get_feature_names())
+            if feature not in set(new_catalog.get_feature_names())
         ]
         for missing_feat_feature in missing_features_names:
             print(
                 f"WARNING: Feature {missing_feat_feature} is missing in the original catalog, adding is in the otf (on the fly) common group"
             )
         if missing_features_names:
-            self.add_otf_features(missing_features_names)
+            new_catalog.add_otf_features(missing_features_names)
+        return new_catalog
 
     def add_otf_features(self, otf_features) -> None:
         """Add on-the-fly (derived) features to the catalog from a definition list."""
