@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <mutex>
+#include <unordered_map>
 
 namespace skmap {
 
@@ -344,12 +345,18 @@ void IoArray::extractOverlay(std::vector<uint_t> pix_block_ids,
                              Eigen::Ref<MatFloat> data_overlay) {
   uint_t n_pix = pix_block_ids.size();
   uint_t n_bids = unique_blocks_ids_comb.size();
+  // block_id -> position in the chunk, for O(1) lookup instead of O(n_bids) scan
+  std::unordered_map<uint_t, uint_t> block_pos;
+  block_pos.reserve(n_bids);
+  for (uint_t j = 0; j < n_bids; j++) {
+    block_pos[unique_blocks_ids_comb[j]] = j;
+  }
   auto extractOverlayPix = [&](uint_t i) {
     uint bid = pix_block_ids[i];
-    uint pid = pix_inblock_idxs[i];
-    for (uint_t j = 0; j < n_bids; j++) {
-      if (unique_blocks_ids_comb[j] == bid)
-        data_overlay(key_layer_ids_comb[j], i) = m_data(j, pid);
+    auto it = block_pos.find(bid);
+    if (it != block_pos.end()) {
+      uint_t j = it->second;
+      data_overlay(key_layer_ids_comb[j], i) = m_data(j, pix_inblock_idxs[i]);
     }
   };
   this->parForRange(extractOverlayPix, n_pix);
