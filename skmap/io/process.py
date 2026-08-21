@@ -117,6 +117,20 @@ try:
         def __init__(self, verbose: bool = True, temporal=False) -> None:
             super().__init__(verbose=verbose, temporal=temporal)
 
+        def _resize_for_output(self, rdata, n_new_bands):
+            """Grow ``rdata.array`` by ``n_new_bands`` so workers can write new bands in place."""
+            if n_new_bands <= 0:
+                return
+            idx_offset = rdata._idx_offset()
+            new_shape = (
+                rdata.array.shape[0],
+                rdata.array.shape[1],
+                idx_offset + n_new_bands,
+            )
+            resized = new_memmap(rdata.array.dtype, new_shape)
+            resized[:, :, : rdata.array.shape[2]] = rdata.array
+            rdata.array = resized
+
         def run(
             self,
             rdata: RasterData,
@@ -554,7 +568,7 @@ try:
             n_gaps = np.sum((np.isnan(y)).astype("int"))
 
             if n_gaps == 0:
-                r = splu(self.coefmat).solve(y)
+                r = self.backend.sparse_solve(self.coefmat, y)
                 return r
             else:
                 return y
@@ -565,7 +579,7 @@ try:
             D = self._speyediff(m, self.d, format="csc")
             self.coefmat = E + self.lmbd * D.conj().T.dot(D)
 
-            return parallel.apply_along_axis(
+            return self.backend.apply_along_axis(
                 self._process_ts, 2, data, n_jobs=self.n_jobs
             )
 
@@ -910,7 +924,7 @@ try:
 
         def _find_peaks(self, data):
             if self.scale_expr is not None:
-                data = ne.evaluate(self.scale_expr, {"data": data})
+                data = self.backend.evaluate(self.scale_expr, {"data": data})
 
             has_nan = np.sum(np.isnan(data).astype("int"))
 
@@ -922,7 +936,7 @@ try:
             result = np.empty((len(idxs) * 2))
 
             if has_nan == 0:
-                peaks, _ = find_peaks(
+                peaks, _ = self.backend.find_peaks(
                     data,
                     height=self.min_height,
                     prominence=self.min_prominence,
@@ -950,7 +964,7 @@ try:
 
         def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
-            result = np.apply_along_axis(self._find_peaks, 2, array[i0_0:i0_1, :, i2])
+            result = self.backend.apply_along_axis(self._find_peaks, 2, array[i0_0:i0_1, :, i2])
             o2 = list(range(idx_offset, idx_offset + result.shape[2]))
             array[i0_0:i0_1, :, o2] = result
 
@@ -990,6 +1004,9 @@ try:
                 end_dt_max = ginfo[RasterData.END_DT_COL].max()
 
                 ts_size = ginfo.shape[0]
+
+                n_seasons = ts_size // self.season_size
+                self._resize_for_output(rdata, len(self.name_misc) * n_seasons)
 
                 args = self._args(rdata, ginfo)
 
@@ -1043,7 +1060,7 @@ try:
 
         def _theil_slopes(self, data):
             if self.scale_expr is not None:
-                data = ne.evaluate(self.scale_expr, {"data": data})
+                data = self.backend.evaluate(self.scale_expr, {"data": data})
 
             has_nan = np.sum(np.isnan(data).astype("int"))
 
@@ -1052,7 +1069,7 @@ try:
             )
 
             if has_nan == 0:
-                result[0], _, _, _ = theilslopes(data, np.arange(0, data.shape[0]))
+                result[0], _, _, _ = self.backend.theilslopes(data, np.arange(0, data.shape[0]))
             else:
                 result[0] = np.nan
             result[0] *= self.scaling
@@ -1060,7 +1077,7 @@ try:
 
         def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
-            result = np.apply_along_axis(self._theil_slopes, 2, array[i0_0:i0_1, :, i2])
+            result = self.backend.apply_along_axis(self._theil_slopes, 2, array[i0_0:i0_1, :, i2])
             o2 = list(range(idx_offset, idx_offset + result.shape[2]))
             array[i0_0:i0_1, :, o2] = result
 
@@ -1099,7 +1116,7 @@ try:
                 start_dt_min = ginfo[RasterData.START_DT_COL].min()
                 end_dt_max = ginfo[RasterData.END_DT_COL].max()
 
-                ginfo.shape[0]
+                self._resize_for_output(rdata, 1)
 
                 args = self._args(rdata, ginfo)
 
@@ -1149,7 +1166,7 @@ try:
 
         def _find_min_max(self, data):
             if self.scale_expr is not None:
-                data = ne.evaluate(self.scale_expr, {"data": data})
+                data = self.backend.evaluate(self.scale_expr, {"data": data})
 
             ts_size = data.shape[0]
 
@@ -1174,7 +1191,7 @@ try:
 
         def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
-            result = np.apply_along_axis(self._find_min_max, 2, array[i0_0:i0_1, :, i2])
+            result = self.backend.apply_along_axis(self._find_min_max, 2, array[i0_0:i0_1, :, i2])
             o2 = list(range(idx_offset, idx_offset + result.shape[2]))
             array[i0_0:i0_1, :, o2] = result
 
@@ -1214,6 +1231,8 @@ try:
                 end_dt_max = ginfo[RasterData.END_DT_COL].max()
 
                 ts_size = ginfo.shape[0]
+
+                self._resize_for_output(rdata, ts_size // self.season_size)
 
                 args = self._args(rdata, ginfo)
 
@@ -1299,13 +1318,13 @@ try:
                     nan_result[:] = np.nan
                     return nan_result
 
-                res = STL(
+                res = self.backend.stl_decompose(
                     data.copy(),
                     period=self.season_size,
                     seasonal=self.season_smoother,
                     trend=self.trend_smoother,
                     robust=True,
-                ).fit()
+                )
 
                 y = res.trend
 
@@ -1318,8 +1337,7 @@ try:
                 X = np.array(range(0, y_size)) / y_size
 
                 X = sm.add_constant(X)
-                model = sm.OLS(y, X)
-                results = model.fit()
+                results = self.backend.ols(y, X)
 
                 result_stack = np.stack(
                     [results.params, results.bse, results.tvalues, results.pvalues],
@@ -1343,65 +1361,75 @@ try:
         def _run(
             self,
             rdata: RasterData,
-            group: str,
+            group_list: list,
+            ginfo_list: list,
             outname: str = "skmap_{gr}.{nm}_{pr}_{dt}",
         ):
-            array = rdata._array()
-            info = rdata._info()
+            new_arrays = []
+            new_infos = []
 
-            start_dt_min = rdata.info[RasterData.START_DT_COL].min()
-            end_dt_max = rdata.info[RasterData.END_DT_COL].max()
+            for group, ginfo in zip(group_list, ginfo_list):
+                rdata._active_group = group
+                array = rdata._array()
+                info = rdata._info()
 
-            new_array = parallel.apply_along_axis(
-                self._trend_regression, axis=2, arr=array, n_jobs=self.n_jobs
-            )
+                start_dt_min = ginfo[RasterData.START_DT_COL].min()
+                end_dt_max = ginfo[RasterData.END_DT_COL].max()
 
-            new_info = []
-
-            for index, row in info.iterrows():
-                start_dt = row[RasterData.START_DT_COL]
-                end_dt = row[RasterData.END_DT_COL]
-
-                nm, pr = ("trend", "m")
-
-                name = rdata._set_date(
-                    outname, start_dt, end_dt, nm=nm, pr=pr, gr=group
+                new_array = self.backend.apply_along_axis(
+                    self._trend_regression, axis=2, arr=array, n_jobs=self.n_jobs
                 )
 
-                new_group = f"{group}.{nm}.{pr}"
+                new_info = []
 
-                new_info.append(
-                    rdata._new_info_row(
-                        rdata.base_raster,
-                        group=new_group,
-                        name=name,
-                        dates=[start_dt, end_dt],
+                for index, row in info.iterrows():
+                    start_dt = row[RasterData.START_DT_COL]
+                    end_dt = row[RasterData.END_DT_COL]
+
+                    nm, pr = ("trend", "m")
+
+                    name = rdata._set_date(
+                        outname, start_dt, end_dt, nm=nm, pr=pr, gr=group
                     )
-                )
 
-            ts_size = array.shape[2]
+                    new_group = f"{group}.{nm}.{pr}"
 
-            for i, (nm, pr, scale) in zip(
-                range(0, len(self.name_misc)), self.name_misc
-            ):
-                new_array[:, :, ts_size + i] *= scale
-
-                name = rdata._set_date(
-                    outname, start_dt_min, end_dt_max, nm=nm, pr=pr, gr=group
-                )
-
-                new_group = f"{group}.{nm}.{pr}"
-
-                new_info.append(
-                    rdata._new_info_row(
-                        rdata.base_raster,
-                        group=new_group,
-                        name=name,
-                        dates=[start_dt_min, end_dt_max],
+                    new_info.append(
+                        rdata._new_info_row(
+                            rdata.base_raster,
+                            group=new_group,
+                            name=name,
+                            dates=[start_dt, end_dt],
+                        )
                     )
-                )
 
-            return new_array, DataFrame(new_info)
+                ts_size = array.shape[2]
+
+                for i, (nm, pr, scale) in zip(
+                    range(0, len(self.name_misc)), self.name_misc
+                ):
+                    new_array[:, :, ts_size + i] *= scale
+
+                    name = rdata._set_date(
+                        outname, start_dt_min, end_dt_max, nm=nm, pr=pr, gr=group
+                    )
+
+                    new_group = f"{group}.{nm}.{pr}"
+
+                    new_info.append(
+                        rdata._new_info_row(
+                            rdata.base_raster,
+                            group=new_group,
+                            name=name,
+                            dates=[start_dt_min, end_dt_max],
+                        )
+                    )
+
+                new_arrays.append(new_array)
+                new_infos.append(DataFrame(new_info))
+
+            rdata._active_group = None
+            return np.concatenate(new_arrays, axis=-1), pd.concat(new_infos)
 
     class Calc(SKMapRunner):
         def __init__(
