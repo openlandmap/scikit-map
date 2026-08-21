@@ -607,7 +607,6 @@ def read_rasters(
         _read_raster,
         args,
         n_jobs=n_jobs,
-        joblib_args={"backend": "loky", "return_as": "generator"},
     ):
         # joblib_args={
         #  'backend': 'threading',
@@ -876,7 +875,6 @@ def save_rasters(
         _save_raster,
         args,
         n_jobs=n_jobs,
-        joblib_args={"backend": "loky", "return_as": "generator"},
     ):
         if on_each_outfile is not None:
             on_each_outfile(out_raster)
