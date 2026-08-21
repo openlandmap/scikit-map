@@ -1511,6 +1511,10 @@ class RasterData(SKMapBase):
             rdata = copy.copy(self)
             rdata.array = self.array[:, :, info.index]
             rdata.info = info
+            # Deep-copy the mutable dicts so the filtered copy cannot corrupt
+            # the original (regression fix: they were shared by reference).
+            rdata.date_args = copy.deepcopy(self.date_args)
+            rdata.raster_files = copy.deepcopy(self.raster_files)
             return rdata
         else:
             self.array = self.array[:, :, info.index]
