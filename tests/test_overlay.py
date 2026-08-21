@@ -21,6 +21,8 @@ class TestOverlayBase:
     TOY_DIR = REPO_ROOT / "skmap/data/toy"
     ELEV_NAME = "elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3"
     ELEV_FILE = TOY_DIR / "static" / (ELEV_NAME + ".tif")
+    SLOPE_NAME = "slope.percent_gedi.eml_m_30m_s_20000101_20181231_nl_epsg.3035_v0.3"
+    SLOPE_FILE = TOY_DIR / "static" / (SLOPE_NAME + ".tif")
 
     PTS_X = [4021600, 4024200]
     PTS_Y = [3216130, 3215420]
@@ -120,6 +122,35 @@ class TestSpaceOverlay(TestOverlayBase):
         assert res.shape == (2, 3)
         assert list(res.columns) == ["lon", "lat", "elev"]
         assert res["elev"].tolist() == [70.0, 284.0]
+
+    def test_run_multiple_layers_same_group(self) -> None:
+        # Regression: a group with more than one layer used to return NaN for
+        # every layer except the last one (extractOverlay hash-map collapse).
+        catalog = DataCatalog.create_catalog(
+            catalog_def=pd.DataFrame(
+                {
+                    "layer_name": ["elev", "slope"],
+                    "path": [
+                        "{base_path}/" + self.ELEV_NAME + ".tif",
+                        "{base_path}/" + self.SLOPE_NAME + ".tif",
+                    ],
+                    "type": ["common", "common"],
+                }
+            ),
+            years=[2020],
+            base_path=str(self.TOY_DIR / "static"),
+        )
+        so = SpaceOverlay(
+            points=gpd.GeoDataFrame(
+                geometry=[Point(x, y) for x, y in zip(self.PTS_X, self.PTS_Y)],
+                crs=self.PTS_CRS,
+            ),
+            catalog=catalog,
+        )
+        res = so.run(max_ram_mb=512, out_file_name=None)
+        assert list(res.columns) == ["lon", "lat", "elev", "slope"]
+        assert res["elev"].tolist() == [70.0, 284.0]
+        assert res["slope"].tolist() == [31.0, 59.0]
 
     def test_out_of_extent_dropped(self) -> None:
         so = SpaceOverlay(

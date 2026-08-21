@@ -3,6 +3,7 @@
 #include <fstream>
 #include <mutex>
 #include <unordered_map>
+#include <utility>
 
 namespace skmap {
 
@@ -345,18 +346,21 @@ void IoArray::extractOverlay(std::vector<uint_t> pix_block_ids,
                              Eigen::Ref<MatFloat> data_overlay) {
   uint_t n_pix = pix_block_ids.size();
   uint_t n_bids = unique_blocks_ids_comb.size();
-  // block_id -> position in the chunk, for O(1) lookup instead of O(n_bids) scan
-  std::unordered_map<uint_t, uint_t> block_pos;
-  block_pos.reserve(n_bids);
+  // block_id -> list of (layer_id, position) pairs. A block appears once per
+  // layer, so a single position per block is not enough: the previous hash-map
+  // version kept only the last layer and left the earlier ones as NaN.
+  std::unordered_map<uint_t, std::vector<std::pair<uint_t, uint_t>>> block_layers;
+  block_layers.reserve(n_bids);
   for (uint_t j = 0; j < n_bids; j++) {
-    block_pos[unique_blocks_ids_comb[j]] = j;
+    block_layers[unique_blocks_ids_comb[j]].emplace_back(key_layer_ids_comb[j], j);
   }
   auto extractOverlayPix = [&](uint_t i) {
     uint bid = pix_block_ids[i];
-    auto it = block_pos.find(bid);
-    if (it != block_pos.end()) {
-      uint_t j = it->second;
-      data_overlay(key_layer_ids_comb[j], i) = m_data(j, pix_inblock_idxs[i]);
+    auto it = block_layers.find(bid);
+    if (it != block_layers.end()) {
+      for (const auto &layer_pos : it->second) {
+        data_overlay(layer_pos.first, i) = m_data(layer_pos.second, pix_inblock_idxs[i]);
+      }
     }
   };
   this->parForRange(extractOverlayPix, n_pix);
