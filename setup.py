@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import sys
 
-from setuptools import Extension, setup
+from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
 
@@ -93,7 +93,8 @@ else:
 setup(
     name="scikit-map",
     version="0.9.1",
-    packages=["skmap"],
+    packages=find_packages(),
+    package_data={"skmap.data": ["toy/*/*.tif", "toy/*/*.gpkg", "toy/*/*/*.tif"]},
     ext_modules=[CMakeExtension("skmap_bindings", ".")],
     cmdclass={"build_ext": CMakeBuild},
     data_files=[("", ["skmap_bindings.pyi"])],
