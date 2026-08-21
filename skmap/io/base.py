@@ -1348,7 +1348,17 @@ class RasterData(SKMapBase):
         new_array, new_info = process.run(self, group_list, ginfo_list, outname)
 
         if new_array is not None:
-            self.array = np.concatenate([self.array, new_array], axis=-1)
+            combined = new_memmap(
+                self.array.dtype,
+                (
+                    self.array.shape[0],
+                    self.array.shape[1],
+                    self.array.shape[2] + new_array.shape[2],
+                ),
+            )
+            combined[:, :, : self.array.shape[2]] = self.array
+            combined[:, :, self.array.shape[2] :] = new_array
+            self.array = combined
 
         to_add_info.append(new_info)
 
@@ -1376,7 +1386,12 @@ class RasterData(SKMapBase):
         self._verbose(f"Dropping data and info for groups: {group}")
         idx = self.info[self.info[RasterData.GROUP_COL].isin(group)].index
         keep_idx = [i for i in range(self.array.shape[2]) if i not in set(idx)]
-        self.array = self.array[:, :, keep_idx]
+        new_arr = new_memmap(
+            self.array.dtype,
+            (self.array.shape[0], self.array.shape[1], len(keep_idx)),
+        )
+        new_arr[:, :, :] = self.array[:, :, keep_idx]
+        self.array = new_arr
         self.info = self.info.drop(idx).reset_index(drop=True)
 
         return self
