@@ -105,23 +105,17 @@ class _ParallelOverlay:
         path = row["path"]
         if _ParallelOverlay._is_tiled(path):
             path = path.replace(_ParallelOverlay.TILE_PLACEHOLDER, default_tile_id)
-        src = rasterio.open(path)
-
-        row["nodata"] = src.nodata
-        _, window = next(src.block_windows(1))
-        row["block_height"] = window.height
-        row["block_width"] = window.width
-
-        key = "".join(
-            [
-                str(default_tile_id),
-                str(src.height),
-                str(src.width),
-                str(src.block_shapes[0]),
-                str(src.transform.to_gdal()),
-            ]
-        )
-        row["group"] = str(hashlib.md5(key.encode("utf-8")).hexdigest())
+        with rasterio.open(path) as src:
+            key = "".join(
+                [
+                    str(default_tile_id),
+                    str(src.height),
+                    str(src.width),
+                    str(src.block_shapes[0]),
+                    str(src.transform.to_gdal()),
+                ]
+            )
+            row["group"] = str(hashlib.md5(key.encode("utf-8")).hexdigest())
 
         return row
 
