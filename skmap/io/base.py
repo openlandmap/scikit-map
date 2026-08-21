@@ -1197,7 +1197,8 @@ class RasterData(SKMapBase):
 
         return self
 
-    def _base_raster(self) -> Optional[bool]:
+    def _has_base_raster(self) -> bool:
+        """Return True if at least one referenced raster is reachable."""
         for filepath in list(self.info[RasterData.PATH_COL]):
             if "http" in filepath:
                 res = requests.head(filepath)
@@ -1206,6 +1207,7 @@ class RasterData(SKMapBase):
             else:
                 if Path(filepath).exists():
                     return True
+        return False
 
     def read(
         self,
@@ -1218,7 +1220,12 @@ class RasterData(SKMapBase):
         scale: float = 1,
         gdal_opts: dict = {},
     ):
-        """Read the selected layers into memory (or a memmap) and return the data array."""
+        """Read the selected layers into a memmap and return ``self``.
+
+        Side effects: sets ``self.window``, ``self.bounds``, ``self.base_raster``
+        (the path of the first reachable raster, used as a geometry reference
+        by runners and ``to_dir``/``to_s3``) and ``self.array`` (the 3-D memmap).
+        """
 
         self.window = window
         self.bounds = bounds
