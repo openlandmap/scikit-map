@@ -35,6 +35,22 @@ class TestDataCatalog:
             }
         ) == (["/whale/expr"], ["common"], ["example"])
 
+    def test_query_returns_copy(self) -> None:
+        catalog = DataCatalog(
+            {
+                "2015": {"elev": {"path": "/tmp/elev_2015.tif", "idx": 0}},
+                "2016": {"elev": {"path": "/tmp/elev_2016.tif", "idx": 1}},
+            },
+            2,
+        )
+        filtered = catalog.query(catalog.get_feature_names(), ["2015"])
+        assert isinstance(filtered, DataCatalog)
+        assert filtered.get_groups() == ["2015"]
+        assert filtered.data_size == 1
+        # the original catalog must be left untouched
+        assert catalog.get_groups() == ["2015", "2016"]
+        assert catalog.data_size == 2
+
     def test_create_catalog_minimal(self) -> None:
         catalog = DataCatalog.create_catalog(
             catalog_def=pd.DataFrame(

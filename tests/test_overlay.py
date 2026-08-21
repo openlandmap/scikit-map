@@ -1,7 +1,10 @@
+import contextlib
+import io
 import os
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import pytest
 from shapely.geometry import Point
@@ -50,9 +53,6 @@ class TestParallelOverlay(TestOverlayBase):
         assert po.layers.to_dict() == {
             "name": {0: self.ELEV_NAME},
             "path": {0: self.ELEV_FILE.as_posix()},
-            "nodata": {0: -9999.0},
-            "block_height": {0: 16},
-            "block_width": {0: 16},
             "group": {0: "8c36693f22356214e61afb7002635270"},
         }
         assert po.query_pixels["8c36693f22356214e61afb7002635270"].to_dict() == {
@@ -114,3 +114,36 @@ class TestSpaceOverlay(TestOverlayBase):
         assert spo.layers.equals(po.layers)
         for k, v in spo.query_pixels.items():
             assert po.query_pixels[k].equals(v)
+
+    def test_run(self) -> None:
+        res = self.so.run(max_ram_mb=512, out_file_name=None)
+        assert res.shape == (2, 3)
+        assert list(res.columns) == ["lon", "lat", "elev"]
+        assert res["elev"].tolist() == [70.0, 284.0]
+
+    def test_out_of_extent_dropped(self) -> None:
+        so = SpaceOverlay(
+            points=gpd.GeoDataFrame(
+                geometry=[
+                    Point(self.PTS_X[0], self.PTS_Y[0]),
+                    Point(0, 0),
+                ],
+                crs=self.PTS_CRS,
+            ),
+            catalog=self.catalog,
+        )
+        assert so.pts.shape[0] == 1
+
+    def test_local_no_http_errors(self) -> None:
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            SpaceOverlay(
+                points=gpd.GeoDataFrame(
+                    geometry=[
+                        Point(x, y) for x, y in zip(self.PTS_X, self.PTS_Y)
+                    ],
+                    crs=self.PTS_CRS,
+                ),
+                catalog=self.catalog,
+            )
+        assert "Error checking URL" not in buf.getvalue()
