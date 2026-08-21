@@ -1345,7 +1345,10 @@ class RasterData(SKMapBase):
         start = time.time()
         self._verbose(f"Running {process_name}" + f" {len(group_list)} groups")
 
-        _, new_info = process.run(self, group_list, ginfo_list, outname)
+        new_array, new_info = process.run(self, group_list, ginfo_list, outname)
+
+        if new_array is not None:
+            self.array = np.concatenate([self.array, new_array], axis=-1)
 
         to_add_info.append(new_info)
 
@@ -1372,7 +1375,9 @@ class RasterData(SKMapBase):
 
         self._verbose(f"Dropping data and info for groups: {group}")
         idx = self.info[self.info[RasterData.GROUP_COL].isin(group)].index
-        self.info = self.info.drop(idx)
+        keep_idx = [i for i in range(self.array.shape[2]) if i not in set(idx)]
+        self.array = self.array[:, :, keep_idx]
+        self.info = self.info.drop(idx).reset_index(drop=True)
 
         return self
 
