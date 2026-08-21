@@ -1,5 +1,7 @@
 import hashlib
 import itertools
+import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Union
 
@@ -17,6 +19,20 @@ import skmap_bindings as sb
 from skmap import parallel
 from skmap.catalog import DataCatalog, run_whales
 from skmap.misc import ttprint
+
+
+def _url_reachable(url: str) -> bool:
+    """Return True if a remote URL responds (non-404) or a local path exists."""
+
+    if url.startswith(("http://", "https://")):
+        try:
+            return requests.head(url, timeout=10).status_code != 404
+        except requests.RequestException as e:
+            print(f"Error checking URL {url}: {e}")
+            return True
+    if url.startswith("/vsi"):
+        return True  # GDAL virtual filesystem, can't HEAD
+    return os.path.exists(url)
 
 
 class _ParallelOverlay:
@@ -299,13 +315,11 @@ class SpaceOverlay:
             processed_urls.append(url)
 
         urls_with_404 = []
-        for url in processed_urls:
-            try:
-                response = requests.head(url, timeout=10)
-                if response.status_code == 404:
-                    urls_with_404.append(url)
-            except requests.RequestException as e:
-                print(f"Error checking URL {url}: {e}")
+        with ThreadPoolExecutor(max_workers=n_threads) as ex:
+            reachable = list(ex.map(_url_reachable, processed_urls))
+        urls_with_404 = [
+            url for url, ok in zip(processed_urls, reachable) if not ok
+        ]
 
         if self.verbose:
             ttprint(
