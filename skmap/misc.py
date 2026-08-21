@@ -387,7 +387,7 @@ def vrt_warp(
     args_vrt = []
     tr_arr = []
     for raster_file, bounds, crs, tr1 in parallel.job(
-        _bounds_crs, args, n_jobs=n_jobs, joblib_args={"backend": "multiprocessing"}  # ty:ignore[invalid-argument-type]
+        _bounds_crs, args, n_jobs=n_jobs
     ):
         total_bounds.append(box(*bounds))
         tr_arr.append(tr1)
@@ -400,7 +400,7 @@ def vrt_warp(
     vrt_files = []
     input_files = []
     for input_file, vrt_file in parallel.job(
-        _build_vrt, args_vrt, n_jobs=-1, joblib_args={"backend": "multiprocessing"}  # ty:ignore[invalid-argument-type]
+        _build_vrt, args_vrt, n_jobs=-1
     ):
         input_files.append(input_file)
         vrt_files.append(vrt_file)
