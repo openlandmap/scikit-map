@@ -15,7 +15,10 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Callable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
+
+if TYPE_CHECKING:
+    from skmap.compute import ComputeBackend
 from uuid import uuid4
 
 import numpy
