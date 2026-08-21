@@ -47,14 +47,14 @@ class NumpyBackend(ComputeBackend):
         return bn.nanmedian(arr, axis=axis)
 
     def nanpercentile(self, arr, q, axis):
-        from skmap.misc import nan_percentile
-
-        # nan_percentile reduces along axis 0 and mutates the input in
-        # place, so transpose the target axis to position 0 and pass a copy.
-        if arr.ndim == 3:
-            moved = np.moveaxis(arr, axis, 0)
-            return nan_percentile(moved.copy(), q=q).transpose((1, 2, 0))
-        return np.nanpercentile(arr, q, axis=axis)
+        # Use np.nanpercentile for consistent semantics across all backends.
+        # (The legacy skmap.misc.nan_percentile NaNs single-observation pixels
+        # except the median; np.nanpercentile returns the single value, which
+        # is the mathematically well-defined behaviour shared by Numba/Cpp.)
+        # numpy puts the percentile axis at position 0; move it to the original
+        # axis position so the result shape matches the other backends.
+        result = np.nanpercentile(arr, q, axis=axis)
+        return np.moveaxis(result, 0, axis)
 
     # --- elementwise ---------------------------------------------------
 

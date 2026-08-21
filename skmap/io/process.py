@@ -617,11 +617,13 @@ try:
                     self.percs.append(int(op[1:]))
                 else:
                     method = f"nan{op}"
+                    # Validate against the NumpyBackend (the reference); the
+                    # actual dispatch happens through self.backend at runtime.
                     if not hasattr(bn, method):
                         raise Exception(
                             f"Operation {method} is invalid, since bottleneck.{method} not exists."
                         )
-                    self.bn_ops.append((op, getattr(bn, method)))
+                    self.bn_ops.append(op)
 
         def _op_name(self, op):
             if op in self.rename_operations:
@@ -635,8 +637,9 @@ try:
             ops = []
             _idxs = []
 
-            for op, method in self.bn_ops:
-                array[:, :, new_idx : new_idx + 1] = method(
+            for op in self.bn_ops:
+                reduce = getattr(self.backend, f"nan{op}")
+                array[:, :, new_idx : new_idx + 1] = reduce(
                     array[:, :, array_idx], axis=-1
                 )[:, :, np.newaxis]
                 _idxs.append(new_idx)
@@ -647,9 +650,9 @@ try:
             if len(self.percs) > 0:
                 perc_idx = list(range(new_idx, new_idx + len(self.percs)))
                 in_array = array[:, :, array_idx]  # array[:,:,array_idx].copy()
-                array[:, :, perc_idx] = nan_percentile(
-                    in_array.transpose((2, 0, 1)), q=self.percs
-                ).transpose((1, 2, 0))
+                array[:, :, perc_idx] = self.backend.nanpercentile(
+                    in_array, q=self.percs, axis=-1
+                )
                 new_idx += len(self.percs)
                 _idxs += perc_idx
 
@@ -658,7 +661,7 @@ try:
 
             if self.post_expression is not None and len(_idxs) > 0:
                 for idx in _idxs:
-                    array[:, :, idx] = ne.evaluate(
+                    array[:, :, idx] = self.backend.evaluate(
                         self.post_expression, local_dict={"new_array": array[:, :, idx]}
                     )
 
@@ -1444,7 +1447,7 @@ try:
                     idx = gmap[group]
                 else:
                     idx = new_gmap[group]
-                array[:, :, idx] = ne.evaluate(expression, local_dict=array_dict)
+                array[:, :, idx] = self.backend.evaluate(expression, local_dict=array_dict)
 
             fidx = list(gmap.values())[0]
 
@@ -1452,20 +1455,35 @@ try:
 
         def run(self, rdata: RasterData, outname: str = "skmap_{gr}_{dt}"):
             self.groups = list(rdata.info[RasterData.GROUP_COL].unique())
-            # n_dates = rdata.info[self.date_cols].value_counts().shape[0]
 
             self.new_groups = []
             for key in self.expressions.keys():
                 if key not in self.groups:
                     self.new_groups.append(key)
 
+            n_new_groups = len(self.new_groups)
+            # Count the date groups so we can resize the array up front.
+            n_date_groups = len(list(rdata.info.groupby(self.date_cols)))
+            n_new_rasters = n_new_groups * n_date_groups
+
+            idx_offset = rdata._idx_offset()
+
+            # Resize the array to accommodate the new output bands.
+            if n_new_rasters > 0:
+                new_shape = (
+                    rdata.array.shape[0],
+                    rdata.array.shape[1],
+                    idx_offset + n_new_rasters,
+                )
+                resized = new_memmap(rdata.array.dtype, new_shape)
+                resized[:, :, : rdata.array.shape[2]] = rdata.array
+                rdata.array = resized
+
             args = []
 
             ref_array = ref_memmap(rdata.array)
 
-            idx_offset = rdata._idx_offset()
             idx_counter = 0
-            n_new_groups = len(self.new_groups)
             for _, rows in rdata.info.groupby(self.date_cols):
                 gidx = rows.index
                 ggroup = list(rdata.info.iloc[gidx]["group"])
@@ -1533,7 +1551,7 @@ try:
 
             for group in self.expressions.keys():
                 expression = self.expressions[group]
-                array_dict[group] = ne.evaluate(expression, local_dict=array_dict)
+                array_dict[group] = self.backend.evaluate(expression, local_dict=array_dict)
 
             return array_dict
 
