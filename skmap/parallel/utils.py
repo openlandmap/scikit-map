@@ -2,17 +2,13 @@
 Parallelization helpers based in thread/process pools and joblib
 """
 
-import gc
 import multiprocessing
-import time
-from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, as_completed, wait
 from pathlib import Path
 from typing import Any, Callable, Iterator, List, Union
 
 import geopandas as gpd
 import numpy
 import numpy as np
-import psutil
 import rasterio
 from rasterio.mask import mask
 from rasterio.windows import from_bounds
@@ -24,23 +20,6 @@ CPU_COUNT = multiprocessing.cpu_count()
 """
 Number of CPU cores available.
 """
-
-
-def _mem_usage() -> float:
-    mem = psutil.virtual_memory()
-    return mem.used / mem.total
-
-
-def _run_task(i, task, mem_usage_limit, mem_check_interval, mem_check, verbose, *args):
-    while _mem_usage() > mem_usage_limit and mem_check:
-        if verbose:
-            ttprint(
-                f"Memory usage in {_mem_usage():.2f}%, stopping workers for {task.__name__}"
-            )
-        time.sleep(mem_check_interval)
-        gc.collect()
-
-    return task(*args)
 
 
 def job(
@@ -525,21 +504,16 @@ class TilingProcessing:
 class TaskSequencer:
     """
     Execute a pipeline of sequential tasks, in a way that the output of
-    one task is used as input for the next task. For each task,
-    a pool of workers is created, allowing the execution of all the
-    available workers in parallel, for different portions of the input data
+    one task is used as input for the next task. Each task is run in
+    parallel over the input data using ``skmap.parallel.job`` (Ray).
 
     :param tasks: Task definition list, where each element can be: (1) a ``Callable`` function;
       (2) a tuple containing a ``Callable`` function and the number of workers for the task; or
       (3) a tuple containing a ``Callable`` function, the number of workers and an ``bool``
       indication if the task would respect the ``mem_usage_limit``. The default number of
       workers is ``1``.
-    :param mem_usage_limit: Percentage of memory usage that when reached triggers a momentarily stop
-      of execution for specific tasks. For example, if the ``task_1`` is responsible for reading
-      the data and ``task_2`` for processing it, the ``task_1`` definition can receive an
-      ``bool`` indication to respect the ``mem_usage_limit``, allowing the ``task_2`` to process
-      the data that has already been read and releasing memory for the next ``task_1`` reads.
-    :param wait_timeout: Timeout argument used by ``concurrent.futures.wait``.
+    :param mem_usage_limit: Deprecated and ignored (no backpressure in the Ray model).
+    :param wait_timeout: Deprecated and ignored.
     :param verbose: Use ``True`` to print the communication and status of the tasks
 
     Examples
@@ -574,35 +548,26 @@ class TaskSequencer:
         wait_timeout: int = 5,
         verbose: bool = False,
     ) -> None:
-        self.wait_timeout = wait_timeout
-        self.mem_usage_limit = mem_usage_limit
         self.verbose = verbose
-        self.mem_check_interval = 10
 
         self.tasks = []
-        self.pipeline = []
-        self.mem_checks = []
+        self.pool_sizes = []
 
         for task in tasks:
             pool_size = 1
-            mem_check = False
 
             if type(task) is tuple:
                 if len(task) == 2:
                     task, pool_size = task
                 else:
-                    task, pool_size, mem_check = task
+                    task, pool_size, _ = task
 
-            self._verbose(
-                f"Starting {pool_size} worker(s) for {task.__name__} (mem_check={mem_check})"
-            )
+            self._verbose(f"Starting {pool_size} worker(s) for {task.__name__}")
 
             self.tasks.append(task)
-            self.pipeline.append(ProcessPoolExecutor(max_workers=pool_size))
-            self.mem_checks.append(mem_check)
+            self.pool_sizes.append(pool_size)
 
         self.n_tasks = len(self.tasks)
-        self.pipeline_futures = [set() for i in range(0, self.n_tasks)]
 
     def _verbose(self, *args: Any, **kwargs: Any) -> None:
         if self.verbose:
@@ -643,8 +608,8 @@ class TaskSequencer:
         ...     ],
         ...     verbose=True
         ... )
-        [...] Starting 1 worker(s) for rnd_data (mem_check=False)
-        [...] Starting 2 worker(s) for max_value (mem_check=False)
+        [...] Starting 1 worker(s) for rnd_data
+        [...] Starting 2 worker(s) for max_value
         >>>
         >>> taskSeq.run(input_data=[ (const, 10) for const in range(0,3) ]) # doctest: +SKIP
         >>> taskSeq.run(input_data=[ (const, 20) for const in range(3,6) ]) # doctest: +SKIP
@@ -652,65 +617,9 @@ class TaskSequencer:
 
         """
 
-        for i_dta in input_data:
-            self._verbose(f"Submission to {self.tasks[0].__name__}")
+        data = list(input_data)
+        for task, pool_size in zip(self.tasks, self.pool_sizes):
+            self._verbose(f"Running {task.__name__} with {pool_size} worker(s)")
+            data = list(job(task, iter(data), n_jobs=pool_size))
 
-            self.pipeline_futures[0].add(
-                self.pipeline[0].submit(
-                    _run_task,
-                    *(
-                        (
-                            0,
-                            self.tasks[0],
-                            self.mem_usage_limit,
-                            self.mem_check_interval,
-                            self.mem_checks[0],
-                            self.verbose,
-                            *i_dta,
-                        )
-                    ),
-                )
-            )
-
-        keep_going = True
-
-        while keep_going:
-            keep_going_aux = []
-            for i in range(0, self.n_tasks - 1):
-                done, self.pipeline_futures[i] = wait(
-                    self.pipeline_futures[i],
-                    return_when=FIRST_COMPLETED,
-                    timeout=self.wait_timeout,
-                )
-
-                if len(done) > 0:
-                    self._verbose(
-                        f"{self.tasks[i].__name__} state: done={len(done)} waiting={len(self.pipeline_futures[i])}"
-                    )
-
-                for f in done:
-                    nex_i = i + 1
-                    self._verbose(f"Submission to {self.tasks[nex_i].__name__}")
-                    self.pipeline_futures[nex_i].add(
-                        self.pipeline[nex_i].submit(
-                            _run_task,
-                            *(
-                                nex_i,
-                                self.tasks[nex_i],
-                                self.mem_usage_limit,
-                                self.mem_check_interval,
-                                self.mem_checks[nex_i],
-                                self.verbose,
-                                *f.result(),
-                            ),
-                        )
-                    )
-
-                keep_going_aux.append(len(self.pipeline_futures[i]) > 0)
-
-            keep_going = any(keep_going_aux)
-
-        self._verbose(f"Waiting {self.tasks[-1].__name__}")
-        result = [future.result() for future in as_completed(self.pipeline_futures[-1])]
-
-        return result
+        return data
