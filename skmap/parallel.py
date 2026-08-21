@@ -22,6 +22,12 @@ Number of CPU cores available.
 """
 
 
+def _call_worker(worker, args):
+    """Call ``worker(*args)`` (module-level so Ray can serialize it)."""
+
+    return worker(*args)
+
+
 def job(
     worker: Callable,
     worker_args: Iterator[tuple],
@@ -81,8 +87,8 @@ def job(
     else:
         num_cpus = max(1, total_cpus // n_jobs)
 
-    remote_worker = ray.remote(num_cpus=num_cpus)(worker)
-    refs = [remote_worker.remote(*args) for args in worker_args]
+    remote_call = ray.remote(num_cpus=num_cpus)(_call_worker)
+    refs = [remote_call.remote(worker, args) for args in worker_args]
 
     # ray.get preserves submission order
     for result in ray.get(refs):
