@@ -52,7 +52,7 @@ class CMakeBuild(build_ext):
 install_requires = [
     "affine>=2.4.0",
     "geopandas>=0.13.2",
-    "joblib>=1.3.2",
+    "ray>=2.9.0",
     "numpy>=1.24.3",
     "pandas>=2.0.2",
     "requests>=2.31.0",
