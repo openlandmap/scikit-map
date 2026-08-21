@@ -155,6 +155,7 @@ class _ParallelOverlay:
         self, path: str | Path, samples: gpd.GeoDataFrame
     ) -> gpd.GeoDataFrame:
         gdf_blocks = []
+        crs = None
 
         if _ParallelOverlay._is_tiled(path):
             samp_tiles = self.raster_tiles.sjoin(
@@ -173,13 +174,30 @@ class _ParallelOverlay:
                 tile_path = str(path).replace(
                     _ParallelOverlay.TILE_PLACEHOLDER, tile_id
                 )
-                src: rasterio.io.DatasetReader = rasterio.open(tile_path)
-                # read the raster's specific blocks and insert their dimensions into gdf
-                # see https://rasterio.readthedocs.io/en/latest/topics/windowed-rw.html#blocks
+                with rasterio.open(tile_path) as src:
+                    crs = src.crs
+                    # read the raster's specific blocks and insert their dimensions into gdf
+                    # see https://rasterio.readthedocs.io/en/latest/topics/windowed-rw.html#blocks
+                    for (i, j), window in src.block_windows(1):
+                        gdf_blocks.append(
+                            {
+                                "tile_id": tile_id,
+                                "window": window,
+                                "inv_transform": ~rasterio.windows.transform(
+                                    window, src.transform
+                                ),
+                                "geometry": box(
+                                    *rasterio.windows.bounds(window, src.transform)
+                                ),
+                            }
+                        )
+
+        else:
+            with rasterio.open(path) as src:
+                crs = src.crs
                 for (i, j), window in src.block_windows(1):
                     gdf_blocks.append(
                         {
-                            "tile_id": tile_id,
                             "window": window,
                             "inv_transform": ~rasterio.windows.transform(
                                 window, src.transform
@@ -190,27 +208,9 @@ class _ParallelOverlay:
                         }
                     )
 
-        else:
-            src: rasterio.io.DatasetReader = rasterio.open(path)
-
-            for (i, j), window in src.block_windows(1):
-                gdf_blocks.append(
-                    {
-                        "window": window,
-                        "inv_transform": ~rasterio.windows.transform(
-                            window, src.transform
-                        ),
-                        "geometry": box(
-                            *rasterio.windows.bounds(window, src.transform)
-                        ),
-                    }
-                )
-
         # convert list-of-dicts to gdf
-        gdf_blocks = gpd.GeoDataFrame(gdf_blocks, crs=src.crs)
+        gdf_blocks = gpd.GeoDataFrame(gdf_blocks, crs=crs)
         gdf_blocks.reset_index(drop=True, inplace=True)
-
-        src.close()
 
         assert gdf_blocks.crs is not None, f"The layer {path} has not crs, need fix"
 
