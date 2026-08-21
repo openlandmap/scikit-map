@@ -168,7 +168,8 @@ def _make_kernels():
                     v = row[ii]
                     if np.isnan(v):
                         v = 0.0
-                    s += w[j] * v
+                    # flip the kernel to match scipy.ndimage.convolve1d (true convolution)
+                    s += w[nw - 1 - j] * v
             out[i] = s
         return out
 

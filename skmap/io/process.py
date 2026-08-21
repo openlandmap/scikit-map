@@ -215,7 +215,7 @@ try:
             return_den: bool = False,
             keep_original_values: bool = True,
             S=[],
-            backend: str = "dense",
+            conv_backend: str = "dense",
             n_jobs: int = os.cpu_count(),
             verbose=False,
         ) -> None:
@@ -230,7 +230,9 @@ try:
             self.return_den = return_den
             self.keep_original_values = keep_original_values
             self.S = S
-            self.backend = backend
+            # conv_backend selects the convolution algorithm (dense/sparse/FFT);
+            # the ComputeBackend (self.backend) is set by RasterData.run.
+            self.conv_backend = conv_backend
             self.n_jobs = n_jobs
 
         def _run(self, data):
@@ -286,7 +288,7 @@ try:
                 V_e[~valid_mask] = 0.0
                 M_e = valid_mask.astype(np.float64)
 
-            if self.backend == "dense":
+            if self.conv_backend == "dense":
                 wv_e = np.zeros((n_e,))
                 wv_e[0] = self.wv_0
                 wv_e[1 : n_f + 1] = self.wv_f
@@ -303,23 +305,23 @@ try:
                     Wm_e = circulant(wm_e)
                     Mt_e = np.dot(M_e, Wm_e)[:, 0:n_s]
 
-            elif self.backend == "sparse":
+            elif self.conv_backend == "sparse":
                 n_pad = max(len(self.wv_f), len(self.wv_p))
                 wv_e = np.zeros(n_pad * 2 + 1)
                 wv_e[n_pad] = self.wv_0
                 wv_e[n_pad - len(self.wv_f) : n_pad] = self.wv_f[::-1]
                 wv_e[n_pad + 1 : n_pad + 1 + len(self.wv_p)] = self.wv_p[::-1]
-                Vt_e = convolve1d(V_e[:, 0:n_s], wv_e, mode="constant", cval=0, axis=-1)
+                Vt_e = self.backend.convolve1d(V_e[:, 0:n_s], wv_e, axis=-1, mode="constant", cval=0)
                 if self.use_mask:
                     wm_e = np.zeros(n_pad * 2 + 1)
                     wm_e[n_pad] = self.wm_0
                     wm_e[n_pad - len(self.wm_f) : n_pad] = self.wm_f[::-1]
                     wm_e[n_pad + 1 : n_pad + 1 + len(self.wm_p)] = self.wm_p[::-1]
-                    Mt_e = convolve1d(
-                        M_e[:, 0:n_s], wm_e, mode="constant", cval=0, axis=-1
+                    Mt_e = self.backend.convolve1d(
+                        M_e[:, 0:n_s], wm_e, axis=-1, mode="constant", cval=0
                     )
 
-            elif self.backend == "FFT":
+            elif self.conv_backend == "FFT":
                 wv_e = np.zeros((n_e,))
                 wv_e[0] = self.wv_0
                 wv_e[1 : n_p + 1] = self.wv_p[::-1]
@@ -386,7 +388,7 @@ try:
                     tmp_vec = np.zeros((n_e,), dtype=np.float64)
                     tmp_vec[0:n_s] = 1.0
                     norm_mask = max(
-                        convolve1d(tmp_vec, wm_e, mode="constant", cval=0, axis=-1)
+                        self.backend.convolve1d(tmp_vec, wm_e, axis=-1, mode="constant", cval=0)
                     )
                     Mt_e[:, :n_s] = Mt_e[:, :n_s] / norm_mask
                     # Normalize by the best acheavable weight
@@ -449,23 +451,14 @@ try:
         def _fftw_toeplitz_matmul(self, data, valid_mask):
             tmp_norm_vec = np.ones((data.shape[0], 1))
             tmp_norm_vec[0] = 0.0
-            norm_vec = matmul_toeplitz(
-                (self.conv_vect_past, self.conv_vect_future),
-                tmp_norm_vec,
-                check_finite=False,
-                workers=None,
+            norm_vec = self.backend.toeplitz_matmul(
+                self.conv_vect_past, self.conv_vect_future, tmp_norm_vec
             )
-            filled = matmul_toeplitz(
-                (self.conv_vect_past, self.conv_vect_future),
-                data,
-                check_finite=False,
-                workers=None,
+            filled = self.backend.toeplitz_matmul(
+                self.conv_vect_past, self.conv_vect_future, data
             )
-            filled_qa = matmul_toeplitz(
-                (self.conv_vect_past, self.conv_vect_future),
-                valid_mask,
-                check_finite=False,
-                workers=None,
+            filled_qa = self.backend.toeplitz_matmul(
+                self.conv_vect_past, self.conv_vect_future, valid_mask
             )
             conv_vec = np.concatenate(
                 (self.conv_vect_past, self.conv_vect_future[-1:0:-1])
