@@ -1648,12 +1648,26 @@ class RasterData(SKMapBase):
 
         return self
 
-    def __del__(self) -> None:
-        print("Deleting")
-        del_memmap(self.array)
+    def __enter__(self):
+        return self
 
-    def __exit__(self):
-        self.__del__()
+    def __exit__(self, *exc):
+        self._cleanup()
+
+    def __del__(self) -> None:
+        # Avoid printing during GC; just release the memmap backing file if present.
+        try:
+            self._cleanup()
+        except Exception:
+            pass
+
+    def _cleanup(self):
+        """Delete the backing memmap file if the array is a memmap."""
+        if hasattr(self, "array"):
+            try:
+                del_memmap(self.array)
+            except Exception:
+                pass
 
     def _get_titles(self, img_title, bands):
         f_arr = self.filter(f"group=={bands}")
