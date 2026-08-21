@@ -155,6 +155,24 @@ class CppBackend(ComputeBackend):
         )
         return out
 
+    def tsirf(self, data, conv_vect_past, conv_vect_future, keep_original_values=True):
+        # C++ applyTsirf operates on (rows=pixels, cols=time) float32 and uses
+        # w_0 (center) + w_p (past taps, applied reversed) + w_f (future taps).
+        # SeasConvFill passes (time, pixels) with conv_vect_{past,future} half-vectors.
+        cp = np.asarray(conv_vect_past, dtype=np.float32)
+        cf = np.asarray(conv_vect_future, dtype=np.float32)
+        w_0 = float(cp[0])
+        w_p = cp[:0:-1].copy()          # reversed past, excluding center
+        w_f = cf[1:].copy()             # future, excluding center
+        # transpose (time, pixels) -> (pixels, time), float32 C-contiguous
+        pix_time = np.ascontiguousarray(np.asarray(data, dtype=np.float32).T)
+        out = np.empty_like(pix_time)
+        self._sb.applyTsirf(
+            pix_time, self._n_threads, out, 0,
+            w_0, w_p, w_f, bool(keep_original_values), "default", "default",
+        )
+        return out.T.astype(np.float64, copy=False)
+
 
 def _cpu_count():
     import os

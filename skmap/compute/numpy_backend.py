@@ -95,3 +95,33 @@ class NumpyBackend(ComputeBackend):
         out = np.array(arr, dtype=arr.dtype, copy=True)
         out[np.isnan(out)] = replace_value
         return out
+    def tsirf(self, data, conv_vect_past, conv_vect_future, keep_original_values=True):
+        """TSIRF gap-fill via Toeplitz convolution + mask normalisation."""
+        from scipy.linalg import matmul_toeplitz
+
+        data = np.asarray(data, dtype=np.float64)
+        valid_mask = ~np.isnan(data)
+        masked = data.copy()
+        masked[~valid_mask] = 0.0
+
+        norm_vec = matmul_toeplitz(
+            (conv_vect_past, conv_vect_future),
+            np.ones((data.shape[0], 1)), check_finite=False, workers=None,
+        )
+        filled = matmul_toeplitz(
+            (conv_vect_past, conv_vect_future),
+            masked, check_finite=False, workers=None,
+        )
+        filled_qa = matmul_toeplitz(
+            (conv_vect_past, conv_vect_future),
+            valid_mask.astype(float), check_finite=False, workers=None,
+        )
+        conv_vec = np.concatenate((conv_vect_past, conv_vect_future[-1:0:-1]))
+        nz = conv_vec[conv_vec > 0]
+        min_conv_val = np.min(nz) if nz.size else 0.0
+        filled = filled / filled_qa
+        no_fill = filled_qa < min_conv_val
+        filled[no_fill] = np.nan
+        if keep_original_values:
+            filled[valid_mask] = masked[valid_mask]
+        return filled

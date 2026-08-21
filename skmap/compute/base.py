@@ -74,6 +74,17 @@ class ComputeBackend(ABC):
     def mask_nan(self, arr, replace_value):
         """Replace NaNs in ``arr`` with ``replace_value``."""
 
+    @abstractmethod
+    def tsirf(self, data, conv_vect_past, conv_vect_future, keep_original_values=True):
+        """TSIRF gap-fill: weighted FIR convolution of each time series,
+        normalised by the convolved validity mask.
+
+        ``data`` is ``(n_imag, n_pixels)`` (time axis 0), NaN marks gaps.
+        ``conv_vect_past`` / ``conv_vect_future`` are the 1-D half-vectors
+        (center at index 0).  Returns the filled ``(n_imag, n_pixels)`` array,
+        NaN where no fill is possible.
+        """
+
     # ------------------------------------------------------------------
     # Specialised statistics -- single SciPy/statsmodels implementation,
     # inherited unchanged by every backend.

@@ -173,6 +173,59 @@ def _make_kernels():
             out[i] = s
         return out
 
+    @njit
+    def _tsirf_1d(row, c_past, c_future):
+        # TSIRF for a single pixel time series (1-D, length n).
+        # c_past/c_future are the half-vectors (center at index 0).
+        # out[j] = (sum_k w[j-k]*row[k]) / (sum_k w[j-k]*valid[k])
+        n = row.shape[0]
+        n_p = c_past.shape[0]
+        n_f = c_future.shape[0]
+        out = np.empty(n, dtype=np.float64)
+        # min nonzero weight for the no-fill threshold
+        min_w = np.inf
+        for i in range(n_p):
+            if c_past[i] > 0 and c_past[i] < min_w:
+                min_w = c_past[i]
+        for i in range(n_f):
+            if c_future[i] > 0 and c_future[i] < min_w:
+                min_w = c_future[i]
+        for j in range(n):
+            num = 0.0
+            den = 0.0
+            # center
+            v = row[j]
+            if np.isnan(v):
+                num += c_past[0] * 0.0
+            else:
+                num += c_past[0] * v
+                den += c_past[0]
+            # past taps: c_past[m] * row[j-m], m=1..n_p-1
+            for m in range(1, n_p):
+                k = j - m
+                if k >= 0:
+                    vv = row[k]
+                    if np.isnan(vv):
+                        num += c_past[m] * 0.0
+                    else:
+                        num += c_past[m] * vv
+                        den += c_past[m]
+            # future taps: c_future[m] * row[j+m], m=1..n_f-1
+            for m in range(1, n_f):
+                k = j + m
+                if k < n:
+                    vv = row[k]
+                    if np.isnan(vv):
+                        num += c_future[m] * 0.0
+                    else:
+                        num += c_future[m] * vv
+                        den += c_future[m]
+            if den < min_w:
+                out[j] = np.nan
+            else:
+                out[j] = num / den
+        return out
+
     return {
         "nanmean": _nanmean_1d,
         "nanstd": _nanstd_1d,
@@ -182,6 +235,7 @@ def _make_kernels():
         "nanmedian": _nanmedian_1d,
         "nanpercentile": _nanpercentile_1d,
         "convolve1d": _convolve1d_1d,
+        "tsirf": _tsirf_1d,
     }
 
 
@@ -306,4 +360,18 @@ class NumbaBackend(ComputeBackend):
     def mask_nan(self, arr, replace_value):
         out = np.array(arr, dtype=arr.dtype, copy=True)
         out[np.isnan(out)] = replace_value
+        return out
+    def tsirf(self, data, conv_vect_past, conv_vect_future, keep_original_values=True):
+        cp = np.asarray(conv_vect_past, dtype=np.float64)
+        cf = np.asarray(conv_vect_future, dtype=np.float64)
+        data64 = np.asarray(data, dtype=np.float64)
+        # data is (n_imag, n_pixels); iterate over pixels (columns)
+        n_imag, n_pix = data64.shape
+        out = np.empty((n_imag, n_pix), dtype=np.float64)
+        kernel = _kernels()["tsirf"]
+        for p in range(n_pix):
+            out[:, p] = kernel(data64[:, p], cp, cf)
+        if keep_original_values:
+            valid = ~np.isnan(data64)
+            out[valid] = data64[valid]
         return out
