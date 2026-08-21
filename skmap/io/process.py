@@ -831,7 +831,7 @@ try:
             )
 
             for group, ops, tm, dt1, dt2 in parallel.job(
-                self._aggregate, args, joblib_args={"backend": "multiprocessing"}
+                self._aggregate, args
             ):
                 for op in ops:
                     _group = group
@@ -972,7 +972,6 @@ try:
                     self._unpack,
                     args,
                     n_jobs=self.n_jobs,
-                    joblib_args={"backend": "multiprocessing"},
                 ):
                     continue
 
@@ -1083,7 +1082,6 @@ try:
                     self._unpack,
                     args,
                     n_jobs=self.n_jobs,
-                    joblib_args={"backend": "multiprocessing"},
                 ):
                     continue
 
@@ -1198,7 +1196,6 @@ try:
                     self._unpack,
                     args,
                     n_jobs=self.n_jobs,
-                    joblib_args={"backend": "multiprocessing"},
                 ):
                     continue
                 nm = self.min_max
@@ -1463,7 +1460,6 @@ try:
                 self._map,
                 args,
                 n_jobs=self.n_jobs,
-                joblib_args={"backend": "multiprocessing"},
             ):
                 row = rdata.info.iloc[fidx]
 
