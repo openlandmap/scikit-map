@@ -502,9 +502,9 @@ try:
                     "Less then two years of images available, the time series reconstruction will not take advantage of seasonality"
                 )
             half_conv_vect = self._compute_conv_mat_row(n_imag)
-            if self.conv_vect_future == []:
+            if len(self.conv_vect_future) == 0:
                 self.conv_vect_future = half_conv_vect
-            if self.conv_vect_past == []:
+            if len(self.conv_vect_past) == 0:
                 self.conv_vect_past = half_conv_vect
 
             filled, filled_qa = self._fftw_toeplitz_matmul(
