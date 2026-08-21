@@ -536,6 +536,16 @@ class SpaceOverlay:
             assert max_comb_chunk > 1, (
                 "skmap-error 42: max_ram_mb too small, can not chunk"
             )
+            pix_block_ids = key_query_pixels["block_id"].tolist()
+            sample_rows = key_query_pixels["sample_row"].tolist()
+            sample_cols = key_query_pixels["sample_col"].tolist()
+            block_width_dict = unique_blocks.set_index("block_id")[
+                "block_width"
+            ].to_dict()
+            pix_inblock_idxs = [
+                sample_rows[k] * block_width_dict[ubid] + sample_cols[k]
+                for k, ubid in enumerate(pix_block_ids)
+            ]
             for chunk_start in range(0, n_comb, max_comb_chunk):
                 key_layer_paths_chunk = key_layer_paths_comb[
                     chunk_start : chunk_start + max_comb_chunk
@@ -576,16 +586,6 @@ class SpaceOverlay:
                     None,
                     np.nan,
                 )
-                pix_block_ids = key_query_pixels["block_id"].tolist()
-                sample_rows = key_query_pixels["sample_row"].tolist()
-                sample_cols = key_query_pixels["sample_col"].tolist()
-                block_width_dict = unique_blocks.set_index("block_id")[
-                    "block_width"
-                ].to_dict()
-                pix_inblock_idxs = [
-                    sample_rows[k] * block_width_dict[ubid] + sample_cols[k]
-                    for k, ubid in enumerate(pix_block_ids)
-                ]
                 sb.extractOverlay(
                     data_array,
                     self.n_threads,
