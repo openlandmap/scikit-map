@@ -832,6 +832,19 @@ try:
             n_new_rasters = len(args) * len(self.operations)
             idx_offset = rdata._idx_offset()
 
+            # Resize the array to accommodate the new bands and point the
+            # captured memmap references at the resized array.
+            new_shape = (
+                rdata.array.shape[0],
+                rdata.array.shape[1],
+                idx_offset + n_new_rasters,
+            )
+            resized = new_memmap(rdata.array.dtype, new_shape)
+            resized[:, :, : rdata.array.shape[2]] = rdata.array
+            rdata.array = resized
+            new_ref = ref_memmap(rdata.array)
+            args = [(new_ref, *arg[1:]) for arg in args]
+
             _args = []
             for idx, arg in zip(range(0, n_new_rasters, len(self.operations)), args):
                 _arg = list(arg)
