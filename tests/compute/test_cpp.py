@@ -125,9 +125,13 @@ def test_apply_along_axis_fallback(arr3d_f32, cbe, ref):
     np.testing.assert_allclose(out, expected, rtol=RTOL, atol=ATOL)
 
 
-def test_float64_cast_warns(cbe):
+def test_float64_falls_back_without_warning(cbe):
+    """float64 input now falls back to numpy silently (no lossy cast)."""
     arr = np.random.rand(10, 12).astype(np.float64)
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        cbe.nanmean(arr, axis=-1)
-        assert any("float32" in str(x.message) for x in w)
+        out = cbe.nanmean(arr, axis=-1)
+        assert not any("float32" in str(x.message) for x in w)
+    # result matches numpy (no precision loss)
+    ref = NumpyBackend().nanmean(arr, axis=-1)
+    np.testing.assert_allclose(out, ref)

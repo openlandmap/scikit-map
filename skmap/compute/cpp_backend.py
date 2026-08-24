@@ -1,16 +1,18 @@
 """C++ compute backend dispatching to the compiled ``skmap_bindings`` kernels.
 
 The C++ extension exposes a handful of array kernels (``nanMean``,
-``computePercentiles``, ``offsetAndScale``, ``maskNan``) that operate on
-2-D ``float32`` C-contiguous arrays, reducing along the column axis.  This
-backend dispatches to those kernels where available and falls back to the
+``computePercentiles``, ``scaleAndOffset``, ``maskNan``, ``applyTsirf``) that
+operate on 2-D ``float32`` C-contiguous arrays, reducing along the column axis.
+This backend dispatches to those kernels where available and falls back to the
 :class:`NumpyBackend` for every other operation (reductions without a C++
-kernel, expression evaluation, convolution, Toeplitz matmul, per-pixel
-apply and the specialised statistics).
+kernel, expression evaluation, convolution, Toeplitz matmul, per-pixel apply
+and the specialised statistics).
 
-The float32-only contract of the bindings is honoured transparently: a
-non-float32 or non-contiguous input is cast/copied and a warning is emitted
-so callers know a conversion happened.
+The float32-only contract of the bindings is honoured *explicitly*: the
+float32 ops accept an ``allow_cast`` flag (default ``False``).  A non-float32
+input without ``allow_cast`` falls back to the numpy implementation (no silent
+precision loss) and the fallback is recorded in ``self.fallbacks`` so callers
+can report what actually ran.
 """
 
 import warnings
@@ -37,36 +39,48 @@ class CppBackend(ComputeBackend):
         self._n_threads = n_threads if n_threads > 0 else _cpu_count()
         # Fallback backend for operations without a C++ kernel.
         self._fallback = NumpyBackend()
+        # Records (op_name, reason) for every fallback since the last reset.
+        self.fallbacks = []
+
+    def _record_fallback(self, op, reason):
+        self.fallbacks.append((op, reason))
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def _to_f32_2d(self, arr, axis):
+    def _to_f32_2d(self, arr, axis, allow_cast=False):
         """Return a float32 C-contiguous 2-D view with the reduction axis as cols.
 
-        Returns ``(matrix_2d, original_shape, axis_moved_to_last)`` so the caller
-        can reshape the result back.
+        Returns ``(matrix_2d, shape)`` or ``None`` if the input is not float32
+        and ``allow_cast`` is False (caller should fall back to numpy).
         """
 
         moved = np.moveaxis(arr, axis, -1)
         shape = moved.shape
-        flat = np.ascontiguousarray(moved.reshape(-1, shape[-1]))
+        flat = moved.reshape(-1, shape[-1])
         if flat.dtype != np.float32:
+            if not allow_cast:
+                return None
             warnings.warn(
                 "CppBackend requires float32; casting %s -> float32 (lossy)"
                 % flat.dtype,
                 stacklevel=3,
             )
             flat = flat.astype(np.float32)
+        flat = np.ascontiguousarray(flat)
         return flat, shape
 
     # ------------------------------------------------------------------
     # Reductions
     # ------------------------------------------------------------------
 
-    def nanmean(self, arr, axis):
-        flat, shape = self._to_f32_2d(arr, axis)
+    def nanmean(self, arr, axis, allow_cast=False):
+        res = self._to_f32_2d(arr, axis, allow_cast)
+        if res is None:
+            self._record_fallback("nanmean", "non-float32 input")
+            return self._fallback.nanmean(arr, axis)
+        flat, shape = res
         out = np.empty(flat.shape[0], dtype=np.float32)
         self._sb.nanMean(flat, self._n_threads, out)
         return out.reshape(shape[:-1])
@@ -86,9 +100,13 @@ class CppBackend(ComputeBackend):
     def nanmedian(self, arr, axis):
         return self._fallback.nanmedian(arr, axis)
 
-    def nanpercentile(self, arr, q, axis):
+    def nanpercentile(self, arr, q, axis, allow_cast=False):
+        res = self._to_f32_2d(arr, axis, allow_cast)
+        if res is None:
+            self._record_fallback("nanpercentile", "non-float32 input")
+            return self._fallback.nanpercentile(arr, q, axis)
+        flat, shape = res
         qs = [float(x) for x in (q if hasattr(q, "__iter__") else [q])]
-        flat, shape = self._to_f32_2d(arr, axis)
         n_cols = flat.shape[1]
         out = np.empty((flat.shape[0], len(qs)), dtype=np.float32)
         self._sb.computePercentiles(
@@ -108,14 +126,12 @@ class CppBackend(ComputeBackend):
     def evaluate(self, expr, local_dict):
         return self._fallback.evaluate(expr, local_dict)
 
-    def scale_offset(self, arr, scale, offset):
+    def scale_offset(self, arr, scale, offset, allow_cast=False):
+        if arr.dtype != np.float32 and not allow_cast:
+            self._record_fallback("scale_offset", "non-float32 input")
+            return self._fallback.scale_offset(arr, scale, offset)
         # scaleAndOffset mutates in place: data = data * scaling + offset
         out = np.array(arr, dtype=np.float32, copy=True, order="C")
-        if arr.dtype != np.float32:
-            warnings.warn(
-                "CppBackend requires float32; casting %s -> float32" % arr.dtype,
-                stacklevel=2,
-            )
         self._sb.scaleAndOffset(out, self._n_threads, float(offset), float(scale))
         return out
 
@@ -142,13 +158,11 @@ class CppBackend(ComputeBackend):
     # NaN handling
     # ------------------------------------------------------------------
 
-    def mask_nan(self, arr, replace_value):
+    def mask_nan(self, arr, replace_value, allow_cast=False):
+        if arr.dtype != np.float32 and not allow_cast:
+            self._record_fallback("mask_nan", "non-float32 input")
+            return self._fallback.mask_nan(arr, replace_value)
         out = np.array(arr, dtype=np.float32, copy=True, order="C")
-        if arr.dtype != np.float32:
-            warnings.warn(
-                "CppBackend requires float32; casting %s -> float32" % arr.dtype,
-                stacklevel=2,
-            )
         flat = out.reshape(-1, out.shape[-1] if out.ndim > 1 else 1)
         self._sb.maskNan(
             flat, self._n_threads, list(range(flat.shape[0])), float(replace_value)
@@ -163,7 +177,12 @@ class CppBackend(ComputeBackend):
         # No C++ FFT kernel; fall back to the numpy vectorised FFT.
         return self._fallback.fft_convolve(data, kernel, n_s)
 
-    def tsirf(self, data, conv_vect_past, conv_vect_future, keep_original_values=True):
+    def tsirf(self, data, conv_vect_past, conv_vect_future, keep_original_values=True, allow_cast=False):
+        if data.dtype != np.float32 and not allow_cast:
+            self._record_fallback("tsirf", "non-float32 input")
+            return self._fallback.tsirf(
+                data, conv_vect_past, conv_vect_future, keep_original_values
+            )
         # C++ applyTsirf operates on (rows=pixels, cols=time) float32 and uses
         # w_0 (center) + w_p (past taps, applied reversed) + w_f (future taps).
         # SeasConvFill passes (time, pixels) with conv_vect_{past,future} half-vectors.
