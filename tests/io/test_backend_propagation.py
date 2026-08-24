@@ -59,3 +59,21 @@ class TestBackendAttribute:
     def test_runner_default_backend_is_numpy(self):
         r = SeasConvFill(season_size=4, verbose=False)
         assert isinstance(r.backend, NumpyBackend)
+
+def test_per_run_backend_override(rdata_numpy):
+    """run(process, backend=...) overrides for this run only."""
+    from skmap.compute import CppBackend
+
+    rdata_numpy.backend = NumpyBackend()
+    runner = SeasConvFill(season_size=4, verbose=False)
+    rdata_numpy.run(runner, backend="cpp")
+    assert isinstance(runner.backend, CppBackend)
+    # the RasterData backend is unchanged
+    assert isinstance(rdata_numpy.backend, NumpyBackend)
+
+
+def test_per_run_backend_override_by_instance(rdata_numpy):
+    be = NumbaBackend()
+    runner = SeasConvFill(season_size=4, verbose=False)
+    rdata_numpy.run(runner, backend=be)
+    assert runner.backend is be

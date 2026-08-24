@@ -1287,12 +1287,22 @@ class RasterData(SKMapBase):
         group: [list, str] = [],
         outname: str = None,
         drop_input: bool = False,
+        backend: Union[str, "ComputeBackend"] = None,
     ):
-        """Execute a function over the loaded raster data, yielding per-tile results."""
+        """Execute a function over the loaded raster data, yielding per-tile results.
+
+        ``backend`` optionally overrides the compute backend for this run only
+        (it does not mutate ``self.backend``).
+        """
 
         # Propagate the compute backend so the runner uses it instead of
-        # hardcoded libraries.
-        process.backend = self.backend
+        # hardcoded libraries.  A per-run override wins over the object default.
+        if backend is not None:
+            from skmap.compute import get_backend
+
+            process.backend = get_backend(backend)
+        else:
+            process.backend = self.backend
 
         if isinstance(process, SKMapGroupRunner):
             if drop_input:
