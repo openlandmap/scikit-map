@@ -10,7 +10,6 @@ import pytest
 
 from skmap.data import toy
 from skmap.io import RasterData
-from skmap.misc import is_memmap
 
 
 @pytest.fixture

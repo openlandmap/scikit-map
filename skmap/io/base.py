@@ -104,7 +104,6 @@ def _read_raster(
     overview,
     verbose,
 ):
-    # array_mm = load_memmap(**ref_array)
 
     for key in gdal_opts.keys():
         gdal.SetConfigOption(key, gdal_opts[key])
@@ -610,10 +609,6 @@ def read_rasters(
     return parallel.SharedArray(out_ref, (n, height * width), np.dtype(dtype))
 
 
-    # if not keep_memmap:
-    #  return del_memmap(array_mm, True)
-    # else:
-    #  return array_mm
 
 
 def read_auth_rasters(
@@ -1214,11 +1209,11 @@ class RasterData(SKMapBase):
         scale: float = 1,
         gdal_opts: dict = {},
     ):
-        """Read the selected layers into a memmap and return ``self``.
+        """Read the selected layers into a SharedArray and return ``self``.
 
         Side effects: sets ``self.window``, ``self.bounds``, ``self.base_raster``
         (the path of the first reachable raster, used as a geometry reference
-        by runners and ``to_dir``/``to_s3``) and ``self.array`` (the 3-D memmap).
+        by runners and ``to_dir``/``to_s3``) and ``self.array`` (the (N, H*W) SharedArray).
         """
 
         self.window = window
@@ -1699,7 +1694,7 @@ class RasterData(SKMapBase):
         self._cleanup()
 
     def __del__(self) -> None:
-        # Avoid printing during GC; just release the memmap backing file if present.
+        # Avoid printing during GC; just drop the ObjectRef if present.
         try:
             self._cleanup()
         except Exception:

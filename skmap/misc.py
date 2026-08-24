@@ -231,58 +231,6 @@ def _warn_deps(e: ImportError, module_name: str) -> None:
     )
 
 
-def new_memmap(dtype, shape):  # noqa: ANN001, ANN201
-    """Create a new memory-mapped ``numpy`` array backed by a temp ``.npy`` file."""
-
-    filename = str(make_tempfile(prefix="memmap", suffix=".npy", make_subdir=False))
-    ttprint(f"Creating {filename}")
-    return np.memmap(filename, dtype=dtype, shape=shape, mode="w+")
-
-
-def load_memmap(
-    filename: Union[Path, str], dtype: Union[np.dtype, str], shape: Tuple[int, ...]
-) -> np.memmap:
-    """Open an existing memory-mapped ``numpy`` array for read/write access."""
-
-    return np.memmap(filename, dtype=dtype, mode="r+", shape=shape)
-    # return np.lib.format.open_memmap(filename, dtype=dtype, mode='w+', shape=shape)
-
-
-def is_memmap(array_mm: NDArray) -> bool:
-    """Return ``True`` if the array is a memory-mapped array."""
-
-    return hasattr(array_mm, "filename")
-
-
-def del_memmap(array_mm: np.memmap, return_array: bool = False) -> Optional[NDArray]:
-    """Delete a memory-mapped array (and its backing file), optionally returning an in-memory copy."""
-
-    result = None
-
-    if is_memmap(array_mm):
-        if return_array:
-            result = np.array(array_mm)  # test np.ascontiguousarray
-
-        os.remove(array_mm.filename)  # ty:ignore[invalid-argument-type]
-        # temp_folder = Path(array_mm.filename).parent
-        # try:
-        #    shutil.rmtree(temp_folder)
-        # except:
-        #    pass
-
-        if return_array:
-            return result
-    else:
-        del array_mm
-
-
-def ref_memmap(array: np.memmap) -> dict:
-    """Return a memory-mapped array reference, creating one if given a plain array."""
-
-    array.flush()
-    return {"filename": array.filename, "dtype": array.dtype, "shape": array.shape}
-
-
 def make_tempdir(basedir: str = "skmap", make_subdir: bool = True) -> Path:
     """Create and return a unique temporary directory path."""
 
@@ -292,20 +240,6 @@ def make_tempdir(basedir: str = "skmap", make_subdir: bool = True) -> Path:
         tempdir = tempdir.joinpath(name)
     tempdir.mkdir(parents=True, exist_ok=True)
     return tempdir
-
-
-def make_tempfile(
-    basedir: str = "skmap",
-    prefix: str = "",
-    suffix: str = "",
-    make_subdir: bool = False,
-) -> Path:
-    """Create and return a unique temporary file path."""
-
-    tempdir = make_tempdir(basedir, make_subdir=make_subdir)
-    return tempdir.joinpath(
-        Path(tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix).name).name
-    )
 
 
 def _bounds_crs(
