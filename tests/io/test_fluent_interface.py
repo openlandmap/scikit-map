@@ -48,7 +48,7 @@ def test_timespan_read_chain():
             .timespan("20141202", "20201201", "days", toy.TOY_DATE_STEP, ignore_29feb=True)
             .read()
         )
-    assert r.array.shape[2] == 24
+    assert r.array.shape[0] == 24
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ def test_select_original_array_unchanged(rdata):
 def test_filter_date_returns_new_object(rdata):
     sub = rdata.filter_date("2015-01-01", "2019-01-01")
     assert sub is not rdata
-    assert sub.array.shape[2] < rdata.array.shape[2]
+    assert sub.array.shape[0] < rdata.array.shape[0]
 
 
 def test_filter_contains_returns_new_object(rdata):

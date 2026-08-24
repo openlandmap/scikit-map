@@ -302,7 +302,8 @@ def _apply_multi(kernel, arr, axis, qs):
     for i in range(flat.shape[0]):
         out[i] = kernel(flat[i], qs)
     shape = moved.shape[:-1] + (qs.shape[0],)
-    return out.reshape(shape)
+    # Move the q-axis back to the original axis position (numpy semantics).
+    return np.moveaxis(out.reshape(shape), -1, axis)
 
 
 class NumbaBackend(ComputeBackend):

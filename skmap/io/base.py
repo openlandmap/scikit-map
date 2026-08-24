@@ -295,18 +295,22 @@ def _save_raster(
 
     array = load_memmap(**ref_array)
 
+    with rasterio.open(fn_base_raster) as src:
+        h, w = src.height, src.width
+    if spatial_win is not None:
+        h, w = spatial_win.height, spatial_win.width
+    band = array[i, :].reshape(h, w)
+
     with _new_raster(
-        fn_base_raster, raster_file, array[:, :, i], spatial_win, dtype, nodata
+        fn_base_raster, raster_file, band, spatial_win, dtype, nodata
     ) as new_raster: # type: DatasetWriter
         band_dtype = new_raster.dtypes[0]
 
         if fit_in_dtype:
-            array[:, :, i] = _fit_in_dtype(
-                array[:, :, i], band_dtype, new_raster.nodata
-            )
+            band = _fit_in_dtype(band, band_dtype, new_raster.nodata)
 
-        array[:, :, i][np.isnan(array[:, :, i])] = new_raster.nodata
-        new_raster.write(array[:, :, i].astype(band_dtype), indexes=1)
+        band[np.isnan(band)] = new_raster.nodata
+        new_raster.write(band.astype(band_dtype), indexes=1)
 
     if on_each_outfile is not None:
         on_each_outfile(raster_file)
@@ -823,7 +827,7 @@ def save_rasters(
     #  data = np.stack([data], axis=2)
 
     if len(array_idx) == 0:
-        array_idx = list(range(0, array.shape[-1]))
+        array_idx = list(range(0, array.shape[0]))
 
     if len(array_idx) != len(raster_files):
         raise Exception(
@@ -1234,6 +1238,9 @@ class RasterData(SKMapBase):
                 overview=overview,
                 gdal_opts=gdal_opts,
             )
+            # read_rasters returns (N, H*W); reshape the single mask band to (H, W).
+            h, w, _ = _read_shape([self.raster_mask], 1, window, None, overview)
+            data_mask = data_mask.reshape(h, w)
             if self.raster_mask_val is np.nan:
                 data_mask = np.logical_not(np.isnan(data_mask))
             else:
@@ -1265,17 +1272,14 @@ class RasterData(SKMapBase):
             gdal_opts=gdal_opts,
             verbose=self.verbose,
             max_rasters=self.max_rasters,
+            backend="python",
         )
 
-        # A1 temporary: read_rasters now returns (N, H*W); reshape to the
-        # (H, W, N) layout the runners still expect. Removed in A2.
+        # Remember the spatial extent so plotting can reshape (N, H*W) -> (H, W, N).
         height, width, _ = _read_shape(
             raster_files, band, self.window, bounds, overview
         )
-        n = self.array.shape[0]
-        tmp = self.array.reshape(n, height, width).transpose(1, 2, 0)
-        self.array = new_memmap(dtype, (height, width, n))
-        self.array[:, :, :] = tmp
+        self._spatial_shape = (height, width)
 
         self._verbose(f"Read array shape: {self.array.shape}")
 
@@ -1399,14 +1403,10 @@ class RasterData(SKMapBase):
         if new_array is not None:
             combined = new_memmap(
                 self.array.dtype,
-                (
-                    self.array.shape[0],
-                    self.array.shape[1],
-                    self.array.shape[2] + new_array.shape[2],
-                ),
+                (self.array.shape[0] + new_array.shape[0], self.array.shape[1]),
             )
-            combined[:, :, : self.array.shape[2]] = self.array
-            combined[:, :, self.array.shape[2] :] = new_array
+            combined[: self.array.shape[0], :] = self.array
+            combined[self.array.shape[0] :, :] = new_array
             self.array = combined
 
         to_add_info.append(new_info)
@@ -1434,12 +1434,12 @@ class RasterData(SKMapBase):
 
         self._verbose(f"Dropping data and info for groups: {group}")
         idx = self.info[self.info[RasterData.GROUP_COL].isin(group)].index
-        keep_idx = [i for i in range(self.array.shape[2]) if i not in set(idx)]
+        keep_idx = [i for i in range(self.array.shape[0]) if i not in set(idx)]
         new_arr = new_memmap(
             self.array.dtype,
-            (self.array.shape[0], self.array.shape[1], len(keep_idx)),
+            (len(keep_idx), self.array.shape[1]),
         )
-        new_arr[:, :, :] = self.array[:, :, keep_idx]
+        new_arr[:, :] = self.array[keep_idx, :]
         self.array = new_arr
         self.info = self.info.drop(idx).reset_index(drop=True)
 
@@ -1544,12 +1544,12 @@ class RasterData(SKMapBase):
         if return_idx:
             return list(info.index)
         elif return_array:
-            return self.array[:, :, info.index]
+            return self.array[info.index, :]
         elif return_info:
             return info
         elif return_copy:
             rdata = copy.copy(self)
-            rdata.array = self.array[:, :, info.index]
+            rdata.array = self.array[info.index, :]
             rdata.info = info
             # Deep-copy the mutable dicts so the filtered copy cannot corrupt
             # the original (regression fix: they were shared by reference).
@@ -1557,7 +1557,7 @@ class RasterData(SKMapBase):
             rdata.raster_files = copy.deepcopy(self.raster_files)
             return rdata
         else:
-            self.array = self.array[:, :, info.index]
+            self.array = self.array[info.index, :]
             self.info = info
             return self
 
@@ -1772,7 +1772,8 @@ class RasterData(SKMapBase):
 
         with rasterio.open(self._base_raster()) as src:
             row_id, col_id = rasterio.transform.rowcol(src.transform, df.x, df.y)
-        df["data"] = np.array(self.array[row_id, col_id]).tolist()
+            pix = row_id * src.width + col_id
+        df["data"] = np.array(self.array[:, pix].T).tolist()
         # if data is required no need to create figures
         if return_data:
             return df.data.to_numpy()
@@ -1907,13 +1908,19 @@ class RasterData(SKMapBase):
         :params groups: list of band names.
         """
 
+        h, w = self._spatial_shape
+
         if len(groups) == 1:  # single band raster
             arr = self.filter(f"group=={groups}").array
+            arr = arr.reshape(arr.shape[0], h, w).transpose(1, 2, 0)
         elif len(groups) == 3:  # composite
             arr = []
             band1 = self.filter(f"group=={groups}[0]", return_array=True)
             band2 = self.filter(f"group=={groups}[1]", return_array=True)
             band3 = self.filter(f"group=={groups}[2]", return_array=True)
+            band1 = band1.reshape(band1.shape[0], h, w).transpose(1, 2, 0)
+            band2 = band2.reshape(band2.shape[0], h, w).transpose(1, 2, 0)
+            band3 = band3.reshape(band3.shape[0], h, w).transpose(1, 2, 0)
 
             alpha = np.ones(band3.shape)
             mask = np.any(np.isnan(np.stack([band1, band2, band3], axis=-1)), axis=-1)

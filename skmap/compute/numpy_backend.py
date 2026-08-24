@@ -143,12 +143,14 @@ class NumpyBackend(ComputeBackend):
 
     def seasonal_min_max(self, arr, season_size, min_max, scaling=1.0):
         arr = np.asarray(arr)
-        n_seasons = arr.shape[-1] // season_size
-        out = np.empty(arr.shape[:-1] + (n_seasons,), dtype=np.float64)
+        moved = np.moveaxis(arr, -1, -1)  # time already last
+        flat = moved.reshape(-1, moved.shape[-1])
+        n_seasons = flat.shape[1] // season_size
+        out = np.empty((flat.shape[0], n_seasons), dtype=np.float64)
         # np.min/np.max propagate NaN (a single NaN in a chunk -> NaN result),
         # matching the FindMinMax contract.
         reduce = np.min if min_max == "min" else np.max
         for s in range(n_seasons):
-            chunk = arr[:, :, s * season_size : (s + 1) * season_size]
-            out[:, :, s] = reduce(chunk, axis=-1) * scaling
-        return out
+            chunk = flat[:, s * season_size : (s + 1) * season_size]
+            out[:, s] = reduce(chunk, axis=-1) * scaling
+        return out.reshape(moved.shape[:-1] + (n_seasons,))

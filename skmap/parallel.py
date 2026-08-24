@@ -165,7 +165,12 @@ def apply_along_axis(
     for r in job(run, chunks):
         result.append(r)
 
-    return np.concatenate(result)
+    result = np.concatenate(result)
+    if effective_axis != axis:
+        # Undo the swap so the reduced axis returns to its original position
+        # (numpy.apply_along_axis semantics: axis 0 -> (out, ...)).
+        result = result.swapaxes(axis, effective_axis)
+    return result
 
 
 class TilingProcessing:

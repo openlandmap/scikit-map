@@ -48,8 +48,8 @@ def test_read_sets_side_effects():
     assert hasattr(r, "window")
     assert hasattr(r, "bounds")
     assert isinstance(r.base_raster, str)
-    assert r.array.ndim == 3
-    assert r.array.shape[2] == 24
+    assert r.array.ndim == 2
+    assert r.array.shape[0] == 24
 
 
 def test_only_one_base_raster_definition():

@@ -97,14 +97,14 @@ try:
                 new_info = self._new_info(rdata, group, outname, self.name)
                 if new_array_qa is not None:
                     new_info += self._new_info(rdata, group, outname, self.name_qa)
-                    new_array = np.concatenate([new_array, new_array_qa], axis=-1)
+                    new_array = np.concatenate([new_array, new_array_qa], axis=0)
 
                 new_arrays.append(new_array)
                 new_infos.append(DataFrame(new_info))
 
             rdata._active_group = None
 
-            new_array = np.concatenate(new_arrays, axis=-1)
+            new_array = np.concatenate(new_arrays, axis=0)
             new_info = pd.concat(new_infos)
 
             return new_array, new_info
@@ -122,13 +122,9 @@ try:
             if n_new_bands <= 0:
                 return
             idx_offset = rdata._idx_offset()
-            new_shape = (
-                rdata.array.shape[0],
-                rdata.array.shape[1],
-                idx_offset + n_new_bands,
-            )
+            new_shape = (idx_offset + n_new_bands, rdata.array.shape[1])
             resized = new_memmap(rdata.array.dtype, new_shape)
-            resized[:, :, : rdata.array.shape[2]] = rdata.array
+            resized[: rdata.array.shape[0], :] = rdata.array
             rdata.array = resized
 
         def run(
@@ -166,7 +162,7 @@ try:
 
         def _n_gaps(self, data=None):
             nan_data = np.isnan(data)
-            gap_mask = np.logical_not(np.all(nan_data, axis=-1))
+            gap_mask = np.logical_not(np.all(nan_data, axis=0))
             return np.sum(nan_data[gap_mask].astype("int"))
 
         def _run(self, data):
@@ -257,7 +253,7 @@ try:
             # Convolution and normalization
             np.seterr(divide="ignore", invalid="ignore")
             orig_shape = data.shape
-            data = np.reshape(data, (data.shape[0] * data.shape[1], data.shape[2]))
+            data = np.ascontiguousarray(data.T)
             # @TODO avoid this and include the multiband case
             if data.ndim > 1:
                 n_t = data.shape[0]
@@ -377,11 +373,11 @@ try:
                     # Normalize by the best acheavable weight
                     if self.keep_original_values:
                         Mt_e[valid_mask[:, 0:n_s]] = 1.0
-                    return np.reshape(Vt_e, orig_shape), np.reshape(Mt_e, orig_shape)
+                    return np.reshape(Vt_e.T, orig_shape), np.reshape(Mt_e.T, orig_shape)
                 else:
-                    return np.reshape(Vt_e, orig_shape)
+                    return np.reshape(Vt_e.T, orig_shape)
             else:
-                return np.reshape(Vt_e, orig_shape)
+                return np.reshape(Vt_e.T, orig_shape)
 
     class SeasConvFill(Filler):
         """
@@ -461,9 +457,7 @@ try:
         def _gapfill(self, data):
             np.seterr(divide="ignore", invalid="ignore")
             orig_shape = data.shape
-            data = np.reshape(
-                data, (data.shape[0] * data.shape[1], data.shape[2])
-            ).T.copy()
+            data = np.ascontiguousarray(data)
             n_imag = data.shape[0]
             if self.season_size * 2 > n_imag:
                 warnings.warn(
@@ -488,15 +482,13 @@ try:
                 filled_qa[valid_mask] = 1.0
                 filled_qa = filled_qa * 100
                 filled_qa[filled_qa == 0.0] = np.nan
-                return np.reshape(filled.T, orig_shape), np.reshape(
-                    filled_qa.T, orig_shape
-                )
+                return filled, filled_qa
 
             filled = self.backend.tsirf(
                 data, self.conv_vect_past, self.conv_vect_future,
                 keep_original_values=True,
             )
-            return np.reshape(filled.T, orig_shape)
+            return filled
 
     class WhittakerSmooth(Transformer):
         """
@@ -546,13 +538,13 @@ try:
                 return y
 
         def _run(self, data):
-            m = data.shape[-1]
+            m = data.shape[0]
             E = sparse.eye(m, format="csc")
             D = self._speyediff(m, self.d, format="csc")
             self.coefmat = E + self.lmbd * D.conj().T.dot(D)
 
             return self.backend.apply_along_axis(
-                self._process_ts, 2, data, n_jobs=self.n_jobs
+                self._process_ts, 0, data, n_jobs=self.n_jobs
             )
 
     class TimeEnum(Enum):
@@ -622,9 +614,9 @@ try:
 
             for op in self.bn_ops:
                 reduce = getattr(self.backend, f"nan{op}")
-                array[:, :, new_idx : new_idx + 1] = reduce(
-                    array[:, :, array_idx], axis=-1
-                )[:, :, np.newaxis]
+                array[new_idx : new_idx + 1, :] = reduce(
+                    array[array_idx, :], axis=0
+                )[np.newaxis, :]
                 _idxs.append(new_idx)
                 new_idx += 1
 
@@ -632,9 +624,9 @@ try:
 
             if len(self.percs) > 0:
                 perc_idx = list(range(new_idx, new_idx + len(self.percs)))
-                in_array = array[:, :, array_idx]  # array[:,:,array_idx].copy()
-                array[:, :, perc_idx] = self.backend.nanpercentile(
-                    in_array, q=self.percs, axis=-1
+                in_array = array[array_idx, :]
+                array[perc_idx, :] = self.backend.nanpercentile(
+                    in_array, q=self.percs, axis=0
                 )
                 new_idx += len(self.percs)
                 _idxs += perc_idx
@@ -644,8 +636,8 @@ try:
 
             if self.post_expression is not None and len(_idxs) > 0:
                 for idx in _idxs:
-                    array[:, :, idx] = self.backend.evaluate(
-                        self.post_expression, local_dict={"new_array": array[:, :, idx]}
+                    array[idx, :] = self.backend.evaluate(
+                        self.post_expression, local_dict={"new_array": array[idx, :]}
                     )
 
             return (group, ops, tm, dt1, dt2)
@@ -820,13 +812,9 @@ try:
 
             # Resize the array to accommodate the new bands and point the
             # captured memmap references at the resized array.
-            new_shape = (
-                rdata.array.shape[0],
-                rdata.array.shape[1],
-                idx_offset + n_new_rasters,
-            )
+            new_shape = (idx_offset + n_new_rasters, rdata.array.shape[1])
             resized = new_memmap(rdata.array.dtype, new_shape)
-            resized[:, :, : rdata.array.shape[2]] = rdata.array
+            resized[: rdata.array.shape[0], :] = rdata.array
             rdata.array = resized
             new_ref = ref_memmap(rdata.array)
             args = [(new_ref, *arg[1:]) for arg in args]
@@ -942,29 +930,29 @@ try:
 
             return result
 
-        def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
+        def _unpack(self, p0, p1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
-            result = self.backend.apply_along_axis(self._find_peaks, 2, array[i0_0:i0_1, :, i2])
-            o2 = list(range(idx_offset, idx_offset + result.shape[2]))
-            array[i0_0:i0_1, :, o2] = result
+            result = self.backend.apply_along_axis(self._find_peaks, 0, array[i2, p0:p1])
+            o2 = list(range(idx_offset, idx_offset + result.shape[0]))
+            array[o2, p0:p1] = result
 
             return True
 
         def _args(self, rdata, ginfo):
             ref_array = ref_memmap(rdata.array)
-            max_i0 = rdata.array.shape[0]
-            rows_per_job = math.ceil(max_i0 / self.n_jobs)
+            max_pixels = rdata.array.shape[1]
+            pixels_per_job = math.ceil(max_pixels / self.n_jobs)
 
             idx_offset = rdata._idx_offset()
 
             args = []
-            for i in range(0, max_i0, rows_per_job):
-                i0_0, i0_1 = i, (i + rows_per_job)
-                if i0_1 > max_i0:
-                    i0_1 = max_i0
+            for i in range(0, max_pixels, pixels_per_job):
+                p0, p1 = i, (i + pixels_per_job)
+                if p1 > max_pixels:
+                    p1 = max_pixels
 
                 i2 = ginfo.index
-                args.append((i0_0, i0_1, i2, ref_array, idx_offset))
+                args.append((p0, p1, i2, ref_array, idx_offset))
 
             return args
 
@@ -1059,29 +1047,29 @@ try:
             result[0] *= self.scaling
             return result
 
-        def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
+        def _unpack(self, p0, p1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
-            result = self.backend.apply_along_axis(self._theil_slopes, 2, array[i0_0:i0_1, :, i2])
-            o2 = list(range(idx_offset, idx_offset + result.shape[2]))
-            array[i0_0:i0_1, :, o2] = result
+            result = self.backend.apply_along_axis(self._theil_slopes, 0, array[i2, p0:p1])
+            o2 = list(range(idx_offset, idx_offset + result.shape[0]))
+            array[o2, p0:p1] = result
 
             return True
 
         def _args(self, rdata, ginfo):
             ref_array = ref_memmap(rdata.array)
-            max_i0 = rdata.array.shape[0]
-            rows_per_job = math.ceil(max_i0 / self.n_jobs)
+            max_pixels = rdata.array.shape[1]
+            pixels_per_job = math.ceil(max_pixels / self.n_jobs)
 
             idx_offset = rdata._idx_offset()
 
             args = []
-            for i in range(0, max_i0, rows_per_job):
-                i0_0, i0_1 = i, (i + rows_per_job)
-                if i0_1 > max_i0:
-                    i0_1 = max_i0
+            for i in range(0, max_pixels, pixels_per_job):
+                p0, p1 = i, (i + pixels_per_job)
+                if p1 > max_pixels:
+                    p1 = max_pixels
 
                 i2 = ginfo.index
-                args.append((i0_0, i0_1, i2, ref_array, idx_offset))
+                args.append((p0, p1, i2, ref_array, idx_offset))
 
             return args
 
@@ -1176,33 +1164,33 @@ try:
                 result[j] *= self.scaling
             return result
 
-        def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
+        def _unpack(self, p0, p1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
-            sub = array[i0_0:i0_1, :, i2]
+            sub = array[i2, p0:p1].T
             if self.scale_expr is not None:
                 sub = self.backend.evaluate(self.scale_expr, {"data": sub})
             result = self.backend.seasonal_min_max(
                 sub, self.season_size, self.min_max, self.scaling
             )
-            o2 = list(range(idx_offset, idx_offset + result.shape[2]))
-            array[i0_0:i0_1, :, o2] = result
+            o2 = list(range(idx_offset, idx_offset + result.shape[1]))
+            array[o2, p0:p1] = result.T
             return True
 
         def _args(self, rdata, ginfo):
             ref_array = ref_memmap(rdata.array)
-            max_i0 = rdata.array.shape[0]
-            rows_per_job = math.ceil(max_i0 / self.n_jobs)
+            max_pixels = rdata.array.shape[1]
+            pixels_per_job = math.ceil(max_pixels / self.n_jobs)
 
             idx_offset = rdata._idx_offset()
 
             args = []
-            for i in range(0, max_i0, rows_per_job):
-                i0_0, i0_1 = i, (i + rows_per_job)
-                if i0_1 > max_i0:
-                    i0_1 = max_i0
+            for i in range(0, max_pixels, pixels_per_job):
+                p0, p1 = i, (i + pixels_per_job)
+                if p1 > max_pixels:
+                    p1 = max_pixels
 
                 i2 = ginfo.index
-                args.append((i0_0, i0_1, i2, ref_array, idx_offset))
+                args.append((p0, p1, i2, ref_array, idx_offset))
 
             return args
 
@@ -1372,7 +1360,7 @@ try:
                 end_dt_max = ginfo[RasterData.END_DT_COL].max()
 
                 new_array = self.backend.apply_along_axis(
-                    self._trend_regression, axis=2, arr=array, n_jobs=self.n_jobs
+                    self._trend_regression, axis=0, arr=array, n_jobs=self.n_jobs
                 )
 
                 new_info = []
@@ -1398,12 +1386,12 @@ try:
                         )
                     )
 
-                ts_size = array.shape[2]
+                ts_size = array.shape[0]
 
                 for i, (nm, pr, scale) in zip(
                     range(0, len(self.name_misc)), self.name_misc
                 ):
-                    new_array[:, :, ts_size + i] *= scale
+                    new_array[ts_size + i, :] *= scale
 
                     name = rdata._set_date(
                         outname, start_dt_min, end_dt_max, nm=nm, pr=pr, gr=group
@@ -1424,7 +1412,7 @@ try:
                 new_infos.append(DataFrame(new_info))
 
             rdata._active_group = None
-            return np.concatenate(new_arrays, axis=-1), pd.concat(new_infos)
+            return np.concatenate(new_arrays, axis=0), pd.concat(new_infos)
 
     class Calc(SKMapRunner):
         """Backend support: ``evaluate`` uses numexpr on all backends (numba
@@ -1452,11 +1440,11 @@ try:
             array_mask = None
             if self.mask_group is not None and len(self.mask_values) >= 1:
                 idx = gmap[self.mask_group]
-                array_mask = np.isin(array[:, :, idx], self.mask_values)
+                array_mask = np.isin(array[idx, :], self.mask_values)
 
             for group in gmap.keys():
                 idx = gmap[group]
-                array_dict[group] = array[:, :, idx]
+                array_dict[group] = array[idx, :]
                 if array_mask is not None and group != self.mask_group:
                     array_dict[group][array_mask] = np.nan
 
@@ -1466,7 +1454,7 @@ try:
                     idx = gmap[group]
                 else:
                     idx = new_gmap[group]
-                array[:, :, idx] = self.backend.evaluate(expression, local_dict=array_dict)
+                array[idx, :] = self.backend.evaluate(expression, local_dict=array_dict)
 
             fidx = list(gmap.values())[0]
 
@@ -1489,13 +1477,9 @@ try:
 
             # Resize the array to accommodate the new output bands.
             if n_new_rasters > 0:
-                new_shape = (
-                    rdata.array.shape[0],
-                    rdata.array.shape[1],
-                    idx_offset + n_new_rasters,
-                )
+                new_shape = (idx_offset + n_new_rasters, rdata.array.shape[1])
                 resized = new_memmap(rdata.array.dtype, new_shape)
-                resized[:, :, : rdata.array.shape[2]] = rdata.array
+                resized[: rdata.array.shape[0], :] = rdata.array
                 rdata.array = resized
 
             args = []

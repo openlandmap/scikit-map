@@ -122,7 +122,8 @@ class CppBackend(ComputeBackend):
             list(range(len(qs))),
             qs,
         )
-        return out.reshape(shape[:-1] + (len(qs),))
+        # Move the q-axis back to the original axis position (numpy semantics).
+        return np.moveaxis(out.reshape(shape[:-1] + (len(qs),)), -1, axis)
 
     # ------------------------------------------------------------------
     # Elementwise

@@ -22,4 +22,5 @@ def test_ndvi_rdata() -> None:
         "bounds",
         "base_raster",
         "array",
+        "_spatial_shape",
     ]

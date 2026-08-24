@@ -87,13 +87,13 @@ def test_save_read_rasters_roundtrip(tmp_path):
     any height/width axis swaps — these are silent for square arrays.
 
     Conventions:
-      - save_rasters expects: (height, width, n_files) = (30, 70, 3)
+      - save_rasters expects: (n_files, height * width) = (3, 2100)
       - read_rasters returns: (n_files, height * width) = (3, 2100)
     """
     H, W, N = 30, 70, 3
     memmap_path = tmp_path / "original.npy"
-    original = np.memmap(memmap_path, dtype=np.float32, mode="w+", shape=(H, W, N))
-    original[:] = np.random.rand(H, W, N).astype(np.float32)
+    flat = np.memmap(memmap_path, dtype=np.float32, mode="w+", shape=(N, H * W))
+    flat[:] = np.random.rand(H, W, N).astype(np.float32).transpose(2, 0, 1).reshape(N, -1)
 
     base_raster_path = str(tmp_path / "base.tif")
     output_paths = [str(tmp_path / f"out_{i}.tif") for i in range(N)]
@@ -105,12 +105,12 @@ def test_save_read_rasters_roundtrip(tmp_path):
         crs="EPSG:4326",
         transform=rasterio.transform.from_origin(0, 0, 1, 1),
     ) as dst:
-        dst.write(original[:, :, 0], 1)
+        dst.write(flat[0].reshape(H, W), 1)
 
-    save_rasters(base_raster_path, output_paths, original, n_jobs=1)
+    save_rasters(base_raster_path, output_paths, flat, n_jobs=1)
 
     loaded = read_rasters(raster_files=output_paths, backend="python", n_jobs=1)
 
     assert loaded.shape == (N, H * W), \
-        f"Shape mismatch: saved {original.shape}, loaded {loaded.shape}"
-    assert_array_equal(loaded.reshape(N, H, W).transpose(1, 2, 0), original)
+        f"Shape mismatch: saved {flat.shape}, loaded {loaded.shape}"
+    assert_array_equal(loaded, flat)

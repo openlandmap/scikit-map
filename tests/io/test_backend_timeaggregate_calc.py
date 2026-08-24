@@ -49,10 +49,10 @@ def test_timeaggregate_backends_match(ref_aggregate, backend):
     ref_arr, ref_info = ref_aggregate
     # the new aggregate bands are appended after the original ndvi bands
     n_orig = 24
-    new_cols = slice(n_orig, r.array.shape[2])
+    new_cols = slice(n_orig, r.array.shape[0])
     np.testing.assert_allclose(
-        r.array[:, :, new_cols],
-        ref_arr[:, :, new_cols],
+        r.array[new_cols, :],
+        ref_arr[new_cols, :],
         rtol=RTOL,
         atol=ATOL,
     )
@@ -86,7 +86,7 @@ def test_timeaggregate_post_expression_backends():
                 verbose=False,
             )
         )
-        results[Backend] = r.array[:, :, 24:].copy()
+        results[Backend] = r.array[24:, :].copy()
     np.testing.assert_allclose(
         results[NumpyBackend], results[NumbaBackend], rtol=RTOL, atol=ATOL
     )
