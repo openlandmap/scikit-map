@@ -206,6 +206,10 @@ try:
 
     class SircleTransformer(Transformer):
         """
+        Backend support: ``convolve1d`` (sparse/dense) is jitted on numba and
+        falls back to scipy on cpp; ``fft_convolve`` (FFT) uses numpy on all
+        backends.
+
         :param data: N_timeseries x N_samples matrix where the time series are stored one per each row
         :param w_0: convolution coefficent associated with the present
         :param w_f: convolution coefficents associated with the future
@@ -381,6 +385,9 @@ try:
 
     class SeasConvFill(Filler):
         """
+        Backend support: ``tsirf`` is jitted on numba and uses the C++
+        ``applyTsirf`` kernel on cpp (float32); the QA path falls back to scipy.
+
         :param season_size: number of images per year
         :param att_seas: dB of attenuation for images of opposite seasonality
         :param att_env: dB of attenuation for temporarily far images
@@ -561,6 +568,10 @@ try:
         YEARLY = 8
 
     class TimeAggregate(Derivator):
+        """Backend support: reductions and percentiles are jitted on numba and
+        use C++ kernels on cpp (float32); ``post_expression`` uses numexpr on
+        all backends.
+        """
         def __init__(
             self,
             time: list = [TimeEnum.YEARLY, TimeEnum.MONTHLY_LONGTERM],
@@ -1120,6 +1131,9 @@ try:
             return None, DataFrame(new_info)
 
     class FindMinMax(Derivator):
+        """Backend support: ``seasonal_min_max`` is jitted on numba and falls
+        back to numpy on cpp; ``scale_expr`` uses numexpr on all backends.
+        """
         def __init__(
             self,
             scale_expr: str = None,
@@ -1413,6 +1427,9 @@ try:
             return np.concatenate(new_arrays, axis=-1), pd.concat(new_infos)
 
     class Calc(SKMapRunner):
+        """Backend support: ``evaluate`` uses numexpr on all backends (numba
+        cannot parse expression strings and cpp has no expression VM).
+        """
         def __init__(
             self,
             expressions: dict,
