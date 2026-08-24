@@ -86,18 +86,23 @@ class CppBackend(ComputeBackend):
         return out.reshape(shape[:-1])
 
     def nanstd(self, arr, axis):
+        self._record_fallback("nanstd", "no C++ kernel")
         return self._fallback.nanstd(arr, axis)
 
     def nanmin(self, arr, axis):
+        self._record_fallback("nanmin", "no C++ kernel")
         return self._fallback.nanmin(arr, axis)
 
     def nanmax(self, arr, axis):
+        self._record_fallback("nanmax", "no C++ kernel")
         return self._fallback.nanmax(arr, axis)
 
     def nansum(self, arr, axis):
+        self._record_fallback("nansum", "no C++ kernel")
         return self._fallback.nansum(arr, axis)
 
     def nanmedian(self, arr, axis):
+        self._record_fallback("nanmedian", "no C++ kernel")
         return self._fallback.nanmedian(arr, axis)
 
     def nanpercentile(self, arr, q, axis, allow_cast=False):
@@ -124,6 +129,7 @@ class CppBackend(ComputeBackend):
     # ------------------------------------------------------------------
 
     def evaluate(self, expr, local_dict):
+        self._record_fallback("evaluate", "no C++ expression VM")
         return self._fallback.evaluate(expr, local_dict)
 
     def scale_offset(self, arr, scale, offset, allow_cast=False):
@@ -140,9 +146,11 @@ class CppBackend(ComputeBackend):
     # ------------------------------------------------------------------
 
     def convolve1d(self, arr, weights, axis, mode="constant", cval=0.0):
+        self._record_fallback("convolve1d", "no generic C++ FIR kernel")
         return self._fallback.convolve1d(arr, weights, axis, mode, cval)
 
     def toeplitz_matmul(self, c, r, data):
+        self._record_fallback("toeplitz_matmul", "no C++ Toeplitz kernel")
         return self._fallback.toeplitz_matmul(c, r, data)
 
     # ------------------------------------------------------------------
@@ -150,6 +158,7 @@ class CppBackend(ComputeBackend):
     # ------------------------------------------------------------------
 
     def apply_along_axis(self, func, axis, arr, *args, n_jobs=1, **kwargs):
+        self._record_fallback("apply_along_axis", "no C++ per-pixel apply")
         return self._fallback.apply_along_axis(
             func, axis, arr, *args, n_jobs=n_jobs, **kwargs
         )
@@ -171,10 +180,12 @@ class CppBackend(ComputeBackend):
 
     def seasonal_min_max(self, arr, season_size, min_max, scaling=1.0):
         # No dedicated C++ kernel; fall back to the numpy vectorised path.
+        self._record_fallback("seasonal_min_max", "no C++ kernel")
         return self._fallback.seasonal_min_max(arr, season_size, min_max, scaling)
 
     def fft_convolve(self, data, kernel, n_s):
         # No C++ FFT kernel; fall back to the numpy vectorised FFT.
+        self._record_fallback("fft_convolve", "no C++ FFT kernel")
         return self._fallback.fft_convolve(data, kernel, n_s)
 
     def tsirf(self, data, conv_vect_past, conv_vect_future, keep_original_values=True, allow_cast=False):

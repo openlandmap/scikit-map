@@ -18,6 +18,16 @@ class ComputeBackend(ABC):
 
     name: str = "abstract"
 
+    def _record_fallback(self, op, reason):
+        """Record that ``op`` fell back to the numpy/scipy implementation."""
+        if not hasattr(self, "fallbacks"):
+            self.fallbacks = []
+        self.fallbacks.append((op, reason))
+
+    def reset_fallbacks(self):
+        """Clear the fallback log (called before each run)."""
+        self.fallbacks = []
+
     # ------------------------------------------------------------------
     # Core array operations -- overridden by each concrete backend.
     # ------------------------------------------------------------------

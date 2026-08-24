@@ -349,6 +349,7 @@ class NumbaBackend(ComputeBackend):
     def evaluate(self, expr, local_dict):
         # Numba cannot parse arbitrary expression strings -- fall back to
         # NumExpr (same as the NumpyBackend) for correctness.
+        self._record_fallback("evaluate", "numba cannot parse expression strings")
         import numexpr as ne
 
         return ne.evaluate(expr, local_dict=local_dict)
@@ -361,6 +362,7 @@ class NumbaBackend(ComputeBackend):
     def convolve1d(self, arr, weights, axis, mode="constant", cval=0.0):
         # The jitted kernel implements mode='constant', cval=0.
         if mode != "constant" or cval != 0.0:
+            self._record_fallback("convolve1d", "non-constant mode")
             from scipy.ndimage import convolve1d as _convolve1d
 
             return _convolve1d(arr, weights, axis=axis, mode=mode, cval=cval)
@@ -378,6 +380,7 @@ class NumbaBackend(ComputeBackend):
 
     def toeplitz_matmul(self, c, r, data):
         # Fall back to SciPy -- the Toeplitz product is already FFT-based.
+        self._record_fallback("toeplitz_matmul", "no numba Toeplitz kernel")
         from scipy.linalg import matmul_toeplitz
 
         return matmul_toeplitz((c, r), data, check_finite=False, workers=None)
@@ -417,6 +420,7 @@ class NumbaBackend(ComputeBackend):
     def fft_convolve(self, data, kernel, n_s):
         # Use the vectorised numpy FFT -- numba's numpy.fft support is limited
         # and per-row jitting loses to the vectorised BLAS path here.
+        self._record_fallback("fft_convolve", "no numba FFT kernel")
         data = np.asarray(data, dtype=np.float64)
         kernel = np.asarray(kernel, dtype=np.float64)
         n_e = data.shape[1]

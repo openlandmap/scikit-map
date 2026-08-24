@@ -1304,6 +1304,9 @@ class RasterData(SKMapBase):
         else:
             process.backend = self.backend
 
+        # Reset the fallback log so the summary below reflects only this run.
+        process.backend.reset_fallbacks()
+
         if isinstance(process, SKMapGroupRunner):
             if drop_input:
                 input_groups = self.info[
@@ -1337,7 +1340,24 @@ class RasterData(SKMapBase):
             if drop_input:
                 self.drop(group)
 
+        self._report_fallbacks(process)
+
         return self
+
+    def _report_fallbacks(self, process):
+        """Print one summary line if the backend fell back to numpy/scipy.
+
+        Note: fallbacks recorded inside Ray workers (e.g. TimeAggregate's
+        per-tile ``_aggregate``) are not propagated back to the main process,
+        so this summary reflects main-process operations only.
+        """
+        fb = getattr(process.backend, "fallbacks", None)
+        if not fb:
+            return
+        ops = sorted({op for op, _ in fb})
+        self._verbose(
+            f"{process.backend.name} backend fell back to numpy/scipy for: {ops}"
+        )
 
     def _group_run(
         self,
