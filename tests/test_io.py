@@ -11,45 +11,27 @@ from skmap.misc import make_tempdir
 
 class TestReadRaster:
     def test_001(self) -> None:
-        out_data = io.read_rasters_cpp(str(toy._static_raster()[0]))
+        out_data = io.read_rasters(str(toy._static_raster()[0]), backend="cpp")
         assert out_data.shape == (1, 65536)
 
     def test_002(self) -> None:
-        out_data = io.read_rasters_cpp(toy._static_raster())
+        out_data = io.read_rasters(toy._static_raster(), backend="cpp")
         assert out_data.shape == (2, 65536)
 
     def test_003(self) -> None:
-        out_data = np.empty((2, 65536), dtype="float32")
-        out_data = io.read_rasters_cpp(toy._static_raster(), out_data=out_data)
+        out_data = io.read_rasters(toy._static_raster(), backend="cpp")
         assert np.nanmax(out_data) == 523.0
 
-    def test_004(self) -> None:
-        out_data = np.empty((4, 65536), dtype="float32")
-        out_data = io.read_rasters_cpp(
-            toy._static_raster(), out_data=out_data, out_idx=[2, 3]
-        )
-        assert np.min(out_data[2:3, :]) == 17.0
-
     def test_005(self) -> None:
-        out_data = io.read_rasters_cpp(
-            toy._static_raster(), window=Window(100, 100, 28, 28)
+        out_data = io.read_rasters(
+            toy._static_raster(), window=Window(100, 100, 28, 28), backend="cpp"
         )
         assert out_data.shape == (2, 784)
-
-    def test_006(self) -> None:
-        out_data = np.empty((4, 784), dtype="float32")
-        out_data = io.read_rasters_cpp(
-            toy._static_raster(),
-            out_data=out_data,
-            out_idx=[2, 3],
-            window=Window(100, 100, 28, 28),
-        )
-        assert np.nanmax(out_data[2:3, :]) == 106.0
 
 
 class TestSaveRaster:
     def test_001(self) -> None:
-        out_data = io.read_rasters_cpp(toy._static_raster())
+        out_data = io.read_rasters(toy._static_raster(), backend="cpp")
         base_raster = str(toy._static_raster()[0])
         out_files = io.save_rasters_cpp(
             base_raster, out_data, "test", str(make_tempdir())

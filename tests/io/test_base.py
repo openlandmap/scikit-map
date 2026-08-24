@@ -88,8 +88,7 @@ def test_save_read_rasters_roundtrip(tmp_path):
 
     Conventions:
       - save_rasters expects: (height, width, n_files) = (30, 70, 3)
-      - read_rasters returns: (height, width, n_files) = (30, 70, 3)
-    No reshape or transpose should be needed.
+      - read_rasters returns: (n_files, height * width) = (3, 2100)
     """
     H, W, N = 30, 70, 3
     memmap_path = tmp_path / "original.npy"
@@ -110,8 +109,8 @@ def test_save_read_rasters_roundtrip(tmp_path):
 
     save_rasters(base_raster_path, output_paths, original, n_jobs=1)
 
-    loaded = read_rasters(raster_files=output_paths, n_jobs=1)
+    loaded = read_rasters(raster_files=output_paths, backend="python", n_jobs=1)
 
-    assert loaded.shape == original.shape, \
+    assert loaded.shape == (N, H * W), \
         f"Shape mismatch: saved {original.shape}, loaded {loaded.shape}"
-    assert_array_equal(original, loaded)
+    assert_array_equal(loaded.reshape(N, H, W).transpose(1, 2, 0), original)

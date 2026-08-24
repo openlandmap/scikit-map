@@ -9,6 +9,7 @@ import math
 import os
 import tempfile
 import time
+import warnings
 from base64 import b64decode, encodebytes
 from copy import deepcopy
 from datetime import datetime
@@ -140,6 +141,10 @@ def _read_raster(
             array_mm = ds.read(band, out_dtype=dtype, window=window)
         ttprint("End reading")
 
+        # Normalise to 2-D (H, W): rasterio returns (1, H, W) for a band list.
+        if array_mm.ndim == 3:
+            array_mm = array_mm[0]
+
         # if band_data.size == 0 and try_without_window:
         #  band_data = ds.read(band, out=array_mm[:,:,raster_idx])
 
@@ -168,11 +173,11 @@ def _read_raster(
             if len(data_mask.shape) == 3:
                 data_mask = data_mask[:, :, 0]
 
-            if data_mask.shape == band_data.shape:
+            if data_mask.shape == array_mm.shape:
                 array_mm[np.logical_not(data_mask)] = np.nan
             else:
                 ttprint(
-                    f"WARNING: incompatible data_mask shape {data_mask.shape} != {band_data.shape}"
+                    f"WARNING: incompatible data_mask shape {data_mask.shape} != {array_mm.shape}"
                 )
 
         if nodata is not None:
@@ -393,39 +398,61 @@ def save_rasters_cpp(
         return [str(Path(out_dir).joinpath(f"{o}.tif")) for o in out_files]
 
 
-def read_rasters_cpp(
-    raster_files: Union[List, str] = [],
-    band: Union[List, int] = 1,
-    window: Window = None,
-    n_jobs: int = 8,
-    out_data: numpy.array = None,
-    out_idx: List = None,
-    dtype: type = np.float32,
-    gdal_opts: dict = {},
-    verbose=False,
+def _read_shape(raster_files, band, window, bounds, overview):
+    """Return ``(height, width, window)`` for a read, converting ``bounds`` to a window."""
+    ds = rasterio.open(raster_files[-1])
+    if bounds is not None and len(bounds) == 4:
+        bounds = shape(
+            rasterio.warp.transform_geom(
+                src_crs="EPSG:4326",
+                dst_crs=ds.crs,
+                geom=box(*bounds),
+            )
+        ).bounds
+        window = from_bounds(*bounds, ds.transform).round_lengths()
+
+    b = band[0] if isinstance(band, (list, tuple)) else band
+    if overview is not None:
+        overviews = ds.overviews(b)
+        if overview in overviews:
+            return (
+                math.ceil(ds.height // overview),
+                math.ceil(ds.width // overview),
+                window,
+            )
+        raise Exception(
+            f"Overview {overview} is invalid for {raster_files[-1]}.\n"
+            f"Use one of overviews: {ds.overviews(b)}"
+        )
+    if window is not None:
+        return window.height, window.width, window
+    return ds.height, ds.width, window
+
+
+def _cpp_read_ok(
+    dtype, bounds, data_mask, scale, expected_shape, try_without_window, overview, max_rasters
 ):
-    """Read a stack of raster files into a 2D array in parallel via the C++ bindings."""
+    """Return True if the C++ readData path can satisfy the request."""
+    return (
+        dtype == "float32"
+        and bounds is None
+        and data_mask is None
+        and scale == 1.0
+        and expected_shape is None
+        and not try_without_window
+        and overview is None
+        and max_rasters is None
+    )
 
-    if isinstance(raster_files, str):
-        raster_files = [raster_files]
-    if isinstance(band, int):
-        band = [band]
-    if isinstance(raster_files[0], Path):
-        raster_files = [str(r) for r in raster_files]
-    if len(raster_files) < n_jobs:
-        n_jobs = len(raster_files)
 
+def _read_rasters_cpp(raster_files, band, window, n_jobs, dtype, gdal_opts, verbose):
+    """Read a stack of rasters into a ``(N, H*W)`` array via the C++ bindings."""
     n_layers = len(raster_files)
-
     if window is None:
         ds = rasterio.open(raster_files[0])
         window = rasterio.windows.Window(0, 0, ds.width, ds.height)
-    if out_data is None:
-        out_data = np.empty((n_layers, window.width * window.height), dtype=dtype)
-    if out_idx is None:
-        out_idx = list(range(0, n_layers))
-
-    nodata_out = np.nan
+    out_data = np.empty((n_layers, window.width * window.height), dtype=dtype)
+    out_idx = list(range(0, n_layers))
 
     if verbose:
         ttprint(
@@ -444,7 +471,7 @@ def read_rasters_cpp(
         band,
         gdal_opts,
         None,
-        nodata_out,
+        np.nan,
     )
 
     if verbose:
@@ -455,7 +482,7 @@ def read_rasters_cpp(
 
 def read_rasters(
     raster_files: Union[List, str] = [],
-    band: int = 1,
+    band: Union[List, int] = 1,
     window: Window | None = None,
     bounds: [] = None,
     dtype: str = "float32",
@@ -467,126 +494,88 @@ def read_rasters(
     gdal_opts: dict = {},
     overview=None,
     max_rasters=None,
+    backend: Union[str, "ComputeBackend"] = None,
     verbose=False,
-) -> NDArray[np.float32]:
-    """
-    Read raster files aggregating them into a single array.
-    Only the first band of each raster is read.
+) -> NDArray:
+    """Read raster files into a single ``(N, H*W)`` array (files-first, pixels flattened).
 
-    The ``nodata`` value is replaced by ``np.nan`` in case of ``dtype=float*``,
-    and for ``dtype=*int*`` it's replaced by the the lowest possible value
-    inside the range (for ``int16`` this value is ``-32768``).
+    The ``nodata`` value is replaced by ``np.nan`` for float dtypes and by the
+    lowest value in range for integer dtypes.
 
-    :param raster_files: A list with the raster paths. Provide it and the ``raster_dirs``
-      is ignored.
-    :param window: Read the data according to the spatial window. By default is ``None``,
-      reading all the raster data.
-    :param dtype: Convert the read data to specific ``dtype``. By default it reads in
-      ``float16`` to save memory, however pay attention in the precision limitations for
-      this ``dtype`` [1].
-    :param n_jobs: Number of parallel jobs used to read the raster files.
-    :param data_mask: A array with the same space dimensions of the read data, where
-      all the values equal ``0`` are converted to ``np.nan``.
-    :param expected_shape: The expected size (space dimension) of the read data.
-      In case of error in reading any of the raster files, this is used to create a
-      empty 2D array. By default is ``None``, throwing a exception if the raster
-      doesn't exists.
-    :param try_without_window: First, try to read using ``window``, if fails
-      try to read without it.
-    :param overview: Overview level to be read. In COG files are usually `[2, 4, 8, 16, 32, 64, 128, 256]`.
-    :param verbose: Use ``True`` to print the reading progress.
+    :param raster_files: Raster paths (a single path is also accepted).
+    :param band: Band index (or list of indices) to read.
+    :param window: Spatial window to read. ``None`` reads the full extent.
+    :param bounds: Bounding box (EPSG:4326) converted to a window.
+    :param dtype: Output dtype. The C++ backend supports ``float32`` only.
+    :param n_jobs: Number of parallel workers (python) / threads (cpp).
+    :param data_mask: Mask array; pixels where it is 0 become ``np.nan``.
+    :param scale: Multiply the read data by this factor.
+    :param expected_shape: Shape used to build an empty array when a raster is missing.
+    :param try_without_window: Retry without the window if the windowed read fails.
+    :param gdal_opts: GDAL configuration options.
+    :param overview: Overview level to read (COG files).
+    :param max_rasters: Pre-allocate this many bands (python backend).
+    :param backend: ``"python"`` or ``"cpp"``. ``None`` auto-selects ``"cpp"``
+      when the request is float32 with no python-only features, else ``"python"``.
+      An explicit ``"cpp"`` with unsupported features falls back to ``"python"``
+      with a warning.
+    :param verbose: Print reading progress.
 
-    :returns: A 3D array, where the last dimension refers to the read files, and a list
-      containing the read paths.
-    :rtype: Tuple[Numpy.array, List[Path]]
-
-    Examples
-    ========
-
-    >>> import rasterio
-    >>> from skmap.io.base import read_rasters
-    >>>
-    >>> # skmap COG layers - NDVI seasons for 2000
-    >>> # these actually 404
-    >>> raster_files = [
-    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200003_skmap_epsg3035_v1.0.tif', # winter
-    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200006_skmap_epsg3035_v1.0.tif', # spring
-    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200009_skmap_epsg3035_v1.0.tif', # summer
-    ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_200012_skmap_epsg3035_v1.0.tif'  # fall
-    ... ]
-    >>>
-    >>> # Transform for the EPSG:3035
-    >>> eu_transform = rasterio.open(raster_files[0]).transform # doctest: +SKIP
-    >>> # Bounding box window over Wageningen, NL
-    >>> window = rasterio.windows.from_bounds(left=4020659, bottom=3213544, right=4023659, top=3216544, transform=eu_transform) # doctest: +SKIP
-    >>>
-    >>> data, _ = read_rasters_cpp(raster_files=raster_files, window=window, verbose=True) # doctest: +SKIP
-    >>> print(f'Data shape: {data.shape}') # doctest: +SKIP
-
-    References
-    ==========
-
-    [1] `Float16 Precision <https://github.com/numpy/numpy/issues/8063>`_
-
+    :returns: A 2-D array ``(N, H*W)`` where ``N`` is the number of files and
+      ``H*W`` the flattened spatial extent.
     """
     if data_mask is not None and dtype not in ("float16", "float32"):
         raise Exception("The data_mask requires dtype as float")
 
     if isinstance(raster_files, str):
         raster_files = [raster_files]
-
+    if isinstance(band, int):
+        band = [band]
+    if isinstance(raster_files[0], Path):
+        raster_files = [str(r) for r in raster_files]
     if len(raster_files) < n_jobs:
         n_jobs = len(raster_files)
+
+    if backend is None:
+        backend = (
+            "cpp"
+            if _cpp_read_ok(
+                dtype, bounds, data_mask, scale, expected_shape,
+                try_without_window, overview, max_rasters,
+            )
+            else "python"
+        )
+    else:
+        backend = str(backend).lower()
+        if backend == "cpp" and not _cpp_read_ok(
+            dtype, bounds, data_mask, scale, expected_shape,
+            try_without_window, overview, max_rasters,
+        ):
+            warnings.warn(
+                "backend='cpp' requested but the request uses python-only "
+                "features (non-float32 dtype, bounds, data_mask, scale, "
+                "overview, expected_shape, try_without_window or max_rasters); "
+                "falling back to the python backend",
+                stacklevel=2,
+            )
+            backend = "python"
+
+    if backend == "cpp":
+        return _read_rasters_cpp(
+            raster_files, band, window, n_jobs, dtype, gdal_opts, verbose
+        )
 
     if verbose:
         ttprint(f"Reading {len(raster_files)} raster file(s) using {n_jobs} workers")
 
-    ds = rasterio.open(raster_files[-1])
-    if bounds is not None and len(bounds) == 4:
-        bounds = shape(
-            rasterio.warp.transform_geom(
-                src_crs="EPSG:4326",
-                dst_crs=ds.crs,
-                geom=box(*bounds),
-            )
-        ).bounds
-        window = from_bounds(*bounds, ds.transform).round_lengths()
-        if verbose:
-            ttprint(f"Transform {bounds} into {window}")
-
-    if overview is not None:
-        overviews = ds.overviews(band)
-        if overview in overviews:
-            height, width = (
-                math.ceil(ds.height // overview),
-                math.ceil(ds.width // overview),
-            )
-        else:
-            raise Exception(
-                f"Overview {overviews} is invalid for {raster_files[-1]}.\n"
-                f"Use one of overviews: {ds.overviews(band)}"
-            )
-    elif window is not None:
-        (
-            height,
-            width,
-        ) = window.height, window.width
-    else:
-        (
-            height,
-            width,
-        ) = ds.height, ds.width
+    height, width, window = _read_shape(raster_files, band, window, bounds, overview)
 
     ttprint("Start new_memmap")
     if max_rasters is not None:
-        array_mm = new_memmap(dtype, shape=(height, width, max_rasters))
+        array_mm = new_memmap(dtype, shape=(max_rasters, height * width))
     else:
-        # TOCHECK: this was multiplied by 10 before, but why?
-        array_mm = new_memmap(dtype, shape=(height, width, len(raster_files)))
+        array_mm = new_memmap(dtype, shape=(len(raster_files), height * width))
     ttprint(f"End new_memmap of shape {array_mm.shape}")
-
-    # ref_array = ref_memmap(array_mm)
-    # print(ref_array)
 
     args = [
         (
@@ -612,12 +601,13 @@ def read_rasters(
         n_jobs=n_jobs,
     ):
         ttprint(array.shape)
-        array_mm[:, :, raster_idx] = array
+        array_mm[raster_idx, :] = array.reshape(-1)
         if not data_exists:
             raster_file = raster_files[raster_idx]
             raise Exception(f"The raster {raster_file} not exists")
 
     return array_mm
+
 
     # if not keep_memmap:
     #  return del_memmap(array_mm, True)
@@ -1276,6 +1266,16 @@ class RasterData(SKMapBase):
             verbose=self.verbose,
             max_rasters=self.max_rasters,
         )
+
+        # A1 temporary: read_rasters now returns (N, H*W); reshape to the
+        # (H, W, N) layout the runners still expect. Removed in A2.
+        height, width, _ = _read_shape(
+            raster_files, band, self.window, bounds, overview
+        )
+        n = self.array.shape[0]
+        tmp = self.array.reshape(n, height, width).transpose(1, 2, 0)
+        self.array = new_memmap(dtype, (height, width, n))
+        self.array[:, :, :] = tmp
 
         self._verbose(f"Read array shape: {self.array.shape}")
 
