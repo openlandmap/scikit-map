@@ -26,7 +26,7 @@ def _make_rdata(backend, gappy=True):
 def ref_seasconv():
     r = _make_rdata(NumpyBackend())
     r.run(SeasConvFill(season_size=4, verbose=False))
-    return r.array[24:, :].copy()
+    return r.array.get()[24:, :].copy()
 
 
 @pytest.mark.parametrize("backend", [NumbaBackend, CppBackend])
@@ -34,16 +34,16 @@ def test_seasconvfill_backends_match(ref_seasconv, backend):
     r = _make_rdata(backend())
     r.run(SeasConvFill(season_size=4, verbose=False))
     np.testing.assert_allclose(
-        r.array[24:, :], ref_seasconv, rtol=RTOL, atol=ATOL
+        r.array.get()[24:, :], ref_seasconv, rtol=RTOL, atol=ATOL
     )
 
 
 def test_seasconvfill_fills_gaps():
     """The gap-filled output should have fewer NaNs than the input."""
     r = _make_rdata(NumpyBackend(), gappy=True)
-    before = np.isnan(r.array).sum()
+    before = np.isnan(r.array.get()).sum()
     r.run(SeasConvFill(season_size=4, verbose=False))
-    after = np.isnan(r.array[24:, :]).sum()
+    after = np.isnan(r.array.get()[24:, :]).sum()
     assert after < before
 
 
@@ -66,7 +66,7 @@ def test_sircletransformer_backends_match(conv_backend):
                 verbose=False,
             )
         )
-        results[Backend] = r.array[24:, :].copy()
+        results[Backend] = r.array.get()[24:, :].copy()
 
     np.testing.assert_allclose(
         results[NumpyBackend], results[NumbaBackend], rtol=RTOL, atol=ATOL

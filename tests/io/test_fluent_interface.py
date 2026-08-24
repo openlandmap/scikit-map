@@ -84,9 +84,9 @@ def test_select_preserves_backend(rdata):
 
 
 def test_select_original_array_unchanged(rdata):
-    orig = rdata.array.copy()
+    orig = rdata.array.get().copy()
     sub = rdata.filter("index < 3")
-    np.testing.assert_array_equal(rdata.array, orig)
+    np.testing.assert_array_equal(rdata.array.get(), orig)
 
 
 def test_filter_date_returns_new_object(rdata):

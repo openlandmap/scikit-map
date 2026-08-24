@@ -26,13 +26,13 @@ def test_context_manager_returns_self(rdata):
 
 
 def test_context_manager_cleans_memmap(rdata):
-    memmap_file = rdata.array.filename
-    with rdata as r:
-        assert is_memmap(r.array)
-    # after exit the backing file is gone
-    import os
+    from skmap.parallel import SharedArray
 
-    assert not os.path.exists(memmap_file)
+    assert isinstance(rdata.array, SharedArray)
+    with rdata as r:
+        assert isinstance(r.array, SharedArray)
+    # after exit the ObjectRef is dropped (Ray GCs the object-store array)
+    assert not hasattr(r, "array")
 
 
 def test_del_does_not_print(rdata):

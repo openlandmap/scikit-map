@@ -87,20 +87,21 @@ def _stack_bands(band_refs, shape):
     return np.stack(bands, axis=0).reshape(shape)
 
 
-def _assemble(refs, new_shape, out_idx_list, n_in):
-    """Build a new array: copy the first ``n_in`` input bands, then write the
-    returned output slices at their absolute band indices.
+def _assemble(refs, new_shape, specs, n_in):
+    """Build a new array from an input ref and returned output slices.
 
-    ``refs`` is ``[ref_in, *slice_refs]`` (a single list so Ray passes the
-    ObjectRefs by reference rather than dereferencing top-level args).
+    ``refs`` is ``[ref_in]``; ``specs`` is a list of
+    ``(idx_list, p0, p1, slice)`` where ``idx_list`` are absolute band
+    indices, ``p0:p1`` the pixel range the slice covers, and ``slice`` is a
+    numpy array (the worker return value, already deserialized).
     """
     import ray
 
     arr_in = ray.get(refs[0])
     out = np.empty(new_shape, dtype=arr_in.dtype)
     out[:n_in] = arr_in
-    for idx, sref in zip(out_idx_list, refs[1:]):
-        out[idx] = ray.get(sref)
+    for idx_list, p0, p1, s in specs:
+        out[idx_list, p0:p1] = s
     return out
 
 

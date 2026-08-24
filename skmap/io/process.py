@@ -33,11 +33,7 @@ try:
     from skmap.io import RasterData
     from skmap.misc import (
         date_range,
-        del_memmap,
-        load_memmap,
         nan_percentile,
-        new_memmap,
-        ref_memmap,
     )
 
     class Transformer(SKMapGroupRunner, ABC):
@@ -118,14 +114,9 @@ try:
             super().__init__(verbose=verbose, temporal=temporal)
 
         def _resize_for_output(self, rdata, n_new_bands):
-            """Grow ``rdata.array`` by ``n_new_bands`` so workers can write new bands in place."""
-            if n_new_bands <= 0:
-                return
-            idx_offset = rdata._idx_offset()
-            new_shape = (idx_offset + n_new_bands, rdata.array.shape[1])
-            resized = new_memmap(rdata.array.dtype, new_shape)
-            resized[: rdata.array.shape[0], :] = rdata.array
-            rdata.array = resized
+            # The SharedArray model has no in-place resize; output bands are
+            # assembled by the _assemble worker after the job loop.
+            return
 
         def run(
             self,
@@ -607,46 +598,60 @@ try:
                 return op
 
         def _aggregate(self, new_idx, ref_array, array_idx, group, tm, dt1, dt2):
-            array = load_memmap(**ref_array)
+            array = parallel.get_shared(ref_array)
 
             ops = []
-            _idxs = []
+            out_slices = []
 
             for op in self.bn_ops:
                 reduce = getattr(self.backend, f"nan{op}")
-                array[new_idx : new_idx + 1, :] = reduce(
-                    array[array_idx, :], axis=0
-                )[np.newaxis, :]
-                _idxs.append(new_idx)
+                out_slices.append(
+                    (
+                        [new_idx],
+                        0,
+                        array.shape[1],
+                        reduce(array[array_idx, :], axis=0)[np.newaxis, :],
+                    )
+                )
                 new_idx += 1
-
                 ops.append(self._op_name(f"{op}"))
 
             if len(self.percs) > 0:
                 perc_idx = list(range(new_idx, new_idx + len(self.percs)))
                 in_array = array[array_idx, :]
-                array[perc_idx, :] = self.backend.nanpercentile(
-                    in_array, q=self.percs, axis=0
+                out_slices.append(
+                    (
+                        perc_idx,
+                        0,
+                        array.shape[1],
+                        self.backend.nanpercentile(in_array, q=self.percs, axis=0),
+                    )
                 )
                 new_idx += len(self.percs)
-                _idxs += perc_idx
 
                 for p in self.percs:
                     ops.append(self._op_name(f"p{p}"))
 
-            if self.post_expression is not None and len(_idxs) > 0:
-                for idx in _idxs:
-                    array[idx, :] = self.backend.evaluate(
-                        self.post_expression, local_dict={"new_array": array[idx, :]}
+            if self.post_expression is not None:
+                out_slices = [
+                    (
+                        idx,
+                        p0,
+                        p1,
+                        self.backend.evaluate(
+                            self.post_expression, local_dict={"new_array": s}
+                        ),
                     )
+                    for idx, p0, p1, s in out_slices
+                ]
 
-            return (group, ops, tm, dt1, dt2)
+            return (group, ops, tm, dt1, dt2, out_slices)
 
         def _args_monthly(
             self, rdata, group, start_dt, end_dt, date_format, months=1, daysp=None
         ):
             args = []
-            ref_array = ref_memmap(rdata.array)
+            ref_array = rdata.array.ref
 
             for dt1, dt2 in date_range(
                 f"{start_dt.year}0101",
@@ -689,7 +694,7 @@ try:
 
         def _args_yearly(self, rdata, group, start_dt, end_dt, date_format):
             args = []
-            ref_array = ref_memmap(rdata.array)
+            ref_array = rdata.array.ref
 
             for dt1, dt2 in date_range(
                 f"{start_dt.year}0101",
@@ -725,7 +730,7 @@ try:
 
         def _args_monthly_longterm(self, rdata, group, start_dt, end_dt, date_format):
             args = []
-            ref_array = ref_memmap(rdata.array)
+            ref_array = rdata.array.ref
 
             for month in range(1, 13):
                 array_idx_list = []
@@ -809,15 +814,9 @@ try:
 
             n_new_rasters = len(args) * len(self.operations)
             idx_offset = rdata._idx_offset()
-
-            # Resize the array to accommodate the new bands and point the
-            # captured memmap references at the resized array.
             new_shape = (idx_offset + n_new_rasters, rdata.array.shape[1])
-            resized = new_memmap(rdata.array.dtype, new_shape)
-            resized[: rdata.array.shape[0], :] = rdata.array
-            rdata.array = resized
-            new_ref = ref_memmap(rdata.array)
-            args = [(new_ref, *arg[1:]) for arg in args]
+            ref_in = rdata.array.ref
+            args = [(ref_in, *arg[1:]) for arg in args]
 
             _args = []
             for idx, arg in zip(range(0, n_new_rasters, len(self.operations)), args):
@@ -833,9 +832,11 @@ try:
                 + f"time aggregates from {start_dt.year} to {end_dt.year}"
             )
 
-            for group, ops, tm, dt1, dt2 in parallel.job(
+            specs = []
+            for group, ops, tm, dt1, dt2, out_slices in parallel.job(
                 self._aggregate, args
             ):
+                specs.extend(out_slices)
                 for op in ops:
                     _group = group
                     if tm != "":
@@ -856,6 +857,13 @@ try:
                     )
 
             rdata._active_group = None
+
+            out_ref = parallel._remote(
+                parallel._assemble, [ref_in], new_shape, specs, idx_offset
+            )
+            rdata.array = parallel.SharedArray(
+                out_ref, new_shape, rdata.array.dtype
+            )
 
             return None, DataFrame(new_info)
 
@@ -930,16 +938,14 @@ try:
 
             return result
 
-        def _unpack(self, p0, p1, i2, ref_array, idx_offset) -> bool:
-            array = load_memmap(**ref_array)
+        def _unpack(self, p0, p1, i2, ref_array, idx_offset):
+            array = parallel.get_shared(ref_array)
             result = self.backend.apply_along_axis(self._find_peaks, 0, array[i2, p0:p1])
             o2 = list(range(idx_offset, idx_offset + result.shape[0]))
-            array[o2, p0:p1] = result
-
-            return True
+            return (o2, p0, p1, result)
 
         def _args(self, rdata, ginfo):
-            ref_array = ref_memmap(rdata.array)
+            ref_array = rdata.array.ref
             max_pixels = rdata.array.shape[1]
             pixels_per_job = math.ceil(max_pixels / self.n_jobs)
 
@@ -974,16 +980,27 @@ try:
                 ts_size = ginfo.shape[0]
 
                 n_seasons = ts_size // self.season_size
-                self._resize_for_output(rdata, len(self.name_misc) * n_seasons)
+                idx_offset = rdata._idx_offset()
+                n_new = len(self.name_misc) * n_seasons
+                new_shape = (idx_offset + n_new, rdata.array.shape[1])
+                ref_in = rdata.array.ref
 
                 args = self._args(rdata, ginfo)
 
-                for r in parallel.job(
+                specs = []
+                for spec in parallel.job(
                     self._unpack,
                     args,
                     n_jobs=self.n_jobs,
                 ):
-                    continue
+                    specs.append(spec)
+
+                out_ref = parallel._remote(
+                    parallel._assemble, [ref_in], new_shape, specs, idx_offset
+                )
+                rdata.array = parallel.SharedArray(
+                    out_ref, new_shape, rdata.array.dtype
+                )
 
                 for i in range(0, ts_size, self.season_size):
                     _i = int(i / self.season_size)
@@ -1047,16 +1064,14 @@ try:
             result[0] *= self.scaling
             return result
 
-        def _unpack(self, p0, p1, i2, ref_array, idx_offset) -> bool:
-            array = load_memmap(**ref_array)
+        def _unpack(self, p0, p1, i2, ref_array, idx_offset):
+            array = parallel.get_shared(ref_array)
             result = self.backend.apply_along_axis(self._theil_slopes, 0, array[i2, p0:p1])
             o2 = list(range(idx_offset, idx_offset + result.shape[0]))
-            array[o2, p0:p1] = result
-
-            return True
+            return (o2, p0, p1, result)
 
         def _args(self, rdata, ginfo):
-            ref_array = ref_memmap(rdata.array)
+            ref_array = rdata.array.ref
             max_pixels = rdata.array.shape[1]
             pixels_per_job = math.ceil(max_pixels / self.n_jobs)
 
@@ -1088,16 +1103,26 @@ try:
                 start_dt_min = ginfo[RasterData.START_DT_COL].min()
                 end_dt_max = ginfo[RasterData.END_DT_COL].max()
 
-                self._resize_for_output(rdata, 1)
+                idx_offset = rdata._idx_offset()
+                new_shape = (idx_offset + 1, rdata.array.shape[1])
+                ref_in = rdata.array.ref
 
                 args = self._args(rdata, ginfo)
 
-                for r in parallel.job(
+                specs = []
+                for spec in parallel.job(
                     self._unpack,
                     args,
                     n_jobs=self.n_jobs,
                 ):
-                    continue
+                    specs.append(spec)
+
+                out_ref = parallel._remote(
+                    parallel._assemble, [ref_in], new_shape, specs, idx_offset
+                )
+                rdata.array = parallel.SharedArray(
+                    out_ref, new_shape, rdata.array.dtype
+                )
 
                 nm = "theilslopes"
                 pr = "m"
@@ -1164,8 +1189,8 @@ try:
                 result[j] *= self.scaling
             return result
 
-        def _unpack(self, p0, p1, i2, ref_array, idx_offset) -> bool:
-            array = load_memmap(**ref_array)
+        def _unpack(self, p0, p1, i2, ref_array, idx_offset):
+            array = parallel.get_shared(ref_array)
             sub = array[i2, p0:p1].T
             if self.scale_expr is not None:
                 sub = self.backend.evaluate(self.scale_expr, {"data": sub})
@@ -1173,11 +1198,10 @@ try:
                 sub, self.season_size, self.min_max, self.scaling
             )
             o2 = list(range(idx_offset, idx_offset + result.shape[1]))
-            array[o2, p0:p1] = result.T
-            return True
+            return (o2, p0, p1, result.T)
 
         def _args(self, rdata, ginfo):
-            ref_array = ref_memmap(rdata.array)
+            ref_array = rdata.array.ref
             max_pixels = rdata.array.shape[1]
             pixels_per_job = math.ceil(max_pixels / self.n_jobs)
 
@@ -1211,16 +1235,27 @@ try:
 
                 ts_size = ginfo.shape[0]
 
-                self._resize_for_output(rdata, ts_size // self.season_size)
+                idx_offset = rdata._idx_offset()
+                n_new = ts_size // self.season_size
+                new_shape = (idx_offset + n_new, rdata.array.shape[1])
+                ref_in = rdata.array.ref
 
                 args = self._args(rdata, ginfo)
 
-                for r in parallel.job(
+                specs = []
+                for spec in parallel.job(
                     self._unpack,
                     args,
                     n_jobs=self.n_jobs,
                 ):
-                    continue
+                    specs.append(spec)
+
+                out_ref = parallel._remote(
+                    parallel._assemble, [ref_in], new_shape, specs, idx_offset
+                )
+                rdata.array = parallel.SharedArray(
+                    out_ref, new_shape, rdata.array.dtype
+                )
                 nm = self.min_max
                 pr = "m"
 
@@ -1435,7 +1470,7 @@ try:
 
         def _map(self, ref_array, gmap, new_gmap):
             array_dict = {}
-            array = load_memmap(**ref_array)
+            array = parallel.get_shared(ref_array)
 
             array_mask = None
             if self.mask_group is not None and len(self.mask_values) >= 1:
@@ -1448,17 +1483,25 @@ try:
                 if array_mask is not None and group != self.mask_group:
                     array_dict[group][array_mask] = np.nan
 
+            out_slices = []
             for group in self.expressions.keys():
                 expression = self.expressions[group]
                 if group in gmap:
                     idx = gmap[group]
                 else:
                     idx = new_gmap[group]
-                array[idx, :] = self.backend.evaluate(expression, local_dict=array_dict)
+                out_slices.append(
+                    (
+                        [idx],
+                        0,
+                        array.shape[1],
+                        self.backend.evaluate(expression, local_dict=array_dict),
+                    )
+                )
 
             fidx = list(gmap.values())[0]
 
-            return fidx
+            return fidx, out_slices
 
         def run(self, rdata: RasterData, outname: str = "skmap_{gr}_{dt}"):
             self.groups = list(rdata.info[RasterData.GROUP_COL].unique())
@@ -1474,17 +1517,12 @@ try:
             n_new_rasters = n_new_groups * n_date_groups
 
             idx_offset = rdata._idx_offset()
-
-            # Resize the array to accommodate the new output bands.
-            if n_new_rasters > 0:
-                new_shape = (idx_offset + n_new_rasters, rdata.array.shape[1])
-                resized = new_memmap(rdata.array.dtype, new_shape)
-                resized[: rdata.array.shape[0], :] = rdata.array
-                rdata.array = resized
+            new_shape = (idx_offset + n_new_rasters, rdata.array.shape[1])
+            ref_in = rdata.array.ref
 
             args = []
 
-            ref_array = ref_memmap(rdata.array)
+            ref_array = rdata.array.ref
 
             idx_counter = 0
             for _, rows in rdata.info.groupby(self.date_cols):
@@ -1505,12 +1543,14 @@ try:
                 idx_counter += 1
 
             new_info = []
+            specs = []
 
-            for fidx in parallel.job(
+            for fidx, out_slices in parallel.job(
                 self._map,
                 args,
                 n_jobs=self.n_jobs,
             ):
+                specs.extend(out_slices)
                 row = rdata.info.iloc[fidx]
 
                 start_dt, end_dt = (
@@ -1541,6 +1581,13 @@ try:
                             dates=[start_dt, end_dt],
                         )
                     )
+
+            out_ref = parallel._remote(
+                parallel._assemble, [ref_in], new_shape, specs, idx_offset
+            )
+            rdata.array = parallel.SharedArray(
+                out_ref, new_shape, rdata.array.dtype
+            )
 
             return None, DataFrame(new_info)
 

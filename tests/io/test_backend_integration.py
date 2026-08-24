@@ -37,7 +37,7 @@ def _run_pipeline(backend):
             verbose=False,
         )
     )
-    return r.array[24:, :].copy()
+    return r.array.get()[24:, :].copy()
 
 
 @pytest.fixture(scope="module")

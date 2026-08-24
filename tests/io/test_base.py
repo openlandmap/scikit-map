@@ -113,4 +113,4 @@ def test_save_read_rasters_roundtrip(tmp_path):
 
     assert loaded.shape == (N, H * W), \
         f"Shape mismatch: saved {flat.shape}, loaded {loaded.shape}"
-    assert_array_equal(loaded, flat)
+    assert_array_equal(loaded.get(), flat)

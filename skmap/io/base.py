@@ -46,11 +46,7 @@ from skmap import SKMapBase, SKMapGroupRunner, SKMapRunner, parallel
 from skmap.misc import (
     _eval,
     date_range,
-    del_memmap,
-    load_memmap,
     make_tempdir,
-    new_memmap,
-    ref_memmap,
     ttprint,
     vrt_warp,
 )
@@ -293,13 +289,13 @@ def _save_raster(
 
     # _, _, nbands = data.shape
 
-    array = load_memmap(**ref_array)
+    array = parallel.get_shared(ref_array)
 
     with rasterio.open(fn_base_raster) as src:
         h, w = src.height, src.width
     if spatial_win is not None:
         h, w = spatial_win.height, spatial_win.width
-    band = array[i, :].reshape(h, w)
+    band = np.array(array[i, :].reshape(h, w))  # writable copy (object store is read-only)
 
     with _new_raster(
         fn_base_raster, raster_file, band, spatial_win, dtype, nodata
@@ -565,21 +561,15 @@ def read_rasters(
             backend = "python"
 
     if backend == "cpp":
-        return _read_rasters_cpp(
+        out = _read_rasters_cpp(
             raster_files, band, window, n_jobs, dtype, gdal_opts, verbose
         )
+        return parallel.put_shared(out)
 
     if verbose:
         ttprint(f"Reading {len(raster_files)} raster file(s) using {n_jobs} workers")
 
     height, width, window = _read_shape(raster_files, band, window, bounds, overview)
-
-    ttprint("Start new_memmap")
-    if max_rasters is not None:
-        array_mm = new_memmap(dtype, shape=(max_rasters, height * width))
-    else:
-        array_mm = new_memmap(dtype, shape=(len(raster_files), height * width))
-    ttprint(f"End new_memmap of shape {array_mm.shape}")
 
     args = [
         (
@@ -599,18 +589,25 @@ def read_rasters(
         for raster_idx in range(0, len(raster_files))
     ]
 
+    # Workers return band arrays (Ray return values = ObjectRefs); a single
+    # _stack_bands worker assembles them in the object store so the main
+    # process never materializes the full array.
+    band_refs = []
     for array, raster_idx, data_exists in parallel.job(
         _read_raster,
         args,
         n_jobs=n_jobs,
     ):
-        ttprint(array.shape)
-        array_mm[raster_idx, :] = array.reshape(-1)
         if not data_exists:
             raster_file = raster_files[raster_idx]
             raise Exception(f"The raster {raster_file} not exists")
+        band_refs.append((raster_idx, parallel.put_shared(array.reshape(-1)).ref))
 
-    return array_mm
+    band_refs.sort(key=lambda x: x[0])
+    refs = [r for _, r in band_refs]
+    n = len(raster_files)
+    out_ref = parallel._remote(parallel._stack_bands, refs, (n, height * width))
+    return parallel.SharedArray(out_ref, (n, height * width), np.dtype(dtype))
 
 
     # if not keep_memmap:
@@ -850,7 +847,7 @@ def save_rasters(
     if verbose:
         ttprint(f"Saving {len(raster_files)} raster files using {n_jobs} workers")
 
-    ref_array = ref_memmap(array)
+    ref_array = parallel.put_shared(array).ref
 
     args = [
         (base_raster, raster_file, ref_array, i, window, dtype, nodata, fit_in_dtype)
@@ -1238,9 +1235,10 @@ class RasterData(SKMapBase):
                 overview=overview,
                 gdal_opts=gdal_opts,
             )
-            # read_rasters returns (N, H*W); reshape the single mask band to (H, W).
+            # read_rasters returns a SharedArray (N, H*W); materialize the
+            # single mask band and reshape it to (H, W).
             h, w, _ = _read_shape([self.raster_mask], 1, window, None, overview)
-            data_mask = data_mask.reshape(h, w)
+            data_mask = data_mask.get().reshape(h, w)
             if self.raster_mask_val is np.nan:
                 data_mask = np.logical_not(np.isnan(data_mask))
             else:
@@ -1272,7 +1270,6 @@ class RasterData(SKMapBase):
             gdal_opts=gdal_opts,
             verbose=self.verbose,
             max_rasters=self.max_rasters,
-            backend="python",
         )
 
         # Remember the spatial extent so plotting can reshape (N, H*W) -> (H, W, N).
@@ -1401,13 +1398,17 @@ class RasterData(SKMapBase):
         new_array, new_info = process.run(self, group_list, ginfo_list, outname)
 
         if new_array is not None:
-            combined = new_memmap(
-                self.array.dtype,
-                (self.array.shape[0] + new_array.shape[0], self.array.shape[1]),
+            new_ref = parallel.put_shared(new_array).ref
+            out_ref = parallel._remote(
+                parallel._concat,
+                [self.array.ref, new_ref],
+                [self.array.shape, new_array.shape],
             )
-            combined[: self.array.shape[0], :] = self.array
-            combined[self.array.shape[0] :, :] = new_array
-            self.array = combined
+            self.array = parallel.SharedArray(
+                out_ref,
+                (self.array.shape[0] + new_array.shape[0], self.array.shape[1]),
+                self.array.dtype,
+            )
 
         to_add_info.append(new_info)
 
@@ -1435,12 +1436,15 @@ class RasterData(SKMapBase):
         self._verbose(f"Dropping data and info for groups: {group}")
         idx = self.info[self.info[RasterData.GROUP_COL].isin(group)].index
         keep_idx = [i for i in range(self.array.shape[0]) if i not in set(idx)]
-        new_arr = new_memmap(
-            self.array.dtype,
+        out_ref = parallel._remote(
+            parallel._select_bands,
+            [self.array.ref],
+            keep_idx,
             (len(keep_idx), self.array.shape[1]),
         )
-        new_arr[:, :] = self.array[keep_idx, :]
-        self.array = new_arr
+        self.array = parallel.SharedArray(
+            out_ref, (len(keep_idx), self.array.shape[1]), self.array.dtype
+        )
         self.info = self.info.drop(idx).reset_index(drop=True)
 
         return self
@@ -1544,12 +1548,12 @@ class RasterData(SKMapBase):
         if return_idx:
             return list(info.index)
         elif return_array:
-            return self.array[info.index, :]
+            return self.array.get()[info.index, :]
         elif return_info:
             return info
         elif return_copy:
             rdata = copy.copy(self)
-            rdata.array = self.array[info.index, :]
+            rdata.array = parallel.put_shared(self.array.get()[info.index, :])
             rdata.info = info
             # Deep-copy the mutable dicts so the filtered copy cannot corrupt
             # the original (regression fix: they were shared by reference).
@@ -1557,7 +1561,7 @@ class RasterData(SKMapBase):
             rdata.raster_files = copy.deepcopy(self.raster_files)
             return rdata
         else:
-            self.array = self.array[info.index, :]
+            self.array = parallel.put_shared(self.array.get()[info.index, :])
             self.info = info
             return self
 
@@ -1702,10 +1706,10 @@ class RasterData(SKMapBase):
             pass
 
     def _cleanup(self):
-        """Delete the backing memmap file if the array is a memmap."""
+        """Drop the ObjectRef so Ray can GC the object-store array."""
         if hasattr(self, "array"):
             try:
-                del_memmap(self.array)
+                del self.array
             except Exception:
                 pass
 
@@ -1773,7 +1777,7 @@ class RasterData(SKMapBase):
         with rasterio.open(self._base_raster()) as src:
             row_id, col_id = rasterio.transform.rowcol(src.transform, df.x, df.y)
             pix = row_id * src.width + col_id
-        df["data"] = np.array(self.array[:, pix].T).tolist()
+        df["data"] = np.array(self.array.get()[:, pix].T).tolist()
         # if data is required no need to create figures
         if return_data:
             return df.data.to_numpy()
@@ -1911,7 +1915,7 @@ class RasterData(SKMapBase):
         h, w = self._spatial_shape
 
         if len(groups) == 1:  # single band raster
-            arr = self.filter(f"group=={groups}").array
+            arr = self.filter(f"group=={groups}").array.get()
             arr = arr.reshape(arr.shape[0], h, w).transpose(1, 2, 0)
         elif len(groups) == 3:  # composite
             arr = []

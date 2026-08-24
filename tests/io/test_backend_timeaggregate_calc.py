@@ -33,7 +33,7 @@ def ref_aggregate():
             verbose=False,
         )
     )
-    return r.array.copy(), r.info.copy()
+    return r.array.get().copy(), r.info.copy()
 
 
 @pytest.mark.parametrize("backend", [NumbaBackend, CppBackend])
@@ -51,7 +51,7 @@ def test_timeaggregate_backends_match(ref_aggregate, backend):
     n_orig = 24
     new_cols = slice(n_orig, r.array.shape[0])
     np.testing.assert_allclose(
-        r.array[new_cols, :],
+        r.array.get()[new_cols, :],
         ref_arr[new_cols, :],
         rtol=RTOL,
         atol=ATOL,
@@ -63,14 +63,14 @@ def ref_calc():
     """Run Calc on the numpy backend using the non-dotted 'ndvi' input group."""
     r = _make_rdata(NumpyBackend(), gappy=True)
     r.run(Calc({"ndvi_x2": "ndvi * 2"}, verbose=False))
-    return r.array.copy()
+    return r.array.get().copy()
 
 
 @pytest.mark.parametrize("backend", [NumbaBackend, CppBackend])
 def test_calc_backends_match(ref_calc, backend):
     r = _make_rdata(backend(), gappy=True)
     r.run(Calc({"ndvi_x2": "ndvi * 2"}, verbose=False))
-    np.testing.assert_allclose(r.array, ref_calc, rtol=RTOL, atol=ATOL)
+    np.testing.assert_allclose(r.array.get(), ref_calc, rtol=RTOL, atol=ATOL)
 
 
 def test_timeaggregate_post_expression_backends():
@@ -86,7 +86,7 @@ def test_timeaggregate_post_expression_backends():
                 verbose=False,
             )
         )
-        results[Backend] = r.array[24:, :].copy()
+        results[Backend] = r.array.get()[24:, :].copy()
     np.testing.assert_allclose(
         results[NumpyBackend], results[NumbaBackend], rtol=RTOL, atol=ATOL
     )

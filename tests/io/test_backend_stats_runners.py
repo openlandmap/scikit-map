@@ -35,7 +35,7 @@ def _make_rdata(backend, gappy=False):
 
 
 def _new_bands(rdata, n_orig=24):
-    return rdata.array[n_orig:, :]
+    return rdata.array.get()[n_orig:, :]
 
 
 # ---------------------------------------------------------------------------

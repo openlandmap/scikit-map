@@ -34,15 +34,25 @@ def test_assemble_worker():
     # two output slices at band indices 3 and 4
     s0 = np.full((1, 4), 100.0, dtype=np.float32)
     s1 = np.full((1, 4), 200.0, dtype=np.float32)
-    slice_refs = [parallel.put_shared(s0).ref, parallel.put_shared(s1).ref]
-    out_ref = parallel._remote(
-        parallel._assemble, [ref_in, *slice_refs], (5, 4), [3, 4], 3
-    )
+    specs = [([3], 0, 4, s0), ([4], 0, 4, s1)]
+    out_ref = parallel._remote(parallel._assemble, [ref_in], (5, 4), specs, 3)
     out = parallel.get_shared(out_ref)
     assert out.shape == (5, 4)
     np.testing.assert_array_equal(out[:3], arr_in)
     np.testing.assert_array_equal(out[3], s0[0])
     np.testing.assert_array_equal(out[4], s1[0])
+
+
+def test_assemble_worker_partial_slice():
+    arr_in = np.zeros((2, 8), dtype=np.float32)
+    ref_in = parallel.put_shared(arr_in).ref
+    s = np.full((1, 4), 7.0, dtype=np.float32)
+    specs = [([2], 2, 6, s)]
+    out_ref = parallel._remote(parallel._assemble, [ref_in], (3, 8), specs, 2)
+    out = parallel.get_shared(out_ref)
+    assert out.shape == (3, 8)
+    np.testing.assert_array_equal(out[2, 2:6], s[0])
+    np.testing.assert_array_equal(out[:2], arr_in)
 
 
 def test_select_bands_worker():
