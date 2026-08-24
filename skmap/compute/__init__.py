@@ -14,6 +14,25 @@ sparse solve, OLS) have a single SciPy/statsmodels implementation shared
 by every backend -- they are declared on the abstract base so a runner can
 ask for them on any backend, but only the *core* array ops are overridden
 per backend.
+
+Backend selection guide
+-----------------------
+
+* ``"numpy"`` -- the reference; always correct, no compilation, no float32
+  constraint.  Use for correctness checks and small data.
+* ``"numba"`` -- accelerates the *reductions* (nanmean/std/min/max/sum/
+  median/percentile), the FIR ``convolve1d``, ``tsirf`` and
+  ``seasonal_min_max``.  Expression evaluation and the scipy-based
+  statistics still run on numpy/scipy.  First call JIT-compiles (~1 s).
+* ``"cpp"`` -- accelerates ``nanmean``, ``nanpercentile``, ``scale_offset``,
+  ``mask_nan`` and ``tsirf`` via the compiled ``skmap_bindings`` kernels.
+  These kernels are **float32-only**: a non-float32 input falls back to
+  numpy (no silent precision loss) unless ``allow_cast=True`` is passed.
+
+Every backend records its fallbacks in ``backend.fallbacks`` (a list of
+``(op, reason)`` tuples); ``RasterData.run`` prints a one-line summary when
+fallbacks occurred.  Fallbacks recorded inside Ray workers are not
+propagated back to the main process.
 """
 
 from .base import ComputeBackend
