@@ -28,6 +28,96 @@ def _call_worker(worker, args):
     return worker(*args)
 
 
+class SharedArray:
+    """A numpy array held in the Ray object store, accessed via an ObjectRef.
+
+    ``shape`` and ``dtype`` are O(1) metadata (no materialization); ``get()``
+    materializes the full array in process memory and should be used sparingly.
+    """
+
+    def __init__(self, ref, shape, dtype):
+        self.ref = ref  # ray.ObjectRef
+        self.shape = tuple(shape)
+        self.dtype = np.dtype(dtype)
+
+    @property
+    def ndim(self):
+        return len(self.shape)
+
+    def get(self):
+        """Materialize the full array (use sparingly)."""
+        import ray
+
+        return ray.get(self.ref)
+
+    def __repr__(self):
+        return f"SharedArray(shape={self.shape}, dtype={self.dtype})"
+
+
+def put_shared(array):
+    """Place ``array`` in the Ray object store and return a ``SharedArray``."""
+    import ray
+
+    ray.init(ignore_reinit_error=True)
+    arr = np.ascontiguousarray(array)
+    return SharedArray(ray.put(arr), arr.shape, arr.dtype)
+
+
+def get_shared(sa_or_ref):
+    """Return the numpy array backing a ``SharedArray`` or raw ``ObjectRef``."""
+    import ray
+
+    ref = sa_or_ref.ref if isinstance(sa_or_ref, SharedArray) else sa_or_ref
+    return ray.get(ref)
+
+
+def _remote(fn, *args):
+    """Invoke a module-level worker remotely and return its ObjectRef."""
+    import ray
+
+    ray.init(ignore_reinit_error=True)
+    return ray.remote(fn).remote(*args)
+
+
+def _stack_bands(band_refs, shape):
+    """Stack per-band arrays into a single ``(N, H*W)`` array (read assembly)."""
+    import ray
+
+    bands = [ray.get(r) for r in band_refs]
+    return np.stack(bands, axis=0).reshape(shape)
+
+
+def _assemble(refs, new_shape, out_idx_list, n_in):
+    """Build a new array: copy the first ``n_in`` input bands, then write the
+    returned output slices at their absolute band indices.
+
+    ``refs`` is ``[ref_in, *slice_refs]`` (a single list so Ray passes the
+    ObjectRefs by reference rather than dereferencing top-level args).
+    """
+    import ray
+
+    arr_in = ray.get(refs[0])
+    out = np.empty(new_shape, dtype=arr_in.dtype)
+    out[:n_in] = arr_in
+    for idx, sref in zip(out_idx_list, refs[1:]):
+        out[idx] = ray.get(sref)
+    return out
+
+
+def _select_bands(refs, keep_idx, shape):
+    """Return a new array with only the bands in ``keep_idx`` (drop)."""
+    import ray
+
+    return ray.get(refs[0])[keep_idx, :]
+
+
+def _concat(refs, shapes):
+    """Concatenate several arrays along the band axis (group-run concat)."""
+    import ray
+
+    return np.concatenate([ray.get(r) for r in refs], axis=0)
+
+
 def job(
     worker: Callable,
     worker_args: Iterator[tuple],
