@@ -36,7 +36,7 @@ class CppBackend(ComputeBackend):
 
     def __init__(self, n_threads: int = 0):
         self._sb = _import_bindings()
-        self._n_threads = n_threads if n_threads > 0 else _cpu_count()
+        self.n_threads = n_threads if n_threads > 0 else _cpu_count()
         # Fallback backend for operations without a C++ kernel.
         self._fallback = NumpyBackend()
         # Records (op_name, reason) for every fallback since the last reset.
@@ -82,7 +82,7 @@ class CppBackend(ComputeBackend):
             return self._fallback.nanmean(arr, axis)
         flat, shape = res
         out = np.empty(flat.shape[0], dtype=np.float32)
-        self._sb.nanMean(flat, self._n_threads, out)
+        self._sb.nanMean(flat, self.n_threads, out)
         return out.reshape(shape[:-1])
 
     def nanstd(self, arr, axis):
@@ -111,7 +111,7 @@ class CppBackend(ComputeBackend):
         out = np.empty((flat.shape[0], len(qs)), dtype=np.float32)
         self._sb.computePercentiles(
             flat,
-            self._n_threads,
+            self.n_threads,
             list(range(n_cols)),
             out,
             list(range(len(qs))),
@@ -132,7 +132,7 @@ class CppBackend(ComputeBackend):
             return self._fallback.scale_offset(arr, scale, offset)
         # scaleAndOffset mutates in place: data = data * scaling + offset
         out = np.array(arr, dtype=np.float32, copy=True, order="C")
-        self._sb.scaleAndOffset(out, self._n_threads, float(offset), float(scale))
+        self._sb.scaleAndOffset(out, self.n_threads, float(offset), float(scale))
         return out
 
     # ------------------------------------------------------------------
@@ -165,7 +165,7 @@ class CppBackend(ComputeBackend):
         out = np.array(arr, dtype=np.float32, copy=True, order="C")
         flat = out.reshape(-1, out.shape[-1] if out.ndim > 1 else 1)
         self._sb.maskNan(
-            flat, self._n_threads, list(range(flat.shape[0])), float(replace_value)
+            flat, self.n_threads, list(range(flat.shape[0])), float(replace_value)
         )
         return out
 
@@ -195,7 +195,7 @@ class CppBackend(ComputeBackend):
         pix_time = np.ascontiguousarray(np.asarray(data, dtype=np.float32).T)
         out = np.empty_like(pix_time)
         self._sb.applyTsirf(
-            pix_time, self._n_threads, out, 0,
+            pix_time, self.n_threads, out, 0,
             w_0, w_p, w_f, bool(keep_original_values), "default", "default",
         )
         return out.T.astype(np.float64, copy=False)

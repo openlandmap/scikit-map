@@ -310,7 +310,14 @@ class NumbaBackend(ComputeBackend):
 
     name = "numba"
 
-    def __init__(self):
+    def __init__(self, n_threads: int = 0):
+        self.n_threads = n_threads if n_threads > 0 else _cpu_count()
+        try:
+            import numba
+
+            numba.set_num_threads(self.n_threads)
+        except Exception:
+            pass
         _kernels()  # trigger compilation eagerly
 
     # --- reductions ----------------------------------------------------
@@ -428,3 +435,9 @@ class NumbaBackend(ComputeBackend):
         for i in range(flat.shape[0]):
             out[i] = kernel(flat[i], season_size, is_max, scaling)
         return out.reshape(moved.shape[:-1] + (n_seasons,))
+
+
+def _cpu_count():
+    import os
+
+    return os.cpu_count() or 1

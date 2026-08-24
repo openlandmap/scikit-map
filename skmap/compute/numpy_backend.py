@@ -14,6 +14,11 @@ class NumpyBackend(ComputeBackend):
 
     name = "numpy"
 
+    def __init__(self, n_threads: int = 0):
+        import os
+
+        self.n_threads = n_threads if n_threads > 0 else (os.cpu_count() or 1)
+
     # --- reductions ----------------------------------------------------
 
     def nanmean(self, arr, axis):
