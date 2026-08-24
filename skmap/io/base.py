@@ -513,15 +513,16 @@ def read_rasters(
     :param try_without_window: Retry without the window if the windowed read fails.
     :param gdal_opts: GDAL configuration options.
     :param overview: Overview level to read (COG files).
-    :param max_rasters: Pre-allocate this many bands (python backend).
+    :param max_rasters: Deprecated no-op (kept for backward compatibility).
     :param backend: ``"python"`` or ``"cpp"``. ``None`` auto-selects ``"cpp"``
       when the request is float32 with no python-only features, else ``"python"``.
       An explicit ``"cpp"`` with unsupported features falls back to ``"python"``
       with a warning.
     :param verbose: Print reading progress.
 
-    :returns: A 2-D array ``(N, H*W)`` where ``N`` is the number of files and
-      ``H*W`` the flattened spatial extent.
+    :returns: A :class:`skmap.parallel.SharedArray` of shape ``(N, H*W)``
+      (``N`` files, ``H*W`` flattened pixels) held in the Ray object store.
+      Call ``.get()`` to materialize it as a numpy array.
     """
     if data_mask is not None and dtype not in ("float16", "float32"):
         raise Exception("The data_mask requires dtype as float")
@@ -749,8 +750,8 @@ def save_rasters(
     verbose: bool = False,
 ):
     """
-    Save a 3D array in multiple raster files using as reference one base raster.
-    The last dimension is used to split the array in different rasters. GeoTIFF is
+    Save a ``(N, H*W)`` array in multiple raster files using as reference one base raster.
+    The first dimension (bands) is used to split the array in different rasters. GeoTIFF is
     the only output format supported. It always replaces the ``np.nan`` value
     by the specified ``nodata``.
 
@@ -759,7 +760,7 @@ def save_rasters(
       new rasters.
     :param raster_files: A list containing the paths for the new raster. It creates
       the folder hierarchy if not exists.
-    :param array: 3D data array.
+    :param array: ``(N, H*W)`` data array (files-first, pixels flattened).
     :param window: Save the data considering a spatial window, even if the ``base_rasters``
       refers to a bigger area. For example, it's possible to have a base raster covering the whole
       Europe and save the data using a window that cover just part of Wageningen. By default is
