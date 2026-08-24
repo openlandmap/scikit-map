@@ -226,6 +226,36 @@ def _make_kernels():
                 out[j] = num / den
         return out
 
+    @njit
+    def _seasonal_min_max_1d(row, season_size, is_max, scaling):
+        n = row.shape[0]
+        n_seasons = n // season_size
+        out = np.empty(n_seasons, dtype=np.float64)
+        for s in range(n_seasons):
+            i0 = s * season_size
+            i1 = i0 + season_size
+            has_nan = False
+            if is_max:
+                m = -np.inf
+            else:
+                m = np.inf
+            for k in range(i0, i1):
+                v = row[k]
+                if np.isnan(v):
+                    has_nan = True
+                    break
+                if is_max:
+                    if v > m:
+                        m = v
+                else:
+                    if v < m:
+                        m = v
+            if has_nan:
+                out[s] = np.nan
+            else:
+                out[s] = m * scaling
+        return out
+
     return {
         "nanmean": _nanmean_1d,
         "nanstd": _nanstd_1d,
@@ -236,6 +266,7 @@ def _make_kernels():
         "nanpercentile": _nanpercentile_1d,
         "convolve1d": _convolve1d_1d,
         "tsirf": _tsirf_1d,
+        "seasonal_min_max": _seasonal_min_max_1d,
     }
 
 
@@ -385,3 +416,15 @@ class NumbaBackend(ComputeBackend):
         W = np.fft.rfft(kernel, n_e)
         V = np.fft.rfft(data, n_e, axis=1)
         return np.fft.irfft(V * W, n_e, axis=1)[:, :n_s]
+
+    def seasonal_min_max(self, arr, season_size, min_max, scaling=1.0):
+        arr64 = np.asarray(arr, dtype=np.float64)
+        moved = np.moveaxis(arr64, -1, -1)  # already last
+        flat = moved.reshape(-1, moved.shape[-1])
+        n_seasons = flat.shape[1] // season_size
+        out = np.empty((flat.shape[0], n_seasons), dtype=np.float64)
+        is_max = 1 if min_max == "max" else 0
+        kernel = _kernels()["seasonal_min_max"]
+        for i in range(flat.shape[0]):
+            out[i] = kernel(flat[i], season_size, is_max, scaling)
+        return out.reshape(moved.shape[:-1] + (n_seasons,))

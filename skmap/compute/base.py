@@ -51,6 +51,13 @@ class ComputeBackend(ABC):
         """NaN-aware percentiles. ``q`` is a sequence of percentile values."""
 
     @abstractmethod
+    def seasonal_min_max(self, arr, season_size, min_max, scaling=1.0):
+        """Per-pixel seasonal min or max. ``arr`` is (H, W, T); reduce the last
+        axis in non-overlapping chunks of ``season_size`` returning
+        (H, W, n_seasons).  ``min_max`` is 'min' or 'max'; NaN in a chunk yields NaN.
+        """
+
+    @abstractmethod
     def evaluate(self, expr, local_dict):
         """Evaluate a NumExpr-style string expression elementwise."""
 

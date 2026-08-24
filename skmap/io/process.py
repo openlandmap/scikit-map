@@ -494,6 +494,9 @@ try:
     class WhittakerSmooth(Transformer):
         """
         https://github.com/mhvwerts/whittaker-eilers-smoother/blob/master/whittaker_smooth.py
+
+        The per-pixel sparse solve uses SciPy (``splu``) on every compute
+        backend; only the ``apply_along_axis`` dispatch is backend-aware.
         """
 
         def __init__(
@@ -858,6 +861,10 @@ try:
             return None, DataFrame(new_info)
 
     class PeakAnalysis(Derivator):
+        """Per-pixel statistics use SciPy/statsmodels on every compute backend
+        (``find_peaks``/``theilslopes``/``STL``+``OLS``); only the ``evaluate``
+        and ``apply_along_axis`` dispatch is backend-aware.
+        """
         def __init__(
             self,
             season_size: int,
@@ -1007,6 +1014,10 @@ try:
             return None, DataFrame(new_info)
 
     class SlopeAnalysis(Derivator):
+        """Per-pixel statistics use SciPy/statsmodels on every compute backend
+        (``find_peaks``/``theilslopes``/``STL``+``OLS``); only the ``evaluate``
+        and ``apply_along_axis`` dispatch is backend-aware.
+        """
         def __init__(
             self,
             scale_expr: str = None,
@@ -1153,10 +1164,14 @@ try:
 
         def _unpack(self, i0_0, i0_1, i2, ref_array, idx_offset) -> bool:
             array = load_memmap(**ref_array)
-            result = self.backend.apply_along_axis(self._find_min_max, 2, array[i0_0:i0_1, :, i2])
+            sub = array[i0_0:i0_1, :, i2]
+            if self.scale_expr is not None:
+                sub = self.backend.evaluate(self.scale_expr, {"data": sub})
+            result = self.backend.seasonal_min_max(
+                sub, self.season_size, self.min_max, self.scaling
+            )
             o2 = list(range(idx_offset, idx_offset + result.shape[2]))
             array[i0_0:i0_1, :, o2] = result
-
             return True
 
         def _args(self, rdata, ginfo):
@@ -1230,6 +1245,10 @@ try:
             return None, DataFrame(new_info)
 
     class TrendAnalysis(Derivator):
+        """Per-pixel statistics use SciPy/statsmodels on every compute backend
+        (``find_peaks``/``theilslopes``/``STL``+``OLS``); only the ``evaluate``
+        and ``apply_along_axis`` dispatch is backend-aware.
+        """
         def __init__(
             self,
             season_size: int,

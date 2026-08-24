@@ -155,6 +155,10 @@ class CppBackend(ComputeBackend):
         )
         return out
 
+    def seasonal_min_max(self, arr, season_size, min_max, scaling=1.0):
+        # No dedicated C++ kernel; fall back to the numpy vectorised path.
+        return self._fallback.seasonal_min_max(arr, season_size, min_max, scaling)
+
     def fft_convolve(self, data, kernel, n_s):
         # No C++ FFT kernel; fall back to the numpy vectorised FFT.
         return self._fallback.fft_convolve(data, kernel, n_s)
