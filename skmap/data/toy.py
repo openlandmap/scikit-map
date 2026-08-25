@@ -29,8 +29,12 @@ def _temporal_raster(type, subpath=None):
     return str(raster_files[0]).replace(base_dt, "{dt}")
 
 
-def rdata(verbose=True):
-    """Return a small example static raster array (two layers) for testing and demos."""
+def rdata(verbose=True, backend="numpy"):
+    """Return a small example static raster array (two layers) for testing and demos.
+
+    :param backend: compute backend (``"numpy"``/``"numba"``/``"cpp"``) used by
+        subsequent :meth:`RasterData.run` calls; see :mod:`skmap.compute`.
+    """
 
     return (
         RasterData(
@@ -40,18 +44,23 @@ def rdata(verbose=True):
                 "static": _static_raster(),
             },
             verbose=verbose,
+            backend=backend,
         )
         .timespan("20141202", "20201201", "days", TOY_DATE_STEP, ignore_29feb=True)
         .read()
     )
 
 
-def ndvi_rdata(gappy=False, verbose=True):
-    """Return a small example quarterly NDVI time-series raster, optionally with gaps."""
+def ndvi_rdata(gappy=False, verbose=True, backend="numpy"):
+    """Return a small example quarterly NDVI time-series raster, optionally with gaps.
+
+    :param backend: compute backend (``"numpy"``/``"numba"``/``"cpp"``) used by
+        subsequent :meth:`RasterData.run` calls; see :mod:`skmap.compute`.
+    """
 
     subpath = "gappy" if gappy else "filled"
     return (
-        RasterData({"ndvi": _temporal_raster("ndvi", subpath)}, verbose=verbose)
+        RasterData({"ndvi": _temporal_raster("ndvi", subpath)}, verbose=verbose, backend=backend)
         .timespan("20141202", "20201201", "days", TOY_DATE_STEP, ignore_29feb=True)
         .read()
     )

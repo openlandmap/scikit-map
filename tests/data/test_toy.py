@@ -24,3 +24,19 @@ def test_ndvi_rdata() -> None:
         "max_rasters",
         "_spatial_shape",
     ]
+
+
+def test_ndvi_rdata_backend() -> None:
+    """The data accessors forward the backend to RasterData."""
+    from skmap.compute import CppBackend, NumbaBackend, NumpyBackend
+
+    assert isinstance(toy.ndvi_rdata(backend="numpy").backend, NumpyBackend)
+    assert isinstance(toy.ndvi_rdata(backend="numba").backend, NumbaBackend)
+    assert isinstance(toy.ndvi_rdata(backend="cpp").backend, CppBackend)
+
+
+def test_rdata_backend() -> None:
+    """rdata() also forwards the backend."""
+    from skmap.compute import NumbaBackend
+
+    assert isinstance(toy.rdata(backend="numba").backend, NumbaBackend)
