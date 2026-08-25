@@ -247,3 +247,99 @@ class TestFromYaml:
         blue = r.filter("band == 'blue'")
         assert len(blue.info) == 4  # 2 years x 2 month-pairs
         assert set(blue.info["band"].unique()) == {"blue"}
+
+
+class TestIntervalExpansion:
+    ENTRY = {
+        "name": "{band}_{season}",
+        "path": "{base_path}/ndvi/{band}_s_{dt}.tif",
+        "temporal_resolution": "interval",
+        "type": "temporal",
+        "start_date": "20141202",
+        "end_date": "20201201",
+        "date_unit": "days",
+        "date_step": "109, 96, 80, 80",
+        "ignore_29feb": True,
+        "band": "ndvi",
+        "variant": "filled",
+        "season": "winter, spring, summer, fall",
+    }
+
+    def test_interval_expands_24_specs(self):
+        specs = list(TemplateExpander().expand(self.ENTRY, base_path="/d"))
+        assert len(specs) == 24
+        s = specs[0]
+        assert s.path == "/d/ndvi/ndvi_s_20141202_20150320.tif"
+        assert s.start_date == datetime(2014, 12, 2)
+        assert s.end_date == datetime(2015, 3, 20)
+        assert s.group == "2014"
+        assert s.temporal is True
+
+    def test_interval_name_template_is_year_agnostic(self):
+        specs = list(TemplateExpander().expand(self.ENTRY, base_path="/d"))
+        # the same season name appears in every year (not date-specific)
+        assert specs[0].name == "ndvi_winter"
+        winter_names = {s.name for s in specs if s.vars["season"] == "winter"}
+        assert winter_names == {"ndvi_winter"}
+
+    def test_interval_cycling_season(self):
+        specs = list(TemplateExpander().expand(self.ENTRY, base_path="/d"))
+        seasons = [s.vars["season"] for s in specs[:8]]
+        # season cycles with the 4 step values: winter, spring, summer, fall, ...
+        assert seasons == [
+            "winter", "spring", "summer", "fall",
+            "winter", "spring", "summer", "fall",
+        ]
+
+    def test_interval_variant_column_not_in_path(self):
+        """A scalar field not referenced in the path still becomes a column."""
+        specs = list(TemplateExpander().expand(self.ENTRY, base_path="/d"))
+        assert all(s.vars["variant"] == "filled" for s in specs)
+        assert all(s.vars["band"] == "ndvi" for s in specs)
+
+    def test_interval_cross_product_band(self):
+        """A list variable with a length != date_step cross-products."""
+        entry = dict(self.ENTRY)
+        entry["band"] = "ndvi, swir1"  # length 2 != 4 -> cross-product
+        entry["name"] = "{band}_{season}"
+        entry["path"] = "{base_path}/{band}/{band}_s_{dt}.tif"
+        specs = list(TemplateExpander().expand(entry, base_path="/d"))
+        assert len(specs) == 48  # 2 bands x 24 intervals
+        assert {s.name.split("_")[0] for s in specs} == {"ndvi", "swir1"}
+
+
+class TestToyLayersYaml:
+    def test_loads_all_toy_data(self):
+        from skmap.data import toy
+
+        r = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
+        assert r.array is None  # lazy
+        assert len(r.info) == 74  # 24+24 ndvi + 24 swir1 + 2 static
+        assert set(r.get_groups()) == {str(y) for y in range(2014, 2021)}
+
+    def test_season_names_are_year_agnostic(self):
+        from skmap.data import toy
+
+        r = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
+        ndvi = r.info[r.info["band"] == "ndvi"]
+        assert set(ndvi["name"].unique()) == {
+            "ndvi_winter", "ndvi_spring", "ndvi_summer", "ndvi_fall"
+        }
+
+    def test_filled_filter_excludes_gappy(self):
+        from skmap.data import toy
+
+        r = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
+        filled = r.filter("variant != 'gappy'")
+        assert len(filled.info) == 50  # 24 ndvi filled + 24 swir1 + 2 static
+        assert set(filled.info["band"].dropna().unique()) == {"ndvi", "swir1"}
+
+    def test_unique_names_within_year(self):
+        """Names are unique within each year group (SpaceOverlay requirement)."""
+        from skmap.data import toy
+
+        r = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
+        filled = r.filter("variant != 'gappy'")
+        for year in ["2015", "2016", "2019"]:
+            sub = filled.filter(f"group == '{year}'")
+            assert sub.info["name"].nunique() == len(sub.info)
