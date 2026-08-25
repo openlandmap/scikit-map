@@ -1,0 +1,61 @@
+# Toy-data layer catalogue for scikit-map demos/tests.
+#
+# ``{base_path}`` is resolved from the ``base_path`` argument of
+# RasterData.from_yaml (or the SKMAP_BASE_PATH environment variable):
+#
+#     rdata = RasterData.from_yaml("layers.yaml", base_path=str(toy.DATA_DIR))
+#
+# Temporal layers use the ``interval`` style: start_date/end_date/date_unit/
+# date_step generate (dt1, dt2) intervals and the ``{dt}`` placeholder expands
+# to ``dt1_dt2``.  ``season`` (4 values) cycles with ``date_step`` (4 values),
+# so composite i gets season[i % 4]; the ``name`` template makes names
+# year-agnostic (ndvi_winter, ndvi_spring, ...) so one model can be trained
+# and predicted across years.
+
+- name: '{band}_{season}'
+  path: '{base_path}/ndvi/filled/ndvi_landsat.ard1_p50_30m_s_{dt}_nl_epsg.3035_v20230720.tif'
+  temporal_resolution: 'interval'
+  type: 'temporal'
+  start_date: '20141202'
+  end_date: '20201201'
+  date_unit: 'days'
+  date_step: '109, 96, 80, 80'
+  ignore_29feb: true
+  band: 'ndvi'
+  variant: 'filled'
+  season: 'winter, spring, summer, fall'
+
+- name: '{band}_{season}'
+  path: '{base_path}/ndvi/gappy/ndvi_landsat.ard1_p50_30m_s_{dt}_nl_epsg.3035_v20230720.tif'
+  temporal_resolution: 'interval'
+  type: 'temporal'
+  start_date: '20141202'
+  end_date: '20201201'
+  date_unit: 'days'
+  date_step: '109, 96, 80, 80'
+  ignore_29feb: true
+  band: 'ndvi'
+  variant: 'gappy'
+  season: 'winter, spring, summer, fall'
+
+- name: '{band}_{season}'
+  path: '{base_path}/swir1/swir1_landsat.ard1_p50_30m_s_{dt}_nl_epsg.3035_v20230720.tif'
+  temporal_resolution: 'interval'
+  type: 'temporal'
+  start_date: '20141202'
+  end_date: '20201201'
+  date_unit: 'days'
+  date_step: '109, 96, 80, 80'
+  ignore_29feb: true
+  band: 'swir1'
+  season: 'winter, spring, summer, fall'
+
+- name: 'elev'
+  path: '{base_path}/static/elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif'
+  temporal_resolution: 'longterm_or_static'
+  type: 'common'
+
+- name: 'slope'
+  path: '{base_path}/static/slope.percent_gedi.eml_m_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif'
+  temporal_resolution: 'longterm_or_static'
+  type: 'common'

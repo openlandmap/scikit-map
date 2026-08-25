@@ -12,6 +12,7 @@ from skmap.misc import find_files
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR.joinpath("toy")
 TOY_DATE_STEP = [109, 96, 80, 80]
+LAYERS_YAML = DATA_DIR.joinpath("layers.yaml")
 
 
 def _static_raster():
