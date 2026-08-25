@@ -19,9 +19,9 @@ from dateutil.relativedelta import relativedelta
 from minio import Minio
 from minio.error import S3Error
 from numpy.typing import NDArray
-from osgeo.gdal import BuildVRT, Warp
+from osgeo.gdal import Warp
 from rasterio.crs import CRS
-from shapely.geometry import box, shape
+from shapely.geometry import box, shape  # noqa: F401  (kept for doctest/back-compat)
 
 TMP_DIR = tempfile.gettempdir()
 
@@ -242,57 +242,40 @@ def make_tempdir(basedir: str = "skmap", make_subdir: bool = True) -> Path:
     return tempdir
 
 
-def _bounds_crs(
-    raster_file: Union[str, Path], dst_crs: Union[CRS, dict, str]
-) -> Tuple[Union[str, Path], Tuple[float, float, float, float], CRS, float]:
-    with rasterio.open(raster_file) as ds:
-        bounds = shape(
-            rasterio.warp.transform_geom(
-                dst_crs=dst_crs, src_crs=ds.crs, geom=box(*ds.bounds)
-            )
-        ).bounds
-        crs = ds.crs
-        tr = ds.transform[0]
-        return raster_file, bounds, crs, tr
-
-
 def _build_vrt(
     raster_file: str,
     band: int,
-    tr: float,
+    tr: Optional[float],
     dst_crs: CRS,
     r_method: str,
     outdir: Union[Path, str],
-    te: Tuple[float, float, float, float],
-    tr_min: float,
 ) -> Tuple[str, str]:
-    outfile_1 = str(
+    """Build a single on-the-fly VRT for one raster (reprojected/resampled).
+
+    The VRT keeps the raster's own extent (no full-union ``outputBounds``), so
+    reading it materializes only that raster's area — the scalable choice for
+    large areas and thousands of files.  Assumes all inputs share the same
+    extent/CRS (the RasterData contract).
+    """
+    src = raster_file if os.path.exists(raster_file) else f"/vsicurl/{raster_file}"
+    outfile = str(
         Path(outdir).joinpath(
             str(Path(raster_file.split("?")[0]).stem + f"_b{band}.vrt")
         )
     )
-    ds_1 = BuildVRT(
-        outfile_1, f"/vsicurl/{raster_file}", bandList=[band], xRes=tr_min, yRes=tr_min
-    )
-    ds_1.FlushCache()
-
-    outfile_2 = str(
-        Path(outdir).joinpath(
-            str(Path(raster_file.split("?")[0]).stem + f"_b{band}_wrapped.vrt")
-        )
-    )
-    ds_2 = Warp(
-        outfile_2,
-        ds_1,
-        xRes=tr,
-        yRes=tr,
-        resampleAlg=r_method,
+    kwargs = dict(
+        format="VRT",
         dstSRS=dst_crs,
-        outputBounds=te,
+        resampleAlg=r_method,
+        srcBands=[band],
+        dstBands=[1],
     )
-    ds_2.FlushCache()
-
-    return raster_file, outfile_2
+    if tr is not None:
+        kwargs["xRes"] = tr
+        kwargs["yRes"] = tr
+    ds = Warp(outfile, src, **kwargs)
+    ds.FlushCache()
+    return raster_file, outfile
 
 
 def vrt_warp(
@@ -305,7 +288,13 @@ def vrt_warp(
     n_jobs: int=-1,
     return_input_files: bool=False,
 ):
-    """Build a VRT-based warp of a source raster to a target geometry/crs and return the path."""
+    """Build one on-the-fly VRT per source raster (reprojected/resampled).
+
+    Each VRT keeps its raster's own extent (no full-union ``outputBounds``), so
+    reading it materializes only that raster's area.  Assumes all inputs share
+    the same extent/CRS.  Returns the VRT paths (or ``(inputs, vrts)`` when
+    ``return_input_files`` is set).
+    """
 
     from skmap import parallel
 
@@ -314,27 +303,12 @@ def vrt_warp(
     else:
         Path(outdir).mkdir(parents=True, exist_ok=True)
 
-    args = sorted(set(r for r in raster_files))
-    args = [(r, dst_crs) for r in raster_files]
-
-    total_bounds = []
-    args_vrt = []
-    tr_arr = []
-    for raster_file, bounds, crs, tr1 in parallel.job(
-        _bounds_crs, args, n_jobs=n_jobs
-    ):
-        total_bounds.append(box(*bounds))
-        tr_arr.append(tr1)
-        args_vrt.append((raster_file, band, tr, dst_crs, r_method, outdir))
-
-    tr_min = np.min(tr_arr)
-    te = gp.GeoSeries(total_bounds).unary_union.bounds
-    args_vrt = [a + (te, tr_min) for a in args_vrt]
+    args = [(r, band, tr, dst_crs, r_method, outdir) for r in raster_files]
 
     vrt_files = []
     input_files = []
     for input_file, vrt_file in parallel.job(
-        _build_vrt, args_vrt, n_jobs=-1
+        _build_vrt, args, n_jobs=n_jobs
     ):
         input_files.append(input_file)
         vrt_files.append(vrt_file)
