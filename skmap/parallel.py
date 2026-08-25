@@ -55,9 +55,15 @@ class SharedArray:
 
 
 def put_shared(array):
-    """Place ``array`` in the Ray object store and return a ``SharedArray``."""
+    """Place ``array`` in the Ray object store and return a ``SharedArray``.
+
+    Accepts a numpy array (wraps it) or an existing ``SharedArray`` (reuses
+    its ref, no extra copy).
+    """
     import ray
 
+    if isinstance(array, SharedArray):
+        return array
     ray.init(ignore_reinit_error=True)
     arr = np.ascontiguousarray(array)
     return SharedArray(ray.put(arr), arr.shape, arr.dtype)
