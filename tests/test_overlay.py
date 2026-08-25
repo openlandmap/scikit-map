@@ -123,6 +123,34 @@ class TestSpaceOverlay(TestOverlayBase):
         assert list(res.columns) == ["lon", "lat", "elev"]
         assert res["elev"].tolist() == [70.0, 284.0]
 
+    def test_run_from_rasterdata(self) -> None:
+        """SpaceOverlay accepts a pre-loaded RasterData as the data source."""
+        from skmap.io import RasterData
+
+        rdata = RasterData(
+            {
+                "common": [
+                    self.ELEV_FILE.as_posix(),
+                    self.SLOPE_FILE.as_posix(),
+                ]
+            }
+        ).read()
+        rdata.info["name"] = ["elev", "slope"]
+
+        so = SpaceOverlay(
+            points=gpd.GeoDataFrame(
+                geometry=[Point(x, y) for x, y in zip(self.PTS_X, self.PTS_Y)],
+                crs=self.PTS_CRS,
+            ),
+            rasterdata=rdata,
+            verbose=False,
+        )
+        res = so.run(max_ram_mb=512, out_file_name=None)
+        assert res.shape == (2, 4)
+        assert list(res.columns) == ["lon", "lat", "elev", "slope"]
+        assert res["elev"].tolist() == [70.0, 284.0]
+        assert res["slope"].tolist() == [31.0, 59.0]
+
     def test_run_multiple_layers_same_group(self) -> None:
         # Regression: a group with more than one layer used to return NaN for
         # every layer except the last one (extractOverlay hash-map collapse).

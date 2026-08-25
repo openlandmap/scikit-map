@@ -268,6 +268,35 @@ class _ParallelOverlay:
         return query_pixels
 
 
+class _RasterDataCatalogAdapter:
+    """Minimal DataCatalog-compatible view over a :class:`~skmap.io.RasterData`.
+
+    Lets ``SpaceOverlay`` reuse its path-based sampling unchanged: a
+    RasterData supplies the layer paths/names/indices and (already computed)
+    whales are a no-op.
+    """
+
+    def __init__(self, rdata) -> None:
+        info = rdata.info.reset_index(drop=True)
+        self.data_size = len(info)
+        self._names = info[rdata.NAME_COL].tolist()
+        self._paths = info[rdata.PATH_COL].tolist()
+        self._idxs = list(range(self.data_size))
+        self.data = {}
+
+    def get_paths(self):
+        return self._paths, self._idxs, self._names
+
+    def get_unrolled_catalog(self):
+        return self._names, self._paths, self._idxs
+
+    def get_feature_names(self):
+        return sorted(set(self._names))
+
+    def _get_whales(self):
+        return [], [], []
+
+
 class SpaceOverlay:
     """
     Overlay a set of points over multiple raster files.
@@ -276,7 +305,9 @@ class SpaceOverlay:
 
     :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
         the points.
-    :param catalog: scikit-map data catalog.
+    :param catalog: scikit-map data catalog (or ``None`` when ``rasterdata`` is given).
+    :param rasterdata: a pre-loaded :class:`~skmap.io.RasterData` whose band
+        names/group structure replace the catalog metadata.
     :param n_threads: Number of CPU cores to be used in parallel. By default all cores
         are used.
     :param verbose: Use ``True`` to print the overlay progress.
@@ -285,14 +316,20 @@ class SpaceOverlay:
     def __init__(
         self,
         points: gpd.GeoDataFrame | str | pd.DataFrame,
-        catalog: DataCatalog,
+        catalog: DataCatalog = None,
+        rasterdata=None,
         raster_tiles: Optional[gpd.GeoDataFrame | str] = None,
         tile_id_col: Union[str] = "tile_id",
         n_threads: int = parallel.CPU_COUNT,
         verbose: bool = True,
     ) -> None:
         self.verbose: bool = verbose
-        self.catalog: DataCatalog = catalog
+        if rasterdata is not None:
+            self.catalog = _RasterDataCatalogAdapter(rasterdata)
+        elif catalog is not None:
+            self.catalog = catalog
+        else:
+            raise ValueError("Provide either ``catalog`` or ``rasterdata``")
         self.layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
 
         if raster_tiles is not None:
