@@ -20,7 +20,6 @@ def test_ndvi_rdata() -> None:
         "array",
         "base_raster",
         "window",
-        "bounds",
         "overview",
         "extent",
         "extent_epsg",

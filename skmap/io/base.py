@@ -446,6 +446,13 @@ def _resolve_read_params(
         src_crs = extent_epsg if extent_epsg is not None else ds.crs
         bnds = rasterio.warp.transform_bounds(src_crs, ds.crs, *extent)
         window = from_bounds(*bnds, ds.transform).round_lengths()
+        # Clip to the raster grid and cast to ints (the C++ readData binding
+        # takes unsigned integer offsets).
+        window = window.intersection(rasterio.windows.Window(0, 0, ds.width, ds.height))
+        window = rasterio.windows.Window(
+            int(window.col_off), int(window.row_off),
+            int(window.width), int(window.height),
+        )
 
     w = window.width if window is not None else ds.width
     h = window.height if window is not None else ds.height
@@ -1038,7 +1045,6 @@ class RasterData(SKMapBase):
         self.array = None
         self.base_raster = None
         self.window = None
-        self.bounds = None
         self.overview = None
         self.extent = None
         self.extent_epsg = None
@@ -1195,7 +1201,9 @@ class RasterData(SKMapBase):
         obj.array = None
         obj.base_raster = None
         obj.window = None
-        obj.bounds = None
+        obj.overview = None
+        obj.extent = None
+        obj.extent_epsg = None
 
         if RasterData.TEMPORAL_COL not in obj.info.columns:
             obj.info[RasterData.TEMPORAL_COL] = obj.info.apply(
