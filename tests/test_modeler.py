@@ -1,5 +1,3 @@
-import os
-
 import joblib
 import numpy as np
 import pandas as pd
@@ -7,7 +5,7 @@ import pytest
 from sklearn.base import is_classifier, is_regressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from skmap.modeler import RFClassifier, RFRegressor, _write_output_layers
+from skmap.modeler import RFClassifier, RFRegressor
 
 # The sklearn-API fixtures below use random data on purpose: they test the
 # estimator *wrapper* conformance (is_regressor, feature_names_in_, get_params),
@@ -16,27 +14,25 @@ from skmap.modeler import RFClassifier, RFRegressor, _write_output_layers
 
 @pytest.fixture
 def _toy_covariates():
-    """Extract elev+slope at toy land-cover sample points via SpaceOverlay."""
-    from pathlib import Path
-
-    from skmap.catalog import DataCatalog
+    """Extract elev+slope at toy land-cover sample points via lazy SpaceOverlay."""
     from skmap.data import toy
+    from skmap.io import RasterData
     from skmap.overlay import SpaceOverlay
 
-    toy_dir = Path(__file__).parent.parent / "skmap" / "data" / "toy"
-    elev = "elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3"
-    slope = "slope.percent_gedi.eml_m_30m_s_20000101_20181231_nl_epsg.3035_v0.3"
-    catalog = DataCatalog.create_catalog(
-        catalog_def=pd.DataFrame({
-            "layer_name": ["elev", "slope"],
-            "path": ["{base_path}/" + elev + ".tif", "{base_path}/" + slope + ".tif"],
-            "type": ["common", "common"],
-        }),
-        years=[2020],
-        base_path=str(toy_dir / "static"),
+    toy_dir = toy.DATA_DIR
+    elev = "elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
+    slope = "slope.percent_gedi.eml_m_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
+    rdata = RasterData(
+        {
+            "common": [
+                str(toy_dir / "static" / elev),
+                str(toy_dir / "static" / slope),
+            ]
+        }
     )
+    rdata.info["name"] = ["elev", "slope"]
     pts = toy.lc_samples()
-    so = SpaceOverlay(points=pts, catalog=catalog)
+    so = SpaceOverlay(points=pts, rasterdata=rdata, verbose=False)
     res = so.run(max_ram_mb=512, out_file_name=None)
     return res
 
@@ -83,42 +79,6 @@ def test_rf_classifier_sklearn_api(classifier_model):
     assert list(est.feature_names_in_) == ["a", "b", "c"]
     pred = est.predict(X.values[:5])
     assert pred.shape == (5,)  # class labels
-
-
-def test_write_output_layers(tmp_path):
-    import skmap_bindings as sb
-
-    base = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "skmap",
-        "data",
-        "toy",
-        "swir1",
-        "swir1_landsat.ard1_p50_30m_s_20181202_20190320_nl_epsg.3035_v20230720.tif",
-    )
-    base = os.path.abspath(base)
-    out_dir = str(tmp_path / "tile1")
-    os.makedirs(out_dir)
-    data = np.full((2, 256 * 256), 100.0, dtype=np.float32)
-    res = _write_output_layers(
-        data,
-        out_dir,
-        ["a", "b"],
-        [base, base],
-        1,
-        {},
-        -9999,
-        "int16",
-        256,
-        256,
-        None,
-        None,
-        "tile1",
-    )
-    assert res == [f"{out_dir}/a", f"{out_dir}/b"]
-    assert os.path.exists(f"{out_dir}/a.tif")
-    assert os.path.exists(f"{out_dir}/b.tif")
 
 
 def test_rf_regressor_end_to_end_toy(_toy_covariates, tmp_path):

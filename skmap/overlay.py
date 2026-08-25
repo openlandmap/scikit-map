@@ -292,7 +292,7 @@ class _PointAccessor:
         return self._names.index(name)
 
 
-class _RasterDataCatalogAdapter:
+class _RasterDataAdapter:
     """Minimal view over a :class:`~skmap.io.RasterData` for path-based sampling.
 
     Lets ``SpaceOverlay`` reuse its block-based sampling unchanged: a
@@ -350,8 +350,8 @@ class SpaceOverlay:
     ) -> None:
         self.verbose: bool = verbose
         self.runners = runners or []
-        self.catalog = _RasterDataCatalogAdapter(rasterdata)
-        self.layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
+        self.adapter = _RasterDataAdapter(rasterdata)
+        self.layer_paths, self.layer_idxs, self.layer_names = self.adapter.get_paths()
 
         if raster_tiles is not None:
             if not isinstance(raster_tiles, gpd.GeoDataFrame):
@@ -449,11 +449,11 @@ class SpaceOverlay:
             column per raster).
         :rtype: geopandas.GeoDataFrame
         """
-        feats_names, _, feats_idx = self.catalog.get_unrolled_catalog()
+        feats_names, _, feats_idx = self.adapter.get_unrolled_catalog()
 
         # FIXME: this should be in a unit test
-        assert (self.catalog.data_size == len(self.catalog.get_feature_names())) & (
-            self.catalog.data_size == len(feats_names)
+        assert (self.adapter.data_size == len(self.adapter.get_feature_names())) & (
+            self.adapter.data_size == len(feats_names)
         ), (
             "Catalog data size should coincide with the number of features, something went wrong"
         )
@@ -464,7 +464,7 @@ class SpaceOverlay:
 
         self.data_overlay = self.read_data(gdal_opts, max_ram_mb)
         self.data_array = np.empty(
-            (self.catalog.data_size, self.data_overlay.shape[1]), dtype=np.float32
+            (self.adapter.data_size, self.data_overlay.shape[1]), dtype=np.float32
         )
         assert self.pts.shape[0] == self.data_overlay.shape[1], (
             "Not matching size between input points and the overalied data"

@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 from shapely.geometry import Point
 
-from skmap.catalog import DataCatalog
+from skmap.io import RasterData
 from skmap.overlay import (
     SpaceOverlay,
     _ParallelOverlay,
@@ -73,31 +73,23 @@ class TestParallelOverlay(TestOverlayBase):
 
 class TestSpaceOverlay(TestOverlayBase):
     def setup_method(self) -> None:
-        self.catalog = DataCatalog.create_catalog(
-            catalog_def=pd.DataFrame(
-                {
-                    "layer_name": ["elev"],
-                    "path": ["{base_path}/" + self.ELEV_NAME + ".tif"],
-                    "type": ["common"],
-                }
-            ),
-            years=[2020],
-            base_path=str(self.TOY_DIR / "static"),
-        )
+        # lazy RasterData: paths only, no .read()
+        self.rdata = RasterData({"common": [self.ELEV_FILE.as_posix()]})
+        self.rdata.info["name"] = ["elev"]
+        assert self.rdata.array is None  # must stay lazy
         self.so = SpaceOverlay(
             points=gpd.GeoDataFrame(
                 geometry=[Point(x, y) for x, y in zip(self.PTS_X, self.PTS_Y)],
                 crs=self.PTS_CRS,
             ),
-            catalog=self.catalog,
+            rasterdata=self.rdata,
         )
 
     def test__init__defaults(self, po: _ParallelOverlay) -> None:
         so = self.so
 
-        # assert vars(so).keys() == []
         assert so.verbose
-        assert so.catalog == self.catalog
+        assert so.runners == []
         assert so.layer_paths == [self.ELEV_FILE.as_posix()]
         assert so.layer_idxs == [0]
         assert so.layer_names == ["elev"]
@@ -123,10 +115,8 @@ class TestSpaceOverlay(TestOverlayBase):
         assert list(res.columns) == ["lon", "lat", "elev"]
         assert res["elev"].tolist() == [70.0, 284.0]
 
-    def test_run_from_rasterdata(self) -> None:
-        """SpaceOverlay accepts a pre-loaded RasterData as the data source."""
-        from skmap.io import RasterData
-
+    def test_run_lazy_rasterdata(self) -> None:
+        """SpaceOverlay works on a lazy (unread) RasterData: no .read() call."""
         rdata = RasterData(
             {
                 "common": [
@@ -134,8 +124,9 @@ class TestSpaceOverlay(TestOverlayBase):
                     self.SLOPE_FILE.as_posix(),
                 ]
             }
-        ).read()
+        )
         rdata.info["name"] = ["elev", "slope"]
+        assert rdata.array is None
 
         so = SpaceOverlay(
             points=gpd.GeoDataFrame(
@@ -154,31 +145,59 @@ class TestSpaceOverlay(TestOverlayBase):
     def test_run_multiple_layers_same_group(self) -> None:
         # Regression: a group with more than one layer used to return NaN for
         # every layer except the last one (extractOverlay hash-map collapse).
-        catalog = DataCatalog.create_catalog(
-            catalog_def=pd.DataFrame(
-                {
-                    "layer_name": ["elev", "slope"],
-                    "path": [
-                        "{base_path}/" + self.ELEV_NAME + ".tif",
-                        "{base_path}/" + self.SLOPE_NAME + ".tif",
-                    ],
-                    "type": ["common", "common"],
-                }
-            ),
-            years=[2020],
-            base_path=str(self.TOY_DIR / "static"),
+        rdata = RasterData(
+            {
+                "common": [
+                    self.ELEV_FILE.as_posix(),
+                    self.SLOPE_FILE.as_posix(),
+                ]
+            }
         )
+        rdata.info["name"] = ["elev", "slope"]
         so = SpaceOverlay(
             points=gpd.GeoDataFrame(
                 geometry=[Point(x, y) for x, y in zip(self.PTS_X, self.PTS_Y)],
                 crs=self.PTS_CRS,
             ),
-            catalog=catalog,
+            rasterdata=rdata,
         )
         res = so.run(max_ram_mb=512, out_file_name=None)
         assert list(res.columns) == ["lon", "lat", "elev", "slope"]
         assert res["elev"].tolist() == [70.0, 284.0]
         assert res["slope"].tolist() == [31.0, 59.0]
+
+    def test_run_with_whale_runners(self) -> None:
+        """Whale runners compute derived columns on the sampled points."""
+        from skmap.io import process
+
+        rdata = RasterData(
+            {
+                "common": [
+                    self.ELEV_FILE.as_posix(),
+                    self.SLOPE_FILE.as_posix(),
+                ]
+            }
+        )
+        rdata.info["name"] = ["elev", "slope"]
+        nd = process.NormalizedDifference("elev", "slope")
+        nd.outname = "nd"
+        lat = process.GetLatitude()
+        lat.outname = "lat_deg"
+        so = SpaceOverlay(
+            points=gpd.GeoDataFrame(
+                geometry=[Point(x, y) for x, y in zip(self.PTS_X, self.PTS_Y)],
+                crs=self.PTS_CRS,
+            ),
+            rasterdata=rdata,
+            runners=[nd, lat],
+            verbose=False,
+        )
+        res = so.run(max_ram_mb=512, out_file_name=None)
+        assert list(res.columns) == ["lon", "lat", "elev", "slope", "nd", "lat_deg"]
+        # nd = round((elev - slope) / (elev + slope))
+        assert res["nd"].tolist() == [0.0, 1.0]
+        # GetLatitude uses the point y coordinate (same as the old lat_info)
+        assert res["lat_deg"].tolist() == [self.PTS_Y[0], self.PTS_Y[1]]
 
     def test_out_of_extent_dropped(self) -> None:
         so = SpaceOverlay(
@@ -189,7 +208,7 @@ class TestSpaceOverlay(TestOverlayBase):
                 ],
                 crs=self.PTS_CRS,
             ),
-            catalog=self.catalog,
+            rasterdata=self.rdata,
         )
         assert so.pts.shape[0] == 1
 
@@ -203,6 +222,6 @@ class TestSpaceOverlay(TestOverlayBase):
                     ],
                     crs=self.PTS_CRS,
                 ),
-                catalog=self.catalog,
+                rasterdata=self.rdata,
             )
         assert "Error checking URL" not in buf.getvalue()

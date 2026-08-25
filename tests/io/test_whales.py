@@ -93,3 +93,24 @@ def test_geometric_temperature(static_rdata):
     vals = r.array.get()[-1]
     assert vals.shape == (256 * 256,)
     assert np.isfinite(vals).all()
+
+
+def test_whale_runners_on_point_accessor():
+    """Whale runners compute the same values on the overlay point accessor."""
+    from skmap.overlay import _PointAccessor
+
+    names = ["elev", "slope"]
+    data = np.array([[70.0, 284.0], [31.0, 59.0]], dtype=np.float32)
+    accessor = _PointAccessor(names, data, lats=np.array([3216130.0, 3215420.0]))
+
+    nd = process.NormalizedDifference("elev", "slope")
+    nd_vals = nd._compute(accessor, data)
+    assert nd_vals.tolist() == [0.0, 1.0]
+
+    ind = process.ExtractIndicator("elev", 70.0)
+    ind_vals = ind._compute(accessor, data)
+    assert ind_vals.tolist() == [1.0, 0.0]
+
+    pct = process.PercentileAggregation(["elev", "slope"], 50.0)
+    pct_vals = pct._compute(accessor, data)
+    np.testing.assert_array_equal(pct_vals, np.array([50.5, 171.5]))
