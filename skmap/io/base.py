@@ -952,6 +952,13 @@ class RasterData(SKMapBase):
         self.date_args = {}
         self._active_group = None
 
+        # Lazily populated by ``read()``; ``None`` means the layers are not
+        # loaded in memory (paths only) so overlay can sample from files.
+        self.array = None
+        self.base_raster = None
+        self.window = None
+        self.bounds = None
+
         has_date = ~self.info[RasterData.START_DT_COL].isnull().any()
 
         if has_date:
@@ -1544,12 +1551,13 @@ class RasterData(SKMapBase):
         if return_idx:
             return list(info.index)
         elif return_array:
-            return self.array.get()[info.index, :]
+            return None if self.array is None else self.array.get()[info.index, :]
         elif return_info:
             return info
         elif return_copy:
             rdata = copy.copy(self)
-            rdata.array = parallel.put_shared(self.array.get()[info.index, :])
+            if self.array is not None:
+                rdata.array = parallel.put_shared(self.array.get()[info.index, :])
             rdata.info = info
             # Deep-copy the mutable dicts so the filtered copy cannot corrupt
             # the original (regression fix: they were shared by reference).
@@ -1557,7 +1565,8 @@ class RasterData(SKMapBase):
             rdata.raster_files = copy.deepcopy(self.raster_files)
             return rdata
         else:
-            self.array = parallel.put_shared(self.array.get()[info.index, :])
+            if self.array is not None:
+                self.array = parallel.put_shared(self.array.get()[info.index, :])
             self.info = info
             return self
 

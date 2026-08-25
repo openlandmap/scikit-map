@@ -17,7 +17,6 @@ from shapely.geometry import Point
 import skmap.set_env  # noqa: F401
 import skmap_bindings as sb
 from skmap import parallel
-from skmap.catalog import DataCatalog, run_whales
 from skmap.misc import ttprint
 
 
@@ -268,12 +267,36 @@ class _ParallelOverlay:
         return query_pixels
 
 
-class _RasterDataCatalogAdapter:
-    """Minimal DataCatalog-compatible view over a :class:`~skmap.io.RasterData`.
+class _PointAccessor:
+    """Minimal RasterData-like interface for whale runners on point samples.
 
-    Lets ``SpaceOverlay`` reuse its path-based sampling unchanged: a
-    RasterData supplies the layer paths/names/indices and (already computed)
-    whales are a no-op.
+    Whale runners only need ``array.get()`` (the ``(N, n_points)`` array) and
+    ``_band_index(name)`` (name→row lookup). This adapter supplies both, so
+    the same :mod:`skmap.io.process` runners compute derived features on
+    overlay samples without loading any raster into memory.
+    """
+
+    def __init__(self, names: List[str], data: np.ndarray, lats: np.ndarray = None) -> None:
+        self._names = list(names)
+        self._data = data
+        self._lats = lats
+
+    @property
+    def array(self):
+        return self
+
+    def get(self) -> np.ndarray:
+        return self._data
+
+    def _band_index(self, name: str, group: str = None) -> int:
+        return self._names.index(name)
+
+
+class _RasterDataCatalogAdapter:
+    """Minimal view over a :class:`~skmap.io.RasterData` for path-based sampling.
+
+    Lets ``SpaceOverlay`` reuse its block-based sampling unchanged: a
+    (lazy) RasterData supplies the layer paths/names/indices via ``info``.
     """
 
     def __init__(self, rdata) -> None:
@@ -282,7 +305,6 @@ class _RasterDataCatalogAdapter:
         self._names = info[rdata.NAME_COL].tolist()
         self._paths = info[rdata.PATH_COL].tolist()
         self._idxs = list(range(self.data_size))
-        self.data = {}
 
     def get_paths(self):
         return self._paths, self._idxs, self._names
@@ -293,9 +315,6 @@ class _RasterDataCatalogAdapter:
     def get_feature_names(self):
         return sorted(set(self._names))
 
-    def _get_whales(self):
-        return [], [], []
-
 
 class SpaceOverlay:
     """
@@ -303,11 +322,17 @@ class SpaceOverlay:
     The retrieved pixel values are organized in columns
     according to the filenames.
 
+    Works on a **lazy** :class:`~skmap.io.RasterData` (paths only, no
+    ``.read()``): pixel values are sampled directly from the raster files, so
+    arbitrarily large rasters can be queried without loading them into memory.
+
     :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
         the points.
-    :param catalog: scikit-map data catalog (or ``None`` when ``rasterdata`` is given).
-    :param rasterdata: a pre-loaded :class:`~skmap.io.RasterData` whose band
-        names/group structure replace the catalog metadata.
+    :param rasterdata: a :class:`~skmap.io.RasterData` (unread) whose band
+        names/group structure describe the raster layers to sample.
+    :param runners: optional list of :mod:`skmap.io.process` whale runners
+        computed on the sampled points after the overlay (e.g.
+        ``NormalizedDifference``, ``Savi``, ``GetLatitude``).
     :param n_threads: Number of CPU cores to be used in parallel. By default all cores
         are used.
     :param verbose: Use ``True`` to print the overlay progress.
@@ -316,20 +341,16 @@ class SpaceOverlay:
     def __init__(
         self,
         points: gpd.GeoDataFrame | str | pd.DataFrame,
-        catalog: DataCatalog = None,
-        rasterdata=None,
+        rasterdata,
+        runners: Optional[List] = None,
         raster_tiles: Optional[gpd.GeoDataFrame | str] = None,
         tile_id_col: Union[str] = "tile_id",
         n_threads: int = parallel.CPU_COUNT,
         verbose: bool = True,
     ) -> None:
         self.verbose: bool = verbose
-        if rasterdata is not None:
-            self.catalog = _RasterDataCatalogAdapter(rasterdata)
-        elif catalog is not None:
-            self.catalog = catalog
-        else:
-            raise ValueError("Provide either ``catalog`` or ``rasterdata``")
+        self.runners = runners or []
+        self.catalog = _RasterDataCatalogAdapter(rasterdata)
         self.layer_paths, self.layer_idxs, self.layer_names = self.catalog.get_paths()
 
         if raster_tiles is not None:
@@ -454,12 +475,8 @@ class SpaceOverlay:
         self.pts["lon"] = self.pts["geometry"].x
         self.pts["lat"] = self.pts["geometry"].y
 
-        run_whales(
-            self.catalog,
-            self.data_array,
-            self.n_threads,
-            lat_info=self.pts["lat"].to_numpy(),
-        )
+        self._run_whale_runners()
+
         # @FIXME check that all the filled flags are True or assert at this point
         df = pd.DataFrame(self.data_array.T, columns=pd.Index(self.ordered_feats_names))
         if "lat" in df:
@@ -471,6 +488,46 @@ class SpaceOverlay:
             self.pts_out.to_parquet(out_file_name)
 
         return self.pts_out
+
+    def _run_whale_runners(self) -> None:
+        """Compute the whale runners on the sampled points and append their bands.
+
+        Runners execute in list order; a runner may depend on bands added by
+        earlier runners (e.g. ``GetLatitude`` before ``GeometricTemperature``).
+        ``GetLatitude`` uses the point latitudes directly (no raster grid).
+        """
+
+        if not self.runners:
+            return
+
+        from skmap.io.process import GetLatitude
+
+        names = list(self.ordered_feats_names)
+        data_array = self.data_array
+        lats = self.pts["lat"].to_numpy().astype(np.float32)
+        accessor = _PointAccessor(names, data_array, lats=lats)
+
+        for runner in self.runners:
+            if isinstance(runner, GetLatitude):
+                new_band = accessor._lats
+            else:
+                new_band = np.asarray(
+                    runner._compute(accessor, data_array), dtype=np.float32
+                )
+            name = getattr(runner, "outname", None)
+            if name is None:
+                name = (
+                    "latitude"
+                    if isinstance(runner, GetLatitude)
+                    else runner.__class__.__name__.lower()
+                )
+            data_array = np.vstack([data_array, new_band.reshape(1, -1)])
+            names.append(name)
+            accessor._names = names
+            accessor._data = data_array
+
+        self.data_array = data_array
+        self.ordered_feats_names = names
 
     def read_data(self, gdal_opts: dict[str, str], max_ram_mb: int) -> np.ndarray:
         """read data in parallel across blocks, normally called by `self.run`
@@ -645,10 +702,17 @@ class SpaceTimeOverlay:
     Overlay a set of points over multiple raster considering the year information.
     The retrieved pixel values are organized in columns according to the filenames.
 
+    Works on a **lazy** :class:`~skmap.io.RasterData` (paths only, no
+    ``.read()``) whose groups encode the years (plus an optional ``common``
+    group). Pixel values are sampled directly from the raster files.
+
     :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
         the points.
     :param col_date: Date column to retrieve the year information.
-    :param catalog: ``DataCatalog`` with the raster layers to overlay.
+    :param rasterdata: a :class:`~skmap.io.RasterData` (unread) with one group
+        per year plus a ``common`` group for shared layers.
+    :param runners: optional list of :mod:`skmap.io.process` whale runners
+        computed on the sampled points after each year's overlay.
     :param raster_tiles: ``geopandas.GeoDataFrame`` or path describing the raster tiles.
     :param tile_id_col: Column name in ``raster_tiles`` holding the tile identifier.
     :param n_threads: Number of CPU cores to be used in parallel. By default all cores
@@ -667,8 +731,9 @@ class SpaceTimeOverlay:
         self,
         points: gpd.GeoDataFrame | pd.DataFrame | str,
         col_date: str,
-        catalog: DataCatalog,
-        raster_tiles: gpd.GeoDataFrame | str,
+        rasterdata,
+        runners: Optional[List] = None,
+        raster_tiles: gpd.GeoDataFrame | str = None,
         tile_id_col: str = "tile_id",
         n_threads: int = parallel.CPU_COUNT,
         verbose: bool = False,
@@ -687,9 +752,9 @@ class SpaceTimeOverlay:
         self.overlay_objs: Dict[
             str, SpaceOverlay
         ] = {}  # FIXME: Dict[int, SpaceOverlay]?
-        self.year_catalogs = {}
         self.verbose = verbose
-        self.catalog = catalog
+        self.rdata = rasterdata
+        self.runners = runners or []
 
         if pd.api.types.is_datetime64_any_dtype(self.pts[self.col_date]):
             year_series = self.pts[self.col_date].dt.year
@@ -697,22 +762,24 @@ class SpaceTimeOverlay:
             year_series = self.pts[self.col_date].astype(int)
         self.year_points = {}
 
-        for year in self.catalog.get_groups():
+        for year in self.rdata.get_groups():
             self.year_points[year] = self.pts[year_series == int(year)]
             if len(self.year_points[year]) > 0:
-                year_catalog = self.catalog.query(
-                    self.catalog.get_feature_names(), [year]
-                )  # 'common' group is retrieved by default
-                self.year_catalogs[year] = year_catalog
+                # 'common' group is included by the filter expression
+                year_rdata = self.rdata.filter(
+                    f'group in ["{year}", "common"]'
+                )
+                n_layers = len(year_rdata.info)
 
                 if self.verbose:
                     ttprint(
-                        f"Overlay {len(self.year_points[year])} points from {year} in {year_catalog.data_size} raster layers"
+                        f"Overlay {len(self.year_points[year])} points from {year} in {n_layers} raster layers"
                     )
 
                 self.overlay_objs[year] = SpaceOverlay(
                     points=self.year_points[year],
-                    catalog=self.year_catalogs[year],
+                    rasterdata=year_rdata,
+                    runners=self.runners,
                     raster_tiles=raster_tiles,
                     tile_id_col=tile_id_col,
                     n_threads=n_threads,
