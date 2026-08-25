@@ -205,14 +205,26 @@ void IoArray::readDataCore(float_t *row_ptr, uint_t row_n_elems,
                            uint_t x_size, uint_t y_size, GDALDataType read_type,
                            std::vector<int> bands_list,
                            std::optional<float_t> value_to_mask,
-                           std::optional<float_t> value_to_set) {
+                           std::optional<float_t> value_to_set,
+                           int overview) {
+  // Overview reads: the window stays in full-resolution pixel coordinates,
+  // but the output buffer is downsampled by the overview factor.  GDAL's
+  // RasterIO auto-selects the matching COG overview level when the buffer is
+  // smaller than the window.
+  uint_t buf_x = x_size;
+  uint_t buf_y = y_size;
+  if (overview > 1) {
+    buf_x = (x_size + (uint_t)overview - 1) / (uint_t)overview;
+    buf_y = (y_size + (uint_t)overview - 1) / (uint_t)overview;
+  }
+
   // Bug fix: GDAL writes x_size*y_size*n_bands floats with default band
   // spacing (nBandSpace=0). The old guard only checked x_size*y_size, missing
   // the band multiplier and silently overflowing the buffer for multi-band reads.
   skmapAssertIfTrue(
-      row_n_elems < x_size * y_size * (uint_t)bands_list.size(),
+      row_n_elems < buf_x * buf_y * (uint_t)bands_list.size(),
       "scikit-map ERROR 1B: row buffer too small for the requested bands "
-      "(need " + std::to_string(x_size * y_size * bands_list.size()) +
+      "(need " + std::to_string(buf_x * buf_y * bands_list.size()) +
       " elements, got " + std::to_string(row_n_elems) + ")");
 
   GdalDatasetGuard readDataset(
@@ -230,7 +242,7 @@ void IoArray::readDataCore(float_t *row_ptr, uint_t row_n_elems,
   }
 
   CPLErr outRead = readDataset->RasterIO(
-      GF_Read, x_off, y_off, x_size, y_size, row_ptr, x_size, y_size,
+      GF_Read, x_off, y_off, x_size, y_size, row_ptr, buf_x, buf_y,
       read_type, static_cast<int>(bands_list.size()), bands_list.data(),
       0, 0, 0);
   skmapAssertIfTrue(outRead != CE_None,
@@ -251,10 +263,16 @@ void IoArray::readData(std::vector<std::string> file_locs,
                        uint_t x_size, uint_t y_size, GDALDataType read_type,
                        std::vector<int> bands_list,
                        std::optional<float_t> value_to_mask,
-                       std::optional<float_t> value_to_set) {
+                       std::optional<float_t> value_to_set, int overview) {
+  uint_t buf_x = x_size;
+  uint_t buf_y = y_size;
+  if (overview > 1) {
+    buf_x = (x_size + (uint_t)overview - 1) / (uint_t)overview;
+    buf_y = (y_size + (uint_t)overview - 1) / (uint_t)overview;
+  }
   // Bug fix: guard updated to include the band multiplier.
   skmapAssertIfTrue(
-      (uint_t)m_data.cols() < x_size * y_size * (uint_t)bands_list.size(),
+      (uint_t)m_data.cols() < buf_x * buf_y * (uint_t)bands_list.size(),
       "scikit-map ERROR 0A: row buffer smaller than x_size * y_size * n_bands");
   // Bug fix: lambda uses auto&& and passes row.data()/row.size() so that
   // readDataCore always writes directly into m_data's buffer (no Eigen copy).
@@ -262,7 +280,7 @@ void IoArray::readData(std::vector<std::string> file_locs,
     std::string file_loc = file_locs[i];
     this->readDataCore(row_ptr, row_n_elems, file_loc,
                        x_off, y_off, x_size, y_size, read_type, bands_list,
-                       value_to_mask, value_to_set);
+                       value_to_mask, value_to_set, overview);
   };
   this->parRowPerm(readTiff, perm_vec);
 }

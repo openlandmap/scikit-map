@@ -106,7 +106,7 @@ void readData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
               const uint_t y_off, const uint_t x_size, const uint_t y_size,
               const std::vector<int> bands_list, py::dict conf_GDAL,
               std::optional<float_t> value_to_mask,
-              std::optional<float_t> value_to_set) {
+              std::optional<float_t> value_to_set, const int overview) {
   // Bug fix: convPyDict calls py::str() (Python C-API) and must run while the
   // GIL is still held. Convert first, then release before GDAL/OMP work.
   dict_t cpp_conf = convPyDict(conf_GDAL);
@@ -115,7 +115,7 @@ void readData(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   ioArray.setupGdal(cpp_conf);
   ioArray.readData(file_locs, perm_vec, x_off, y_off, x_size, y_size,
                    GDALDataType::GDT_Float32, bands_list, value_to_mask,
-                   value_to_set);
+                   value_to_set, overview);
 }
 
 /**
@@ -229,7 +229,7 @@ void readDataCore(Eigen::Ref<MatFloat> data, const uint_t n_threads,
                   const uint_t y_off, const uint_t x_size, const uint_t y_size,
                   const std::vector<int> bands_list, py::dict conf_GDAL,
                   std::optional<float_t> value_to_mask,
-                  std::optional<float_t> value_to_set) {
+                  std::optional<float_t> value_to_set, const int overview) {
   dict_t cpp_conf = convPyDict(conf_GDAL); // must run before GIL release
   py::gil_scoped_release release;
   IoArray ioArray(data, n_threads);
@@ -238,7 +238,7 @@ void readDataCore(Eigen::Ref<MatFloat> data, const uint_t n_threads,
   ioArray.readDataCore(data.row(0).data(), static_cast<uint_t>(data.cols()),
                        file_loc, x_off, y_off, x_size, y_size,
                        GDALDataType::GDT_Float32, bands_list, value_to_mask,
-                       value_to_set);
+                       value_to_set, overview);
 }
 
 /**
@@ -819,11 +819,11 @@ void checkSimdInstructionSetsInUse() {
 PYBIND11_MODULE(skmap_bindings, m) {
   m.def("readDataCore", &readDataCore, py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),
-        py::arg() = std::nullopt, py::arg() = std::nullopt,
+        py::arg() = std::nullopt, py::arg() = std::nullopt, py::arg("overview") = 0,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
   m.def("readData", &readData, py::arg("data"), py::arg("n_threads"), py::arg("file_locs"), py::arg("perm_vec"),
         py::arg("x_off"), py::arg("y_off"), py::arg("x_size"), py::arg("y_size"), py::arg("bands_list"), py::arg("conf_GDAL"),
-        py::arg("value_to_mask") = std::nullopt, py::arg("value_to_set") = std::nullopt,
+        py::arg("value_to_mask") = std::nullopt, py::arg("value_to_set") = std::nullopt, py::arg("overview") = 0,
         "Read Tiff files in parallel with GDAL-Eigen-OpenMP");
   m.def("readDataBlocks", &readDataBlocks, py::arg(), py::arg(), py::arg(),
         py::arg(), py::arg(), py::arg(), py::arg(), py::arg(), py::arg(),

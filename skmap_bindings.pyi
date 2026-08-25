@@ -401,6 +401,7 @@ def readData(
     conf_GDAL: dict,
     value_to_mask: float | None = None,
     value_to_set: float | None = None,
+    overview: int = 0,
 ) -> None: ...
 def readDataBlocks(
     data: NDArray[np.float32],
@@ -428,6 +429,7 @@ def readDataCore(
     conf_GDAL: dict,
     value_to_mask: float | None = None,
     value_to_set: float | None = None,
+    overview: int = 0,
 ) -> None: ...
 def reorderArray(
     data: NDArray[np.float32],

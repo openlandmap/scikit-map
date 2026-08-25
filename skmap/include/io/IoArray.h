@@ -49,7 +49,8 @@ public:
                     uint_t x_size, uint_t y_size, GDALDataType read_type,
                     std::vector<int> bands_list,
                     std::optional<float_t> value_to_mask,
-                    std::optional<float_t> value_to_set);
+                    std::optional<float_t> value_to_set,
+                    int overview = 0);
 
   /**
    * @ingroup io
@@ -93,7 +94,8 @@ public:
                 uint_t x_size, uint_t y_size, GDALDataType read_type,
                 std::vector<int> bands_list,
                 std::optional<float_t> value_to_mask,
-                std::optional<float_t> value_to_set);
+                std::optional<float_t> value_to_set,
+                int overview = 0);
 
   /**
    * @ingroup io
