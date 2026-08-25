@@ -1749,6 +1749,85 @@ class RasterData(SKMapBase):
                         )
         return covs_idx
 
+    def get_years(self) -> List[int]:
+        """Sorted unique years of the temporal layers (from ``start_date``).
+
+        Returns an empty list when there are no temporal layers or no
+        ``start_date`` column.  Static-only catalogues have no years.
+        """
+        info = self.info
+        if (
+            RasterData.TEMPORAL_COL not in info.columns
+            or "start_date" not in info.columns
+        ):
+            return []
+        temporal = info[info[RasterData.TEMPORAL_COL]]
+        if temporal.empty or temporal["start_date"].isna().all():
+            return []
+        return sorted(temporal["start_date"].dt.year.dropna().astype(int).unique())
+
+    def _get_covs_idx_by_year(
+        self, covs_lst: List[str], years: List = None
+    ) -> tuple:
+        """Map covariate names to band indices per *year*.
+
+        Returns ``(covs_idx, years)`` where ``covs_idx`` has shape
+        ``(len(covs_lst), n_years)``.  Temporal covariates are matched by
+        ``name`` **and** ``start_date`` year (resolving year-agnostic names
+        such as ``ndvi_winter`` that repeat once per year); static covariates
+        (the ``common`` group) use the same band index for every year.
+
+        A static-only catalogue (no temporal layers) yields ``n_years == 1``
+        with a ``None`` year placeholder, so a single prediction is produced
+        from the static covariates.
+
+        :raises ValueError: if temporal layers exist but lack ``start_date``
+          (year-based prediction requires dates).
+        """
+        info = self.info.reset_index(drop=True)
+        temporal = info[info[RasterData.TEMPORAL_COL]]
+
+        if (
+            not temporal.empty
+            and (
+                "start_date" not in info.columns
+                or temporal["start_date"].isna().all()
+            )
+        ):
+            raise ValueError(
+                "predict_raster requires a 'start_date' on temporal layers "
+                "to build per-year feature matrices; got temporal layers "
+                "without dates."
+            )
+
+        if years is None:
+            years = self.get_years()
+        if not years:
+            # static-only catalogue: one prediction unit, all covs from common.
+            years = [None]
+
+        common = info[info[RasterData.GROUP_COL] == "common"]
+        covs_idx = np.zeros((len(covs_lst), len(years)), np.int32)
+        for j, y in enumerate(years):
+            if y is None:
+                year_info = info.iloc[0:0]
+            else:
+                year_info = temporal[temporal["start_date"].dt.year == y]
+            for i, c in enumerate(covs_lst):
+                hits = year_info[year_info[RasterData.NAME_COL] == c]
+                if len(hits):
+                    covs_idx[i, j] = int(hits.index[0])
+                else:
+                    chits = common[common[RasterData.NAME_COL] == c]
+                    if len(chits):
+                        covs_idx[i, j] = int(chits.index[0])
+                    else:
+                        raise KeyError(
+                            f"Covariate {c!r} not found for year {y!r} "
+                            "or in the common group"
+                        )
+        return covs_idx, years
+
     @property
     def valid_pixels(self) -> np.ndarray:
         """Boolean mask over ``H*W`` of pixels with no NaN in any band."""

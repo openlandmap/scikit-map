@@ -112,42 +112,123 @@ class Modeler:
         """
         return self.predict_fn(self.model, X)
 
-    def predict_raster(self, rdata, valid_only: bool = True) -> np.ndarray:
-        """Predict on a :class:`~skmap.io.RasterData` (spatial).
+    def predict_raster(self, rdata, valid_only=True) -> np.ndarray:
+        """Predict on a :class:`~skmap.io.RasterData` for **all years at once**.
 
-        Maps the model's covariate names to RasterData bands (via
-        :meth:`RasterData._get_covs_idx`), predicts once per group (year),
-        and returns a numpy array of shape
-        ``(n_groups, H*W[, n_responses/n_class])`` with ``NaN`` for invalid
-        pixels.
+        All available years are concatenated into a single feature matrix
+        (``(n_years·n_pixels, n_covs)``) with static covariates repeated for
+        every year, and the model is invoked **once**.  The result is reshaped
+        to ``(n_out·n_years, H*W)`` — out-band major, year minor (band ``k`` →
+        output ``k // n_years``, year ``k % n_years``) — so it can be written
+        directly as one raster per (output, year).
+
+        Years come from the temporal layers' ``start_date``; a static-only
+        catalogue yields ``n_years == 1`` (a single prediction).
 
         :param rdata: a RasterData whose bands are named after the model's
-          covariate features (``common`` group falls back for shared layers).
-        :param valid_only: if ``True`` (default) only non-NaN pixels are
-          predicted and the result is a dense ``(n_groups, H*W, ...)`` array
-          with ``NaN`` elsewhere.
+          covariate features.  Temporal covariates are matched by name **and**
+          year (year-agnostic names such as ``ndvi_winter`` repeat per year);
+          ``common`` (static) covariates are reused for every year.
+        :param valid_only: select which pixels to predict.
+
+          * ``True`` (default) — per-(year, pixel) NaN validity: a pixel is
+            predicted for a year only if none of that year's covariates is NaN.
+          * ``False`` — predict every pixel for every year.
+          * a 1-D boolean ``np.ndarray`` of shape ``(H*W,)`` — a static land
+            mask, applied to **all** years (the same pixels are predicted in
+            every year; the rest are ``NaN``).
+
+        :return: ``(n_out·n_years, H*W)`` float32 array, ``NaN`` where not
+          predicted.  ``n_out`` is 1 for label/single-response models, or the
+          number of classes/responses for probability / multi-output models.
         """
-        groups = rdata.get_groups()
-        covs_idx = rdata._get_covs_idx(self.model_covs)  # (n_covs, n_groups)
+        covs_idx, years = rdata._get_covs_idx_by_year(self.model_covs)
         arr = rdata.array.get()
         n_pixels = arr.shape[1]
+        n_years = len(years)
+        n_covs = len(self.model_covs)
 
-        predictions = []
-        for j in range(len(groups)):
-            X = arr[covs_idx[:, j], :].T  # (n_pixels, n_covs)
-            if valid_only:
-                valid = ~np.isnan(X).any(axis=1)
-                pred_valid = np.asarray(
-                    self.predict_fn(self.model, X[valid]), dtype=np.float32
-                )
-                shape = (n_pixels,) + pred_valid.shape[1:]
-                pred = np.full(shape, np.nan, dtype=np.float32)
-                pred[valid] = pred_valid
-            else:
-                pred = np.asarray(self.predict_fn(self.model, X), dtype=np.float32)
-            predictions.append(pred)
+        # Build the concatenated feature matrix (n_years·n_pixels, n_covs),
+        # rows ordered year-major: year0_pixel0.., year1_pixel0..  Static
+        # covariates repeat because their column in covs_idx is the same band
+        # for every year.
+        X = np.concatenate(
+            [arr[covs_idx[:, j], :].T for j in range(n_years)], axis=0
+        ).astype(np.float32, copy=False)
 
-        return np.stack(predictions)
+        if isinstance(valid_only, np.ndarray):
+            # static land mask: same pixels across all years.
+            valid = np.tile(np.asarray(valid_only, dtype=bool), n_years)
+        elif valid_only:
+            valid = ~np.isnan(X).any(axis=1)
+        else:
+            valid = np.ones(X.shape[0], dtype=bool)
+
+        pred_full = np.full((n_years * n_pixels, 1), np.nan, dtype=np.float32)
+        if valid.any():
+            pred_valid = np.asarray(
+                self.predict_fn(self.model, X[valid]), dtype=np.float32
+            )
+            if pred_valid.ndim == 1:
+                pred_valid = pred_valid.reshape(-1, 1)
+            n_out = pred_valid.shape[1]
+            pred_full = np.full(
+                (n_years * n_pixels, n_out), np.nan, dtype=np.float32
+            )
+            pred_full[valid] = pred_valid
+        else:
+            n_out = pred_full.shape[1]
+
+        # (n_years, n_pixels, n_out) -> (n_out, n_years, n_pixels) ->
+        # (n_out·n_years, n_pixels), out-band major, year minor.
+        pred = (
+            pred_full.reshape(n_years, n_pixels, n_out)
+            .transpose(2, 0, 1)
+            .reshape(n_out * n_years, n_pixels)
+        )
+        return pred
+
+    def predict_raster_to_file(
+        self,
+        rdata,
+        out_files: list,
+        valid_only=True,
+        base_raster: str = None,
+        **save_kwargs,
+    ) -> list:
+        """Run :meth:`predict_raster` and write one raster per (output, year).
+
+        ``out_files`` must list ``n_out·n_years`` paths ordered out-band
+        major, year minor — i.e. matching the layout returned by
+        :meth:`predict_raster`::
+
+            years = rdata.get_years() or [None]
+            out_files = [
+                f"{out_dir}/{out_name}_{year}.tif"
+                for out_name in out_names
+                for year in years
+            ]
+
+        :param rdata: passed to :meth:`predict_raster`.
+        :param out_files: list of output GeoTIFF paths.
+        :param valid_only: passed to :meth:`predict_raster`.
+        :param base_raster: reference raster for the geo-transform/CRS;
+          defaults to ``rdata._base_raster()``.
+        :param save_kwargs: forwarded to :func:`skmap.io.save_rasters`.
+        :return: ``out_files``.
+        """
+        from skmap.io.base import save_rasters
+
+        pred = self.predict_raster(rdata, valid_only=valid_only)
+        if len(out_files) != pred.shape[0]:
+            raise ValueError(
+                f"expected {pred.shape[0]} output files (n_out·n_years), "
+                f"got {len(out_files)}"
+            )
+        if base_raster is None:
+            base_raster = rdata._base_raster()
+        save_rasters(base_raster, out_files, pred, **save_kwargs)
+        return out_files
 
 
 #################################################################################################################################
