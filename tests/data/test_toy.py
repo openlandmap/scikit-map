@@ -17,10 +17,10 @@ def test_ndvi_rdata() -> None:
         "info",
         "date_args",
         "_active_group",
-        "max_rasters",
+        "array",
+        "base_raster",
         "window",
         "bounds",
-        "base_raster",
-        "array",
+        "max_rasters",
         "_spatial_shape",
     ]
