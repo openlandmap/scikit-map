@@ -344,3 +344,40 @@ class TestToyLayersYaml:
             sub = filled.filter(f"year == {year}")
             # 4 ndvi + 4 swir1, all distinct season names
             assert sub.info["name"].nunique() == len(sub.info)
+
+
+class TestFilterDateByStartDate:
+    def test_cross_year_composite_kept_by_start_date(self):
+        """A Dec-to-Mar composite is assigned to its start year via by_start_date."""
+        from skmap.data import toy
+
+        r = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
+        filled = r.filter("variant != 'gappy'")
+
+        # 2019 winter composite starts 2019-12-02, ends 2020-03-20
+        sub = filled.filter_date(
+            "2019-01-01", "2019-12-31",
+            include_non_temporal=True, by_start_date=True,
+        )
+        assert "ndvi_winter" in set(sub.info["name"].unique())
+
+        # without by_start_date it is dropped (end crosses the year boundary)
+        sub2 = filled.filter_date(
+            "2019-01-01", "2019-12-31", include_non_temporal=True
+        )
+        assert "ndvi_winter" not in set(sub2.info["name"].unique())
+
+    def test_filter_then_read_resets_index(self):
+        """filter() + read() yields a 0-indexed array (no index mismatch)."""
+        from skmap.data import toy
+
+        r = (
+            RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
+            .filter("band == 'ndvi' and variant == 'gappy'")
+            .read()
+        )
+        assert list(r.info.index) == list(range(len(r.info)))
+        assert r.array.shape[0] == len(r.info)
+        # return_array indexing must not go out of bounds (regression)
+        arr = r.filter_date("2020-01-01", return_array=True)
+        assert arr.shape[0] == 3  # 2020 spring/summer/fall composites

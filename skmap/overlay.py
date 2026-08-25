@@ -788,9 +788,12 @@ class SpaceTimeOverlay:
             self.range_points[label] = range_pts
 
             if len(range_pts) > 0:
-                # temporal layers in range + all static layers (lazy)
+                # temporal layers starting in this range + all static layers (lazy);
+                # by_start_date assigns cross-year (e.g. winter) composites to
+                # the year they start in.
                 range_rdata = self.rdata.filter_date(
-                    start, end, date_format=date_format, include_non_temporal=True
+                    start, end, date_format=date_format, include_non_temporal=True,
+                    by_start_date=True,
                 )
                 n_layers = len(range_rdata.info)
 

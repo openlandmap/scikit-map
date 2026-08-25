@@ -1366,6 +1366,9 @@ class RasterData(SKMapBase):
         )
         self._spatial_shape = (height, width)
 
+        # The array is rebuilt positionally (rows 0..N-1); reset info.index to match.
+        self.info = self.info.reset_index(drop=True)
+
         self._verbose(f"Read array shape: {self.array.shape}")
 
         return self
@@ -1559,6 +1562,7 @@ class RasterData(SKMapBase):
         date_format="%Y-%m-%d",
         date_overlap=False,
         include_non_temporal=False,
+        by_start_date=False,
         return_array=False,
         return_copy=True,
         return_idx=False,
@@ -1568,6 +1572,11 @@ class RasterData(SKMapBase):
         :param include_non_temporal: when ``True``, also keep layers without a
             date (static layers with ``None`` in the start-date column), so
             they are preserved alongside the date-filtered temporal layers.
+        :param by_start_date: when ``True``, a layer is kept when its
+            ``start_date`` falls within ``[start_date, end_date]`` (the
+            ``end_date`` column is ignored).  This assigns cross-year
+            composites (e.g. a Dec-to-Mar winter composite) to the year they
+            start in.
         """
 
         start_dt_col, end_dt_col = (RasterData.START_DT_COL, RasterData.END_DT_COL)
@@ -1576,7 +1585,13 @@ class RasterData(SKMapBase):
         if RasterData.DT_COL in info_main.columns:
             start_dt_col, end_dt_col = (RasterData.DT_COL, None)
 
-        if date_overlap:
+        if by_start_date:
+            if end_date is None:
+                raise ValueError("by_start_date requires end_date")
+            dt_mask = (
+                info_main[start_dt_col] >= to_datetime(start_date, format=date_format)
+            ) & (info_main[start_dt_col] <= to_datetime(end_date, format=date_format))
+        elif date_overlap:
             dt_mask = np.logical_or(
                 info_main[start_dt_col] >= to_datetime(start_date, format=date_format),
                 info_main[end_dt_col] >= to_datetime(start_date, format=date_format),
@@ -1586,7 +1601,7 @@ class RasterData(SKMapBase):
                 start_date, format=date_format
             )
 
-        if end_date is not None and end_dt_col is not None:
+        if not by_start_date and end_date is not None and end_dt_col is not None:
             if date_overlap:
                 dt_mask_end = np.logical_or(
                     info_main[end_dt_col] <= to_datetime(end_date, format=date_format),
@@ -1656,7 +1671,7 @@ class RasterData(SKMapBase):
                 rdata.array = parallel.put_shared(
                     self.array.get()[info.index, :], local=self.backend.name == "cpp"
                 )
-            rdata.info = info
+            rdata.info = info.reset_index(drop=True)
             # Deep-copy the mutable dicts so the filtered copy cannot corrupt
             # the original (regression fix: they were shared by reference).
             rdata.date_args = copy.deepcopy(self.date_args)
