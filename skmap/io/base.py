@@ -227,7 +227,7 @@ def _read_auth_raster(raster_files, url_pos, bands, username, password, dtype, n
     return url_pos, data, ds_params
 
 @contextmanager
-def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=None):
+def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=None, overview=None):
     if not isinstance(raster_file, Path):
         raster_file = Path(raster_file)
 
@@ -249,6 +249,9 @@ def _new_raster(base_raster, raster_file, data, window=None, dtype=None, nodata=
 
         if window is not None:
             transform = rasterio.windows.transform(window, transform)
+
+        if overview is not None and overview > 1:
+            transform = transform * rasterio.Affine.scale(overview, overview)
 
         with rasterio.open(
             raster_file,
@@ -275,6 +278,7 @@ def _save_raster(
     dtype: str | None = None,
     nodata=None,
     fit_in_dtype=False,
+    overview=None,
     on_each_outfile: Callable | None = None,
 ):
     # if len(data.shape) < 3:
@@ -288,10 +292,13 @@ def _save_raster(
         h, w = src.height, src.width
     if spatial_win is not None:
         h, w = spatial_win.height, spatial_win.width
+    if overview is not None and overview > 1:
+        h = math.ceil(h / overview)
+        w = math.ceil(w / overview)
     band = np.array(array[i, :].reshape(h, w))  # writable copy (object store is read-only)
 
     with _new_raster(
-        fn_base_raster, raster_file, band, spatial_win, dtype, nodata
+        fn_base_raster, raster_file, band, spatial_win, dtype, nodata, overview
     ) as new_raster: # type: DatasetWriter
         band_dtype = new_raster.dtypes[0]
 
@@ -814,6 +821,7 @@ def save_rasters(
     array,
     window: Window = None,
     bounds: [] = None,
+    overview: int = None,
     dtype: str = None,
     nodata=None,
     array_idx: List = [],
@@ -919,7 +927,7 @@ def save_rasters(
     ref_array = parallel.put_shared(array).ref
 
     args = [
-        (base_raster, raster_file, ref_array, i, window, dtype, nodata, fit_in_dtype)
+        (base_raster, raster_file, ref_array, i, window, dtype, nodata, fit_in_dtype, overview)
         for raster_file, i in zip(raster_files, array_idx)
     ]
 
@@ -1981,7 +1989,7 @@ class RasterData(SKMapBase):
             self.array,
             array_idx=info.index,
             window=self.window,
-            bounds=self.bounds,
+            overview=self.overview,
             dtype=dtype,
             nodata=nodata,
             fit_in_dtype=fit_in_dtype,
