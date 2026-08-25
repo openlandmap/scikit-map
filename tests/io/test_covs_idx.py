@@ -72,6 +72,30 @@ def test_covs_idx_missing_raises(static_rdata):
         static_rdata._get_covs_idx(["missing"])
 
 
+def test_from_catalog():
+    """from_catalog maps DataCatalog feature names to RasterData bands."""
+    import pandas as pd
+
+    from skmap.catalog import DataCatalog
+
+    elev = "elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
+    slope = "slope.percent_gedi.eml_m_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
+    toy_dir = toy.DATA_DIR
+    catalog = DataCatalog.create_catalog(
+        catalog_def=pd.DataFrame({
+            "layer_name": ["elev", "slope"],
+            "path": ["{base_path}/" + elev, "{base_path}/" + slope],
+            "type": ["common", "common"],
+        }),
+        years=[2020],
+        base_path=str(toy_dir / "static"),
+    )
+    rdata = RasterData.from_catalog(catalog, read_kwargs={"verbose": False})
+    assert rdata.array.shape == (2, 256 * 256)
+    assert rdata.info["name"].tolist() == ["elev", "slope"]
+    assert rdata._get_covs_idx(["elev", "slope"]).tolist() == [[0], [1]]
+
+
 def test_valid_pixels_and_roundtrip(static_rdata):
     vp = static_rdata.valid_pixels
     assert vp.shape == (256 * 256,)
