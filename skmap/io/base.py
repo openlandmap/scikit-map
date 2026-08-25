@@ -1567,6 +1567,88 @@ class RasterData(SKMapBase):
     def _info(self):
         return self._filter(self.info, return_info=True)
 
+    def get_groups(self) -> List[str]:
+        """Return the group names, excluding the shared ``common`` group.
+
+        Mirrors :meth:`skmap.catalog.DataCatalog.get_groups` so a RasterData
+        organised by year (plus a ``common`` group) can drive per-group
+        prediction. A dataset with only ``common`` layers returns
+        ``["common"]``.
+        """
+        groups = sorted(
+            set(self.info[RasterData.GROUP_COL].unique()) - {"common", "otf"}
+        )
+        if not groups and "common" in set(self.info[RasterData.GROUP_COL].unique()):
+            groups = ["common"]
+        return groups
+
+    def _band_index(self, name: str, group: str = None) -> int:
+        """Return the array band index (row position) of a named layer.
+
+        The array is always ``(N, H*W)`` with band ``k`` corresponding to the
+        ``k``-th row of ``self.info``, so positional lookup (not the possibly
+        stale ``info.index`` values) is used.
+        """
+        info = self.info.reset_index(drop=True)
+        mask = info[RasterData.NAME_COL] == name
+        if group is not None:
+            mask &= info[RasterData.GROUP_COL] == group
+        hits = np.flatnonzero(mask.values)
+        if len(hits) == 0:
+            raise KeyError(
+                f"Layer {name!r} not found in RasterData groups {self.get_groups()}"
+            )
+        return int(hits[0])
+
+    def _get_covs_idx(self, covs_lst: List[str]) -> np.ndarray:
+        """Map covariate names to band indices per group (``common`` falls back).
+
+        Mirrors :meth:`skmap.catalog.DataCatalog._get_covs_idx`: returns an
+        int matrix of shape ``(len(covs_lst), n_groups)`` where each column is
+        a group and each row a covariate; a covariate missing from a group
+        falls back to the ``common`` group.
+        """
+        groups = self.get_groups()
+        info = self.info.reset_index(drop=True)
+        covs_idx = np.zeros((len(covs_lst), len(groups)), np.int32)
+        for j, g in enumerate(groups):
+            ginfo = info[info[RasterData.GROUP_COL] == g]
+            common = info[info[RasterData.GROUP_COL] == "common"]
+            for i, c in enumerate(covs_lst):
+                hits = ginfo[ginfo[RasterData.NAME_COL] == c]
+                if len(hits):
+                    covs_idx[i, j] = int(hits.index[0])
+                else:
+                    chits = common[common[RasterData.NAME_COL] == c]
+                    if len(chits):
+                        covs_idx[i, j] = int(chits.index[0])
+                    else:
+                        raise KeyError(
+                            f"Covariate {c!r} not found in group {g!r} or common"
+                        )
+        return covs_idx
+
+    @property
+    def valid_pixels(self) -> np.ndarray:
+        """Boolean mask over ``H*W`` of pixels with no NaN in any band."""
+        return ~np.isnan(self.array.get()).any(axis=0)
+
+    def select_valid(self) -> np.ndarray:
+        """Return the ``(n_valid, n_bands)`` array of non-NaN pixel rows."""
+        return self.array.get()[:, self.valid_pixels].T
+
+    def expand_valid(self, values, nodata=np.nan) -> np.ndarray:
+        """Expand a ``(n_valid,)`` / ``(n_valid, k)`` array back to ``H*W``."""
+        valid = self.valid_pixels
+        values = np.asarray(values)
+        if values.ndim == 1:
+            out = np.full(valid.shape[0], nodata, dtype=values.dtype)
+            out[valid] = values
+            return out
+        out = np.full((valid.shape[0], values.shape[1]), nodata, dtype=values.dtype)
+        out[valid] = values
+        return out
+
     def _base_raster(self):
         for _, row in self.info.iterrows():
             path = row[RasterData.PATH_COL]
