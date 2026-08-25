@@ -315,7 +315,7 @@ class TestToyLayersYaml:
         r = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
         assert r.array is None  # lazy
         assert len(r.info) == 74  # 24+24 ndvi + 24 swir1 + 2 static
-        assert set(r.get_groups()) == {str(y) for y in range(2014, 2021)}
+        assert set(r.get_groups()) == {"ndvi", "swir1"}
 
     def test_season_names_are_year_agnostic(self):
         from skmap.data import toy
@@ -335,11 +335,12 @@ class TestToyLayersYaml:
         assert set(filled.info["band"].dropna().unique()) == {"ndvi", "swir1"}
 
     def test_unique_names_within_year(self):
-        """Names are unique within each year group (SpaceOverlay requirement)."""
+        """Names are unique within a single year's slice (SpaceOverlay requirement)."""
         from skmap.data import toy
 
         r = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
         filled = r.filter("variant != 'gappy'")
-        for year in ["2015", "2016", "2019"]:
-            sub = filled.filter(f"group == '{year}'")
+        for year in [2015, 2016, 2019]:
+            sub = filled.filter(f"year == {year}")
+            # 4 ndvi + 4 swir1, all distinct season names
             assert sub.info["name"].nunique() == len(sub.info)

@@ -124,6 +124,7 @@ class TemplateExpander:
     COLUMN_EXCLUDES = META_FIELDS | YEAR_FIELDS | {
         "name",
         "base_path",
+        "group",
         "start_date",
         "end_date",
         "date_unit",
@@ -141,6 +142,7 @@ class TemplateExpander:
         """Expand one catalogue entry into :class:`LayerSpec` objects."""
         path_tmpl = entry["path"]
         name_tmpl = entry.get("name", "")
+        group_tmpl = entry.get("group", "")
         temporal_resolution = entry.get("temporal_resolution", "longterm_or_static")
         type_ = entry.get("type", "temporal")
 
@@ -157,7 +159,7 @@ class TemplateExpander:
 
         if temporal_resolution == "interval":
             yield from self._expand_interval(
-                entry, base_path, path_tmpl, name_tmpl, type_, scalars, list_axes
+                entry, base_path, path_tmpl, name_tmpl, group_tmpl, type_, scalars, list_axes
             )
             return
 
@@ -220,7 +222,7 @@ class TemplateExpander:
 
             yield LayerSpec(
                 path=path,
-                group=self._group(type_, vars_),
+                group=self._group(type_, vars_, group_tmpl),
                 start_date=start_date,
                 end_date=end_date,
                 name=name,
@@ -235,6 +237,7 @@ class TemplateExpander:
         base_path: str,
         path_tmpl: str,
         name_tmpl: str,
+        group_tmpl: str,
         type_: str,
         scalars: Dict[str, Any],
         list_axes: Dict[str, List[str]],
@@ -290,7 +293,7 @@ class TemplateExpander:
 
                 yield LayerSpec(
                     path=path,
-                    group=self._group(type_, vars_),
+                    group=self._group(type_, vars_, group_tmpl),
                     start_date=dt1,
                     end_date=dt2,
                     name=name,
@@ -317,7 +320,9 @@ class TemplateExpander:
         except KeyError as e:
             raise ValueError(f"Unresolved variable {e} in template: {tmpl!r}") from e
 
-    def _group(self, type_: str, vars_: Dict[str, Any]) -> str:
+    def _group(self, type_: str, vars_: Dict[str, Any], group_tmpl: str = "") -> str:
+        if group_tmpl:
+            return self._format(group_tmpl, vars_)
         if type_ == "common":
             return "common"
         return str(vars_.get("year", "default"))
