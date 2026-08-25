@@ -31,6 +31,43 @@ The object is **lazy**: it holds only the file paths until you call
 sample points directly from the files without ever loading whole rasters into
 memory.
 
+Loading rasters from YAML
+=========================
+
+A layer catalogue can be described in YAML and expanded into a lazy
+:class:`~skmap.io.RasterData` via :meth:`~skmap.io.RasterData.from_yaml`.
+``{variable}`` placeholders in the path template are expanded from the
+``start_year``/``end_year`` range, the ``band`` list and the paired
+``start_month``/``end_month`` lists (see :mod:`skmap.io.sources` for the full
+schema):
+
+.. code-block:: yaml
+
+    - layer: '{band}_glad.landsat.ard2.swa_m_30m_s_{year}{start_month}_{year}{end_month}_go_epsg.4326_v1'
+      path: '{base_path}/arco/{band}_glad.landsat.ard2.swa_m_30m_s_{year}{start_month}_{year}{end_month}_go_epsg.4326_v1.tif'
+      temporal_resolution: 'bimonthly'
+      type: 'temporal'
+      start_year: 1997
+      end_year: 2024
+      band: 'blue, green, red, nir, swir1, swir2, thermal'
+      start_month: '0101, 0301, 0501, 0701, 0901, 1101'
+      end_month: '0228, 0430, 0630, 0831, 1031, 1231'
+
+    - layer: 'elev'
+      path: '{base_path}/elev.tif'
+      temporal_resolution: 'longterm_or_static'
+      type: 'common'
+
+.. code-block:: python
+
+    rdata = RasterData.from_yaml("layers.yaml", base_path="/data")
+    rdata.info  # one row per expanded layer, plus band/year/month columns
+
+Temporal layers are grouped by year (``group`` = ``"2015"``, ...) and static
+layers under ``"common"``; every ``{variable}`` referenced in the path becomes
+an extra ``info`` column, so runners can group by multiple columns (e.g.
+``group`` and ``band``).
+
 Space-Time overlay
 ==================
 
