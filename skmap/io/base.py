@@ -117,21 +117,15 @@ def _read_raster(
 
         ttprint("Start reading")
         array_mm = None
-        if overview is not None:
-            overviews = ds.overviews(band)
-            if overview in overviews:
-                array_mm = ds.read(
-                    band,
-                    out_dtype=dtype,
-                    out_shape=(
-                        1,
-                        math.ceil(ds.height // overview),
-                        math.ceil(ds.width // overview),
-                    ),
-                    window=window,
-                )
-            else:
-                array_mm = ds.read(band, out_dtype=dtype, window=window)
+        if overview is not None and overview > 1:
+            h = window.height if window is not None else ds.height
+            w = window.width if window is not None else ds.width
+            array_mm = ds.read(
+                band,
+                out_dtype=dtype,
+                out_shape=(1, math.ceil(h / overview), math.ceil(w / overview)),
+                window=window,
+            )
         else:
             array_mm = ds.read(band, out_dtype=dtype, window=window)
         ttprint("End reading")
@@ -411,21 +405,88 @@ def _read_shape(raster_files, band, window, bounds, overview):
         window = from_bounds(*bounds, ds.transform).round_lengths()
 
     b = band[0] if isinstance(band, (list, tuple)) else band
-    if overview is not None:
+    if overview is not None and overview > 1:
         overviews = ds.overviews(b)
-        if overview in overviews:
-            return (
-                math.ceil(ds.height // overview),
-                math.ceil(ds.width // overview),
-                window,
+        if overview not in overviews:
+            raise ValueError(
+                f"Overview {overview} is invalid for {raster_files[-1]}.\n"
+                f"Use one of overviews: {overviews}"
             )
-        raise Exception(
-            f"Overview {overview} is invalid for {raster_files[-1]}.\n"
-            f"Use one of overviews: {ds.overviews(b)}"
-        )
+        h = window.height if window is not None else ds.height
+        w = window.width if window is not None else ds.width
+        return (math.ceil(h / overview), math.ceil(w / overview), window)
     if window is not None:
         return window.height, window.width, window
     return ds.height, ds.width, window
+
+
+def _resolve_read_params(
+    raster_files, band, extent, extent_epsg, dtype, n_layers, overview,
+    ram_fraction, verbose,
+):
+    """Resolve the read window (from ``extent``) and overview factor (RAM-fit).
+
+    Returns ``(window, overview, out_height, out_width)``.  ``overview`` is
+    ``None`` for a full-resolution read, or the COG overview factor to use.
+    """
+    import psutil
+
+    ds = rasterio.open(raster_files[0])
+    b = band[0] if isinstance(band, (list, tuple)) else band
+
+    window = None
+    if extent is not None and len(extent) == 4:
+        src_crs = extent_epsg if extent_epsg is not None else ds.crs
+        bnds = rasterio.warp.transform_bounds(src_crs, ds.crs, *extent)
+        window = from_bounds(*bnds, ds.transform).round_lengths()
+
+    w = window.width if window is not None else ds.width
+    h = window.height if window is not None else ds.height
+    overviews = ds.overviews(b)
+    dtype_bytes = np.dtype(dtype).itemsize
+    full_bytes = w * h * n_layers * dtype_bytes
+    available = psutil.virtual_memory().available * ram_fraction
+
+    if overview is not None:
+        if overview not in overviews:
+            raise ValueError(
+                f"Overview {overview} is invalid for {raster_files[0]}. "
+                f"Use one of: {overviews}"
+            )
+    elif full_bytes > available:
+        for ov in sorted(overviews):
+            ov_bytes = math.ceil(w / ov) * math.ceil(h / ov) * n_layers * dtype_bytes
+            if ov_bytes <= available:
+                if verbose:
+                    ttprint(
+                        f"Full read ~{full_bytes / 1e9:.2f} GB exceeds available "
+                        f"RAM (~{available / 1e9:.2f} GB); using overview x{ov} "
+                        f"(~{ov_bytes / 1e9:.2f} GB)"
+                    )
+                overview = ov
+                break
+        else:
+            if overviews:
+                overview = max(overviews)
+                if verbose:
+                    ttprint(
+                        f"Full read ~{full_bytes / 1e9:.2f} GB exceeds available "
+                        f"RAM; even the coarsest overview x{overview} does not fit"
+                    )
+            else:
+                raise MemoryError(
+                    f"Reading {n_layers} rasters at {w}x{h} {dtype} needs "
+                    f"~{full_bytes / 1e9:.2f} GB but only ~{available / 1e9:.2f} GB "
+                    f"RAM is available and the rasters have no COG overviews. "
+                    f"Provide a smaller extent or rasters with overviews."
+                )
+
+    if overview is not None and overview > 1:
+        out_h = math.ceil(h / overview)
+        out_w = math.ceil(w / overview)
+    else:
+        out_h, out_w = h, w
+    return window, overview, out_h, out_w
 
 
 def _cpp_read_ok(
@@ -439,23 +500,28 @@ def _cpp_read_ok(
         and scale == 1.0
         and expected_shape is None
         and not try_without_window
-        and overview is None
         and max_rasters is None
     )
 
 
-def _read_rasters_cpp(raster_files, band, window, n_jobs, dtype, gdal_opts, verbose):
+def _read_rasters_cpp(raster_files, band, window, n_jobs, dtype, gdal_opts, verbose, overview=None):
     """Read a stack of rasters into a ``(N, H*W)`` array via the C++ bindings."""
     n_layers = len(raster_files)
     if window is None:
         ds = rasterio.open(raster_files[0])
         window = rasterio.windows.Window(0, 0, ds.width, ds.height)
-    out_data = np.empty((n_layers, window.width * window.height), dtype=dtype)
+    if overview is not None and overview > 1:
+        buf_w = math.ceil(window.width / overview)
+        buf_h = math.ceil(window.height / overview)
+    else:
+        buf_w, buf_h = window.width, window.height
+    out_data = np.empty((n_layers, buf_w * buf_h), dtype=dtype)
     out_idx = list(range(0, n_layers))
 
     if verbose:
         ttprint(
-            f"Reading {n_layers} layers using window={window} and array={out_data.shape}"
+            f"Reading {n_layers} layers using window={window} overview={overview} "
+            f"and array={out_data.shape}"
         )
 
     sb.readData(
@@ -463,14 +529,15 @@ def _read_rasters_cpp(raster_files, band, window, n_jobs, dtype, gdal_opts, verb
         n_jobs,
         raster_files,
         out_idx,
-        window.col_off,
-        window.row_off,
-        window.width,
-        window.height,
+        int(window.col_off),
+        int(window.row_off),
+        int(window.width),
+        int(window.height),
         band,
         gdal_opts,
         None,
         np.nan,
+        overview if overview is not None else 0,
     )
 
     if verbose:
@@ -566,7 +633,7 @@ def read_rasters(
 
     if backend == "cpp":
         out = _read_rasters_cpp(
-            raster_files, band, window, n_jobs, dtype, gdal_opts, verbose
+            raster_files, band, window, n_jobs, dtype, gdal_opts, verbose, overview
         )
         # An explicit backend='cpp' keeps the result in-process (no Ray); the
         # auto-selected cpp path keeps the default Ray object-store model.
@@ -964,6 +1031,9 @@ class RasterData(SKMapBase):
         self.base_raster = None
         self.window = None
         self.bounds = None
+        self.overview = None
+        self.extent = None
+        self.extent_epsg = None
 
         has_date = ~self.info[RasterData.START_DT_COL].isnull().any()
 
@@ -1291,24 +1361,52 @@ class RasterData(SKMapBase):
 
     def read(
         self,
-        window: Window = None,
-        bounds: list = None,
+        extent: list = None,
+        extent_epsg=None,
         dtype: str = "float32",
         expected_shape=None,
         overview: int = None,
+        ram_fraction: float = 0.7,
         n_jobs: int = 4,
         scale: float = 1,
         gdal_opts: dict = {},
     ):
         """Read the selected layers into a SharedArray and return ``self``.
 
-        Side effects: sets ``self.window``, ``self.bounds``, ``self.base_raster``
-        (the path of the first reachable raster, used as a geometry reference
-        by runners and ``to_dir``/``to_s3``) and ``self.array`` (the (N, H*W) SharedArray).
+        :param extent: ``(minx, miny, maxx, maxy)`` bounding box to read, in
+          ``extent_epsg`` (defaults to the rasters' own CRS). ``None`` reads
+          the full extent.
+        :param extent_epsg: EPSG code / CRS of ``extent``. Defaults to the
+          rasters' own CRS.
+        :param overview: COG overview factor to read (e.g. ``2``). ``None``
+          auto-selects: if the full read would not fit in RAM (estimated from
+          width, height, dtype and ``ram_fraction`` of available memory), the
+          finest overview that fits is used and logged.
+        :param ram_fraction: fraction of available RAM the read is allowed to
+          use (default 0.7).
+
+        Side effects: sets ``self.window``, ``self.overview``, ``self.extent``,
+        ``self.extent_epsg``, ``self.base_raster`` and ``self.array``.
         """
 
+        self.extent = extent
+        self.extent_epsg = extent_epsg
+
+        self.base_raster = self._base_raster()
+        raster_files = []
+
+        # FIXME: add supporting for band_list
+        for band, rows in self.info.groupby(RasterData.BAND_COL):
+            raster_files += [Path(r) for r in rows[RasterData.PATH_COL]]
+
+        # Resolve the read window (from extent) and the overview factor
+        # (explicit or RAM-fit) once, so mask and data reads agree.
+        window, overview, out_h, out_w = _resolve_read_params(
+            raster_files, band, extent, extent_epsg, dtype,
+            len(raster_files), overview, ram_fraction, self.verbose,
+        )
         self.window = window
-        self.bounds = bounds
+        self.overview = overview
 
         data_mask = None
         if self.raster_mask is not None:
@@ -1321,21 +1419,11 @@ class RasterData(SKMapBase):
                 overview=overview,
                 gdal_opts=gdal_opts,
             )
-            # read_rasters returns a SharedArray (N, H*W); materialize the
-            # single mask band and reshape it to (H, W).
-            h, w, _ = _read_shape([self.raster_mask], 1, window, None, overview)
-            data_mask = data_mask.get().reshape(h, w)
+            data_mask = data_mask.get().reshape(out_h, out_w)
             if self.raster_mask_val is np.nan:
                 data_mask = np.logical_not(np.isnan(data_mask))
             else:
                 data_mask = data_mask != self.raster_mask_val
-
-        self.base_raster = self._base_raster()
-        raster_files = []
-
-        # FIXME: add supporting for band_list
-        for band, rows in self.info.groupby(RasterData.BAND_COL):
-            raster_files += [Path(r) for r in rows[RasterData.PATH_COL]]
 
         self._verbose(
             f"RasterData with {len(raster_files)} rasters"
@@ -1345,8 +1433,7 @@ class RasterData(SKMapBase):
         self.array = read_rasters(
             raster_files,
             band=band,
-            window=self.window,
-            bounds=bounds,
+            window=window,
             data_mask=data_mask,
             dtype=dtype,
             expected_shape=expected_shape,
@@ -1360,11 +1447,7 @@ class RasterData(SKMapBase):
             backend="cpp" if self.backend.name == "cpp" else None,
         )
 
-        # Remember the spatial extent so plotting can reshape (N, H*W) -> (H, W, N).
-        height, width, _ = _read_shape(
-            raster_files, band, self.window, bounds, overview
-        )
-        self._spatial_shape = (height, width)
+        self._spatial_shape = (out_h, out_w)
 
         # The array is rebuilt positionally (rows 0..N-1); reset info.index to match.
         self.info = self.info.reset_index(drop=True)
