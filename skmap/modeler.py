@@ -268,6 +268,42 @@ class Modeler:
         """
         return self.predict_fn(self.model, X)
 
+    def predict_raster(self, rdata, valid_only: bool = True) -> np.ndarray:
+        """Predict on a pre-loaded :class:`~skmap.io.RasterData` (spatial).
+
+        Maps the model's covariate names to RasterData bands (via
+        :meth:`RasterData._get_covs_idx`), predicts once per group (year),
+        and returns a numpy array of shape
+        ``(n_groups, H*W[, n_responses/n_class])`` with ``NaN`` for invalid
+        pixels.
+
+        :param rdata: a RasterData whose bands are named after the model's
+          covariate features (``common`` group falls back for shared layers).
+        :param valid_only: if ``True`` (default) only non-NaN pixels are
+          predicted and the result is a dense ``(n_groups, H*W, ...)`` array
+          with ``NaN`` elsewhere.
+        """
+        groups = rdata.get_groups()
+        covs_idx = rdata._get_covs_idx(self.model_covs)  # (n_covs, n_groups)
+        arr = rdata.array.get()
+        n_pixels = arr.shape[1]
+
+        predictions = []
+        for j in range(len(groups)):
+            X = arr[covs_idx[:, j], :].T  # (n_pixels, n_covs)
+            if valid_only:
+                valid = ~np.isnan(X).any(axis=1)
+                pred_valid = np.asarray(
+                    self.predict_fn(self.model, X[valid]), dtype=np.float32
+                )
+                shape = (n_pixels,) + pred_valid.shape[1:]
+                pred = np.full(shape, np.nan, dtype=np.float32)
+                pred[valid] = pred_valid
+            else:
+                pred = np.asarray(self.predict_fn(self.model, X), dtype=np.float32)
+            predictions.append(pred)
+
+        return np.stack(predictions)
     def predict_tile(self, data: TiledData) -> NoReturn:
         """Run the model over a :class:`TiledData` tile and return a :class:`TiledData` of predictions."""
 

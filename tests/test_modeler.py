@@ -155,3 +155,59 @@ def test_rf_classifier_end_to_end_toy(_toy_covariates, tmp_path):
     assert pred.shape == (10,)
     # predicted labels must be a subset of the training labels
     assert set(np.unique(pred)).issubset(set(np.unique(y)))
+
+
+def _toy_raster_rdata():
+    """A RasterData with named covariate bands (elev, slope) for predict_raster."""
+    from pathlib import Path
+
+    from skmap.data import toy
+    from skmap.io import RasterData
+
+    toy_dir = toy.DATA_DIR
+    elev = "elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
+    slope = "slope.percent_gedi.eml_m_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
+    rdata = RasterData(
+        {"common": [str(toy_dir / "static" / elev), str(toy_dir / "static" / slope)]}
+    ).read()
+    rdata.info["name"] = ["elev", "slope"]
+    return rdata
+
+
+def test_predict_raster_regressor(tmp_path):
+    """predict_raster maps covariate names to bands and predicts every pixel."""
+    rdata = _toy_raster_rdata()
+    arr = rdata.array.get()  # (2, 65536)
+    X = pd.DataFrame(arr.T, columns=["elev", "slope"])
+    rng = np.random.default_rng(0)
+    y = X["elev"] * 2 + X["slope"] * 0.5
+
+    idx = rng.choice(len(y), 3000, replace=False)
+    model = RandomForestRegressor(n_estimators=3, random_state=0).fit(
+        X.iloc[idx], y.iloc[idx]
+    )
+    path = str(tmp_path / "reg_raster.joblib")
+    joblib.dump(model, path)
+
+    est = RFRegressor(path)
+    assert list(est.feature_names_in_) == ["elev", "slope"]
+    pred = est.predict_raster(rdata)
+    assert pred.shape == (1, 256 * 256)
+    assert np.isfinite(pred).all()
+
+
+def test_predict_raster_classifier(tmp_path):
+    """predict_raster on a classifier returns class labels per pixel."""
+    rdata = _toy_raster_rdata()
+    arr = rdata.array.get()
+    X = pd.DataFrame(arr.T, columns=["elev", "slope"])
+    y = (X["elev"] > 100).astype(int)
+
+    model = RandomForestClassifier(n_estimators=3, random_state=0).fit(X, y)
+    path = str(tmp_path / "cls_raster.joblib")
+    joblib.dump(model, path)
+
+    est = RFClassifier(path)
+    pred = est.predict_raster(rdata)
+    assert pred.shape == (1, 256 * 256)
+    assert set(np.unique(pred[~np.isnan(pred)])).issubset({0.0, 1.0})
