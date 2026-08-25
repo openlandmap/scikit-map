@@ -151,3 +151,26 @@ class TestDateRange:
                 return_str=True,
             )
         )
+
+
+def test_vrt_warp_single_vrt_per_file(tmp_path):
+    """vrt_warp builds one on-the-fly VRT per raster at its own extent."""
+    import os
+
+    import rasterio
+
+    from skmap.data import toy
+    from skmap.misc import vrt_warp
+
+    files = [str(toy.DATA_DIR / "static" / f) for f in os.listdir(toy.DATA_DIR / "static")]
+    vrts = vrt_warp(
+        files, dst_crs="EPSG:3035", tr=30, r_method="near",
+        outdir=str(tmp_path), n_jobs=2,
+    )
+    assert len(vrts) == len(files)
+    assert all("_wrapped" not in v for v in vrts)
+    for v in vrts:
+        with rasterio.open(v) as ds:
+            assert ds.crs == "EPSG:3035"
+            assert ds.transform.a == 30
+            assert (ds.width, ds.height) == (256, 256)
