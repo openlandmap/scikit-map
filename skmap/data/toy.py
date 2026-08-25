@@ -57,6 +57,19 @@ def ndvi_rdata(gappy=False, verbose=True):
     )
 
 
+def ndvi_files(gappy=False):
+    """Return a sorted list of concrete NDVI toy-raster file paths."""
+
+    subpath = "gappy" if gappy else "filled"
+    return find_files(DATA_DIR.joinpath("ndvi", subpath), "*.tif")
+
+
+def swir1_files():
+    """Return a sorted list of concrete SWIR1 toy-raster file paths."""
+
+    return find_files(DATA_DIR.joinpath("swir1"), "*.tif")
+
+
 def lc_samples():
     """Return a small example land-cover sample ``GeoDataFrame`` for testing and demos."""
 
