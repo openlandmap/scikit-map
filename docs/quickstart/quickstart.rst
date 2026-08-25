@@ -4,44 +4,76 @@ Quickstart
 
 See :ref:`installation-section` for installation instructions.
 
-``Scikit-map`` is used in two places in a machine learning pipeline: For Space-time overlay and large-scale predictions.
+``Scikit-map`` is used in two places in a machine learning pipeline: for Space-time overlay and large-scale predictions.
 
 .. image:: ../img/pipeline.svg
 
-Creating a catalog
-==================
+Loading rasters
+===============
 
-Every scikit-map project starts with a catalog. This is a Pandas Dataframe or a csv file.
-
-.. csv-table:: Example catalog
-    :file: example.csv
-    :header-rows: 1
-
-Create a catalog from it like:
+Every scikit-map project starts with a :class:`~skmap.io.RasterData`, which
+describes a set of raster layers grouped by year (plus a ``common`` group for
+static layers shared across years).
 
 .. doctest::
 
-    >>> from pathlib import Path
-    >>> from skmap.catalog import DataCatalog
-    >>> catalog = DataCatalog.create_catalog(
-    ...     catalog_def="docs/quickstart/example.csv",
-    ...     years=list(range(2000,2022)),
-    ...     base_path=str(Path(".").absolute())
-    ... )
-    >>> catalog.data
-    {'2000': {'layer_YYYY': {'path': ' file_2000.tif', 'idx': 0}}, ... 'common': {'static': {'path': 'static.tif', 'idx': 22}}}
+    >>> from skmap.io import RasterData
+    >>> rdata = RasterData({
+    ...     "2020": ["ndvi_2020.tif", "swir1_2020.tif"],
+    ...     "common": ["elev.tif", "slope.tif"],
+    ... })
+    >>> rdata.get_groups()
+    ['2020']
+
+The object is **lazy**: it holds only the file paths until you call
+:meth:`~skmap.io.RasterData.read`. This means the space-time overlay below can
+sample points directly from the files without ever loading whole rasters into
+memory.
 
 Space-Time overlay
 ==================
 
 .. image:: ../img/spacetime_overlay.svg
 
+.. code-block:: python
 
+    import geopandas as gpd
+    from skmap.overlay import SpaceTimeOverlay
+
+    samples = gpd.read_file("samples.gpkg")
+    overlay = SpaceTimeOverlay(
+        points=samples,
+        col_date="date",
+        rasterdata=rdata,
+        raster_tiles=None,
+    )
+    train = overlay.run(max_ram_mb=512, out_file_name=None)
 
 Large-scale predictions
 =======================
 
+.. code-block:: python
+
+    from skmap.modeler import RFRegressor
+
+    model = RFRegressor("model.joblib")
+    rdata = rdata.read()  # materialize rasters for spatial prediction
+    pred = model.predict_raster(rdata)
+
 Whales
 ======
 
+Derived (on-the-fly) features are computed by :mod:`skmap.io.process` runners.
+They can be applied either to a loaded :class:`~skmap.io.RasterData` or as a
+``runners`` list to the overlay:
 
+.. code-block:: python
+
+    from skmap.io import process
+
+    overlay = SpaceTimeOverlay(
+        points=samples,
+        col_date="date",
+        rasterdata=rdata,
+        runners=[process.NormalizedDifference("ndvi", "swir1")],
+    )

@@ -35,7 +35,7 @@ Data Processing
 IoArray Class
 =============
 
-This class is used by :py:class:`TiledDataLoader`, :py:class:`TiledDataExporter` and :py:class:`SpaceOverlay`
+This class is used by :py:class:`SpaceOverlay` and the raster I/O layer.
 
 .. doxygenclass:: skmap::IoArray
    :members:
