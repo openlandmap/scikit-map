@@ -10,6 +10,14 @@ import geopandas as gpd
 import numpy
 import numpy as np
 import rasterio
+
+
+def _ensure_ray():
+    """Initialize Ray exactly once (avoids the re-init warning)."""
+    import ray
+
+    if not ray.is_initialized():
+        ray.init(ignore_reinit_error=True)
 from rasterio.mask import mask
 from rasterio.windows import from_bounds
 from shapely.geometry import Polygon
@@ -64,7 +72,7 @@ def put_shared(array):
 
     if isinstance(array, SharedArray):
         return array
-    ray.init(ignore_reinit_error=True)
+    _ensure_ray()
     arr = np.ascontiguousarray(array)
     return SharedArray(ray.put(arr), arr.shape, arr.dtype)
 
@@ -81,7 +89,7 @@ def _remote(fn, *args):
     """Invoke a module-level worker remotely and return its ObjectRef."""
     import ray
 
-    ray.init(ignore_reinit_error=True)
+    _ensure_ray()
     return ray.remote(fn).remote(*args)
 
 
@@ -174,7 +182,7 @@ def job(
             stacklevel=2,
         )
 
-    ray.init(ignore_reinit_error=True)
+    _ensure_ray()
 
     # Map n_jobs to a per-task CPU allocation so that at most n_jobs tasks
     # run concurrently (n_jobs=-1 uses all available CPUs).
