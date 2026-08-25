@@ -1471,11 +1471,17 @@ class RasterData(SKMapBase):
         end_date=None,
         date_format="%Y-%m-%d",
         date_overlap=False,
+        include_non_temporal=False,
         return_array=False,
         return_copy=True,
         return_idx=False,
     ):
-        """Return a copy keeping only layers whose date falls within ``[start, end]``."""
+        """Return a copy keeping only layers whose date falls within ``[start, end]``.
+
+        :param include_non_temporal: when ``True``, also keep layers without a
+            date (static layers with ``None`` in the start-date column), so
+            they are preserved alongside the date-filtered temporal layers.
+        """
 
         start_dt_col, end_dt_col = (RasterData.START_DT_COL, RasterData.END_DT_COL)
         info_main = self.info
@@ -1506,6 +1512,9 @@ class RasterData(SKMapBase):
                 )
 
             dt_mask = np.logical_and(dt_mask, dt_mask_end)
+
+        if include_non_temporal:
+            dt_mask = np.logical_or(dt_mask, info_main[start_dt_col].isnull())
 
         return self._filter(
             info_main[dt_mask],
