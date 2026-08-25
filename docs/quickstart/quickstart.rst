@@ -12,8 +12,9 @@ Loading rasters
 ===============
 
 Every scikit-map project starts with a :class:`~skmap.io.RasterData`, which
-describes a set of raster layers grouped by year (plus a ``common`` group for
-static layers shared across years).
+describes a set of raster layers.  Temporal layers carry ``start_date`` /
+``end_date`` columns (populated by :meth:`~skmap.io.RasterData.timespan`) and
+static layers have ``None`` dates.
 
 .. doctest::
 
@@ -34,6 +35,11 @@ Space-Time overlay
 ==================
 
 .. image:: ../img/spacetime_overlay.svg
+
+:class:`~skmap.overlay.SpaceTimeOverlay` filters the temporal layers by date
+(via :meth:`~skmap.io.RasterData.filter_date`) for each date range and always
+includes the static (undated) layers.  When ``date_ranges`` is not given, one
+range per unique year in the points' date column is derived automatically.
 
 .. code-block:: python
 
