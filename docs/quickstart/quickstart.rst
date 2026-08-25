@@ -66,7 +66,20 @@ schema):
 Temporal layers are grouped by year (``group`` = ``"2015"``, ...) and static
 layers under ``"common"``; every ``{variable}`` referenced in the path becomes
 an extra ``info`` column, so runners can group by multiple columns (e.g.
-``group`` and ``band``).
+``group`` and ``band``).  A ``group`` template overrides the default (use
+``group: '{band}'`` for band-grouped time-series).
+
+A runnable example ships with the toy data::
+
+    >>> from skmap.data import toy
+    >>> from skmap.io import RasterData
+    >>> rdata = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
+    >>> rdata.get_groups()
+    ['ndvi', 'swir1']
+
+It also demonstrates the ``interval`` temporal style, a ``name`` template
+(year-agnostic ``{band}_{season}`` names) and a ``variant`` column separating
+the gap-filled and gappy NDVI.
 
 Space-Time overlay
 ==================
