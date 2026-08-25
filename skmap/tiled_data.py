@@ -160,6 +160,12 @@ class TiledDataLoader(TiledData):
     """
     Loads tiled data in parallel based on a catalog file
 
+    .. note::
+        For non-tiled (single-window) work, prefer :class:`~skmap.io.RasterData`
+        (or ``RasterData.from_catalog``). ``to_rasterdata`` converts a loaded
+        tile into a RasterData for the
+        :meth:`skmap.modeler.Modeler.predict_raster` pipeline.
+
     :param catalog: scikit-map `DataCatalog`
     :param mask_template_path: ``str`` with a ``{tile_id}`` placeholder
     :type mask_template_path: str

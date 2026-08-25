@@ -12,7 +12,16 @@ from skmap.misc import mmdd_to_doy
 
 
 class DataCatalog:
-    """A catalog of raster covariate layers, organised by groups, that drives tile-based reading and on-the-fly feature derivation (whales)."""
+    """A catalog of raster covariate layers, organised by groups, that drives tile-based reading and on-the-fly feature derivation (whales).
+
+    .. note::
+        :class:`~skmap.io.RasterData` is the preferred data abstraction.
+        ``RasterData.from_catalog`` migrates a catalog, the
+        :mod:`skmap.io.process` whale runners replace ``run_whales``, and
+        :meth:`skmap.modeler.Modeler.predict_raster` predicts on a pre-loaded
+        RasterData. This class is kept for the tile pipeline and backward
+        compatibility.
+    """
 
     def __init__(self, data, data_size) -> None:
         self.data = data
