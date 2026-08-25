@@ -699,20 +699,31 @@ class SpaceOverlay:
 
 class SpaceTimeOverlay:
     """
-    Overlay a set of points over multiple raster considering the year information.
+    Overlay a set of points over multiple raster considering the date information.
     The retrieved pixel values are organized in columns according to the filenames.
 
     Works on a **lazy** :class:`~skmap.io.RasterData` (paths only, no
-    ``.read()``) whose groups encode the years (plus an optional ``common``
-    group). Pixel values are sampled directly from the raster files.
+    ``.read()``) whose temporal layers carry ``start_date``/``end_date``
+    columns (populated by :meth:`~skmap.io.RasterData.timespan`) and whose
+    static layers have ``None`` dates.  For each date range, temporal layers
+    overlapping the range are selected via
+    :meth:`~skmap.io.RasterData.filter_date` and **all** static layers are
+    always included.  Pixel values are sampled directly from the raster files.
 
     :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
         the points.
-    :param col_date: Date column to retrieve the year information.
-    :param rasterdata: a :class:`~skmap.io.RasterData` (unread) with one group
-        per year plus a ``common`` group for shared layers.
+    :param col_date: Date column in ``points`` used to assign each point to a
+        date range.
+    :param rasterdata: a :class:`~skmap.io.RasterData` (unread, with dates from
+        ``timespan``) holding temporal and static layers.
+    :param date_ranges: optional list of ``(start, end)`` date-string tuples
+        defining the overlay slices.  When ``None`` one range per unique year
+        in ``points[col_date]`` is derived
+        (``f"{y}-01-01"``, ``f"{y}-12-31"``).
+    :param date_format: strptime format of the ``date_ranges`` strings
+        (default ``"%Y-%m-%d"``).
     :param runners: optional list of :mod:`skmap.io.process` whale runners
-        computed on the sampled points after each year's overlay.
+        computed on the sampled points after each slice's overlay.
     :param raster_tiles: ``geopandas.GeoDataFrame`` or path describing the raster tiles.
     :param tile_id_col: Column name in ``raster_tiles`` holding the tile identifier.
     :param n_threads: Number of CPU cores to be used in parallel. By default all cores
@@ -732,6 +743,8 @@ class SpaceTimeOverlay:
         points: gpd.GeoDataFrame | pd.DataFrame | str,
         col_date: str,
         rasterdata,
+        date_ranges: Optional[List[tuple]] = None,
+        date_format: str = "%Y-%m-%d",
         runners: Optional[List] = None,
         raster_tiles: gpd.GeoDataFrame | str = None,
         tile_id_col: str = "tile_id",
@@ -749,36 +762,47 @@ class SpaceTimeOverlay:
         self.n_threads = n_threads
 
         self.col_date = col_date
-        self.overlay_objs: Dict[
-            str, SpaceOverlay
-        ] = {}  # FIXME: Dict[int, SpaceOverlay]?
+        self.overlay_objs: Dict[str, SpaceOverlay] = {}
         self.verbose = verbose
         self.rdata = rasterdata
         self.runners = runners or []
+        self.date_format = date_format
 
-        if pd.api.types.is_datetime64_any_dtype(self.pts[self.col_date]):
-            year_series = self.pts[self.col_date].dt.year
-        else:
-            year_series = self.pts[self.col_date].astype(int)
-        self.year_points = {}
+        # Normalise the point dates to pandas timestamps for range matching.
+        dates = pd.to_datetime(self.pts[self.col_date])
 
-        for year in self.rdata.get_groups():
-            self.year_points[year] = self.pts[year_series == int(year)]
-            if len(self.year_points[year]) > 0:
-                # 'common' group is included by the filter expression
-                year_rdata = self.rdata.filter(
-                    f'group in ["{year}", "common"]'
+        # Derive one range per unique year when the caller does not supply them.
+        if date_ranges is None:
+            years = sorted(dates.dt.year.unique())
+            date_ranges = [(f"{y}-01-01", f"{y}-12-31") for y in years]
+        self.date_ranges = date_ranges
+        self.range_points: Dict[str, gpd.GeoDataFrame] = {}
+
+        for start, end in date_ranges:
+            label = f"{start}..{end}"
+            start_ts = pd.to_datetime(start, format=date_format)
+            # half-open [start, end+1day) so a point late on `end` is included
+            end_ts = pd.to_datetime(end, format=date_format) + pd.Timedelta(days=1)
+            mask = (dates >= start_ts) & (dates < end_ts)
+            range_pts = self.pts[mask]
+            self.range_points[label] = range_pts
+
+            if len(range_pts) > 0:
+                # temporal layers in range + all static layers (lazy)
+                range_rdata = self.rdata.filter_date(
+                    start, end, date_format=date_format, include_non_temporal=True
                 )
-                n_layers = len(year_rdata.info)
+                n_layers = len(range_rdata.info)
 
                 if self.verbose:
                     ttprint(
-                        f"Overlay {len(self.year_points[year])} points from {year} in {n_layers} raster layers"
+                        f"Overlay {len(range_pts)} points in [{start}, {end}]"
+                        f" across {n_layers} raster layers"
                     )
 
-                self.overlay_objs[year] = SpaceOverlay(
-                    points=self.year_points[year],
-                    rasterdata=year_rdata,
+                self.overlay_objs[label] = SpaceOverlay(
+                    points=range_pts,
+                    rasterdata=range_rdata,
                     runners=self.runners,
                     raster_tiles=raster_tiles,
                     tile_id_col=tile_id_col,
@@ -786,7 +810,7 @@ class SpaceTimeOverlay:
                     verbose=verbose,
                 )
             else:
-                print(f"No points to overlay for year {year}, skipping it")
+                print(f"No points to overlay in [{start}, {end}], skipping it")
 
     def run(
         self,
@@ -798,26 +822,24 @@ class SpaceTimeOverlay:
         },
     ) -> Optional[pd.DataFrame]:
         """
-        Execute the spacetime overlay. It removes the year part from the column names.
-        For example, the raster ``raster_20101202..20110320.tif`` results in the column
-        name ``raster_1202..0320``.
+        Execute the spacetime overlay and concatenate the per-range results.
 
-        :returns: Data frame with the original columns plus the overlay result (one new
-            column per raster).
-        :rtype: geopandas.GeoDataFrame
+        :returns: Data frame with the original point columns plus one column
+            per sampled raster layer (and per whale runner output).
+        :rtype: pandas.DataFrame
         """
         self.result: Optional[pd.DataFrame] = None
 
-        for year in self.overlay_objs:
+        for label in self.overlay_objs:
             if self.verbose:
-                ttprint(f"Running the overlay for {year}")
-            year_result = self.overlay_objs[year].run(max_ram_mb, None, gdal_opts)
+                ttprint(f"Running the overlay for {label}")
+            range_result = self.overlay_objs[label].run(max_ram_mb, None, gdal_opts)
 
             if self.result is None:
-                self.result = year_result
+                self.result = range_result
             else:
                 self.result: pd.DataFrame = pd.concat(
-                    [self.result, year_result], ignore_index=True
+                    [self.result, range_result], ignore_index=True
                 )
 
             if out_file_name is not None:
