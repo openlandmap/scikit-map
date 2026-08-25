@@ -1,4 +1,7 @@
-"""Tests for the Ray object-store sharing helpers (SharedArray)."""
+"""Tests for the Ray object-store sharing helpers (SharedArray).
+
+SharedArray mechanics; controlled arrays required, toy data adds no value.
+"""
 
 import numpy as np
 

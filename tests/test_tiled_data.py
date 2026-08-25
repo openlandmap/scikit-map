@@ -1,3 +1,4 @@
+# Pure-function tests for S3 listing / percentile strings; no raster data, toy data N/A.
 from skmap.tiled_data import get_percentiele_string, s3_list_files, s3_split_prefix
 
 

@@ -1,4 +1,7 @@
-"""Tests for backend thread control (n_threads)."""
+"""Tests for backend thread control (n_threads).
+
+Thread setting only; no data needed.
+"""
 
 from skmap.compute import CppBackend, NumbaBackend, NumpyBackend
 

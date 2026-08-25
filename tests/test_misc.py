@@ -1,3 +1,4 @@
+# Pure-function tests for date_range; no raster data, toy data N/A.
 from datetime import datetime
 from typing import List, Tuple
 
