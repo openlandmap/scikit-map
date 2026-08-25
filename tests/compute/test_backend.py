@@ -1,30 +1,15 @@
-"""Unit tests for the compute-backend interface and the NumpyBackend reference."""
+"""Unit tests for the compute-backend interface and the NumpyBackend reference.
+
+Reduction / elementwise / convolution tests run on real toy NDVI data
+(``toy_arr`` / ``toy_arr_filled`` fixtures). Tests that need constructed
+signals (find_peaks, theilslopes, STL, OLS, sparse_solve, Toeplitz) stay
+synthetic — marked with ``# synthetic:`` comments.
+"""
 
 import numpy as np
 import pytest
 
 from skmap.compute import ComputeBackend, NumpyBackend, get_backend
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-@pytest.fixture
-def arr3d():
-    """A small (4, 5, 6) array with some NaNs, float32."""
-    rng = np.random.default_rng(42)
-    a = rng.random((4, 5, 6), dtype=np.float32) * 100
-    a[0, 0, 0] = np.nan
-    a[1, 2, 3] = np.nan
-    a[3, 4, 5] = np.nan
-    return a
-
-
-@pytest.fixture
-def arr2d():
-    rng = np.random.default_rng(7)
-    return (rng.random((10, 12), dtype=np.float32) * 50).astype(np.float32)
 
 
 # ---------------------------------------------------------------------------
@@ -58,67 +43,66 @@ class TestInterface:
 class TestNumpyBackend:
     be = NumpyBackend()
 
-    def test_nanmean(self, arr3d):
-        out = self.be.nanmean(arr3d, axis=-1)
-        assert out.shape == (4, 5)
-        ref = np.nanmean(arr3d, axis=-1)
+    def test_nanmean(self, toy_arr):
+        out = self.be.nanmean(toy_arr, axis=-1)
+        assert out.shape == (1024,)
+        ref = np.nanmean(toy_arr, axis=-1)
         np.testing.assert_allclose(out, ref, rtol=1e-5)
 
-    def test_nanstd(self, arr3d):
-        out = self.be.nanstd(arr3d, axis=-1)
-        assert out.shape == (4, 5)
-        ref = np.nanstd(arr3d, axis=-1)
+    def test_nanstd(self, toy_arr):
+        out = self.be.nanstd(toy_arr, axis=-1)
+        assert out.shape == (1024,)
+        ref = np.nanstd(toy_arr, axis=-1)
         np.testing.assert_allclose(out, ref, rtol=1e-4)
 
-    def test_nanmin(self, arr3d):
-        out = self.be.nanmin(arr3d, axis=-1)
-        ref = np.nanmin(arr3d, axis=-1)
+    def test_nanmin(self, toy_arr):
+        out = self.be.nanmin(toy_arr, axis=-1)
+        ref = np.nanmin(toy_arr, axis=-1)
         np.testing.assert_allclose(out, ref, rtol=1e-6)
 
-    def test_nanmax(self, arr3d):
-        out = self.be.nanmax(arr3d, axis=-1)
-        ref = np.nanmax(arr3d, axis=-1)
+    def test_nanmax(self, toy_arr):
+        out = self.be.nanmax(toy_arr, axis=-1)
+        ref = np.nanmax(toy_arr, axis=-1)
         np.testing.assert_allclose(out, ref, rtol=1e-6)
 
-    def test_nansum(self, arr3d):
-        out = self.be.nansum(arr3d, axis=-1)
-        ref = np.nansum(arr3d, axis=-1)
+    def test_nansum(self, toy_arr):
+        out = self.be.nansum(toy_arr, axis=-1)
+        ref = np.nansum(toy_arr, axis=-1)
         np.testing.assert_allclose(out, ref, rtol=1e-5)
 
-    def test_nanmedian(self, arr3d):
-        out = self.be.nanmedian(arr3d, axis=-1)
-        ref = np.nanmedian(arr3d, axis=-1)
+    def test_nanmedian(self, toy_arr):
+        out = self.be.nanmedian(toy_arr, axis=-1)
+        ref = np.nanmedian(toy_arr, axis=-1)
         np.testing.assert_allclose(out, ref, rtol=1e-5)
 
-    def test_nanpercentile(self, arr3d):
+    def test_nanpercentile(self, toy_arr):
         q = [25, 50, 75]
-        out = self.be.nanpercentile(arr3d, q, axis=-1)
-        assert out.shape == (4, 5, 3)
+        out = self.be.nanpercentile(toy_arr, q, axis=-1)
+        assert out.shape == (1024, 3)
         # numpy puts the percentile axis first; the backend returns it last
-        # (matching the (H, W, n_percs) layout used by TimeAggregate).
-        ref = np.nanpercentile(arr3d, q, axis=-1).transpose(1, 2, 0)
+        ref = np.nanpercentile(toy_arr, q, axis=-1).T
         np.testing.assert_allclose(out, ref, rtol=1e-4)
 
-    def test_evaluate(self, arr2d):
-        a = arr2d
-        b = arr2d + 1
+    def test_evaluate(self, toy_arr_filled):
+        a = toy_arr_filled
+        b = toy_arr_filled + 1
         out = self.be.evaluate("a * 2 + b", {"a": a, "b": b})
         np.testing.assert_allclose(out, a * 2 + b, rtol=1e-6)
 
-    def test_scale_offset(self, arr2d):
-        out = self.be.scale_offset(arr2d, 2.0, 1.0)
-        np.testing.assert_allclose(out, arr2d * 2.0 + 1.0, rtol=1e-6)
+    def test_scale_offset(self, toy_arr_filled):
+        out = self.be.scale_offset(toy_arr_filled, 2.0, 1.0)
+        np.testing.assert_allclose(out, toy_arr_filled * 2.0 + 1.0, rtol=1e-6)
 
-    def test_convolve1d(self, arr2d):
+    def test_convolve1d(self, toy_arr_filled):
         w = np.array([0.25, 0.5, 0.25], dtype=np.float32)
-        out = self.be.convolve1d(arr2d, w, axis=0)
+        out = self.be.convolve1d(toy_arr_filled, w, axis=0)
         from scipy.ndimage import convolve1d
 
-        # The backend default is mode='constant', cval=0 (as used by process.py)
-        ref = convolve1d(arr2d, w, axis=0, mode="constant", cval=0.0)
+        ref = convolve1d(toy_arr_filled, w, axis=0, mode="constant", cval=0.0)
         np.testing.assert_allclose(out, ref, rtol=1e-5)
 
     def test_toeplitz_matmul(self):
+        # synthetic: specific Toeplitz matrix structure
         c = np.array([1.0, 2.0, 3.0])
         r = np.array([1.0, 4.0, 5.0])
         data = np.arange(6, dtype=np.float64).reshape(3, 2)
@@ -128,20 +112,23 @@ class TestNumpyBackend:
         ref = matmul_toeplitz((c, r), data, check_finite=False, workers=None)
         np.testing.assert_allclose(out, ref)
 
-    def test_apply_along_axis(self, arr3d):
-        out = self.be.apply_along_axis(np.nansum, 2, arr3d)
-        assert out.shape == (4, 5)
-        ref = np.nansum(arr3d, axis=2)
+    def test_apply_along_axis(self, toy_arr):
+        out = self.be.apply_along_axis(np.nansum, -1, toy_arr)
+        assert out.shape == (1024,)
+        ref = np.nansum(toy_arr, axis=-1)
         np.testing.assert_allclose(out, ref, rtol=1e-5)
 
-    def test_mask_nan(self, arr3d):
-        out = self.be.mask_nan(arr3d, -999.0)
+    def test_mask_nan(self, toy_arr):
+        out = self.be.mask_nan(toy_arr, -999.0)
         assert not np.isnan(out).any()
-        assert out[0, 0, 0] == -999.0
+        # a position that was NaN in the input must be -999 in the output
+        nan_pos = np.argwhere(np.isnan(toy_arr))[0]
+        assert out[nan_pos[0], nan_pos[1]] == -999.0
         # original untouched
-        assert np.isnan(arr3d[0, 0, 0])
+        assert np.isnan(toy_arr[nan_pos[0], nan_pos[1]])
 
     def test_sparse_solve(self):
+        # synthetic: specific sparse system
         from scipy.sparse import csc_matrix
 
         A = csc_matrix(np.array([[4.0, 1.0], [1.0, 3.0]]))
@@ -150,17 +137,20 @@ class TestNumpyBackend:
         np.testing.assert_allclose(A @ x, y, atol=1e-10)
 
     def test_find_peaks(self):
+        # synthetic: specific peak signal
         data = np.array([0.0, 1.0, 0.0, 2.0, 0.0])
         peaks, _ = self.be.find_peaks(data, height=0.5)
         assert list(peaks) == [1, 3]
 
     def test_theilslopes(self):
+        # synthetic: specific trend
         data = np.array([1.0, 2.0, 3.0, 4.0])
         x = np.arange(4)
         slope, *_ = self.be.theilslopes(data, x)
         np.testing.assert_allclose(slope, 1.0)
 
     def test_stl_decompose(self):
+        # synthetic: constructed seasonal+trend signal
         rng = np.random.default_rng(0)
         data = rng.standard_normal(24) + np.arange(24) * 0.5
         res = self.be.stl_decompose(data, period=4, seasonal=5)
@@ -168,6 +158,7 @@ class TestNumpyBackend:
         assert res.trend.shape == (24,)
 
     def test_ols(self):
+        # synthetic: specific regression
         import statsmodels.api as sm
 
         y = np.array([1.0, 3.0, 2.0, 5.0])

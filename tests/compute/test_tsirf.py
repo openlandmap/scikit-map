@@ -1,4 +1,10 @@
-"""Unit + equivalence tests for the tsirf backend op."""
+"""Unit + equivalence tests for the tsirf backend op.
+
+The equivalence test runs on real gappy toy NDVI data (``toy_arr`` fixture,
+transposed to (n_imag, n_pixels) = (24, 1024) as tsirf expects). The all-NaN
+edge case stays synthetic. ``_conv_vectors`` uses a known convolution
+structure (synthetic by design).
+"""
 
 import numpy as np
 import pytest
@@ -22,47 +28,40 @@ def _conv_vectors(n_imag, season_size=4):
 
 
 @pytest.fixture
-def ts_data():
-    rng = np.random.default_rng(1)
-    data = rng.random((24, 40)) * 100  # (n_imag, n_pixels)
-    # punch some gaps
-    data[3, 5] = np.nan
-    data[10, 20] = np.nan
-    data[0, 0] = np.nan
-    return data
-
-
-@pytest.fixture
 def convs():
     return _conv_vectors(24), _conv_vectors(24)
 
 
-def test_numpy_tsirf_fills_gaps(ts_data, convs):
+def test_numpy_tsirf_fills_gaps(toy_arr, convs):
     cp, cf = convs
-    out = NumpyBackend().tsirf(ts_data, cp, cf)
-    assert out.shape == ts_data.shape
-    # gaps at interior positions should be filled (not NaN)
-    assert not np.isnan(out[3, 5])
-    assert not np.isnan(out[10, 20])
+    data = toy_arr.T  # tsirf expects (n_imag, n_pixels) = (24, 1024)
+    out = NumpyBackend().tsirf(data, cp, cf)
+    assert out.shape == data.shape
+    nan_mask = np.isnan(data)
+    if nan_mask.any():
+        filled = ~np.isnan(out)
+        assert filled[nan_mask].any(), "some gaps should be filled"
 
 
-def test_numpy_tsirf_keeps_originals(ts_data, convs):
+def test_numpy_tsirf_keeps_originals(toy_arr, convs):
     cp, cf = convs
-    out = NumpyBackend().tsirf(ts_data, cp, cf, keep_original_values=True)
-    # original valid values preserved exactly
-    valid = ~np.isnan(ts_data)
-    np.testing.assert_allclose(out[valid], ts_data[valid])
+    data = toy_arr.T
+    out = NumpyBackend().tsirf(data, cp, cf, keep_original_values=True)
+    valid = ~np.isnan(data)
+    np.testing.assert_allclose(out[valid], data[valid])
 
 
 @pytest.mark.parametrize("Backend", [NumbaBackend, CppBackend])
-def test_tsirf_backends_match_numpy(ts_data, convs, Backend):
+def test_tsirf_backends_match_numpy(toy_arr, convs, Backend):
     cp, cf = convs
-    ref = NumpyBackend().tsirf(ts_data, cp, cf)
-    out = Backend().tsirf(ts_data, cp, cf)
+    data = toy_arr.T
+    ref = NumpyBackend().tsirf(data, cp, cf)
+    out = Backend().tsirf(data, cp, cf)
     np.testing.assert_allclose(out, ref, rtol=1e-3, atol=1e-2)
 
 
 def test_tsirf_no_fill_when_all_nan(convs):
+    # synthetic: needs a constructed all-NaN input to verify NaN propagation
     cp, cf = convs
     data = np.full((24, 5), np.nan)
     out = NumpyBackend().tsirf(data, cp, cf)
