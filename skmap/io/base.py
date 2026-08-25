@@ -1086,6 +1086,83 @@ class RasterData(SKMapBase):
 
         return RasterData(groups, verbose=verbose)
 
+    @classmethod
+    def from_info(
+        cls,
+        info,
+        backend: Union[str, "ComputeBackend"] = "numpy",
+        verbose: bool = False,
+        date_format: str = "%Y%m%d",
+        ignore_29feb: bool = True,
+    ):
+        """Build a RasterData from a pre-built ``info`` DataFrame (classmethod).
+
+        Used by the layer sources (:mod:`skmap.io.sources`) to construct a lazy
+        RasterData whose ``info`` already carries dates, groups, names and any
+        extra per-layer variable columns.  Unlike ``__init__``, the incoming
+        ``temporal`` column is preserved as-is (static layers stay ``False``).
+        """
+        from skmap.compute import get_backend
+
+        obj = cls.__new__(cls)
+        obj.backend = get_backend(backend)
+        obj.verbose = verbose
+        obj.raster_mask = None
+        obj.raster_mask_val = np.nan
+        obj.max_rasters = None
+        obj.raster_files = {}
+        obj.info = info.reset_index(drop=True)
+        obj.date_args = {}
+        obj._active_group = None
+        obj.array = None
+        obj.base_raster = None
+        obj.window = None
+        obj.bounds = None
+
+        if RasterData.TEMPORAL_COL not in obj.info.columns:
+            obj.info[RasterData.TEMPORAL_COL] = obj.info.apply(
+                lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]),
+                axis=1,
+            )
+
+        # date_args for the groups that actually carry dates (temporal groups)
+        dated = ~obj.info[RasterData.START_DT_COL].isnull()
+        for g in obj.info.loc[dated, RasterData.GROUP_COL].unique():
+            obj.date_args[g] = {
+                "date_style": "interval",
+                "date_format": date_format,
+                "ignore_29feb": ignore_29feb,
+            }
+
+        return obj
+
+    @classmethod
+    def from_yaml(
+        cls,
+        path: str,
+        base_path: str = None,
+        date_format: str = "%Y%m%d",
+        ignore_29feb: bool = True,
+        backend: Union[str, "ComputeBackend"] = "numpy",
+        verbose: bool = False,
+    ):
+        """Build a lazy RasterData from a YAML layer catalogue (classmethod).
+
+        See :mod:`skmap.io.sources` for the YAML schema and the expansion
+        rules.  The result holds paths + dates only (no ``.read()``); its
+        ``info`` carries one column per ``{variable}`` referenced in the path
+        templates (e.g. ``band``, ``year``, ``start_month``, ``end_month``,
+        ``perc``) so runners can group by multiple columns.
+        """
+        from skmap.io.sources import YamlSource
+
+        return YamlSource(
+            path,
+            base_path=base_path,
+            date_format=date_format,
+            ignore_29feb=ignore_29feb,
+        ).to_rasterdata(backend=backend, verbose=verbose)
+
     def _set_date(
         self,
         text,
