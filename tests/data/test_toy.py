@@ -21,6 +21,9 @@ def test_ndvi_rdata() -> None:
         "base_raster",
         "window",
         "bounds",
+        "overview",
+        "extent",
+        "extent_epsg",
         "max_rasters",
         "_spatial_shape",
     ]
