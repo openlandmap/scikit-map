@@ -6,45 +6,35 @@ sources (YAML/JSON) share :class:`TemplateExpander`, which expands
 ``{variable}`` placeholders in the path/name templates into concrete paths
 and dates.
 
-The YAML schema (see ``layers.yaml``)::
+Two temporal styles are supported:
 
-    - layer: '{band}_..._{year}{start_month}_{year}{end_month}_...'
-      path: '{base_path}/arco/{band}_..._{year}{start_month}_{year}{end_month}_....tif'
-      temporal_resolution: 'bimonthly'   # bimonthly | yearly | monthly | longterm_or_static
-      type: 'temporal'                   # temporal | common
-      start_year: 1997
-      end_year: 2024
-      band: 'blue, green, red'           # comma-separated -> cross-product axis
-      start_month: '0101, 0301, 0501'    # paired with end_month (zipped)
-      end_month: '0228, 0430, 0630'
-      perc: 'p50'                        # any other field -> scalar or list axis
+* **grid** (``bimonthly`` / ``monthly`` / ``yearly``): ``start_year`` /
+  ``end_year`` -> a ``year`` axis; ``start_month`` / ``end_month``
+  (comma-separated, equal length) -> zipped ``(start_month, end_month)``
+  pairs; other comma-separated fields (``band``, ``perc``, ...) ->
+  cross-product axes.
+* **interval**: ``start_date`` / ``end_date`` / ``date_unit`` / ``date_step``
+  generate ``(dt1, dt2)`` intervals via :func:`skmap.misc.date_range`; the
+  ``{dt}`` placeholder expands to ``dt1_dt2``.  List variables whose length
+  equals ``len(date_step)`` **cycle** with the interval index (e.g. a
+  ``season`` list paired with the seasonal steps); other list variables
+  cross-product.
 
-Variables are classified as:
-
-* ``start_year``/``end_year`` (ints) -> a ``year`` iteration axis
-  (``range(start_year, end_year + 1)``), also available as scalars
-  ``{start_year}``/``{end_year}``.
-* ``start_month``/``end_month`` (comma-separated, equal length) -> zipped
-  ``(start_month, end_month)`` pairs -> a ``month`` iteration axis.
-* any other comma-separated field (``band``, ``perc``, ``version``, ...) ->
-  a list iteration axis (cross-product).
-* single-valued fields -> scalars substituted into every combination.
-
-Only axes whose placeholder appears in the ``path`` template are iterated.
-``longterm_or_static`` layers skip the year/month axes.
+An optional ``name`` template overrides the default file-stem name (useful
+for year-agnostic names such as ``{band}_{season}`` so one model can be
+trained and predicted across years).
 
 The resulting :class:`~skmap.io.RasterData` is **lazy** (paths + dates only,
 no ``.read()``).  Its ``info`` DataFrame carries the standard columns plus one
-column per ``{variable}`` referenced in the path template (except
-``base_path``), so runners can group by multiple columns (e.g. ``group`` and
-``band``).
+column per data variable (``band``, ``variant``, ``season``, ``perc``,
+``year``, ``start_month``, ``end_month``, ...), so runners can group by
+multiple columns (e.g. ``group`` and ``band``).
 """
 
 from __future__ import annotations
 
 import calendar
 import os
-import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -130,6 +120,18 @@ class TemplateExpander:
     META_FIELDS = {"layer", "path", "temporal_resolution", "type", "leap_year"}
     YEAR_FIELDS = {"start_year", "end_year"}
     PAIRED_FIELDS = {"start_month", "end_month"}
+    # Config/meta/derived fields that never become ``info`` columns.
+    COLUMN_EXCLUDES = META_FIELDS | YEAR_FIELDS | {
+        "name",
+        "base_path",
+        "start_date",
+        "end_date",
+        "date_unit",
+        "date_step",
+        "ignore_29feb",
+        "date_format",
+        "dt",
+    }
 
     def __init__(self, date_format: str = "%Y%m%d", ignore_29feb: bool = True) -> None:
         self.date_format = date_format
@@ -138,29 +140,35 @@ class TemplateExpander:
     def expand(self, entry: Dict[str, Any], base_path: str) -> Iterator[LayerSpec]:
         """Expand one catalogue entry into :class:`LayerSpec` objects."""
         path_tmpl = entry["path"]
-        layer_tmpl = entry.get("layer", "")
+        name_tmpl = entry.get("name", "")
         temporal_resolution = entry.get("temporal_resolution", "longterm_or_static")
         type_ = entry.get("type", "temporal")
 
         # --- classify variables -------------------------------------------------
         scalars: Dict[str, Any] = {}
         list_axes: Dict[str, List[str]] = {}
-        year_range: Optional[List[int]] = None
-        month_pairs: Optional[List[Tuple[str, Optional[str]]]] = None
-
         for key, val in entry.items():
-            if key in self.META_FIELDS or key in self.YEAR_FIELDS or key in self.PAIRED_FIELDS:
+            if key in self.COLUMN_EXCLUDES or key in self.PAIRED_FIELDS:
                 continue
             if isinstance(val, str) and "," in val:
                 list_axes[key] = [v.strip() for v in val.split(",")]
             else:
                 scalars[key] = val
 
+        if temporal_resolution == "interval":
+            yield from self._expand_interval(
+                entry, base_path, path_tmpl, name_tmpl, type_, scalars, list_axes
+            )
+            return
+
+        # --- grid mode: bimonthly / monthly / yearly / static -------------------
+        year_range: Optional[List[int]] = None
         if "start_year" in entry:
             start_year = int(entry["start_year"])
             end_year = int(entry.get("end_year", start_year))
             year_range = list(range(start_year, end_year + 1))
 
+        month_pairs: Optional[List[Tuple[str, Optional[str]]]] = None
         if "start_month" in entry:
             sm = self._split_list(entry["start_month"])
             em = self._split_list(entry.get("end_month", "")) or [None] * len(sm)
@@ -170,7 +178,7 @@ class TemplateExpander:
                 )
             month_pairs = list(zip(sm, em))
 
-        # --- active axes (only those referenced in the path template) -----------
+        # active axes (only those referenced in the path template)
         axes: List[Tuple[str, List]] = []
         if year_range is not None and "{year}" in path_tmpl:
             axes.append(("year", year_range))
@@ -182,7 +190,7 @@ class TemplateExpander:
         ):
             axes.append(("month", month_pairs))
 
-        # --- cross product ------------------------------------------------------
+        # cross product
         combos: List[Dict[str, Any]] = [{}]
         for name, values in axes:
             new_combos = []
@@ -196,7 +204,6 @@ class TemplateExpander:
                     new_combos.append(c)
             combos = new_combos
 
-        # --- substitute + compute dates -----------------------------------------
         for combo in combos:
             vars_ = dict(scalars)
             vars_["base_path"] = base_path
@@ -207,26 +214,94 @@ class TemplateExpander:
                 vars_["end_year"] = entry["end_year"]
 
             path = self._format(path_tmpl, vars_)
-            layer = self._format(layer_tmpl, vars_) if layer_tmpl else ""
+            name = self._format(name_tmpl, vars_) if name_tmpl else None
 
             start_date, end_date = self._compute_dates(temporal_resolution, vars_)
-
-            # one column per {variable} referenced in the path (except base_path)
-            template_vars = set(re.findall(r"\{(\w+)\}", path_tmpl))
-            spec_vars = {
-                k: vars_[k] for k in template_vars if k != "base_path" and k in vars_
-            }
 
             yield LayerSpec(
                 path=path,
                 group=self._group(type_, vars_),
                 start_date=start_date,
                 end_date=end_date,
+                name=name,
                 temporal=start_date is not None,
-                vars=spec_vars,
+                vars=self._spec_vars(vars_),
             )
 
+    # ------------------------------------------------------------- interval mode
+    def _expand_interval(
+        self,
+        entry: Dict[str, Any],
+        base_path: str,
+        path_tmpl: str,
+        name_tmpl: str,
+        type_: str,
+        scalars: Dict[str, Any],
+        list_axes: Dict[str, List[str]],
+    ) -> Iterator[LayerSpec]:
+        from skmap.misc import date_range
+
+        date_format = entry.get("date_format", self.date_format)
+        ignore_29feb = entry.get("ignore_29feb", self.ignore_29feb)
+        step_vals = [int(s) for s in self._split_list(entry.get("date_step", 1))]
+
+        # List variables with the same length as date_step cycle with the
+        # interval index (paired, not cross-product); others cross-product.
+        cycling: Dict[str, List[str]] = {}
+        cross_axes: Dict[str, List[str]] = {}
+        for name, values in list_axes.items():
+            if len(values) == len(step_vals):
+                cycling[name] = values
+            else:
+                cross_axes[name] = values
+
+        intervals = date_range(
+            entry["start_date"],
+            entry["end_date"],
+            entry.get("date_unit", "days"),
+            step_vals,
+            date_format=date_format,
+            ignore_29feb=ignore_29feb,
+        )
+
+        combos: List[Dict[str, Any]] = [{}]
+        for name, values in cross_axes.items():
+            if "{" + name + "}" in path_tmpl or "{" + name + "}" in name_tmpl:
+                new_combos = []
+                for c in combos:
+                    for v in values:
+                        cc = dict(c)
+                        cc[name] = v
+                        new_combos.append(cc)
+                combos = new_combos
+
+        for combo in combos:
+            for i, (dt1, dt2) in enumerate(intervals):
+                vars_ = dict(scalars)
+                vars_["base_path"] = base_path
+                vars_.update(combo)
+                for name, values in cycling.items():
+                    vars_[name] = values[i % len(values)]
+                vars_["dt"] = f"{dt1.strftime(date_format)}_{dt2.strftime(date_format)}"
+                vars_["year"] = dt1.year
+
+                path = self._format(path_tmpl, vars_)
+                name = self._format(name_tmpl, vars_) if name_tmpl else None
+
+                yield LayerSpec(
+                    path=path,
+                    group=self._group(type_, vars_),
+                    start_date=dt1,
+                    end_date=dt2,
+                    name=name,
+                    temporal=True,
+                    vars=self._spec_vars(vars_),
+                )
+
     # ------------------------------------------------------------------ helpers
+    def _spec_vars(self, vars_: Dict[str, Any]) -> Dict[str, Any]:
+        return {k: v for k, v in vars_.items() if k not in self.COLUMN_EXCLUDES}
+
     @staticmethod
     def _split_list(val) -> List[str]:
         if val is None:
