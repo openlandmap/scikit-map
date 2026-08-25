@@ -160,9 +160,8 @@ class CppBackend(ComputeBackend):
 
     def apply_along_axis(self, func, axis, arr, *args, n_jobs=1, **kwargs):
         self._record_fallback("apply_along_axis", "no C++ per-pixel apply")
-        return self._fallback.apply_along_axis(
-            func, axis, arr, *args, n_jobs=n_jobs, **kwargs
-        )
+        # cpp mode avoids Ray: run in-process (ignore n_jobs parallelism).
+        return np.apply_along_axis(func, axis, arr, *args, **kwargs)
 
     # ------------------------------------------------------------------
     # NaN handling

@@ -117,6 +117,20 @@ def test_apply_along_axis_fallback(toy_arr, cbe, ref):
     np.testing.assert_allclose(out, expected, rtol=RTOL, atol=ATOL)
 
 
+def test_apply_along_axis_cpp_does_not_init_ray(toy_arr, cbe):
+    """cpp mode runs apply_along_axis in-process; it must not touch Ray."""
+    import ray
+
+    if ray.is_initialized():
+        ray.shutdown()
+
+    # n_jobs > 1 used to dispatch to parallel.apply_along_axis (Ray); cpp must
+    # stay in-process.
+    out = cbe.apply_along_axis(np.nansum, -1, toy_arr, n_jobs=4)
+    assert not ray.is_initialized()
+    np.testing.assert_allclose(out, np.nansum(toy_arr, axis=-1), rtol=RTOL, atol=ATOL)
+
+
 def test_float64_falls_back_without_warning(cbe):
     # synthetic: needs a deliberately float64 array to test the cast contract
     arr = np.random.rand(10, 12).astype(np.float64)
