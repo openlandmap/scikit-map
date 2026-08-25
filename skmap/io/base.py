@@ -1073,47 +1073,6 @@ class RasterData(SKMapBase):
 
         return RasterData(groups, verbose=verbose)
 
-    @classmethod
-    def from_catalog(cls, catalog, groups: List[str] = None, read_kwargs: dict = None):
-        """Build and read a :class:`RasterData` from a :class:`~skmap.catalog.DataCatalog`.
-
-        Migration helper: maps each catalog group (year) and the ``common``
-        group to RasterData groups, using the catalog feature names as band
-        names. Whale (``/whale/``) paths are skipped — run the corresponding
-        :mod:`skmap.io.process` whale runners instead.
-
-        :param catalog: the source catalog.
-        :param groups: which groups to include (default: all, plus ``common``).
-        :param read_kwargs: extra kwargs forwarded to :meth:`read`.
-        """
-        if groups is None:
-            groups = catalog.get_groups()
-
-        raster_files = {}
-        names_by_group = {}
-        for g in list(groups) + (["common"] if "common" in catalog.data else []):
-            files, names = [], []
-            for f in sorted(catalog.data.get(g, {}).keys()):
-                path = catalog.data[g][f]["path"]
-                if path.startswith("/whale"):
-                    continue
-                files.append(path.format(tile_id=""))
-                names.append(f)
-            if files:
-                raster_files[g] = files
-                names_by_group[g] = names
-
-        rdata = cls(raster_files, verbose=read_kwargs.pop("verbose", False))
-        rdata.read(**(read_kwargs or {}))
-
-        # Override the file-stem-derived names with catalog feature names,
-        # in the same group→feature order the array was read.
-        ordered_names = []
-        for g in raster_files:
-            ordered_names += names_by_group[g]
-        rdata.info[RasterData.NAME_COL] = ordered_names
-        return rdata
-
     def _set_date(
         self,
         text,
@@ -1611,10 +1570,9 @@ class RasterData(SKMapBase):
     def get_groups(self) -> List[str]:
         """Return the group names, excluding the shared ``common`` group.
 
-        Mirrors :meth:`skmap.catalog.DataCatalog.get_groups` so a RasterData
-        organised by year (plus a ``common`` group) can drive per-group
-        prediction. A dataset with only ``common`` layers returns
-        ``["common"]``.
+        A RasterData organised by year (plus a ``common`` group) can drive
+        per-group prediction and overlay. A dataset with only ``common``
+        layers returns ``["common"]``.
         """
         groups = sorted(
             set(self.info[RasterData.GROUP_COL].unique()) - {"common", "otf"}
@@ -1644,10 +1602,9 @@ class RasterData(SKMapBase):
     def _get_covs_idx(self, covs_lst: List[str]) -> np.ndarray:
         """Map covariate names to band indices per group (``common`` falls back).
 
-        Mirrors :meth:`skmap.catalog.DataCatalog._get_covs_idx`: returns an
-        int matrix of shape ``(len(covs_lst), n_groups)`` where each column is
-        a group and each row a covariate; a covariate missing from a group
-        falls back to the ``common`` group.
+        Returns an int matrix of shape ``(len(covs_lst), n_groups)`` where each
+        column is a group and each row a covariate; a covariate missing from a
+        group falls back to the ``common`` group.
         """
         groups = self.get_groups()
         info = self.info.reset_index(drop=True)
