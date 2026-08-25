@@ -428,6 +428,28 @@ class TiledDataLoader(TiledData):
         otf_name_idx = otf_idx[otf_name]
         self.array[otf_name_idx] = otf_const
 
+    def to_rasterdata(self):
+        """Return a :class:`~skmap.io.RasterData` wrapping this tile's array.
+
+        Migration helper: builds a RasterData from the already-loaded tile
+        array (no re-read) using the catalog feature names as band names and
+        the mask raster as the spatial reference.
+        """
+        from skmap import parallel
+        from skmap.io import RasterData
+
+        names, paths, idx = self.catalog.get_unrolled_catalog()
+        ordered = sorted(zip(idx, names, paths))
+        names = [n for _, n, _ in ordered]
+        paths = [p for _, _, p in ordered]
+
+        rdata = RasterData({"default": paths})
+        rdata.info[RasterData.NAME_COL] = names
+        rdata.array = parallel.put_shared(self.array)
+        rdata._spatial_shape = (self.y_size, self.x_size)
+        rdata.base_raster = self.mask_path
+        return rdata
+
 
 def get_percentiele_string(q):
     """Format a quantile ``q`` in ``[0, 1]`` as a short percentile label string (e.g. ``p50``)."""
