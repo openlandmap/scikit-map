@@ -95,6 +95,28 @@ def test_filter_date_returns_new_object(rdata):
     assert sub.array.shape[0] < rdata.array.shape[0]
 
 
+def test_filter_date_include_non_temporal():
+    """include_non_temporal keeps static (undated) layers alongside the date filter."""
+    from skmap.data import toy
+
+    swir_tmpl = str(toy.swir1_files()[0]).replace("20141202_20150320", "{dt}")
+    elev = str(
+        toy.DATA_DIR
+        / "static"
+        / "elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
+    )
+    r = RasterData({"swir1": swir_tmpl, "static": elev}).timespan(
+        "20141202", "20201201", "days", [109, 96, 80, 80]
+    )
+    # default: static dropped
+    sub = r.filter_date("2015-01-01", "2015-12-31")
+    assert "static" not in sub.info["group"].unique()
+    # include_non_temporal=True: static kept
+    sub2 = r.filter_date("2015-01-01", "2015-12-31", include_non_temporal=True)
+    assert "static" in sub2.info["group"].unique()
+    assert len(sub2.info) == len(sub.info) + 1  # +1 static elev
+
+
 def test_filter_contains_returns_new_object(rdata):
     sub = rdata.filter_contains("ndvi")
     assert sub is not rdata

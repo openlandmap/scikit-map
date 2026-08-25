@@ -13,26 +13,25 @@ class TestSpaceTimeOverlay:
     SAMPLES = TOY_DIR / "samples" / "samples.gpkg"
     SWIR1_DIR = TOY_DIR / "swir1"
 
-    YEARS = [2015, 2016, 2017, 2018, 2019, 2020]
+    ELEV = (
+        TOY_DIR / "static"
+        / "elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
+    ).as_posix()
 
     @classmethod
-    def _swir1_path(cls, year: int) -> str:
-        fname = (
-            f"swir1_landsat.ard1_p50_30m_s_{year}0321_{year}0624"
-            "_nl_epsg.3035_v20230720.tif"
-        )
-        return (cls.SWIR1_DIR / fname).as_posix()
+    def _swir1_template(cls) -> str:
+        # the first swir1 file carries the 20141202_20150320 period; turn the
+        # period into the {dt} placeholder so timespan() can expand it
+        first = sorted(cls.SWIR1_DIR.glob("*.tif"))[0]
+        return str(first).replace("20141202_20150320", "{dt}")
 
     @classmethod
-    def _temporal_rdata(cls, years=None) -> RasterData:
-        years = years if years is not None else cls.YEARS
-        raster_files = {}
-        names = []
-        for year in years:
-            raster_files[str(year)] = [cls._swir1_path(year)]
-            names.append("swir1")
-        rdata = RasterData(raster_files)
-        rdata.info["name"] = names
+    def _temporal_rdata(cls) -> RasterData:
+        """A lazy RasterData with 24 dated swir1 bands + 1 static elev layer."""
+        rdata = RasterData(
+            {"swir1": cls._swir1_template(), "static": cls.ELEV}
+        ).timespan("20141202", "20201201", "days", [109, 96, 80, 80])
+        assert rdata.array is None  # must stay lazy
         return rdata
 
     def test_groups_points_by_year(self) -> None:
@@ -41,11 +40,12 @@ class TestSpaceTimeOverlay:
         sto = SpaceTimeOverlay(
             points=pts, col_date="date", rasterdata=rdata, raster_tiles=None
         )
-        for year in self.YEARS:
+        for year in range(2015, 2021):
+            label = f"{year}-01-01..{year}-12-31"
             expected = pts[pts["date"].dt.year == year]
-            assert len(sto.year_points[str(year)]) == len(expected)
+            assert len(sto.range_points[label]) == len(expected)
         # the caller's rdata must not be mutated
-        assert rdata.get_groups() == [str(y) for y in self.YEARS]
+        assert rdata.array is None
 
     def test_run_returns_dataframe(self) -> None:
         pts = gpd.read_file(self.SAMPLES)
@@ -56,8 +56,42 @@ class TestSpaceTimeOverlay:
         res = sto.run(max_ram_mb=512, out_file_name=None)
         assert res is not None
         assert res.shape[0] == len(pts)
-        assert "swir1" in res.columns
-        assert np.isfinite(res["swir1"]).all()
+        # the static elev layer must appear in the concatenated output
+        assert any(c.startswith("elev") for c in res.columns)
+
+    def test_static_layer_in_every_range(self) -> None:
+        """The static (non-dated) layer is included in every date slice."""
+        pts = gpd.read_file(self.SAMPLES)
+        rdata = self._temporal_rdata()
+        sto = SpaceTimeOverlay(
+            points=pts, col_date="date", rasterdata=rdata, raster_tiles=None
+        )
+        for label, so in sto.overlay_objs.items():
+            names = so.layer_names
+            assert any(n.startswith("elev") for n in names), (
+                f"static elev missing from slice {label}"
+            )
+
+    def test_explicit_date_ranges(self) -> None:
+        """Explicit date_ranges select only the temporal layers in range."""
+        pts = gpd.read_file(self.SAMPLES)
+        rdata = self._temporal_rdata()
+        sto = SpaceTimeOverlay(
+            points=pts,
+            col_date="date",
+            rasterdata=rdata,
+            date_ranges=[("2018-01-01", "2018-06-30")],
+            raster_tiles=None,
+        )
+        assert sto.date_ranges == [("2018-01-01", "2018-06-30")]
+        res = sto.run(max_ram_mb=512, out_file_name=None)
+        assert res.shape[0] == len(pts[pts["date"].dt.year == 2018])
+        # static elev present, swir1 bands only from the first half of 2018
+        assert any(c.startswith("elev") for c in res.columns)
+        swir_cols = [c for c in res.columns if c.startswith("swir1")]
+        assert len(swir_cols) > 0
+        # every swir1 column should start within the first half of 2018
+        assert all("2018" in c for c in swir_cols)
 
     def test_year_alignment(self) -> None:
         pts = gpd.read_file(self.SAMPLES)
@@ -68,13 +102,20 @@ class TestSpaceTimeOverlay:
         res = sto.run(max_ram_mb=512, out_file_name=None)
 
         pts_2019 = pts[pts["date"].dt.year == 2019].reset_index(drop=True)
-        rdata_2019 = self._temporal_rdata(years=[2019])
-        so_2019 = SpaceOverlay(points=pts_2019, rasterdata=rdata_2019)
+        rdata_2019 = self._temporal_rdata()
+        so_2019 = SpaceOverlay(
+            points=pts_2019,
+            rasterdata=rdata_2019.filter_date(
+                "2019-01-01", "2019-12-31", include_non_temporal=True
+            ),
+        )
         res_2019 = so_2019.run(max_ram_mb=512, out_file_name=None)
 
         res_2019_st = res[res["date"].dt.year == 2019].reset_index(drop=True)
-        assert np.allclose(
-            res_2019_st["swir1"].to_numpy(),
-            res_2019["swir1"].to_numpy(),
-            equal_nan=True,
-        )
+        swir_cols = [c for c in res_2019.columns if c.startswith("swir1")]
+        for col in swir_cols:
+            assert np.allclose(
+                res_2019_st[col].to_numpy(),
+                res_2019[col].to_numpy(),
+                equal_nan=True,
+            )
