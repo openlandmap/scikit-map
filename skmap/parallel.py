@@ -41,10 +41,19 @@ class SharedArray:
 
     ``shape`` and ``dtype`` are O(1) metadata (no materialization); ``get()``
     materializes the full array in process memory and should be used sparingly.
+
+    When ``ref`` is a numpy array the SharedArray is *local* (Ray-free, e.g.
+    the explicit C++ read path): ``get()`` returns the array directly and
+    ``ref`` exposes the array itself so the downstream helpers skip Ray.
     """
 
     def __init__(self, ref, shape, dtype):
-        self.ref = ref  # ray.ObjectRef
+        if isinstance(ref, np.ndarray):
+            self._data = ref
+            self._ref = None
+        else:
+            self._data = None
+            self._ref = ref  # ray.ObjectRef
         self.shape = tuple(shape)
         self.dtype = np.dtype(dtype)
 
@@ -52,41 +61,64 @@ class SharedArray:
     def ndim(self):
         return len(self.shape)
 
+    @property
+    def ref(self):
+        """ObjectRef for Ray-backed arrays; the numpy array itself for local ones."""
+        return self._data if self._data is not None else self._ref
+
     def get(self):
         """Materialize the full array (use sparingly)."""
+        if self._data is not None:
+            return self._data
         import ray
 
-        return ray.get(self.ref)
+        return ray.get(self._ref)
 
     def __repr__(self):
         return f"SharedArray(shape={self.shape}, dtype={self.dtype})"
 
 
-def put_shared(array):
+def put_shared(array, local=False):
     """Place ``array`` in the Ray object store and return a ``SharedArray``.
+
+    ``local=True`` keeps the array in-process (no Ray): the returned
+    ``SharedArray`` holds the numpy array directly.  The explicit C++ read
+    path uses it so ``backend='cpp'`` never touches Ray.
 
     Accepts a numpy array (wraps it) or an existing ``SharedArray`` (reuses
     its ref, no extra copy).
     """
-    import ray
-
     if isinstance(array, SharedArray):
         return array
-    _ensure_ray()
     arr = np.ascontiguousarray(array)
+    if local:
+        return SharedArray(arr, arr.shape, arr.dtype)
+    import ray
+
+    _ensure_ray()
     return SharedArray(ray.put(arr), arr.shape, arr.dtype)
 
 
 def get_shared(sa_or_ref):
-    """Return the numpy array backing a ``SharedArray`` or raw ``ObjectRef``."""
+    """Return the numpy array backing a ``SharedArray``, ``ObjectRef`` or ndarray."""
+    if isinstance(sa_or_ref, SharedArray):
+        return sa_or_ref.get()
+    if isinstance(sa_or_ref, np.ndarray):
+        return sa_or_ref
     import ray
 
-    ref = sa_or_ref.ref if isinstance(sa_or_ref, SharedArray) else sa_or_ref
-    return ray.get(ref)
+    return ray.get(sa_or_ref)
 
 
 def _remote(fn, *args):
-    """Invoke a module-level worker remotely and return its ObjectRef."""
+    """Invoke a module-level worker remotely and return its ObjectRef.
+
+    When the array refs are all local numpy arrays (C++ mode) the worker runs
+    in-process instead of touching Ray.
+    """
+    refs = args[0]
+    if isinstance(refs, list) and all(isinstance(r, np.ndarray) for r in refs):
+        return fn(*args)
     import ray
 
     _ensure_ray()
@@ -95,9 +127,7 @@ def _remote(fn, *args):
 
 def _stack_bands(band_refs, shape):
     """Stack per-band arrays into a single ``(N, H*W)`` array (read assembly)."""
-    import ray
-
-    bands = [ray.get(r) for r in band_refs]
+    bands = [get_shared(r) for r in band_refs]
     return np.stack(bands, axis=0).reshape(shape)
 
 
@@ -109,9 +139,9 @@ def _assemble(refs, new_shape, specs, n_in):
     indices, ``p0:p1`` the pixel range the slice covers, and ``slice`` is a
     numpy array (the worker return value, already deserialized).
     """
-    import ray
+    import numpy as np
 
-    arr_in = ray.get(refs[0])
+    arr_in = get_shared(refs[0])
     out = np.empty(new_shape, dtype=arr_in.dtype)
     out[:n_in] = arr_in
     for idx_list, p0, p1, s in specs:
@@ -121,16 +151,12 @@ def _assemble(refs, new_shape, specs, n_in):
 
 def _select_bands(refs, keep_idx, shape):
     """Return a new array with only the bands in ``keep_idx`` (drop)."""
-    import ray
-
-    return ray.get(refs[0])[keep_idx, :]
+    return get_shared(refs[0])[keep_idx, :]
 
 
 def _concat(refs, shapes):
     """Concatenate several arrays along the band axis (group-run concat)."""
-    import ray
-
-    return np.concatenate([ray.get(r) for r in refs], axis=0)
+    return np.concatenate([get_shared(r) for r in refs], axis=0)
 
 
 def job(

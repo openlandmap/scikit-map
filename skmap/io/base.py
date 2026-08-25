@@ -517,12 +517,14 @@ def read_rasters(
     :param backend: ``"python"`` or ``"cpp"``. ``None`` auto-selects ``"cpp"``
       when the request is float32 with no python-only features, else ``"python"``.
       An explicit ``"cpp"`` with unsupported features falls back to ``"python"``
-      with a warning.
+      with a warning.  An explicit ``"cpp"`` also keeps the result in-process
+      (no Ray); the auto-selected cpp path keeps the Ray object-store model.
     :param verbose: Print reading progress.
 
     :returns: A :class:`skmap.parallel.SharedArray` of shape ``(N, H*W)``
-      (``N`` files, ``H*W`` flattened pixels) held in the Ray object store.
-      Call ``.get()`` to materialize it as a numpy array.
+      (``N`` files, ``H*W`` flattened pixels).  It is held in the Ray object
+      store (call ``.get()`` to materialize it) except for explicit
+      ``backend='cpp'`` reads, which return a local array directly.
     """
     if data_mask is not None and dtype not in ("float16", "float32"):
         raise Exception("The data_mask requires dtype as float")
@@ -536,6 +538,7 @@ def read_rasters(
     if len(raster_files) < n_jobs:
         n_jobs = len(raster_files)
 
+    cpp_explicit = False
     if backend is None:
         backend = (
             "cpp"
@@ -547,6 +550,7 @@ def read_rasters(
         )
     else:
         backend = str(backend).lower()
+        cpp_explicit = backend == "cpp"
         if backend == "cpp" and not _cpp_read_ok(
             dtype, bounds, data_mask, scale, expected_shape,
             try_without_window, overview, max_rasters,
@@ -564,7 +568,9 @@ def read_rasters(
         out = _read_rasters_cpp(
             raster_files, band, window, n_jobs, dtype, gdal_opts, verbose
         )
-        return parallel.put_shared(out)
+        # An explicit backend='cpp' keeps the result in-process (no Ray); the
+        # auto-selected cpp path keeps the default Ray object-store model.
+        return parallel.put_shared(out, local=cpp_explicit)
 
     if verbose:
         ttprint(f"Reading {len(raster_files)} raster file(s) using {n_jobs} workers")
@@ -1273,6 +1279,8 @@ class RasterData(SKMapBase):
             gdal_opts=gdal_opts,
             verbose=self.verbose,
             max_rasters=self.max_rasters,
+            # explicit backend='cpp' reads via the C++ bindings only (no Ray)
+            backend="cpp" if self.backend.name == "cpp" else None,
         )
 
         # Remember the spatial extent so plotting can reshape (N, H*W) -> (H, W, N).
@@ -1401,7 +1409,9 @@ class RasterData(SKMapBase):
         new_array, new_info = process.run(self, group_list, ginfo_list, outname)
 
         if new_array is not None:
-            new_ref = parallel.put_shared(new_array).ref
+            new_ref = parallel.put_shared(
+                new_array, local=self.backend.name == "cpp"
+            ).ref
             out_ref = parallel._remote(
                 parallel._concat,
                 [self.array.ref, new_ref],
@@ -1566,7 +1576,9 @@ class RasterData(SKMapBase):
         elif return_copy:
             rdata = copy.copy(self)
             if self.array is not None:
-                rdata.array = parallel.put_shared(self.array.get()[info.index, :])
+                rdata.array = parallel.put_shared(
+                    self.array.get()[info.index, :], local=self.backend.name == "cpp"
+                )
             rdata.info = info
             # Deep-copy the mutable dicts so the filtered copy cannot corrupt
             # the original (regression fix: they were shared by reference).
@@ -1575,8 +1587,9 @@ class RasterData(SKMapBase):
             return rdata
         else:
             if self.array is not None:
-                self.array = parallel.put_shared(self.array.get()[info.index, :])
-            self.info = info
+                self.array = parallel.put_shared(
+                    self.array.get()[info.index, :], local=self.backend.name == "cpp"
+                )
             return self
 
     def _array(self):

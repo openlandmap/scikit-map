@@ -1642,7 +1642,8 @@ try:
             name = outname or self.__class__.__name__.lower()
 
             rdata.array = parallel.put_shared(
-                np.concatenate([arr, new_band], axis=0)
+                np.concatenate([arr, new_band], axis=0),
+                local=rdata.backend.name == "cpp",
             )
             new_info = DataFrame(
                 [rdata._new_info_row(rdata.base_raster, group=group, name=name)]
@@ -1821,7 +1822,8 @@ try:
             name = outname or "latitude"
 
             rdata.array = parallel.put_shared(
-                np.concatenate([arr, new_band], axis=0)
+                np.concatenate([arr, new_band], axis=0),
+                local=rdata.backend.name == "cpp",
             )
             new_info = DataFrame(
                 [rdata._new_info_row(rdata.base_raster, group=group, name=name)]

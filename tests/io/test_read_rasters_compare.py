@@ -61,3 +61,45 @@ def test_auto_backend_selects_cpp_for_float32(ndvi_filled):
     res = read_rasters(raster_files=[path], verbose=False)
     assert res.dtype == np.float32
     assert res.shape == (1, 256 * 256)
+
+
+def test_cpp_backend_read_is_local_no_ray(ndvi_filled):
+    """backend='cpp' reads via the C++ bindings and stays in-process (no Ray)."""
+    import ray
+
+    if ray.is_initialized():
+        ray.shutdown()
+
+    data = read_rasters(raster_files=[ndvi_filled[0]], backend="cpp", verbose=False)
+    assert isinstance(data.ref, np.ndarray)  # local array, not an ObjectRef
+    assert not ray.is_initialized()
+
+    data_ray = read_rasters(
+        raster_files=[ndvi_filled[0]], backend="python", verbose=False
+    )
+    assert_equal(data.get(), data_ray.get())
+
+
+def test_rasterdata_cpp_backend_read_skips_ray():
+    """RasterData(backend='cpp').read() must not initialize Ray."""
+    import ray
+
+    if ray.is_initialized():
+        ray.shutdown()
+
+    r = toy.rdata(backend="cpp")
+    assert isinstance(r.array.ref, np.ndarray)
+    assert not ray.is_initialized()
+    assert r.array.shape[0] == 50  # 24 ndvi + 24 swir1 + 2 static
+
+
+def test_rasterdata_default_backend_keeps_ray_object_store():
+    """The default (numpy) backend keeps the Ray object-store memory model."""
+    import ray
+
+    if ray.is_initialized():
+        ray.shutdown()
+
+    r = toy.rdata(backend="numpy")
+    assert isinstance(r.array.ref, ray.ObjectRef)
+    assert r.array.shape[0] == 50
