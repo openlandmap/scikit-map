@@ -1605,6 +1605,268 @@ try:
 
             return array_dict
 
+    class WhaleRunner(SKMapRunner):
+        """Base class for on-the-fly feature (whale) runners.
+
+        Each whale computes one derived band from existing bands (looked up by
+        name via :meth:`RasterData._band_index`) and appends it to
+        ``rdata.array``. The new band is added to ``info`` under ``group``
+        (default: the primary input band's group) and ``name`` (``outname`` or
+        a class default).
+
+        # ponytail: computed in the main process with numpy vectorization; a
+        # whale touches a handful of bands so materializing is negligible.
+        # Route through a worker only if a whale becomes a throughput hotspot.
+        """
+
+        def __init__(self, verbose: bool = True) -> None:
+            super().__init__(verbose=verbose)
+
+        def _band(self, rdata: RasterData, name: str, group: str = None) -> np.ndarray:
+            return rdata.array.get()[rdata._band_index(name, group), :]
+
+        def _primary_band(self) -> str:
+            raise NotImplementedError
+
+        def _compute(self, rdata: RasterData, arr: np.ndarray) -> np.ndarray:
+            raise NotImplementedError
+
+        def run(self, rdata: RasterData, outname: str = None, group: str = None):
+            arr = rdata.array.get()
+            new_band = np.asarray(self._compute(rdata, arr), dtype=arr.dtype)
+            new_band = new_band.reshape(1, -1)
+
+            if group is None:
+                primary = rdata._band_index(self._primary_band())
+                group = rdata.info.iloc[primary][RasterData.GROUP_COL]
+            name = outname or self.__class__.__name__.lower()
+
+            rdata.array = parallel.put_shared(
+                np.concatenate([arr, new_band], axis=0)
+            )
+            new_info = DataFrame(
+                [rdata._new_info_row(rdata.base_raster, group=group, name=name)]
+            )
+            return None, new_info
+
+    class NormalizedDifference(WhaleRunner):
+        """Derive a normalised-difference band from two input bands.
+
+        ``val = (plus*scale_plus - minus*scale_minus) /
+        (plus*scale_plus + minus*scale_minus) * scale_result + offset_result``
+        (rounded, clipped; infinities mapped to ±scale_result + offset).
+        """
+
+        def __init__(
+            self,
+            idx_plus: str,
+            idx_minus: str,
+            scale_plus: float = 1.0,
+            scale_minus: float = 1.0,
+            scale_result: float = 1.0,
+            offset_result: float = 0.0,
+            clip: list = None,
+            verbose: bool = True,
+        ) -> None:
+            super().__init__(verbose=verbose)
+            self.idx_plus = idx_plus
+            self.idx_minus = idx_minus
+            self.scale_plus = scale_plus
+            self.scale_minus = scale_minus
+            self.scale_result = scale_result
+            self.offset_result = offset_result
+            self.clip = clip if clip is not None else [-np.inf, np.inf]
+            if len(self.clip) == 1:
+                self.clip = [-self.clip[0], self.clip[0]]
+
+        def _primary_band(self):
+            return self.idx_plus
+
+        def _compute(self, rdata, arr):
+            p = self._band(rdata, self.idx_plus) * self.scale_plus
+            m = self._band(rdata, self.idx_minus) * self.scale_minus
+            with np.errstate(divide="ignore", invalid="ignore"):
+                val = (p - m) / (p + m) * self.scale_result + self.offset_result
+            val = np.round(val)
+            val = np.where(val == -np.inf, -self.scale_result + self.offset_result, val)
+            val = np.where(val == np.inf, self.scale_result + self.offset_result, val)
+            return np.clip(val, self.clip[0], self.clip[1])
+
+    class Nirv(WhaleRunner):
+        """Derive NIRv = ((NDVI - 0.08) * NIR) scaled."""
+
+        def __init__(
+            self,
+            idx_nir: str,
+            idx_red: str,
+            nir_scaling: float = 1.0,
+            red_scaling: float = 1.0,
+            result_scaling: float = 1.0,
+            result_offset: float = 0.0,
+            clip: list = None,
+            verbose: bool = True,
+        ) -> None:
+            super().__init__(verbose=verbose)
+            self.idx_nir = idx_nir
+            self.idx_red = idx_red
+            self.nir_scaling = nir_scaling
+            self.red_scaling = red_scaling
+            self.result_scaling = result_scaling
+            self.result_offset = result_offset
+            self.clip = clip if clip is not None else [-np.inf, np.inf]
+            if len(self.clip) == 1:
+                self.clip = [-self.clip[0], self.clip[0]]
+
+        def _primary_band(self):
+            return self.idx_nir
+
+        def _compute(self, rdata, arr):
+            nir = self._band(rdata, self.idx_nir) * self.nir_scaling
+            red = self._band(rdata, self.idx_red) * self.red_scaling
+            with np.errstate(divide="ignore", invalid="ignore"):
+                ndvi = (nir - red) / (nir + red)
+                val = ((ndvi - 0.08) * nir) * self.result_scaling + self.result_offset
+            val = np.round(val)
+            val = np.where(val == -np.inf, -self.result_scaling + self.result_offset, val)
+            val = np.where(val == np.inf, self.result_scaling + self.result_offset, val)
+            return np.clip(val, self.clip[0], self.clip[1])
+
+    class Savi(WhaleRunner):
+        """Derive SAVI = (nir - red) * 1.5 / (nir + red + 0.5) scaled."""
+
+        def __init__(
+            self,
+            idx_red: str,
+            idx_nir: str,
+            red_scaling: float = 1.0,
+            nir_scaling: float = 1.0,
+            result_scaling: float = 1.0,
+            result_offset: float = 0.0,
+            clip: list = None,
+            verbose: bool = True,
+        ) -> None:
+            super().__init__(verbose=verbose)
+            self.idx_red = idx_red
+            self.idx_nir = idx_nir
+            self.red_scaling = red_scaling
+            self.nir_scaling = nir_scaling
+            self.result_scaling = result_scaling
+            self.result_offset = result_offset
+            self.clip = clip if clip is not None else [-np.inf, np.inf]
+            if len(self.clip) == 1:
+                self.clip = [-self.clip[0], self.clip[0]]
+
+        def _primary_band(self):
+            return self.idx_nir
+
+        def _compute(self, rdata, arr):
+            nir = self._band(rdata, self.idx_nir) * self.nir_scaling
+            red = self._band(rdata, self.idx_red) * self.red_scaling
+            with np.errstate(divide="ignore", invalid="ignore"):
+                val = ((nir - red) * 1.5) / (nir + red + 0.5)
+                val = val * self.result_scaling + self.result_offset
+            val = np.round(val)
+            val = np.where(val == -np.inf, -self.result_scaling + self.result_offset, val)
+            val = np.where(val == np.inf, self.result_scaling + self.result_offset, val)
+            return np.clip(val, self.clip[0], self.clip[1])
+
+    class ExtractIndicator(WhaleRunner):
+        """Derive a binary indicator band: 1 where ``layer == code``, else 0."""
+
+        def __init__(self, idx_layer: str, code: float, verbose: bool = True) -> None:
+            super().__init__(verbose=verbose)
+            self.idx_layer = idx_layer
+            self.code = code
+
+        def _primary_band(self):
+            return self.idx_layer
+
+        def _compute(self, rdata, arr):
+            return (self._band(rdata, self.idx_layer) == self.code).astype(np.float32)
+
+    class PercentileAggregation(WhaleRunner):
+        """Derive a percentile band across a set of named temporal bands."""
+
+        def __init__(self, bands: list, percentile: float, verbose: bool = True) -> None:
+            super().__init__(verbose=verbose)
+            self.bands = bands
+            self.percentile = percentile
+
+        def _primary_band(self):
+            return self.bands[0]
+
+        def _compute(self, rdata, arr):
+            idxs = [rdata._band_index(b) for b in self.bands]
+            return np.nanpercentile(arr[idxs, :], self.percentile, axis=0)
+
+    class GetLatitude(WhaleRunner):
+        """Derive a latitude band from the base raster's geotransform."""
+
+        def _primary_band(self):
+            raise RuntimeError("GetLatitude has no input band")
+
+        def run(self, rdata: RasterData, outname: str = None, group: str = None):
+            import rasterio
+
+            arr = rdata.array.get()
+            h, w = rdata._spatial_shape
+            row_off = rdata.window.row_off if rdata.window is not None else 0
+            with rasterio.open(rdata.base_raster) as src:
+                transform = src.transform
+            lats = transform.f + (np.arange(h) + row_off + 0.5) * transform.e
+            new_band = np.repeat(lats, w).astype(arr.dtype).reshape(1, -1)
+
+            if group is None:
+                group = "common"
+            name = outname or "latitude"
+
+            rdata.array = parallel.put_shared(
+                np.concatenate([arr, new_band], axis=0)
+            )
+            new_info = DataFrame(
+                [rdata._new_info_row(rdata.base_raster, group=group, name=name)]
+            )
+            return None, new_info
+
+    class GeometricTemperature(WhaleRunner):
+        """Derive a geometric-temperature band from latitude and elevation."""
+
+        def __init__(
+            self,
+            idx_latitude: str,
+            idx_elevation: str,
+            elevation_scaling: float = 1.0,
+            a: float = 1.0,
+            b: float = 1.0,
+            result_scaling: float = 1.0,
+            day_of_year_mmdd: str = "0101",
+            verbose: bool = True,
+        ) -> None:
+            super().__init__(verbose=verbose)
+            self.idx_latitude = idx_latitude
+            self.idx_elevation = idx_elevation
+            self.elevation_scaling = elevation_scaling
+            self.a = a
+            self.b = b
+            self.result_scaling = result_scaling
+            from skmap.misc import mmdd_to_doy
+
+            self.day_of_year = mmdd_to_doy(day_of_year_mmdd)
+
+        def _primary_band(self):
+            return self.idx_elevation
+
+        def _compute(self, rdata, arr):
+            lat = self._band(rdata, self.idx_latitude)
+            elev = self._band(rdata, self.idx_elevation)
+            doy = self.day_of_year
+            cos_teta = np.cos(((doy - 18.0) / 182.5 + 4.0 ** (lat < 0)) * np.pi)
+            cos_fi = np.cos(lat * np.pi / 180.0)
+            sin_abs_fi = np.abs(np.sin(lat * np.pi / 180.0))
+            res = self.a * cos_fi + self.b * (1.0 - cos_teta) * sin_abs_fi
+            res = res - 0.006 * self.elevation_scaling * elev
+            return np.round(res * self.result_scaling)
+
 except ImportError as e:
     from skmap.misc import _warn_deps
 
