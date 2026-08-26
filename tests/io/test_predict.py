@@ -1,4 +1,4 @@
-"""Tests for RasterData.predict / predict_raster / predict_raster_to_file."""
+"""Tests for the Prediction runner (skmap.io.process.Prediction)."""
 
 import os
 
@@ -9,6 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from skmap.data import toy
 from skmap.io import RasterData
+from skmap.io.process import Prediction
 
 
 def _toy_raster_rdata():
@@ -68,106 +69,94 @@ class _CallCounter:
         return rng.random((len(X), self.n_out), dtype=np.float32)
 
 
+def _prediction_bands(rdata):
+    """Return the appended prediction bands (n_out·n_years, H*W)."""
+    idx = rdata.info[rdata.info["group"] == "prediction"].index
+    return rdata.array.get()[idx]
+
+
 # ---------------------------------------------------------------------------
-# predict (2-D)
+# single static catalogue
 # ---------------------------------------------------------------------------
 
 
-def test_predict_regressor():
+def test_prediction_regressor():
     rdata = _toy_raster_rdata()
     arr = rdata.array.get()
     X = pd.DataFrame(arr.T, columns=["elev", "slope"])
     y = X["elev"] * 2 + X["slope"] * 0.5
     model = RandomForestRegressor(n_estimators=3, random_state=0).fit(X, y)
-    pred = rdata.predict(model, X.values[:5])
-    assert pred.shape == (5,)
 
+    rdata.run(Prediction(model=model, feature_names=["elev", "slope"]))
 
-def test_predict_classifier_proba():
-    rdata = _toy_raster_rdata()
-    arr = rdata.array.get()
-    X = pd.DataFrame(arr.T, columns=["elev", "slope"])
-    y = (X["elev"] > 100).astype(int)
-    model = RandomForestClassifier(n_estimators=3, random_state=0).fit(X, y)
-    proba = rdata.predict(model, X.values[:5], predict_proba=True)
-    assert proba.shape == (5, 2)
+    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    assert len(pred_info) == 1
+    assert pred_info["name"].iloc[0] == "prediction"
+    assert not pred_info["temporal"].iloc[0]
 
-
-# ---------------------------------------------------------------------------
-# predict_raster (single static catalogue)
-# ---------------------------------------------------------------------------
-
-
-def test_predict_raster_regressor():
-    rdata = _toy_raster_rdata()
-    arr = rdata.array.get()
-    X = pd.DataFrame(arr.T, columns=["elev", "slope"])
-    y = X["elev"] * 2 + X["slope"] * 0.5
-    model = RandomForestRegressor(n_estimators=3, random_state=0).fit(X, y)
-    pred = rdata.predict_raster(model, feature_names=["elev", "slope"])
+    pred = _prediction_bands(rdata)
     assert pred.shape == (1, 256 * 256)
     assert np.isfinite(pred).all()
 
 
-def test_predict_raster_classifier():
+def test_prediction_classifier():
     rdata = _toy_raster_rdata()
     arr = rdata.array.get()
     X = pd.DataFrame(arr.T, columns=["elev", "slope"])
     y = (X["elev"] > 100).astype(int)
     model = RandomForestClassifier(n_estimators=3, random_state=0).fit(X, y)
-    pred = rdata.predict_raster(model, feature_names=["elev", "slope"])
+
+    rdata.run(Prediction(model=model, feature_names=["elev", "slope"]))
+
+    pred = _prediction_bands(rdata)
     assert pred.shape == (1, 256 * 256)
     assert set(np.unique(pred[~np.isnan(pred)])).issubset({0.0, 1.0})
 
 
-def test_predict_raster_proba():
+def test_prediction_proba():
     rdata = _toy_raster_rdata()
     arr = rdata.array.get()
     X = pd.DataFrame(arr.T, columns=["elev", "slope"])
     y = (X["elev"] > 100).astype(int)
     model = RandomForestClassifier(n_estimators=3, random_state=0).fit(X, y)
-    proba = rdata.predict_raster(
-        model, feature_names=["elev", "slope"], predict_proba=True
+
+    rdata.run(
+        Prediction(model=model, feature_names=["elev", "slope"], predict_proba=True)
     )
-    assert proba.shape == (2, 256 * 256)  # n_class * n_years(=1)
+
+    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    assert list(pred_info["name"]) == ["prediction_prob_0", "prediction_prob_1"]
+    pred = _prediction_bands(rdata)
+    assert pred.shape == (2, 256 * 256)  # n_class * n_years(=1)
 
 
-def test_predict_raster_missing_feature_names_raises():
+def test_prediction_missing_feature_names_raises():
     rdata = _toy_raster_rdata()
     model = _CallCounter(n_out=1)  # no feature_names_in_
     with pytest.raises(ValueError, match="feature_names"):
-        rdata.predict_raster(model)
+        rdata.run(Prediction(model=model))
 
 
 # ---------------------------------------------------------------------------
-# multi-year predict_raster (all years concatenated, one model call)
+# multi-year (all years concatenated, one model call)
 # ---------------------------------------------------------------------------
 
 
-def test_get_years_and_covs_idx_by_year():
-    rdata = _toy_multiyear_rdata()
-    assert rdata.get_years() == [2015, 2016, 2017, 2018, 2019]
-
-    covs_idx, years = rdata._get_covs_idx_by_year(_TY_FEATURES)
-    assert years == [2015, 2016, 2017, 2018, 2019]
-    assert covs_idx.shape == (len(_TY_FEATURES), 5)
-
-    elev_i = _TY_FEATURES.index("elev")
-    assert len(set(covs_idx[elev_i].tolist())) == 1  # static repeats
-    ndvi_w = _TY_FEATURES.index("ndvi_winter")
-    assert len(set(covs_idx[ndvi_w].tolist())) == 5  # temporal per year
-
-
-def test_predict_raster_multiyear_one_call():
+def test_prediction_multiyear_one_call():
     """All years predicted in a single model call; statics repeated."""
     rdata = _toy_multiyear_rdata()
     n_pix = rdata.array.shape[1]
     model = _CallCounter(n_out=1)
 
-    pred = rdata.predict_raster(model, feature_names=_TY_FEATURES, valid_only=False)
+    rdata.run(Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False))
 
     assert model.calls == 1
+    pred = _prediction_bands(rdata)
     assert pred.shape == (5, n_pix)  # n_out(=1) * n_years
+
+    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    assert list(pred_info["name"]) == ["prediction"] * 5
+    assert list(pred_info["start_date"].dt.year) == [2015, 2016, 2017, 2018, 2019]
 
     X = model.X.reshape(5, n_pix, len(_TY_FEATURES))
     for static in ("elev", "slope"):
@@ -175,21 +164,32 @@ def test_predict_raster_multiyear_one_call():
         assert all(np.array_equal(X[0, :, i], X[y, :, i]) for y in range(5))
 
 
-def test_predict_raster_multiyear_classifier_layout():
+def test_prediction_multiyear_classifier_layout():
     """predict_proba yields (n_class*n_years, n_pixels), out-band major."""
     rdata = _toy_multiyear_rdata()
     n_pix = rdata.array.shape[1]
     n_class = 3
     model = _CallCounter(n_out=n_class)
 
-    pred = rdata.predict_raster(
-        model, feature_names=_TY_FEATURES, predict_proba=True, valid_only=False
+    rdata.run(
+        Prediction(
+            model=model,
+            feature_names=_TY_FEATURES,
+            predict_proba=True,
+            valid_only=False,
+        )
     )
+    pred = _prediction_bands(rdata)
     assert pred.shape == (n_class * 5, n_pix)
     assert model.calls == 1
 
+    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    assert list(pred_info["name"]) == [
+        f"prediction_prob_{i}" for i in range(n_class) for _ in range(5)
+    ]
 
-def test_predict_raster_static_land_mask():
+
+def test_prediction_static_land_mask():
     """A 1-D boolean land mask selects the same pixels for every year."""
     rdata = _toy_multiyear_rdata()
     n_pix = rdata.array.shape[1]
@@ -197,13 +197,16 @@ def test_predict_raster_static_land_mask():
 
     mask = ~np.isnan(rdata.array.get()).any(axis=0)
     assert mask.any()
-    pred = rdata.predict_raster(model, feature_names=_TY_FEATURES, valid_only=mask)
+    rdata.run(
+        Prediction(model=model, feature_names=_TY_FEATURES, valid_only=mask)
+    )
+    pred = _prediction_bands(rdata)
     assert pred.shape == (5, n_pix)
     valid_per_year = (~np.isnan(pred)).sum(axis=1)
     assert np.all(valid_per_year == mask.sum())
 
 
-def test_predict_raster_temporal_without_dates_raises():
+def test_prediction_temporal_without_dates_raises():
     """Temporal layers without start_date are rejected (dates required)."""
     rdata = toy.ndvi_rdata()
     rdata.info = rdata.info.drop(columns=["start_date", "end_date"], errors="ignore")
@@ -212,17 +215,63 @@ def test_predict_raster_temporal_without_dates_raises():
 
     model = _CallCounter(n_out=1)
     with pytest.raises(ValueError, match="start_date"):
-        rdata.predict_raster(model, feature_names=[rdata.info["name"].iloc[0]])
+        rdata.run(
+            Prediction(model=model, feature_names=[rdata.info["name"].iloc[0]])
+        )
 
 
-def test_predict_raster_to_file(tmp_path):
-    """predict_raster_to_file writes one GeoTIFF per (output, year)."""
+# ---------------------------------------------------------------------------
+# target_names
+# ---------------------------------------------------------------------------
+
+
+def test_prediction_target_names():
+    rdata = _toy_multiyear_rdata()
+    model = _CallCounter(n_out=3)
+
+    rdata.run(
+        Prediction(
+            model=model,
+            feature_names=_TY_FEATURES,
+            predict_proba=True,
+            target_names=["water", "pasture", "forest"],
+            valid_only=False,
+        )
+    )
+    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    assert list(pred_info["name"]) == [
+        f"prediction_{t}" for t in ("water", "pasture", "forest") for _ in range(5)
+    ]
+
+
+def test_prediction_target_names_wrong_length_raises():
+    rdata = _toy_multiyear_rdata()
+    model = _CallCounter(n_out=3)
+    with pytest.raises(ValueError, match="target_names"):
+        rdata.run(
+            Prediction(
+                model=model,
+                feature_names=_TY_FEATURES,
+                predict_proba=True,
+                target_names=["water", "pasture"],
+                valid_only=False,
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
+# save
+# ---------------------------------------------------------------------------
+
+
+def test_prediction_to_file(tmp_path):
+    """Prediction bands can be written to one GeoTIFF per (output, year)."""
     import rasterio
 
+    from skmap.io import save_rasters
     from skmap.overlay import SpaceTimeOverlay
 
     rdata = _toy_multiyear_rdata()
-    n_pix = rdata.array.shape[1]
 
     samples = toy.lc_samples()
     overlay = SpaceTimeOverlay(
@@ -238,14 +287,13 @@ def test_predict_raster_to_file(tmp_path):
     y = train["target"].astype(float)
     model = RandomForestRegressor(n_estimators=3, random_state=0).fit(X, y)
 
+    rdata.run(Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False))
+    pred = _prediction_bands(rdata)  # (n_out=1 * n_years, H*W)
+
     years = rdata.get_years()
-    out_files = [str(tmp_path / f"pred_{y}.tif") for y in years]  # n_out=1
-    ret = rdata.predict_raster_to_file(
-        model, out_files, feature_names=_TY_FEATURES, valid_only=False
-    )
-    assert ret == out_files
+    out_files = [str(tmp_path / f"pred_{y}.tif") for y in years]
+    save_rasters(rdata.base_raster, out_files, pred)
     for f in out_files:
         assert os.path.exists(f)
         with rasterio.open(f) as ds:
             assert ds.read(1).shape == (256, 256)
-    assert rdata.predict_raster(model, feature_names=_TY_FEATURES, valid_only=False).shape == (5, n_pix)

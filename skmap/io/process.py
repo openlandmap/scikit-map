@@ -1605,6 +1605,161 @@ try:
 
             return array_dict
 
+    class Prediction(SKMapRunner):
+        """Predict on a RasterData for **all years at once**, appending the
+        result bands to ``rdata.array``.
+
+        All available years are concatenated into a single feature matrix
+        (``(n_years·n_pixels, n_features)``) with static covariates repeated
+        for every year, and the model is invoked **once**.  The result is
+        reshaped to ``(n_out·n_years, H*W)`` — out-band major, year minor —
+        and appended to ``rdata.array``; one info row per (output, year) is
+        added under ``group`` (default ``"prediction"``).
+
+        Years come from the temporal layers' ``start_date``; a static-only
+        catalogue yields ``n_years == 1`` (a single prediction).
+
+        :param model: a fitted model exposing ``predict`` (and optionally
+          ``predict_proba``).
+        :param feature_names: covariate names in the model's feature order.
+          Defaults to ``model.feature_names_in_`` (or ``feature_names_``).
+        :param predict_proba: use ``model.predict_proba`` instead of
+          ``model.predict`` (default).
+        :param valid_only: select which pixels to predict.
+
+          * ``True`` (default) — per-(year, pixel) NaN validity.
+          * ``False`` — predict every pixel for every year.
+          * a 1-D boolean ``np.ndarray`` of shape ``(H*W,)`` — a static land
+            mask, applied to **all** years.
+        :param target_names: output names for multi-output / probability
+          models.  Replaces the ``prob_0``/``out_0`` suffix with the given
+          names (``prediction_<name>``).  Must have ``n_out`` entries.
+        :param group: info group for the appended prediction bands.
+        """
+
+        def __init__(
+            self,
+            model,
+            feature_names=None,
+            predict_proba: bool = False,
+            valid_only=True,
+            target_names=None,
+            group: str = "prediction",
+            verbose: bool = True,
+        ) -> None:
+            super().__init__(verbose=verbose)
+            self.model = model
+            self.feature_names = feature_names
+            self.predict_proba = predict_proba
+            self.valid_only = valid_only
+            self.target_names = target_names
+            self.group = group
+
+        def _resolve_feature_names(self):
+            feature_names = self.feature_names
+            if feature_names is None:
+                feature_names = getattr(self.model, "feature_names_in_", None)
+                if feature_names is None:
+                    feature_names = getattr(self.model, "feature_names_", None)
+                if feature_names is None:
+                    raise ValueError(
+                        "model has no feature_names_in_/feature_names_; "
+                        "pass feature_names="
+                    )
+            return list(feature_names)
+
+        def _out_names(self, n_out):
+            if self.target_names is not None:
+                if len(self.target_names) != n_out:
+                    raise ValueError(
+                        f"target_names has {len(self.target_names)} entries but "
+                        f"the model produces {n_out} outputs"
+                    )
+                return [f"prediction_{t}" for t in self.target_names]
+            if n_out == 1:
+                return ["prediction"]
+            if self.predict_proba:
+                return [f"prediction_prob_{i}" for i in range(n_out)]
+            return [f"prediction_out_{i}" for i in range(n_out)]
+
+        def _predict(self, rdata):
+            feature_names = self._resolve_feature_names()
+            covs_idx, years = rdata._get_covs_idx_by_year(feature_names)
+            arr = rdata.array.get()
+            n_pixels = arr.shape[1]
+            n_years = len(years)
+
+            # Build the concatenated feature matrix (n_years·n_pixels,
+            # n_features), rows ordered year-major.  Static covariates repeat
+            # because their column in covs_idx is the same band every year.
+            X = np.concatenate(
+                [arr[covs_idx[:, j], :].T for j in range(n_years)], axis=0
+            ).astype(np.float32, copy=False)
+
+            if isinstance(self.valid_only, np.ndarray):
+                valid = np.tile(np.asarray(self.valid_only, dtype=bool), n_years)
+            elif self.valid_only:
+                valid = ~np.isnan(X).any(axis=1)
+            else:
+                valid = np.ones(X.shape[0], dtype=bool)
+
+            fn = self.model.predict_proba if self.predict_proba else self.model.predict
+
+            pred_full = np.full((n_years * n_pixels, 1), np.nan, dtype=np.float32)
+            if valid.any():
+                pred_valid = np.asarray(fn(X[valid]), dtype=np.float32)
+                if pred_valid.ndim == 1:
+                    pred_valid = pred_valid.reshape(-1, 1)
+                n_out = pred_valid.shape[1]
+                pred_full = np.full(
+                    (n_years * n_pixels, n_out), np.nan, dtype=np.float32
+                )
+                pred_full[valid] = pred_valid
+            else:
+                n_out = pred_full.shape[1]
+
+            # (n_years, n_pixels, n_out) -> (n_out, n_years, n_pixels) ->
+            # (n_out·n_years, n_pixels), out-band major, year minor.
+            pred = (
+                pred_full.reshape(n_years, n_pixels, n_out)
+                .transpose(2, 0, 1)
+                .reshape(n_out * n_years, n_pixels)
+            )
+            return pred, years, n_out
+
+        def run(self, rdata, outname=None):
+            pred, years, n_out = self._predict(rdata)
+            out_names = self._out_names(n_out)
+
+            arr = rdata.array.get()
+            rdata.array = parallel.put_shared(
+                np.concatenate([arr, pred], axis=0),
+                local=rdata.backend.name == "cpp",
+            )
+
+            new_info = []
+            for out in range(n_out):
+                for year in years:
+                    name = out_names[out]
+                    if year is None:
+                        row = rdata._new_info_row(
+                            rdata.base_raster, group=self.group, name=name
+                        )
+                        row[RasterData.TEMPORAL_COL] = False
+                        new_info.append(row)
+                    else:
+                        new_info.append(
+                            rdata._new_info_row(
+                                rdata.base_raster,
+                                group=self.group,
+                                name=name,
+                                dates=[f"{year}-01-01", f"{year}-12-31"],
+                                date_format="%Y-%m-%d",
+                                date_style="interval",
+                            )
+                        )
+            return None, DataFrame(new_info)
+
     class WhaleRunner(SKMapRunner):
         """Base class for on-the-fly feature (whale) runners.
 
