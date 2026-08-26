@@ -111,10 +111,12 @@ Large-scale predictions
 .. code-block:: python
 
     import joblib
+    from skmap.io.process import Prediction
 
     model = joblib.load("model.joblib")
     rdata = rdata.read()  # materialize rasters for spatial prediction
-    pred = rdata.predict_raster(model)
+    rdata.run(Prediction(model=model))
+    pred = rdata.filter('group == "prediction"').array.get()
 
 Whales
 ======
