@@ -125,9 +125,11 @@ def test_prediction_proba():
     )
 
     pred_info = rdata.info[rdata.info["group"] == "prediction"]
-    assert list(pred_info["name"]) == ["prediction_prob_0", "prediction_prob_1"]
+    assert list(pred_info["name"]) == [
+        "prediction_prob_0", "prediction_prob_1", "prediction"
+    ]
     pred = _prediction_bands(rdata)
-    assert pred.shape == (2, 256 * 256)  # n_class * n_years(=1)
+    assert pred.shape == (3, 256 * 256)  # n_class + dominant, n_years=1
 
 
 def test_prediction_missing_feature_names_raises():
@@ -165,7 +167,7 @@ def test_prediction_multiyear_one_call():
 
 
 def test_prediction_multiyear_classifier_layout():
-    """predict_proba yields (n_class*n_years, n_pixels), out-band major."""
+    """predict_proba yields proba (n_class*n_years) + dominant (n_years)."""
     rdata = _toy_multiyear_rdata()
     n_pix = rdata.array.shape[1]
     n_class = 3
@@ -180,13 +182,13 @@ def test_prediction_multiyear_classifier_layout():
         )
     )
     pred = _prediction_bands(rdata)
-    assert pred.shape == (n_class * 5, n_pix)
+    assert pred.shape == (n_class * 5 + 5, n_pix)  # proba + dominant
     assert model.calls == 1
 
     pred_info = rdata.info[rdata.info["group"] == "prediction"]
     assert list(pred_info["name"]) == [
         f"prediction_prob_{i}" for i in range(n_class) for _ in range(5)
-    ]
+    ] + ["prediction"] * 5
 
 
 def test_prediction_static_land_mask():
@@ -241,7 +243,7 @@ def test_prediction_target_names():
     pred_info = rdata.info[rdata.info["group"] == "prediction"]
     assert list(pred_info["name"]) == [
         f"prediction_{t}" for t in ("water", "pasture", "forest") for _ in range(5)
-    ]
+    ] + ["prediction"] * 5
 
 
 def test_prediction_target_names_wrong_length_raises():
@@ -257,6 +259,90 @@ def test_prediction_target_names_wrong_length_raises():
                 valid_only=False,
             )
         )
+
+
+# ---------------------------------------------------------------------------
+# year column (Q1)
+# ---------------------------------------------------------------------------
+
+
+def test_prediction_year_column():
+    rdata = _toy_multiyear_rdata()
+    model = _CallCounter(n_out=1)
+    rdata.run(Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False))
+    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    assert list(pred_info["year"]) == [2015, 2016, 2017, 2018, 2019]
+
+
+def test_prediction_year_column_static():
+    rdata = _toy_raster_rdata()
+    model = _CallCounter(n_out=1)
+    rdata.run(Prediction(model=model, feature_names=["elev", "slope"]))
+    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    assert len(pred_info) == 1
+    assert pred_info["year"].iloc[0] is None or pd.isna(pred_info["year"].iloc[0])
+
+
+# ---------------------------------------------------------------------------
+# drop_input (Q2)
+# ---------------------------------------------------------------------------
+
+
+def test_prediction_drop_input():
+    rdata = _toy_multiyear_rdata()
+    model = _CallCounter(n_out=1)
+    rdata.run(
+        Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False),
+        drop_input=True,
+    )
+    assert set(rdata.info["group"]) == {"prediction"}
+    assert rdata.array.shape[0] == 5  # n_out(=1) * n_years
+
+
+def test_prediction_drop_input_proba():
+    rdata = _toy_multiyear_rdata()
+    model = _CallCounter(n_out=3)
+    rdata.run(
+        Prediction(
+            model=model, feature_names=_TY_FEATURES,
+            predict_proba=True, valid_only=False,
+        ),
+        drop_input=True,
+    )
+    assert set(rdata.info["group"]) == {"prediction"}
+    # proba (n_class*5) + dominant (5)
+    assert rdata.array.shape[0] == 3 * 5 + 5
+
+
+# ---------------------------------------------------------------------------
+# dominant class argmax (Q3)
+# ---------------------------------------------------------------------------
+
+
+def test_prediction_dominant_argmax():
+    """Dominant class = argmax over proba classes; NaN where invalid."""
+    rdata = _toy_multiyear_rdata()
+    n_pix = rdata.array.shape[1]
+    n_class = 3
+    model = _CallCounter(n_out=n_class)
+    mask = ~np.isnan(rdata.array.get()).any(axis=0)
+
+    rdata.run(
+        Prediction(
+            model=model, feature_names=_TY_FEATURES,
+            predict_proba=True, valid_only=mask,
+        )
+    )
+    pred = _prediction_bands(rdata)
+    proba = pred[: n_class * 5].reshape(n_class, 5, n_pix)
+    dominant = pred[n_class * 5 :].reshape(5, n_pix)
+
+    valid_yp = ~np.isnan(proba).all(axis=0)  # (5, n_pix)
+    assert np.array_equal(
+        dominant[valid_yp].astype(int), proba[:, valid_yp].argmax(axis=0)
+    )
+    if (~valid_yp).any():
+        assert np.isnan(dominant[~valid_yp]).all()
 
 
 # ---------------------------------------------------------------------------

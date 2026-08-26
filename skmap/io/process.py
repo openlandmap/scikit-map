@@ -1614,7 +1614,13 @@ try:
         for every year, and the model is invoked **once**.  The result is
         reshaped to ``(n_out·n_years, H*W)`` — out-band major, year minor —
         and appended to ``rdata.array``; one info row per (output, year) is
-        added under ``group`` (default ``"prediction"``).
+        added under ``group`` (default ``"prediction"``).  Each row carries a
+        ``year`` column (the prediction year, or ``None`` for a static
+        catalogue).
+
+        When ``predict_proba=True`` a dominant-class band (the argmax over the
+        probability classes) is appended in addition to the per-class
+        probability bands, named ``prediction`` (one band per year).
 
         Years come from the temporal layers' ``start_date``; a static-only
         catalogue yields ``n_years == 1`` (a single prediction).
@@ -1725,39 +1731,62 @@ try:
                 .transpose(2, 0, 1)
                 .reshape(n_out * n_years, n_pixels)
             )
-            return pred, years, n_out
+            # Dominant class (argmax over classes) for predict_proba.
+            dominant = None
+            if self.predict_proba and n_out > 1:
+                proba_3d = pred.reshape(n_out, n_years, n_pixels)
+                valid_yp = ~np.isnan(proba_3d).all(axis=0)
+                dominant = np.full((n_years, n_pixels), np.nan, dtype=np.float32)
+                if valid_yp.any():
+                    dominant[valid_yp] = (
+                        proba_3d[:, valid_yp].argmax(axis=0).astype(np.float32)
+                    )
+
+            return pred, dominant, years, n_out
+
+        def _info_row(self, rdata, name, year):
+            """Build one info row for a prediction band, setting the ``year``."""
+            if year is None:
+                row = rdata._new_info_row(
+                    rdata.base_raster, group=self.group, name=name
+                )
+                row[RasterData.TEMPORAL_COL] = False
+                row["year"] = None
+                return row
+            row = rdata._new_info_row(
+                rdata.base_raster,
+                group=self.group,
+                name=name,
+                dates=[f"{year}-01-01", f"{year}-12-31"],
+                date_format="%Y-%m-%d",
+                date_style="interval",
+            )
+            row["year"] = year
+            return row
 
         def run(self, rdata, outname=None):
-            pred, years, n_out = self._predict(rdata)
+            pred, dominant, years, n_out = self._predict(rdata)
             out_names = self._out_names(n_out)
 
             arr = rdata.array.get()
+            new_bands = [arr, pred]
+            if dominant is not None:
+                new_bands.append(dominant)
+
             rdata.array = parallel.put_shared(
-                np.concatenate([arr, pred], axis=0),
+                np.concatenate(new_bands, axis=0),
                 local=rdata.backend.name == "cpp",
             )
 
             new_info = []
+            # probability / label bands: out-band major, year minor
             for out in range(n_out):
                 for year in years:
-                    name = out_names[out]
-                    if year is None:
-                        row = rdata._new_info_row(
-                            rdata.base_raster, group=self.group, name=name
-                        )
-                        row[RasterData.TEMPORAL_COL] = False
-                        new_info.append(row)
-                    else:
-                        new_info.append(
-                            rdata._new_info_row(
-                                rdata.base_raster,
-                                group=self.group,
-                                name=name,
-                                dates=[f"{year}-01-01", f"{year}-12-31"],
-                                date_format="%Y-%m-%d",
-                                date_style="interval",
-                            )
-                        )
+                    new_info.append(self._info_row(rdata, out_names[out], year))
+            # dominant-class bands (argmax): one per year
+            if dominant is not None:
+                for year in years:
+                    new_info.append(self._info_row(rdata, "prediction", year))
             return None, DataFrame(new_info)
 
     class WhaleRunner(SKMapRunner):

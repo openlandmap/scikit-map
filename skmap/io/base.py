@@ -1512,6 +1512,10 @@ class RasterData(SKMapBase):
             start = time.time()
             self._verbose(f"Running {process_name}" + f" on {self.array.shape}")
 
+            # Snapshot the input groups so drop_input can remove the consumed
+            # covariates even when no explicit `group` is passed (e.g. Prediction).
+            input_groups = self.info[RasterData.GROUP_COL].unique().tolist()
+
             kwargs = {"rdata": self}
             if outname is not None:
                 kwargs["outname"] = outname
@@ -1529,7 +1533,7 @@ class RasterData(SKMapBase):
             )
 
             if drop_input:
-                self.drop(group)
+                self.drop(group if group else input_groups)
 
         self._report_fallbacks(process)
 
