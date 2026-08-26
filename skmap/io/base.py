@@ -2111,8 +2111,20 @@ class RasterData(SKMapBase):
             # n = 20
             # for name in list(f_arr.info['name']):
             #   titles.append('\n'.join(name[i:i+n] for i in range(0, len(name), n)))
+        elif isinstance(img_title, str) and "{" in img_title:
+            # template with {field} placeholders, e.g. "Land Cover {year} {name}"
+            titles = []
+            for _, row in f_arr.info.iterrows():
+                fields = row.to_dict()
+                sd, ed = fields.get("start_date"), fields.get("end_date")
+                if sd is not None and ed is not None:
+                    fields["date"] = f"{sd} - {ed}"
+                y = fields.get("year")
+                if y is not None and not pd.isna(y):
+                    fields["year"] = int(y)
+                titles.append(img_title.format(**fields))
         else:
-            titles = [""] * f_arr.info.shape[0]
+            titles = [img_title] * f_arr.info.shape[0]
         return titles
 
     def point_query(

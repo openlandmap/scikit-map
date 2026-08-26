@@ -383,3 +383,43 @@ def test_prediction_to_file(tmp_path):
         assert os.path.exists(f)
         with rasterio.open(f) as ds:
             assert ds.read(1).shape == (256, 256)
+
+
+# ---------------------------------------------------------------------------
+# plot titles (img_title_text templates)
+# ---------------------------------------------------------------------------
+
+
+def test_get_titles_template():
+    """{field} templates format against each prediction info row."""
+    rdata = _toy_multiyear_rdata()
+    model = _CallCounter(n_out=1)
+    rdata.run(Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False))
+
+    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    titles = rdata._get_titles("Land Cover {year} {name}", ["prediction"])
+    assert len(titles) == len(pred_info)
+    assert titles[0] == "Land Cover 2015 prediction"
+    assert titles[-1] == "Land Cover 2019 prediction"
+
+
+def test_get_titles_date_convenience():
+    """{date} expands to 'start - end'."""
+    rdata = _toy_multiyear_rdata()
+    model = _CallCounter(n_out=1)
+    rdata.run(Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False))
+
+    titles = rdata._get_titles("{date}", ["prediction"])
+    assert titles[0].startswith("2015-01-01")
+    assert "2015-12-31" in titles[0]
+
+
+def test_get_titles_literal():
+    """A plain literal (no braces) is repeated for every frame."""
+    rdata = _toy_multiyear_rdata()
+    model = _CallCounter(n_out=1)
+    rdata.run(Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False))
+
+    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    titles = rdata._get_titles("Land Cover", ["prediction"])
+    assert titles == ["Land Cover"] * len(pred_info)
