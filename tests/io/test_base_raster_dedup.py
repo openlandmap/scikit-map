@@ -38,7 +38,7 @@ def test_base_raster_raises_when_none():
 
 
 def test_read_sets_side_effects():
-    """read() must set window, bounds, base_raster and array."""
+    """read() must set window, overview, extent, base_raster and array."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         r = RasterData(
@@ -46,7 +46,9 @@ def test_read_sets_side_effects():
         ).timespan("20141202", "20201201", "days", toy.TOY_DATE_STEP, ignore_29feb=True)
     r.read()
     assert hasattr(r, "window")
-    assert hasattr(r, "bounds")
+    assert hasattr(r, "overview")
+    assert hasattr(r, "extent")
+    assert hasattr(r, "extent_epsg")
     assert isinstance(r.base_raster, str)
     assert r.array.ndim == 2
     assert r.array.shape[0] == 24
