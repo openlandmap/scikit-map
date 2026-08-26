@@ -110,11 +110,11 @@ Large-scale predictions
 
 .. code-block:: python
 
-    from skmap.modeler import RFRegressor
+    import joblib
 
-    model = RFRegressor("model.joblib")
+    model = joblib.load("model.joblib")
     rdata = rdata.read()  # materialize rasters for spatial prediction
-    pred = model.predict_raster(rdata)
+    pred = rdata.predict_raster(model)
 
 Whales
 ======
