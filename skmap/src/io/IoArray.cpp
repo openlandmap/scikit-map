@@ -24,6 +24,15 @@ static void initGdal() {
   }
 }
 
+// Prefix /vsicurl/ for http(s) URLs so GDAL opens remote COGs via curl
+// (rasterio does this automatically; raw GDALOpen does not).
+static std::string resolvePath(const std::string &path) {
+  if (path.rfind("http://", 0) == 0 || path.rfind("https://", 0) == 0) {
+    return "/vsicurl/" + path;
+  }
+  return path;
+}
+
 GDALResampleAlg hashResample(std::string const &inString) {
   if (inString == "GRA_CubicSpline")
     return GRA_CubicSpline;
@@ -228,7 +237,7 @@ void IoArray::readDataCore(float_t *row_ptr, uint_t row_n_elems,
       " elements, got " + std::to_string(row_n_elems) + ")");
 
   GdalDatasetGuard readDataset(
-      (GDALDataset *)GDALOpen(file_loc.c_str(), GA_ReadOnly));
+      (GDALDataset *)GDALOpen(resolvePath(file_loc).c_str(), GA_ReadOnly));
   skmapAssertIfTrue(
       readDataset.get() == nullptr,
       "scikit-map ERROR 1: issues in opening the file with path " + file_loc);
@@ -316,7 +325,7 @@ void IoArray::readDataBlocks(
 void IoArray::getLatLonArray(std::string file_loc, uint_t x_off, uint_t y_off,
                              uint_t x_size, uint_t y_size) {
   GdalDatasetGuard readDataset(
-      (GDALDataset *)GDALOpen(file_loc.c_str(), GA_ReadOnly));
+      (GDALDataset *)GDALOpen(resolvePath(file_loc).c_str(), GA_ReadOnly));
   skmapAssertIfTrue(readDataset.get() == nullptr,
                     "scikit-map ERROR 6: issues in opening the file with URL " +
                         file_loc);

@@ -1393,7 +1393,10 @@ class RasterData(SKMapBase):
 
         # FIXME: add supporting for band_list
         for band, rows in self.info.groupby(RasterData.BAND_COL):
-            raster_files += [Path(r) for r in rows[RasterData.PATH_COL]]
+            # keep http(s) URLs as strings: Path() would mangle "https://" -> "https:/"
+            raster_files += [
+                r if "http" in str(r) else Path(r) for r in rows[RasterData.PATH_COL]
+            ]
 
         # Resolve the read window (from extent) and the overview factor
         # (explicit or RAM-fit) once, so mask and data reads agree.
