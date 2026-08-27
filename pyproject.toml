@@ -70,6 +70,12 @@ docs = [
 include = ["skmap*"]
 where = ["."]
 
+[tool.pytest.ini_options]
+addopts = "-m 'not network'"
+markers = [
+    "network: tests that hit live network services (skipped by default)",
+]
+
 [tool.ruff.lint]
 extend-select = ["ANN", "I"]
 
