@@ -81,6 +81,32 @@ It also demonstrates the ``interval`` temporal style, a ``name`` template
 (year-agnostic ``{band}_{season}`` names) and a ``variant`` column separating
 the gap-filled and gappy NDVI.
 
+Loading rasters from STAC
+=========================
+
+:meth:`~skmap.io.RasterData.from_stac` builds a lazy :class:`~skmap.io.RasterData`
+from a STAC catalogue.  It queries the per-collection ``/items`` endpoint and
+yields one ``info`` row per **data asset** (an asset whose ``roles`` contains
+``"data"``), with ``collection``, ``asset``, ``year``, ``gsd`` and ``epsg``
+columns.  The ``datetime`` window is filtered client-side.
+
+.. code-block:: python
+
+    from skmap.io import RasterData
+
+    rdata = RasterData.from_stac(
+        url="https://stac.opengeohub.org/v1/cat/ecodatacube",
+        collections="ndvi_glad.landsat.ard2.seasconv_eu_ecodatacube",
+        datetime="2019-01-01/2019-12-31",
+    )
+    rdata.info  # one row per (item, data asset); remote COG hrefs, no .read()
+
+Layers are grouped by collection (``group`` = collection id) and named
+``{asset}_{monthday}`` (year-agnostic, unique within a year).  The result is
+lazy: use :meth:`~skmap.io.RasterData.read` with an ``extent`` for a small
+tile, or :class:`~skmap.overlay.SpaceTimeOverlay` to sample points, rather
+than reading the full (continental) grid.
+
 Space-Time overlay
 ==================
 
