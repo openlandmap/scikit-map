@@ -82,14 +82,22 @@ class TestIterSpecs:
         specs = list(s.iter_specs())
         # thumbnail + style assets are skipped; only the data asset is kept
         assert len(specs) == 3
-        assert all(sp.name == "ndvi_m_30m_s" for sp in specs)
+        assert all(sp.name.startswith("ndvi_m_30m_s_") for sp in specs)
         assert all(sp.path.endswith(".tif") for sp in specs)
+
+    def test_names_unique_within_year(self):
+        """Year-agnostic names (asset + month-day) are unique within a year."""
+        s = _stub({NDVI_CID: NDVI_ITEMS})
+        specs = list(s.iter_specs())
+        names_2022 = [sp.name for sp in specs if sp.start_date.year == 2022]
+        assert names_2022 == ["ndvi_m_30m_s_1101", "ndvi_m_30m_s_0901"]
+        assert len(set(names_2022)) == len(names_2022)
 
     def test_multiple_data_assets_one_row_each(self):
         s = _stub({CH4_CID: CH4_ITEMS})
         specs = list(s.iter_specs())
         assert [sp.name for sp in specs] == [
-            "ch4_p10_2km_a", "ch4_p50_2km_a", "ch4_p90_2km_a"
+            "ch4_p10_2km_a_1201", "ch4_p50_2km_a_1201", "ch4_p90_2km_a_1201"
         ]
         assert [sp.vars["asset"] for sp in specs] == [
             "ch4_p10_2km_a", "ch4_p50_2km_a", "ch4_p90_2km_a"
@@ -117,7 +125,7 @@ class TestIterSpecs:
     def test_bands_filter(self):
         s = _stub({CH4_CID: CH4_ITEMS}, bands=["ch4_p50_2km_a"])
         specs = list(s.iter_specs())
-        assert [sp.name for sp in specs] == ["ch4_p50_2km_a"]
+        assert [sp.name for sp in specs] == ["ch4_p50_2km_a_1201"]
 
     def test_vars_columns(self):
         s = _stub({NDVI_CID: NDVI_ITEMS})

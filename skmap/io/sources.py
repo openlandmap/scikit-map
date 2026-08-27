@@ -514,7 +514,9 @@ class StacSource(LayerSource):
                 group=cid,
                 start_date=start,
                 end_date=end,
-                name=key,
+                # year-agnostic but unique within a year (overlay requirement),
+                # like the YAML ``{band}_{season}`` names
+                name=f"{key}_{start:%m%d}",
                 temporal=True,
                 vars={
                     "collection": cid,
