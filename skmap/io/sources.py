@@ -39,8 +39,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
+import requests
 import yaml
 
 
@@ -420,3 +421,162 @@ class YamlSource(LayerSource):
     def iter_specs(self) -> Iterator[LayerSpec]:
         for entry in self.entries:
             yield from self.expander.expand(entry, self.base_path or "")
+
+
+def _parse_iso(s: Any) -> Optional[datetime]:
+    """Parse an ISO-8601 datetime string (optional ``Z``) to a naive datetime."""
+    if not s:
+        return None
+    s = str(s).strip()
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(s).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return None
+
+
+class StacSource(LayerSource):
+    """Read a STAC catalogue and expand its items into :class:`LayerSpec` objects.
+
+    Queries the per-collection ``/items`` endpoint (collection-respected,
+    token-paginated) and yields one :class:`LayerSpec` per **data asset**
+    (an asset whose ``roles`` contains ``"data"``).  Dates come from the
+    item's ``start_datetime`` / ``end_datetime`` properties (the ``datetime``
+    field is often ``None``).  The ``datetime`` argument is filtered
+    **client-side** because the ecodatacube ``/items`` endpoint rejects the
+    ``datetime`` query parameter.
+
+    :param url: Catalogue root URL, e.g.
+        ``https://stac.opengeohub.org/v1/cat/ecodatacube``.
+    :param collections: One collection id or a list of ids.
+    :param datetime: ``"YYYY-MM-DD/YYYY-MM-DD"`` window (client-side filter).
+    :param bbox: ``[west, south, east, north]`` in EPSG:4326, passed to the
+        items endpoint.
+    :param bands: Restrict to these data-asset keys (default: all data assets).
+    :param max_items: Cap the total number of items fetched per collection.
+    :param limit: Page size for the items endpoint.
+    """
+
+    def __init__(
+        self,
+        url: str,
+        collections: Union[str, List[str]],
+        datetime: str = None,
+        bbox: List[float] = None,
+        bands: List[str] = None,
+        max_items: int = None,
+        limit: int = 500,
+        date_format: str = "%Y%m%d",
+        ignore_29feb: bool = True,
+        timeout: float = 60,
+    ) -> None:
+        self.url = url.rstrip("/")
+        self.collections = (
+            [collections] if isinstance(collections, str) else list(collections)
+        )
+        self.bbox = bbox
+        self.bands = set(bands) if bands else None
+        self.max_items = max_items
+        self.limit = limit
+        self.timeout = timeout
+        self.date_format = date_format
+        self.ignore_29feb = ignore_29feb
+        self._root = None
+        self._start, self._end = self._parse_range(datetime)
+
+    # ------------------------------------------------------------- public API
+    def iter_specs(self) -> Iterator[LayerSpec]:
+        for cid in self.collections:
+            for item in self._fetch_item_dicts(cid):
+                yield from self._item_specs(cid, item)
+
+    # ------------------------------------------------------------- item -> specs
+    def _item_specs(self, cid: str, item: Dict[str, Any]) -> Iterator[LayerSpec]:
+        props = item.get("properties", {})
+        start = _parse_iso(props.get("start_datetime"))
+        end = _parse_iso(props.get("end_datetime"))
+        if start is None:
+            return
+        if self._start is not None and start < self._start:
+            return
+        if self._end is not None and start > self._end:
+            return
+
+        for key, asset in item.get("assets", {}).items():
+            roles = asset.get("roles") or []
+            if "data" not in roles:
+                continue
+            if self.bands is not None and key not in self.bands:
+                continue
+            yield LayerSpec(
+                path=asset.get("href"),
+                group=cid,
+                start_date=start,
+                end_date=end,
+                name=key,
+                temporal=True,
+                vars={
+                    "collection": cid,
+                    "asset": key,
+                    "year": start.year,
+                    "gsd": props.get("gsd"),
+                    "epsg": props.get("proj:epsg"),
+                },
+            )
+
+    # ------------------------------------------------------------- HTTP layer
+    def _fetch_item_dicts(self, collection_id: str) -> List[Dict[str, Any]]:
+        """Fetch all items of a collection (token-paginated). Test seam."""
+        root = self._root_url()
+        url = f"{root}/collections/{collection_id}/items"
+        params = {"limit": self.limit}
+        if self.bbox:
+            params["bbox"] = ",".join(str(b) for b in self.bbox)
+
+        items: List[Dict[str, Any]] = []
+        first = True
+        while url:
+            resp = requests.get(
+                url, params=params if first else None, timeout=self.timeout
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            items.extend(data.get("features", []))
+            if self.max_items and len(items) >= self.max_items:
+                return items[: self.max_items]
+            nxt = next(
+                (l for l in data.get("links", []) if l.get("rel") == "next"), None
+            )
+            url = nxt["href"] if nxt else None
+            first = False
+        return items
+
+    def _root_url(self) -> str:
+        """Return the catalogue root URL (from the catalog's ``root`` link)."""
+        if self._root is None:
+            resp = requests.get(self.url, timeout=self.timeout)
+            resp.raise_for_status()
+            data = resp.json()
+            for link in data.get("links", []):
+                if link.get("rel") == "root":
+                    self._root = link["href"].rstrip("/")
+                    break
+            if self._root is None:
+                raise ValueError(f"No 'root' link found in catalogue {self.url}")
+        return self._root
+
+    # ------------------------------------------------------------- helpers
+    @staticmethod
+    def _parse_range(dt: Any) -> Tuple[Optional[datetime], Optional[datetime]]:
+        if dt is None:
+            return None, None
+        if isinstance(dt, (list, tuple)):
+            a, b = dt[0], dt[1]
+        elif "/" in str(dt):
+            a, b = str(dt).split("/", 1)
+        else:
+            a = b = dt
+        start = _parse_iso(a) if a not in ("", "..", None) else None
+        end = _parse_iso(b) if b not in ("", "..", None) else None
+        return start, end

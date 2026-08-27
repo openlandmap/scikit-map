@@ -37,7 +37,6 @@ from numpy.typing import NDArray
 from osgeo import gdal
 from pandas import DataFrame, Series, to_datetime
 from PIL import Image
-from pystac.item import Item
 from rasterio.windows import Window, from_bounds
 from shapely.geometry import box, shape
 
@@ -48,7 +47,6 @@ from skmap.misc import (
     date_range,
     make_tempdir,
     ttprint,
-    vrt_warp,
 )
 
 _INT_DTYPE = (
@@ -1115,61 +1113,6 @@ class RasterData(SKMapBase):
 
         return row
 
-    def from_stac_items(
-        stac_items: List[Item],
-        bands: List[str] = None,
-        to_crs=rasterio.crs.CRS.from_epsg(4326),
-        spatial_res=None,
-        resamp_method="near",
-        n_jobs: int = 10,
-        verbose=False,
-    ):
-        """Build a :class:`RasterData` from a list of STAC items (classmethod)."""
-
-        all_bands = list(stac_items[0].assets.keys())
-        if bands is None:
-            if verbose:
-                ttprint(f"Reading band {all_bands[0]} from {all_bands}")
-            bands = [all_bands[0]]
-
-        stac_info = []
-        stac_href = {}
-
-        for i in stac_items:
-            for band in i.assets.keys():
-                if band in bands:
-                    href = i.assets[band].href
-                    if href not in stac_href:
-                        stac_href[href] = False
-                        stac_info.append(
-                            {
-                                "href": i.assets[band].href,
-                                "band": band,
-                                "date": i.datetime.replace(tzinfo=None),
-                            }
-                        )
-
-        stac_info = pd.DataFrame(stac_info)
-
-        raster_file, vrt_files = vrt_warp(
-            stac_info["href"],
-            dst_crs=to_crs.to_wkt(),
-            tr=spatial_res,
-            r_method=resamp_method,
-            return_input_files=True,
-        )
-        vrt_info = pd.DataFrame({"href": raster_file, "vrt": vrt_files})
-        stac_info = stac_info.merge(vrt_info, on="href", how="inner")
-
-        groups = {}
-        for g, row in stac_info.groupby("band"):
-            if g not in groups:
-                groups[g] = []
-
-            groups[g] += [(v, 1, d, d) for v, d in zip(row["vrt"], row["date"])]
-
-        return RasterData(groups, verbose=verbose)
-
     @classmethod
     def from_info(
         cls,
@@ -1245,6 +1188,43 @@ class RasterData(SKMapBase):
         return YamlSource(
             path,
             base_path=base_path,
+            date_format=date_format,
+            ignore_29feb=ignore_29feb,
+        ).to_rasterdata(backend=backend, verbose=verbose)
+
+    @classmethod
+    def from_stac(
+        cls,
+        url: str,
+        collections: Union[str, List[str]],
+        datetime: str = None,
+        bbox: List[float] = None,
+        bands: List[str] = None,
+        max_items: int = None,
+        limit: int = 500,
+        date_format: str = "%Y%m%d",
+        ignore_29feb: bool = True,
+        backend: Union[str, "ComputeBackend"] = "numpy",
+        verbose: bool = False,
+    ):
+        """Build a lazy RasterData from a STAC catalogue (classmethod).
+
+        Queries the per-collection ``/items`` endpoint and yields one ``info``
+        row per data asset (``roles`` contains ``"data"``).  The result holds
+        remote COG hrefs + dates only (no ``.read()``); its ``info`` carries
+        ``collection``, ``asset``, ``year``, ``gsd`` and ``epsg`` columns.
+        See :class:`skmap.io.sources.StacSource` for the query rules.
+        """
+        from skmap.io.sources import StacSource
+
+        return StacSource(
+            url=url,
+            collections=collections,
+            datetime=datetime,
+            bbox=bbox,
+            bands=bands,
+            max_items=max_items,
+            limit=limit,
             date_format=date_format,
             ignore_29feb=ignore_29feb,
         ).to_rasterdata(backend=backend, verbose=verbose)
