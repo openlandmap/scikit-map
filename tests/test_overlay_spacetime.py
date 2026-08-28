@@ -119,3 +119,25 @@ class TestSpaceTimeOverlay:
                 res_2019[col].to_numpy(),
                 equal_nan=True,
             )
+
+    def test_skips_range_with_no_layers(self, capsys):
+        """A year with no matching layers is skipped, not crashed.
+
+        Regression for KeyError: 'group' when a date range (here 2020) has
+        points but the catalogue has no layers covering it.
+        """
+        pts = gpd.read_file(self.SAMPLES)
+        # temporal-only swir1 (no static) ending before 2020 -> the 2020 range
+        # has points but zero layers.
+        rdata = RasterData(
+            {"swir1": self._swir1_template()}
+        ).timespan("20141202", "20190901", "days", [109, 96, 80, 80])
+        sto = SpaceTimeOverlay(
+            points=pts, col_date="date", rasterdata=rdata, raster_tiles=None
+        )
+        # 2020 has points but no layers -> skipped (not built, not crashed)
+        assert "2020-01-01..2020-12-31" not in sto.overlay_objs
+        res = sto.run(max_ram_mb=512, out_file_name=None)
+        assert 2020 not in set(res["date"].dt.year)
+        out = capsys.readouterr().out
+        assert "No raster layers in [2020-01-01, 2020-12-31]" in out

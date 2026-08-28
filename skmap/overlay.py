@@ -797,6 +797,13 @@ class SpaceTimeOverlay:
                 )
                 n_layers = len(range_rdata.info)
 
+                if n_layers == 0:
+                    # No raster layers cover this range (e.g. the catalogue ends
+                    # before the points' last year): skip it rather than build an
+                    # empty overlay (which has no ``group`` column).
+                    print(f"No raster layers in [{start}, {end}], skipping it")
+                    continue
+
                 if self.verbose:
                     ttprint(
                         f"Overlay {len(range_pts)} points in [{start}, {end}]"
