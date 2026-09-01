@@ -1,0 +1,26 @@
+- layer: '{band}_glad.landsat.ard2.swa_m_30m_s_{year}{start_month}_{year}{end_month}_go_epsg.4326_v1'
+  path: '{base_path}/arco/{band}_glad.landsat.ard2.swa_m_30m_s_{year}{start_month}_{year}{end_month}_go_epsg.4326_v1.tif'
+  temporal_resolution: 'bimonthly' # bimonthly, yearly, longterm_or_static, monthly
+  type: 'temporal' # temporal, common
+  start_year: 1997
+  end_year: 2024
+  leap_year: FALSE
+  band: 'blue, green, red, nir, swir1, swir2, thermal'
+  start_month: '0101, 0301, 0501, 0701, 0901, 1101'
+  end_month: '0228, 0430, 0630, 0831, 1031, 1231'
+
+- layer: 'clm_lst_mod11a2.nighttime.m02_{perc}_1km_s0..0cm_2000..2021_v1.2'
+  path: '{base_path}/global/clm/clm_lst_mod11a2.nighttime.m02_{perc}_1km_s0..0cm_2000..2021_v1.2.tif'
+  temporal_resolution: 'longterm_or_static' # bimonthly, yearly, longterm_or_static, monthly
+  type: 'common' # temporal, common
+  perc: 'p50'
+
+- layer: 'gedtm_rf_std_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2'
+  path: '{base_path}/global/dtm/v1.2/gedtm_rf_std_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2.tif'
+  temporal_resolution: 'longterm_or_static' # bimonthly, yearly, longterm_or_static, monthly
+  type: 'common' # temporal, common
+
+- layer: 'pnv_potential.landcover_probav.lc100.closed.forest..deciduous.broadleaf_p_250m_s0..0cm_2017_v0.1'
+  path: '{base_path}/global/pnv/pnv_potential.landcover_probav.lc100.closed.forest..deciduous.broadleaf_p_250m_s0..0cm_2017_v0.1.tif'
+  temporal_resolution: 'longterm_or_static' # bimonthly, yearly, longterm_or_static, monthly
+  type: 'common' # temporal, common

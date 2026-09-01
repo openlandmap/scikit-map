@@ -7,6 +7,16 @@ from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
 
+def _read_version():
+    """Read the package version from pyproject.toml (single source of truth)."""
+    try:
+        import tomllib
+    except ImportError:  # Python 3.10
+        import tomli as tomllib
+    with open("pyproject.toml", "rb") as f:
+        return tomllib.load(f)["project"]["version"]
+
+
 class CMakeExtension(Extension):
     def __init__(self, name: str, sourcedir: str = "") -> None:
         super().__init__(name, sources=[])
@@ -92,7 +102,7 @@ else:
 
 setup(
     name="scikit-map",
-    version="0.9.1",
+    version=_read_version(),
     packages=find_packages(),
     package_data={"skmap.data": ["toy/*/*.tif", "toy/*/*.gpkg", "toy/*/*/*.tif"]},
     ext_modules=[CMakeExtension("skmap_bindings", ".")],
