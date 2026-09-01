@@ -3,6 +3,7 @@ Parallelization helpers based on Ray
 """
 
 import multiprocessing
+import os
 from pathlib import Path
 from typing import Any, Callable, Iterator, List, Union
 
@@ -32,6 +33,14 @@ Number of CPU cores available.
 
 def _call_worker(worker, args):
     """Call ``worker(*args)`` (module-level so Ray can serialize it)."""
+
+    # Ray parallelizes at the task level; cap per-worker BLAS/OMP threads to 1
+    # so n_tasks x n_cores thread oversubscription cannot OOM the workers
+    # (observed as SIGTERM core dumps in LAPACK on many-core machines).
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
     return worker(*args)
 
