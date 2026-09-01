@@ -1041,6 +1041,7 @@ class RasterData(SKMapBase):
         # Lazily populated by ``read()``; ``None`` means the layers are not
         # loaded in memory (paths only) so overlay can sample from files.
         self.array = None
+        self._cached_array = None
         self.base_raster = None
         self.window = None
         self.overview = None
@@ -1060,6 +1061,19 @@ class RasterData(SKMapBase):
 
         self.info.reset_index(drop=True, inplace=True)
         self.max_rasters = max_rasters
+
+    def _set_array(self, value):
+        """Set ``self.array`` and invalidate the materialized cache."""
+        self.array = value
+        self._cached_array = None
+
+    def _arr(self):
+        """Materialize ``self.array`` once and cache it (invalidated on mutation)."""
+        if self.array is None:
+            return None
+        if self._cached_array is None:
+            self._cached_array = self.array.get()
+        return self._cached_array
 
     def _new_info_row(
         self,
@@ -1429,21 +1443,23 @@ class RasterData(SKMapBase):
             + f" and {len(self.info[RasterData.GROUP_COL].unique())} group(s)"
         )
 
-        self.array = read_rasters(
-            raster_files,
-            band=band,
-            window=window,
-            data_mask=data_mask,
-            dtype=dtype,
-            expected_shape=expected_shape,
-            n_jobs=n_jobs,
-            overview=overview,
+        self._set_array(
+            read_rasters(
+                raster_files,
+                band=band,
+                window=window,
+                data_mask=data_mask,
+                dtype=dtype,
+                expected_shape=expected_shape,
+                n_jobs=n_jobs,
+                overview=overview,
             scale=scale,
             gdal_opts=gdal_opts,
             verbose=self.verbose,
             max_rasters=self.max_rasters,
             # explicit backend='cpp' reads via the C++ bindings only (no Ray)
             backend="cpp" if self.backend.name == "cpp" else None,
+            )
         )
 
         self._spatial_shape = (out_h, out_w)
@@ -1583,10 +1599,12 @@ class RasterData(SKMapBase):
                 [self.array.ref, new_ref],
                 [self.array.shape, new_array.shape],
             )
-            self.array = parallel.SharedArray(
-                out_ref,
-                (self.array.shape[0] + new_array.shape[0], self.array.shape[1]),
-                self.array.dtype,
+            self._set_array(
+                parallel.SharedArray(
+                    out_ref,
+                    (self.array.shape[0] + new_array.shape[0], self.array.shape[1]),
+                    self.array.dtype,
+                )
             )
             # Free the local copy now that the data lives in the object store;
             # otherwise a large result is held twice until this frame returns.
@@ -1624,8 +1642,10 @@ class RasterData(SKMapBase):
             keep_idx,
             (len(keep_idx), self.array.shape[1]),
         )
-        self.array = parallel.SharedArray(
-            out_ref, (len(keep_idx), self.array.shape[1]), self.array.dtype
+        self._set_array(
+            parallel.SharedArray(
+                out_ref, (len(keep_idx), self.array.shape[1]), self.array.dtype
+            )
         )
         self.info = self.info.drop(idx).reset_index(drop=True)
 
@@ -1751,14 +1771,16 @@ class RasterData(SKMapBase):
         if return_idx:
             return list(info.index)
         elif return_array:
-            return None if self.array is None else self.array.get()[info.index, :]
+            return None if self.array is None else self._arr()[info.index, :]
         elif return_info:
             return info
         elif return_copy:
             rdata = copy.copy(self)
             if self.array is not None:
-                rdata.array = parallel.put_shared(
-                    self.array.get()[info.index, :], local=self.backend.name == "cpp"
+                rdata._set_array(
+                    parallel.put_shared(
+                        self._arr()[info.index, :], local=self.backend.name == "cpp"
+                    )
                 )
             rdata.info = info.reset_index(drop=True)
             # Deep-copy the mutable dicts so the filtered copy cannot corrupt
@@ -1768,8 +1790,10 @@ class RasterData(SKMapBase):
             return rdata
         else:
             if self.array is not None:
-                self.array = parallel.put_shared(
-                    self.array.get()[info.index, :], local=self.backend.name == "cpp"
+                self._set_array(
+                    parallel.put_shared(
+                        self._arr()[info.index, :], local=self.backend.name == "cpp"
+                    )
                 )
             return self
 
@@ -1920,11 +1944,11 @@ class RasterData(SKMapBase):
     @property
     def valid_pixels(self) -> np.ndarray:
         """Boolean mask over ``H*W`` of pixels with no NaN in any band."""
-        return ~np.isnan(self.array.get()).any(axis=0)
+        return ~np.isnan(self._arr()).any(axis=0)
 
     def select_valid(self) -> np.ndarray:
         """Return the ``(n_valid, n_bands)`` array of non-NaN pixel rows."""
-        return self.array.get()[:, self.valid_pixels].T
+        return self._arr()[:, self.valid_pixels].T
 
     def expand_valid(self, values, nodata=np.nan) -> np.ndarray:
         """Expand a ``(n_valid,)`` / ``(n_valid, k)`` array back to ``H*W``."""
@@ -2160,7 +2184,7 @@ class RasterData(SKMapBase):
         with rasterio.open(self._base_raster()) as src:
             row_id, col_id = rasterio.transform.rowcol(src.transform, df.x, df.y)
             pix = row_id * src.width + col_id
-        df["data"] = np.array(self.array.get()[:, pix].T).tolist()
+        df["data"] = np.array(self._arr()[:, pix].T).tolist()
         # if data is required no need to create figures
         if return_data:
             return df.data.to_numpy()
