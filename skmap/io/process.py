@@ -523,25 +523,21 @@ class WhittakerSmooth(Transformer):
         spmat = sparse.diags(diagonals, offsets, shape, format=format)
         return spmat
 
-    def _process_ts(self, data):
-        y = data.reshape(-1).copy()
-        n_gaps = np.sum((np.isnan(y)).astype("int"))
-
-        if n_gaps == 0:
-            r = self.backend.sparse_solve(self.coefmat, y)
-            return r
-        else:
-            return y
-
     def _run(self, data):
         m = data.shape[0]
         E = sparse.eye(m, format="csc")
         D = self._speyediff(m, self.d, format="csc")
-        self.coefmat = E + self.lmbd * D.conj().T.dot(D)
+        coefmat = E + self.lmbd * D.conj().T.dot(D)
 
-        return self.backend.apply_along_axis(
-            self._process_ts, 0, data, n_jobs=self.n_jobs
-        )
+        # ponytail: one LU factorization + multi-RHS solve for all gap-free
+        # pixels, instead of n_pixels separate splu() calls via
+        # apply_along_axis.  Fall back to a per-pixel loop if the multi-RHS
+        # solve becomes memory-bound on very large grids.
+        valid = ~np.isnan(data).any(axis=0)
+        out = data.astype(np.float64, copy=True)
+        if valid.any():
+            out[:, valid] = self.backend.sparse_solve(coefmat, data[:, valid])
+        return out
 
 class TimeEnum(Enum):
     MONTHLY = 1

@@ -60,13 +60,14 @@ def test_seasconvfill_cpp_uses_cpp_kernel():
     assert "tsirf" not in ops
 
 
-def test_whittaker_cpp_falls_back_for_apply():
-    """WhittakerSmooth (main process) records its apply_along_axis fallback."""
+def test_whittaker_cpp_no_apply_fallback():
+    """WhittakerSmooth batches the solve via inherited sparse_solve, so it
+    no longer dispatches apply_along_axis (and records no fallback)."""
     r = _make_rdata(CppBackend())
     runner = WhittakerSmooth(lmbd=10, d=2, verbose=False)
     r.run(runner)
     ops = {op for op, _ in runner.backend.fallbacks}
-    assert "apply_along_axis" in ops
+    assert "apply_along_axis" not in ops
 
 
 def test_numpy_backend_no_fallbacks():

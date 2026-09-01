@@ -17,15 +17,16 @@ def _make_rdata(backend):
     return r
 
 
-def test_cpp_whittaker_records_apply_fallback():
-    """WhittakerSmooth runs in the main process, so its fallback is captured."""
+def test_cpp_whittaker_no_apply_fallback():
+    """WhittakerSmooth batches the solve via inherited sparse_solve, so it
+    no longer dispatches apply_along_axis (and records no fallback)."""
     from skmap.io.process import WhittakerSmooth
 
     r = _make_rdata(CppBackend())
     runner = WhittakerSmooth(lmbd=10, d=2, verbose=False)
     r.run(runner)
     ops = {op for op, _ in runner.backend.fallbacks}
-    assert "apply_along_axis" in ops
+    assert "apply_along_axis" not in ops
 
 
 def test_cpp_trendanalysis_records_apply_fallback():
