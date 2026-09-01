@@ -113,7 +113,8 @@ def _read_raster(
     try:
         ds = rasterio.open(raster_file)
 
-        ttprint("Start reading")
+        if verbose:
+            ttprint("Start reading")
         array_mm = None
         if overview is not None and overview > 1:
             h = window.height if window is not None else ds.height
@@ -126,7 +127,8 @@ def _read_raster(
             )
         else:
             array_mm = ds.read(band, out_dtype=dtype, window=window)
-        ttprint("End reading")
+        if verbose:
+            ttprint("End reading")
 
         # Normalise to 2-D (H, W): rasterio returns (1, H, W) for a band list.
         if array_mm.ndim == 3:
@@ -140,7 +142,8 @@ def _read_raster(
         data_exists = True
         # print(f"Data was read: {raster_file}")
     except Exception as ex:
-        ttprint(f"Exception: {ex}")
+        if verbose:
+            ttprint(f"Exception: {ex}")
         # traceback.i(print)_exc()
 
         if window is not None:
@@ -168,14 +171,18 @@ def _read_raster(
                 )
 
         if nodata is not None:
-            ttprint("Start _nodata_replacement")
+            if verbose:
+                ttprint("Start _nodata_replacement")
             array_mm[array_mm == nodata] = _nodata_replacement(dtype)
-            ttprint("End _nodata_replacement")
+            if verbose:
+                ttprint("End _nodata_replacement")
 
     if scale != 1.0:
-        ttprint("Start scaling")
+        if verbose:
+            ttprint("Start scaling")
         array_mm = array_mm * scale
-        ttprint("Start scaling")
+        if verbose:
+            ttprint("End scaling")
 
     return array_mm, raster_idx, data_exists
 
@@ -1588,6 +1595,9 @@ class RasterData(SKMapBase):
                 (self.array.shape[0] + new_array.shape[0], self.array.shape[1]),
                 self.array.dtype,
             )
+            # Free the local copy now that the data lives in the object store;
+            # otherwise a large result is held twice until this frame returns.
+            del new_array
 
         to_add_info.append(new_info)
 
