@@ -28,15 +28,9 @@ import pandas as pd
 import rasterio
 import requests
 from dateutil.relativedelta import relativedelta
-from IPython.display import HTML
-from matplotlib import pyplot
-from matplotlib._animation_data import DISPLAY_TEMPLATE, JS_INCLUDE, STYLE_INCLUDE
-from minio import Minio
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from numpy.typing import NDArray
 from osgeo import gdal
 from pandas import DataFrame, Series, to_datetime
-from PIL import Image
 from rasterio.windows import Window, from_bounds
 from shapely.geometry import box, shape
 
@@ -2025,6 +2019,8 @@ class RasterData(SKMapBase):
     ):
         """Write the selected layers to an S3-compatible bucket as GeoTIFFs."""
 
+        from minio import Minio
+
         bucket = path.split("/")[0]
         prefix = "/".join(path.split("/")[1:])
 
@@ -2149,6 +2145,8 @@ class RasterData(SKMapBase):
         >>> points = gpd.read_file('./skmap/data/toy/samples/samples.gpkg')
         >>> rasterdata.point_query(x=points.geometry.x.to_list(), y=points.geometry.y.to_list() , label_xaxis='index', cols=3, titles=points.label) #doctest: +SKIP
         """
+        from matplotlib import pyplot
+
         df = pd.DataFrame()
         df["x"], df["y"], df["title"] = x, y, titles
         bbox = rasterio.open(self._base_raster()).bounds
@@ -2253,6 +2251,9 @@ class RasterData(SKMapBase):
         cbar_props: dict = None,
         composite=False,
     ):
+        from matplotlib import pyplot
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
         # base figure with predefined style
 
         # no axis labels
@@ -2358,6 +2359,8 @@ class RasterData(SKMapBase):
         :param dpi                  : dot per inch value to save the figure. If the `to_img` param provided
         :param layout_col           : This controls the column count that will be used in the grid plot. Default is 3.
         """
+        from matplotlib import pyplot
+
         if not groups:
             groups = [self.info.group.to_list()[0]]
 
@@ -2499,6 +2502,10 @@ class RasterData(SKMapBase):
         :param to_gif: path to save a GIF if not ``None``.
         :param n_jobs: number of parallel jobs.
         """
+
+        from IPython.display import HTML
+        from matplotlib._animation_data import DISPLAY_TEMPLATE, JS_INCLUDE, STYLE_INCLUDE
+        from PIL import Image
 
         if not groups:
             groups = [self.info.group.to_list()[0]]
