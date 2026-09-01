@@ -1026,15 +1026,14 @@ class RasterData(SKMapBase):
             ],
         )
 
-        self.info[RasterData.TEMPORAL_COL] = self.info.apply(
-            lambda r: RasterData.PLACEHOLDER_DT in str(r[RasterData.PATH_COL]), axis=1
+        paths = self.info[RasterData.PATH_COL].astype(str)
+        self.info[RasterData.TEMPORAL_COL] = paths.str.contains(
+            RasterData.PLACEHOLDER_DT, regex=False
         )
-        self.info[RasterData.NAME_COL] = self.info.apply(
-            lambda r: Path(str(r[RasterData.PATH_COL]).split("?")[0]).stem
-            if not r[RasterData.TEMPORAL_COL]
-            else None,
-            axis=1,
-        )
+        self.info[RasterData.NAME_COL] = [
+            Path(p.split("?")[0]).stem if not t else None
+            for p, t in zip(paths, self.info[RasterData.TEMPORAL_COL])
+        ]
 
         self.date_args = {}
         self._active_group = None
