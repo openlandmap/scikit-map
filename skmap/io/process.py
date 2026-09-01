@@ -1698,9 +1698,14 @@ try:
             # Build the concatenated feature matrix (n_years·n_pixels,
             # n_features), rows ordered year-major.  Static covariates repeat
             # because their column in covs_idx is the same band every year.
-            X = np.concatenate(
-                [arr[covs_idx[:, j], :].T for j in range(n_years)], axis=0
-            ).astype(np.float32, copy=False)
+            # Pre-allocate and fill in-place: the old np.concatenate over a
+            # list of per-year transposed copies held n_years blocks at once.
+            n_features = covs_idx.shape[0]
+            X = np.empty((n_years * n_pixels, n_features), dtype=np.float32)
+            for j in range(n_years):
+                X[j * n_pixels : (j + 1) * n_pixels, :] = arr[
+                    covs_idx[:, j], :
+                ].T
 
             if isinstance(self.valid_only, np.ndarray):
                 valid = np.tile(np.asarray(self.valid_only, dtype=bool), n_years)
