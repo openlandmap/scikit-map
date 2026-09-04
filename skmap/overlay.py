@@ -288,7 +288,12 @@ class _PointAccessor:
     def get(self) -> np.ndarray:
         return self._data
 
-    def _band_index(self, name: str, group: str = None) -> int:
+    def _arr(self) -> np.ndarray:
+        return self._data
+
+    def _band_index(
+        self, name: str, group: str = None, match: dict = None, match_col: str = None
+    ) -> int:
         return self._names.index(name)
 
 

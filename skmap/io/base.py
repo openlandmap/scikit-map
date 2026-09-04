@@ -5,6 +5,7 @@ from contextlib import ExitStack, contextmanager
 from rasterio.io import DatasetWriter
 
 import copy
+import inspect
 import math
 import os
 import tempfile
@@ -1037,6 +1038,8 @@ class RasterData(SKMapBase):
 
         self.date_args = {}
         self._active_group = None
+        self._active_group_cols = [RasterData.GROUP_COL]
+        self._active_group_map = {}
 
         # Lazily populated by ``read()``; ``None`` means the layers are not
         # loaded in memory (paths only) so overlay can sample from files.
@@ -1075,6 +1078,28 @@ class RasterData(SKMapBase):
             self._cached_array = self.array.get()
         return self._cached_array
 
+    def _active_group_key(self):
+        """Return a hashable key for ``date_args`` lookup from ``_active_group``.
+
+        When a run is partitioned by multiple columns, ``_active_group`` is a
+        joined string (e.g. ``"2020.red"``) mapped back to its column values
+        via ``_active_group_map``; the ``group`` component (or the first
+        column) is used as the ``date_args`` key.
+        """
+        ag = self._active_group
+        if ag is None:
+            return None
+        key = self._active_group_map.get(ag, ag)
+        if isinstance(key, tuple):
+            cols = self._active_group_cols
+            if RasterData.GROUP_COL in cols:
+                key = key[cols.index(RasterData.GROUP_COL)]
+            else:
+                key = key[0]
+        if key not in self.date_args and self.date_args:
+            key = next(iter(self.date_args))
+        return key
+
     def _new_info_row(
         self,
         raster_file: str,
@@ -1096,12 +1121,13 @@ class RasterData(SKMapBase):
         row[RasterData.BAND_COL] = 1
 
         if self._active_group is not None:
+            ag_key = self._active_group_key()
             if date_style is None:
-                date_style = self.date_args[self._active_group]["date_style"]
+                date_style = self.date_args[ag_key]["date_style"]
             if date_format is None:
-                date_format = self.date_args[self._active_group]["date_format"]
+                date_format = self.date_args[ag_key]["date_format"]
 
-            self.date_args[group] = self.date_args[self._active_group]
+            self.date_args[group] = self.date_args[ag_key]
         else:
             self.date_args[group] = {
                 "date_style": date_style,
@@ -1155,6 +1181,8 @@ class RasterData(SKMapBase):
         obj.info = info.reset_index(drop=True)
         obj.date_args = {}
         obj._active_group = None
+        obj._active_group_cols = [RasterData.GROUP_COL]
+        obj._active_group_map = {}
         obj.array = None
         obj.base_raster = None
         obj.window = None
@@ -1257,10 +1285,10 @@ class RasterData(SKMapBase):
             gr = ""
 
         if date_format is None:
-            date_format = self.date_args[self._active_group]["date_format"]
+            date_format = self.date_args[self._active_group_key()]["date_format"]
 
         if date_style is None:
-            date_style = self.date_args[self._active_group]["date_style"]
+            date_style = self.date_args[self._active_group_key()]["date_style"]
 
         if ignore_29feb and "%j" in date_format:
             dt1 = dt1 + relativedelta(leapdays=-1)
@@ -1478,11 +1506,23 @@ class RasterData(SKMapBase):
         outname: str = None,
         drop_input: bool = False,
         backend: Union[str, "ComputeBackend"] = None,
+        by=None,
+        match: dict = None,
+        match_col: str = None,
     ):
         """Execute a function over the loaded raster data, yielding per-tile results.
 
         ``backend`` optionally overrides the compute backend for this run only
         (it does not mutate ``self.backend``).
+
+        ``by`` optionally partitions a group runner by one or more ``info``
+        columns instead of the default ``group`` column (e.g.
+        ``by=["year", "band"]``).
+
+        ``match_col`` (default ``name``) is the ``info`` column searched for
+        each input band name of a whale runner (e.g.
+        ``match_col="band"``); ``match`` optionally adds further column==value
+        constraints to disambiguate.
         """
 
         # Propagate the compute backend so the runner uses it instead of
@@ -1502,7 +1542,7 @@ class RasterData(SKMapBase):
                 input_groups = self.info[
                     self.info[RasterData.TEMPORAL_COL] == process.temporal
                 ][RasterData.GROUP_COL].unique().tolist()
-            self._group_run(process, group, outname)
+            self._group_run(process, group, outname, by=by)
             if drop_input:
                 self.drop(input_groups)
         else:
@@ -1518,6 +1558,13 @@ class RasterData(SKMapBase):
             kwargs = {"rdata": self}
             if outname is not None:
                 kwargs["outname"] = outname
+            sig = inspect.signature(process.run).parameters
+            if match is not None and "match" in sig:
+                kwargs["match"] = match
+            if match_col is not None and "match_col" in sig:
+                kwargs["match_col"] = match_col
+            if by is not None and "by" in sig:
+                kwargs["by"] = by
 
             _, new_info = process.run(**kwargs)
 
@@ -1558,29 +1605,45 @@ class RasterData(SKMapBase):
         process: SKMapGroupRunner,
         group: [list, str] = [],
         outname: str = None,
+        by=None,
     ):
         if isinstance(group, str):
             group = [group]
+
+        by = by or RasterData.GROUP_COL
+        if isinstance(by, str):
+            by = [by]
+        self._active_group_cols = by
+        self._active_group_map = {}
 
         to_add_info = []
 
         group_list = []
         ginfo_list = []
 
-        for _group, ginfo in self.info.groupby(RasterData.GROUP_COL):
+        for key, ginfo in self.info.groupby(by):
             if ginfo[RasterData.TEMPORAL_COL].iloc[0] != process.temporal:
                 self._verbose(
-                    f"Skipping {process.__class__.__name__} for {_group} group"
+                    f"Skipping {process.__class__.__name__} for {key} group"
                 )
                 continue
 
-            if len(group) > 0 and _group not in group:
+            # ``group`` filters on the first partition column's values
+            # (GROUP_COL by default, preserving the old behaviour).
+            gval = key if len(by) == 1 else key[0]
+            if len(group) > 0 and gval not in group:
                 continue
 
-            expr_group = f'{RasterData.GROUP_COL} == "{_group}"'
-            ginfo = self.info.query(expr_group)
+            # A multi-column key becomes a joined string for naming; the
+            # original tuple is kept in _active_group_map so _filter can
+            # reconstruct the per-column constraints.
+            if isinstance(key, tuple):
+                group_name = ".".join(str(k) for k in key)
+                self._active_group_map[group_name] = key
+            else:
+                group_name = key
 
-            group_list.append(_group)
+            group_list.append(group_name)
             ginfo_list.append(ginfo)
 
         process_name = process.__class__.__name__
@@ -1617,6 +1680,8 @@ class RasterData(SKMapBase):
         )
 
         self._active_group = None
+        self._active_group_cols = [RasterData.GROUP_COL]
+        self._active_group_map = {}
 
         if len(to_add_info) > 0:
             new_info = pd.concat(to_add_info)
@@ -1756,6 +1821,23 @@ class RasterData(SKMapBase):
             return_idx=return_idx,
         )
 
+    def select(self, **match) -> "RasterData":
+        """Return a copy keeping only rows where each column equals a value.
+
+        Filters by arbitrary ``info`` columns (not just ``group``), e.g.
+        ``rdata.select(band="red", year=2020)``.  Useful to pre-filter a
+        multi-column catalogue before running a runner.
+        """
+        info = self.info
+        for col, val in match.items():
+            if col not in info.columns:
+                raise KeyError(
+                    f"Column {col!r} not in RasterData.info "
+                    f"(columns: {list(info.columns)})"
+                )
+            info = info[info[col] == val]
+        return self._filter(info, return_copy=True)
+
     def _filter(
         self,
         info,
@@ -1766,7 +1848,12 @@ class RasterData(SKMapBase):
     ):
         # Active filters
         if self._active_group is not None:
-            info = info.query(f'{RasterData.GROUP_COL} == "{self._active_group}"')
+            key = self._active_group_map.get(self._active_group, self._active_group)
+            if isinstance(key, tuple):
+                for col, val in zip(self._active_group_cols, key):
+                    info = info[info[col] == val]
+            else:
+                info = info.query(f'{RasterData.GROUP_COL} == "{self._active_group}"')
 
         if return_idx:
             return list(info.index)
@@ -1817,31 +1904,73 @@ class RasterData(SKMapBase):
             groups = ["common"]
         return groups
 
-    def _band_index(self, name: str, group: str = None) -> int:
+    def _band_index(
+        self,
+        name: str,
+        group: str = None,
+        match: dict = None,
+        match_col: str = None,
+    ) -> int:
         """Return the array band index (row position) of a named layer.
 
         The array is always ``(N, H*W)`` with band ``k`` corresponding to the
         ``k``-th row of ``self.info``, so positional lookup (not the possibly
         stale ``info.index`` values) is used.
+
+        ``match_col`` (default ``name``) is the ``info`` column searched for
+        ``name``, so layers can be resolved by a variable column (e.g.
+        ``match_col="band"``) when the catalogue is organised by a column
+        other than ``group``.  ``match`` optionally adds further column==value
+        constraints to disambiguate.  If more than one row matches, a
+        ``KeyError`` is raised (callers must disambiguate rather than
+        silently pick the first).
         """
+        match_col = match_col or RasterData.NAME_COL
         info = self.info.reset_index(drop=True)
-        mask = info[RasterData.NAME_COL] == name
+        if match_col not in info.columns:
+            raise KeyError(
+                f"Column {match_col!r} not in RasterData.info "
+                f"(columns: {list(info.columns)})"
+            )
+        mask = info[match_col] == name
         if group is not None:
             mask &= info[RasterData.GROUP_COL] == group
+        if match:
+            for col, val in match.items():
+                if col not in info.columns:
+                    raise KeyError(
+                        f"Column {col!r} not in RasterData.info "
+                        f"(columns: {list(info.columns)})"
+                    )
+                mask &= info[col] == val
         hits = np.flatnonzero(mask.values)
         if len(hits) == 0:
             raise KeyError(
-                f"Layer {name!r} not found in RasterData groups {self.get_groups()}"
+                f"Layer {name!r} not found in column {match_col!r}"
+                + (f" with match={match}" if match else "")
+                + (f" in group {group!r}" if group is not None else "")
+                + f" (groups: {self.get_groups()})"
+            )
+        if len(hits) > 1:
+            raise KeyError(
+                f"Layer {name!r} matched {len(hits)} rows; "
+                f"add a match constraint to disambiguate"
             )
         return int(hits[0])
 
-    def _get_covs_idx(self, covs_lst: List[str]) -> np.ndarray:
+    def _get_covs_idx(self, covs_lst: List[str], match_col: str = None) -> np.ndarray:
         """Map covariate names to band indices per group (``common`` falls back).
 
         Returns an int matrix of shape ``(len(covs_lst), n_groups)`` where each
         column is a group and each row a covariate; a covariate missing from a
         group falls back to the ``common`` group.
+
+        ``match_col`` (default ``name``) is the ``info`` column searched for
+        each covariate name, so covariates can be resolved by a variable
+        column (e.g. ``match_col="band"``) when the catalogue is organised by
+        a column other than ``group``.
         """
+        match_col = match_col or RasterData.NAME_COL
         groups = self.get_groups()
         info = self.info.reset_index(drop=True)
         covs_idx = np.zeros((len(covs_lst), len(groups)), np.int32)
@@ -1849,11 +1978,11 @@ class RasterData(SKMapBase):
             ginfo = info[info[RasterData.GROUP_COL] == g]
             common = info[info[RasterData.GROUP_COL] == "common"]
             for i, c in enumerate(covs_lst):
-                hits = ginfo[ginfo[RasterData.NAME_COL] == c]
+                hits = ginfo[ginfo[match_col] == c]
                 if len(hits):
                     covs_idx[i, j] = int(hits.index[0])
                 else:
-                    chits = common[common[RasterData.NAME_COL] == c]
+                    chits = common[common[match_col] == c]
                     if len(chits):
                         covs_idx[i, j] = int(chits.index[0])
                     else:
@@ -1880,15 +2009,20 @@ class RasterData(SKMapBase):
         return sorted(temporal["start_date"].dt.year.dropna().astype(int).unique())
 
     def _get_covs_idx_by_year(
-        self, covs_lst: List[str], years: List = None
+        self, covs_lst: List[str], years: List = None, match_col: str = None
     ) -> tuple:
         """Map covariate names to band indices per *year*.
 
         Returns ``(covs_idx, years)`` where ``covs_idx`` has shape
         ``(len(covs_lst), n_years)``.  Temporal covariates are matched by
-        ``name`` **and** ``start_date`` year (resolving year-agnostic names
-        such as ``ndvi_winter`` that repeat once per year); static covariates
-        (the ``common`` group) use the same band index for every year.
+        ``match_col`` (default ``name``) **and** ``start_date`` year
+        (resolving year-agnostic names such as ``ndvi_winter`` that repeat
+        once per year); static covariates (the ``common`` group) use the same
+        band index for every year.
+
+        ``match_col`` lets covariates be resolved by a variable column (e.g.
+        ``match_col="band"``) when the catalogue is organised by a column
+        other than ``group``.
 
         A static-only catalogue (no temporal layers) yields ``n_years == 1``
         with a ``None`` year placeholder, so a single prediction is produced
@@ -1897,6 +2031,7 @@ class RasterData(SKMapBase):
         :raises ValueError: if temporal layers exist but lack ``start_date``
           (year-based prediction requires dates).
         """
+        match_col = match_col or RasterData.NAME_COL
         info = self.info.reset_index(drop=True)
         temporal = info[info[RasterData.TEMPORAL_COL]]
 
@@ -1927,11 +2062,11 @@ class RasterData(SKMapBase):
             else:
                 year_info = temporal[temporal["start_date"].dt.year == y]
             for i, c in enumerate(covs_lst):
-                hits = year_info[year_info[RasterData.NAME_COL] == c]
+                hits = year_info[year_info[match_col] == c]
                 if len(hits):
                     covs_idx[i, j] = int(hits.index[0])
                 else:
-                    chits = common[common[RasterData.NAME_COL] == c]
+                    chits = common[common[match_col] == c]
                     if len(chits):
                         covs_idx[i, j] = int(chits.index[0])
                     else:

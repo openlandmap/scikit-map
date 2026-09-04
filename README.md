@@ -80,6 +80,30 @@ rdata = RasterData({
 })
 ```
 
+### Multi-column selection and runners
+
+The `info` frame carries one column per catalogue variable (`band`, `year`,
+`season`, `collection`, `asset`, ...), so runners are not limited to the
+predefined `group` column:
+
+```python
+# Filter layers by any variable column
+rdata.select(band="ndvi", year=2019)
+
+# Resolve a runner's input bands from a variable column, producing one
+# output band per (year, season) partition
+rdata.run(
+    process.NormalizedDifference("ndvi", "swir1"),
+    match_col="band",        # "ndvi"/"swir1" live in the `band` column
+    by=["year", "season"],   # one derived band per partition
+)
+```
+
+`match_col` also applies to `Prediction` and `Calc` (their `feature_names` /
+expression variables are looked up in that column), and `by` repartitions
+group runners (`SeasConvFill`, `TimeAggregate`, ...) by any column instead of
+`group`.
+
 ### Time-series gap filling and smoothing
 
 ```python

@@ -862,8 +862,10 @@ class TimeAggregate(Derivator):
         out_ref = parallel._remote(
             parallel._assemble, [ref_in], new_shape, specs, idx_offset
         )
-        rdata.array = parallel.SharedArray(
-            out_ref, new_shape, rdata.array.dtype
+        rdata._set_array(
+            parallel.SharedArray(
+                out_ref, new_shape, rdata.array.dtype
+            )
         )
 
         return None, DataFrame(new_info)
@@ -999,8 +1001,10 @@ class PeakAnalysis(Derivator):
             out_ref = parallel._remote(
                 parallel._assemble, [ref_in], new_shape, specs, idx_offset
             )
-            rdata.array = parallel.SharedArray(
-                out_ref, new_shape, rdata.array.dtype
+            rdata._set_array(
+                parallel.SharedArray(
+                    out_ref, new_shape, rdata.array.dtype
+                )
             )
 
             for i in range(0, ts_size, self.season_size):
@@ -1121,8 +1125,10 @@ class SlopeAnalysis(Derivator):
             out_ref = parallel._remote(
                 parallel._assemble, [ref_in], new_shape, specs, idx_offset
             )
-            rdata.array = parallel.SharedArray(
-                out_ref, new_shape, rdata.array.dtype
+            rdata._set_array(
+                parallel.SharedArray(
+                    out_ref, new_shape, rdata.array.dtype
+                )
             )
 
             nm = "theilslopes"
@@ -1254,8 +1260,10 @@ class FindMinMax(Derivator):
             out_ref = parallel._remote(
                 parallel._assemble, [ref_in], new_shape, specs, idx_offset
             )
-            rdata.array = parallel.SharedArray(
-                out_ref, new_shape, rdata.array.dtype
+            rdata._set_array(
+                parallel.SharedArray(
+                    out_ref, new_shape, rdata.array.dtype
+                )
             )
             nm = self.min_max
             pr = "m"
@@ -1460,6 +1468,7 @@ class Calc(SKMapRunner):
         mask_group: str = None,
         mask_values: list = [],
         n_jobs: int = os.cpu_count(),
+        match_col: str = None,
         verbose=False,
     ) -> None:
         self.n_jobs = n_jobs
@@ -1467,6 +1476,7 @@ class Calc(SKMapRunner):
         self.expressions = expressions
         self.mask_group = mask_group
         self.mask_values = mask_values
+        self.match_col = match_col
         self.date_cols = [RasterData.START_DT_COL, RasterData.END_DT_COL]
 
     def _map(self, ref_array, gmap, new_gmap):
@@ -1533,8 +1543,17 @@ class Calc(SKMapRunner):
             gmap = {}
             new_gmap = {}
 
-            for idx, group in zip(gidx, ggroup):
-                gmap[group] = idx
+            if self.match_col is not None:
+                # Key the expression namespace by a variable column (e.g.
+                # ``band``) instead of the group column, so expressions can
+                # reference ``red``/``nir`` when the catalogue is organised
+                # by year.
+                gvals = list(rdata.info.iloc[gidx][self.match_col])
+                for idx, val in zip(gidx, gvals):
+                    gmap[val] = idx
+            else:
+                for idx, group in zip(gidx, ggroup):
+                    gmap[group] = idx
 
             new_group_offset = idx_offset + (idx_counter * n_new_groups)
             for idx, new_group in zip(range(0, n_new_groups), self.new_groups):
@@ -1586,8 +1605,10 @@ class Calc(SKMapRunner):
         out_ref = parallel._remote(
             parallel._assemble, [ref_in], new_shape, specs, idx_offset
         )
-        rdata.array = parallel.SharedArray(
-            out_ref, new_shape, rdata.array.dtype
+        rdata._set_array(
+            parallel.SharedArray(
+                out_ref, new_shape, rdata.array.dtype
+            )
         )
 
         return None, DataFrame(new_info)
@@ -1642,6 +1663,9 @@ class Prediction(SKMapRunner):
       models.  Replaces the ``prob_0``/``out_0`` suffix with the given
       names (``prediction_<name>``).  Must have ``n_out`` entries.
     :param group: info group for the appended prediction bands.
+    :param match_col: ``info`` column searched for each ``feature_names``
+      entry (default ``name``).  Use e.g. ``match_col="band"`` when the
+      catalogue is organised by a column other than ``group``.
     """
 
     def __init__(
@@ -1652,6 +1676,7 @@ class Prediction(SKMapRunner):
         valid_only=True,
         target_names=None,
         group: str = "prediction",
+        match_col: str = None,
         verbose: bool = True,
     ) -> None:
         super().__init__(verbose=verbose)
@@ -1661,6 +1686,7 @@ class Prediction(SKMapRunner):
         self.valid_only = valid_only
         self.target_names = target_names
         self.group = group
+        self.match_col = match_col
 
     def _resolve_feature_names(self):
         feature_names = self.feature_names
@@ -1691,8 +1717,10 @@ class Prediction(SKMapRunner):
 
     def _predict(self, rdata):
         feature_names = self._resolve_feature_names()
-        covs_idx, years = rdata._get_covs_idx_by_year(feature_names)
-        arr = rdata.array.get()
+        covs_idx, years = rdata._get_covs_idx_by_year(
+            feature_names, match_col=self.match_col
+        )
+        arr = rdata._arr()
         n_pixels = arr.shape[1]
         n_years = len(years)
 
@@ -1779,9 +1807,11 @@ class Prediction(SKMapRunner):
         if dominant is not None:
             new_bands.append(dominant)
 
-        rdata.array = parallel.put_shared(
-            np.concatenate(new_bands, axis=0),
-            local=rdata.backend.name == "cpp",
+        rdata._set_array(
+            parallel.put_shared(
+                np.concatenate(new_bands, axis=0),
+                local=rdata.backend.name == "cpp",
+            )
         )
 
         new_info = []
@@ -1811,9 +1841,22 @@ class WhaleRunner(SKMapRunner):
 
     def __init__(self, verbose: bool = True) -> None:
         super().__init__(verbose=verbose)
+        self._current_match = None
+        self._current_match_col = None
 
-    def _band(self, rdata: RasterData, name: str, group: str = None) -> np.ndarray:
-        return rdata.array.get()[rdata._band_index(name, group), :]
+    def _band(
+        self,
+        rdata: RasterData,
+        name: str,
+        group: str = None,
+        match: dict = "__auto__",
+        match_col: str = "__auto__",
+    ) -> np.ndarray:
+        if match == "__auto__":
+            match = self._current_match
+        if match_col == "__auto__":
+            match_col = self._current_match_col
+        return rdata._arr()[rdata._band_index(name, group, match, match_col), :]
 
     def _primary_band(self) -> str:
         raise NotImplementedError
@@ -1821,24 +1864,117 @@ class WhaleRunner(SKMapRunner):
     def _compute(self, rdata: RasterData, arr: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
-    def run(self, rdata: RasterData, outname: str = None, group: str = None):
-        arr = rdata.array.get()
-        new_band = np.asarray(self._compute(rdata, arr), dtype=arr.dtype)
-        new_band = new_band.reshape(1, -1)
+    def run(
+        self,
+        rdata: RasterData,
+        outname: str = None,
+        group: str = None,
+        match: dict = None,
+        match_col: str = None,
+        by=None,
+    ):
+        """Compute the derived band(s) and append them to ``rdata``.
 
-        if group is None:
-            primary = rdata._band_index(self._primary_band())
-            group = rdata.info.iloc[primary][RasterData.GROUP_COL]
-        name = outname or self.__class__.__name__.lower()
+        ``match_col`` (default ``name``) is the ``info`` column searched for
+        each input band name, so bands can be resolved by a variable column
+        (e.g. ``match_col="band"``) when the catalogue is organised by a
+        column other than ``group``.  ``match`` optionally adds further
+        column==value constraints to disambiguate.
 
-        rdata.array = parallel.put_shared(
-            np.concatenate([arr, new_band], axis=0),
-            local=rdata.backend.name == "cpp",
+        ``by`` optionally partitions the computation by one or more ``info``
+        columns (e.g. ``by="year"``), producing one output band per partition
+        instead of a single band.  Each partition's column values are added
+        to the ``match`` constraints so input bands resolve within that
+        partition.
+        """
+        if by is None:
+            return self._run_single(rdata, outname, group, match, match_col)
+        return self._run_grouped(rdata, outname, match, match_col, by)
+
+    def _run_single(self, rdata, outname, group, match, match_col):
+        self._current_match = match
+        self._current_match_col = match_col
+        try:
+            arr = rdata._arr()
+            new_band = np.asarray(self._compute(rdata, arr), dtype=arr.dtype)
+            new_band = new_band.reshape(1, -1)
+
+            if group is None:
+                primary = rdata._band_index(
+                    self._primary_band(), match=match, match_col=match_col
+                )
+                group = rdata.info.iloc[primary][RasterData.GROUP_COL]
+            name = outname or self.__class__.__name__.lower()
+
+            rdata._set_array(
+                parallel.put_shared(
+                    np.concatenate([arr, new_band], axis=0),
+                    local=rdata.backend.name == "cpp",
+                )
+            )
+            new_info = DataFrame(
+                [rdata._new_info_row(rdata.base_raster, group=group, name=name)]
+            )
+            return None, new_info
+        finally:
+            self._current_match = None
+            self._current_match_col = None
+
+    def _run_grouped(self, rdata, outname, match, match_col, by):
+        if isinstance(by, str):
+            by = [by]
+        arr = rdata._arr()
+        base_name = outname or self.__class__.__name__.lower()
+
+        new_bands = []
+        new_infos = []
+        for key, ginfo in rdata.info.groupby(by):
+            key_vals = key if isinstance(key, tuple) else (key,)
+            gmatch = dict(match or {})
+            for col, val in zip(by, key_vals):
+                gmatch[col] = val
+
+            self._current_match = gmatch
+            self._current_match_col = match_col
+            try:
+                new_band = np.asarray(
+                    self._compute(rdata, arr), dtype=arr.dtype
+                ).reshape(1, -1)
+            finally:
+                self._current_match = None
+                self._current_match_col = None
+
+            primary = rdata._band_index(
+                self._primary_band(), match=gmatch, match_col=match_col
+            )
+            group_name = rdata.info.iloc[primary][RasterData.GROUP_COL]
+
+            def _fmt(k):
+                # float columns with NaN (e.g. a float year on static rows)
+                # format integral values without the ".0".
+                if isinstance(k, float) and k.is_integer():
+                    return str(int(k))
+                return str(k)
+
+            name = f"{base_name}_{'_'.join(_fmt(k) for k in key_vals)}"
+
+            new_bands.append(new_band)
+            row = rdata._new_info_row(
+                rdata.base_raster, group=group_name, name=name
+            )
+            # carry the partition values so the derived bands stay
+            # selectable by the same variable columns
+            for col, val in zip(by, key_vals):
+                row[col] = val
+            new_infos.append(row)
+
+        rdata._set_array(
+            parallel.put_shared(
+                np.concatenate([arr] + new_bands, axis=0),
+                local=rdata.backend.name == "cpp",
+            )
         )
-        new_info = DataFrame(
-            [rdata._new_info_row(rdata.base_raster, group=group, name=name)]
-        )
-        return None, new_info
+        return None, DataFrame(new_infos)
 
 class NormalizedDifference(WhaleRunner):
     """Derive a normalised-difference band from two input bands.
@@ -1999,7 +2135,7 @@ class GetLatitude(WhaleRunner):
     def run(self, rdata: RasterData, outname: str = None, group: str = None):
         import rasterio
 
-        arr = rdata.array.get()
+        arr = rdata._arr()
         h, w = rdata._spatial_shape
         row_off = rdata.window.row_off if rdata.window is not None else 0
         with rasterio.open(rdata.base_raster) as src:
@@ -2011,9 +2147,11 @@ class GetLatitude(WhaleRunner):
             group = "common"
         name = outname or "latitude"
 
-        rdata.array = parallel.put_shared(
-            np.concatenate([arr, new_band], axis=0),
-            local=rdata.backend.name == "cpp",
+        rdata._set_array(
+            parallel.put_shared(
+                np.concatenate([arr, new_band], axis=0),
+                local=rdata.backend.name == "cpp",
+            )
         )
         new_info = DataFrame(
             [rdata._new_info_row(rdata.base_raster, group=group, name=name)]
