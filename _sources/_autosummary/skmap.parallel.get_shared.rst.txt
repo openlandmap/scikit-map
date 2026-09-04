@@ -1,0 +1,6 @@
+skmap.parallel.get\_shared
+==========================
+
+.. currentmodule:: skmap.parallel
+
+.. autofunction:: get_shared

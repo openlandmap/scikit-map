@@ -1,0 +1,6 @@
+skmap.misc.mmdd\_to\_doy
+========================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: mmdd_to_doy

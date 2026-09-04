@@ -1,0 +1,6 @@
+skmap.misc.s3\_upload\_file
+===========================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: s3_upload_file

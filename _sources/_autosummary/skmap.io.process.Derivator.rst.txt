@@ -1,0 +1,25 @@
+skmap.io.process.Derivator
+==========================
+
+.. currentmodule:: skmap.io.process
+
+.. autoclass:: Derivator
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~Derivator.run
+   
+   
+
+   
+   
+   

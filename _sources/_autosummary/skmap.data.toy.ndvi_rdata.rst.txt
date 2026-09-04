@@ -1,0 +1,6 @@
+skmap.data.toy.ndvi\_rdata
+==========================
+
+.. currentmodule:: skmap.data.toy
+
+.. autofunction:: ndvi_rdata

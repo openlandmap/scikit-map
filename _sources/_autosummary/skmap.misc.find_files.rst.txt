@@ -1,0 +1,6 @@
+skmap.misc.find\_files
+======================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: find_files

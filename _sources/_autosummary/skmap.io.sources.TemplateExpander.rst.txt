@@ -1,0 +1,34 @@
+skmap.io.sources.TemplateExpander
+=================================
+
+.. currentmodule:: skmap.io.sources
+
+.. autoclass:: TemplateExpander
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~TemplateExpander.expand
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~TemplateExpander.COLUMN_EXCLUDES
+      ~TemplateExpander.META_FIELDS
+      ~TemplateExpander.PAIRED_FIELDS
+      ~TemplateExpander.YEAR_FIELDS
+   
+   

@@ -1,0 +1,26 @@
+skmap.overlay.SpaceOverlay
+==========================
+
+.. currentmodule:: skmap.overlay
+
+.. autoclass:: SpaceOverlay
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~SpaceOverlay.read_data
+      ~SpaceOverlay.run
+   
+   
+
+   
+   
+   

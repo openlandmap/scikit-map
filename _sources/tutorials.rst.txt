@@ -2,7 +2,8 @@
 Tutorials
 ##################
 
-These tutorials use a `benchmark dataset <https://zenodo.org/record/4311598>`_ which provides ready-to-use raster layers and sample points for *10 different regions* in Europe, according to `tiling system <https://gitlab.com/geoharmonizer_inea/spatial-layers#standard-tiling-system>`_ from GeoHarmonizer project.
+These tutorials use the **toy dataset** bundled with scikit-map (``skmap/data/toy``), so no additional download is required to follow along — except
+`05_stac_integration <notebooks/05_stac_integration.ipynb>`_, which reads from the live `EcoDataCube <https://stac.opengeohub.org/v1/cat/ecodatacube>`_ STAC catalogue and therefore needs network access.
 
 .. toctree::
    :glob:

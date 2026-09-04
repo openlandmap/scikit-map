@@ -1,0 +1,6 @@
+skmap.misc.s3\_list\_objects
+============================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: s3_list_objects

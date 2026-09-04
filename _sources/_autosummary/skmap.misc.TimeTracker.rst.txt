@@ -1,0 +1,24 @@
+skmap.misc.TimeTracker
+======================
+
+.. currentmodule:: skmap.misc
+
+.. autoclass:: TimeTracker
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+   
+   
+
+   
+   
+   

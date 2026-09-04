@@ -1,0 +1,41 @@
+skmap.compute
+=============
+
+.. automodule:: skmap.compute
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      get_backend
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. autosummary::
+   :toctree:
+   :template: custom-module-template.rst
+   :recursive:
+
+   base
+   cpp_backend
+   numba_backend
+   numpy_backend
+

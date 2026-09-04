@@ -1,0 +1,6 @@
+skmap.misc.ttprint
+==================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: ttprint

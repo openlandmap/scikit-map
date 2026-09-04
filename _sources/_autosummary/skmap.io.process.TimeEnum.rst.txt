@@ -1,0 +1,31 @@
+skmap.io.process.TimeEnum
+=========================
+
+.. currentmodule:: skmap.io.process
+
+.. autoclass:: TimeEnum
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~TimeEnum.MONTHLY
+      ~TimeEnum.MONTHLY_15P
+      ~TimeEnum.MONTHLY_LONGTERM
+      ~TimeEnum.BIMONTHLY
+      ~TimeEnum.BIMONTHLY_15P
+      ~TimeEnum.BIMONTHLY_LONGTERM
+      ~TimeEnum.QUARTERLY
+      ~TimeEnum.YEARLY
+   
+   

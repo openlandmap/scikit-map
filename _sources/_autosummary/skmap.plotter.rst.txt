@@ -1,0 +1,32 @@
+skmap.plotter
+=============
+
+.. automodule:: skmap.plotter
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      plot_rasters
+      plot_stac_collection
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

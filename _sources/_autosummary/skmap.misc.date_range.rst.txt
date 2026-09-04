@@ -1,0 +1,6 @@
+skmap.misc.date\_range
+======================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: date_range

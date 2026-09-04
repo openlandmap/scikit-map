@@ -1,0 +1,30 @@
+skmap.misc.ControlS3
+====================
+
+.. currentmodule:: skmap.misc
+
+.. autoclass:: ControlS3
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~ControlS3.create_empty_file
+      ~ControlS3.list
+      ~ControlS3.move_completed_tile
+      ~ControlS3.push_file
+      ~ControlS3.remove
+      ~ControlS3.select_slurm_tile
+   
+   
+
+   
+   
+   

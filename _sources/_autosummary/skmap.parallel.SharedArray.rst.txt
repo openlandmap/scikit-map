@@ -1,0 +1,32 @@
+skmap.parallel.SharedArray
+==========================
+
+.. currentmodule:: skmap.parallel
+
+.. autoclass:: SharedArray
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~SharedArray.get
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SharedArray.ndim
+      ~SharedArray.ref
+   
+   

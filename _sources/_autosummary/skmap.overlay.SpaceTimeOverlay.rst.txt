@@ -1,0 +1,25 @@
+skmap.overlay.SpaceTimeOverlay
+==============================
+
+.. currentmodule:: skmap.overlay
+
+.. autoclass:: SpaceTimeOverlay
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~SpaceTimeOverlay.run
+   
+   
+
+   
+   
+   

@@ -1,0 +1,28 @@
+skmap.parallel.TilingProcessing
+===============================
+
+.. currentmodule:: skmap.parallel
+
+.. autoclass:: TilingProcessing
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~TilingProcessing.generate_tiles
+      ~TilingProcessing.process_all
+      ~TilingProcessing.process_multiple
+      ~TilingProcessing.process_one
+   
+   
+
+   
+   
+   

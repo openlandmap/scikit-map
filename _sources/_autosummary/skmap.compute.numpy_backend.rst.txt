@@ -1,0 +1,32 @@
+skmap.compute.numpy\_backend
+============================
+
+.. automodule:: skmap.compute.numpy_backend
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      NumpyBackend
+   
+   
+
+   
+   
+   
+
+
+

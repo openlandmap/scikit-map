@@ -1,0 +1,48 @@
+﻿skmap
+=====
+
+.. automodule:: skmap
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      SKMapBase
+      SKMapGroupRunner
+      SKMapRunner
+   
+   
+
+   
+   
+   
+
+
+
+.. autosummary::
+   :toctree:
+   :template: custom-module-template.rst
+   :recursive:
+
+   compute
+   data
+   io
+   misc
+   overlay
+   parallel
+   plotter
+   set_env
+

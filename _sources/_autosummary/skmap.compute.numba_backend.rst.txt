@@ -1,0 +1,32 @@
+skmap.compute.numba\_backend
+============================
+
+.. automodule:: skmap.compute.numba_backend
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      NumbaBackend
+   
+   
+
+   
+   
+   
+
+
+

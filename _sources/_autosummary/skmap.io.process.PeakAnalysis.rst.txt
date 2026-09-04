@@ -1,0 +1,25 @@
+skmap.io.process.PeakAnalysis
+=============================
+
+.. currentmodule:: skmap.io.process
+
+.. autoclass:: PeakAnalysis
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~PeakAnalysis.run
+   
+   
+
+   
+   
+   

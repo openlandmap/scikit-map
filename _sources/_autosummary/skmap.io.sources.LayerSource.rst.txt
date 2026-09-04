@@ -1,0 +1,33 @@
+skmap.io.sources.LayerSource
+============================
+
+.. currentmodule:: skmap.io.sources
+
+.. autoclass:: LayerSource
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~LayerSource.iter_specs
+      ~LayerSource.to_rasterdata
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~LayerSource.date_format
+      ~LayerSource.ignore_29feb
+   
+   

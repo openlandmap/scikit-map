@@ -1,0 +1,6 @@
+skmap.parallel.put\_shared
+==========================
+
+.. currentmodule:: skmap.parallel
+
+.. autofunction:: put_shared

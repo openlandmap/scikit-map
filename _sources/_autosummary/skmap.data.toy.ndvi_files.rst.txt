@@ -1,0 +1,6 @@
+skmap.data.toy.ndvi\_files
+==========================
+
+.. currentmodule:: skmap.data.toy
+
+.. autofunction:: ndvi_files

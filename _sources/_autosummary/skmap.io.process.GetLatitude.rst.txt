@@ -1,0 +1,25 @@
+skmap.io.process.GetLatitude
+============================
+
+.. currentmodule:: skmap.io.process
+
+.. autoclass:: GetLatitude
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~GetLatitude.run
+   
+   
+
+   
+   
+   

@@ -1,0 +1,6 @@
+skmap.misc.update\_by\_separator
+================================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: update_by_separator

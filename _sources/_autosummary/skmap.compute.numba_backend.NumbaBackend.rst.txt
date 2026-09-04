@@ -1,0 +1,52 @@
+skmap.compute.numba\_backend.NumbaBackend
+=========================================
+
+.. currentmodule:: skmap.compute.numba_backend
+
+.. autoclass:: NumbaBackend
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~NumbaBackend.apply_along_axis
+      ~NumbaBackend.convolve1d
+      ~NumbaBackend.evaluate
+      ~NumbaBackend.fft_convolve
+      ~NumbaBackend.find_peaks
+      ~NumbaBackend.mask_nan
+      ~NumbaBackend.nanmax
+      ~NumbaBackend.nanmean
+      ~NumbaBackend.nanmedian
+      ~NumbaBackend.nanmin
+      ~NumbaBackend.nanpercentile
+      ~NumbaBackend.nanstd
+      ~NumbaBackend.nansum
+      ~NumbaBackend.ols
+      ~NumbaBackend.reset_fallbacks
+      ~NumbaBackend.scale_offset
+      ~NumbaBackend.seasonal_min_max
+      ~NumbaBackend.sparse_solve
+      ~NumbaBackend.stl_decompose
+      ~NumbaBackend.theilslopes
+      ~NumbaBackend.toeplitz_matmul
+      ~NumbaBackend.tsirf
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~NumbaBackend.name
+   
+   

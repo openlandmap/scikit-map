@@ -1,0 +1,6 @@
+skmap.io.base.read\_auth\_rasters
+=================================
+
+.. currentmodule:: skmap.io.base
+
+.. autofunction:: read_auth_rasters

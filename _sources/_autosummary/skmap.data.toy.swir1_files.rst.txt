@@ -1,0 +1,6 @@
+skmap.data.toy.swir1\_files
+===========================
+
+.. currentmodule:: skmap.data.toy
+
+.. autofunction:: swir1_files

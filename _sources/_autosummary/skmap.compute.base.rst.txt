@@ -1,0 +1,32 @@
+skmap.compute.base
+==================
+
+.. automodule:: skmap.compute.base
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      ComputeBackend
+   
+   
+
+   
+   
+   
+
+
+

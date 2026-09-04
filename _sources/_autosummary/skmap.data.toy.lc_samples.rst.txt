@@ -1,0 +1,6 @@
+skmap.data.toy.lc\_samples
+==========================
+
+.. currentmodule:: skmap.data.toy
+
+.. autofunction:: lc_samples

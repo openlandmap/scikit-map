@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/runner/work/scikit-map/scikit-map/build/temp.linux-x86_64-cpython-312/skmap_bindings/_deps/eigen-subbuild/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

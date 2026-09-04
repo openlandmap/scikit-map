@@ -1,0 +1,61 @@
+skmap.io.base.RasterData
+========================
+
+.. currentmodule:: skmap.io.base
+
+.. autoclass:: RasterData
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~RasterData.animate
+      ~RasterData.drop
+      ~RasterData.expand_valid
+      ~RasterData.filter
+      ~RasterData.filter_contains
+      ~RasterData.filter_date
+      ~RasterData.from_info
+      ~RasterData.from_stac
+      ~RasterData.from_yaml
+      ~RasterData.get_groups
+      ~RasterData.get_years
+      ~RasterData.plot
+      ~RasterData.point_query
+      ~RasterData.read
+      ~RasterData.rename
+      ~RasterData.run
+      ~RasterData.select_valid
+      ~RasterData.timespan
+      ~RasterData.to_dir
+      ~RasterData.to_s3
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~RasterData.BAND_COL
+      ~RasterData.DT_COL
+      ~RasterData.END_DT_COL
+      ~RasterData.GROUP_COL
+      ~RasterData.INTERVAL_DT_SEP
+      ~RasterData.NAME_COL
+      ~RasterData.PATH_COL
+      ~RasterData.PLACEHOLDER_DT
+      ~RasterData.START_DT_COL
+      ~RasterData.TEMPORAL_COL
+      ~RasterData.TRANSFORM_SEP
+      ~RasterData.valid_pixels
+   
+   

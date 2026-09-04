@@ -1,0 +1,6 @@
+skmap.compute.get\_backend
+==========================
+
+.. currentmodule:: skmap.compute
+
+.. autofunction:: get_backend

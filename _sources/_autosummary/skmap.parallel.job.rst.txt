@@ -1,0 +1,6 @@
+skmap.parallel.job
+==================
+
+.. currentmodule:: skmap.parallel
+
+.. autofunction:: job

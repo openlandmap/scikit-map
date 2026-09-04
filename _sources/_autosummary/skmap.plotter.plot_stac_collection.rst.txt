@@ -1,0 +1,6 @@
+skmap.plotter.plot\_stac\_collection
+====================================
+
+.. currentmodule:: skmap.plotter
+
+.. autofunction:: plot_stac_collection

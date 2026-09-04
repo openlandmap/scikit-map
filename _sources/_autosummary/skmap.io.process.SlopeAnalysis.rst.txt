@@ -1,0 +1,25 @@
+skmap.io.process.SlopeAnalysis
+==============================
+
+.. currentmodule:: skmap.io.process
+
+.. autoclass:: SlopeAnalysis
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~SlopeAnalysis.run
+   
+   
+
+   
+   
+   

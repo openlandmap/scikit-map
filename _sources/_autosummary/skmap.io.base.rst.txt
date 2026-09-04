@@ -1,0 +1,43 @@
+skmap.io.base
+=============
+
+.. automodule:: skmap.io.base
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      read_auth_rasters
+      read_rasters
+      save_rasters
+      save_rasters_cpp
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      RasterData
+   
+   
+
+   
+   
+   
+
+
+

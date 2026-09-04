@@ -1,0 +1,25 @@
+skmap.io.process.NormalizedDifference
+=====================================
+
+.. currentmodule:: skmap.io.process
+
+.. autoclass:: NormalizedDifference
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~NormalizedDifference.run
+   
+   
+
+   
+   
+   

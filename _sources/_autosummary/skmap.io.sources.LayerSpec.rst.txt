@@ -1,0 +1,37 @@
+skmap.io.sources.LayerSpec
+==========================
+
+.. currentmodule:: skmap.io.sources
+
+.. autoclass:: LayerSpec
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~LayerSpec.band_idx
+      ~LayerSpec.end_date
+      ~LayerSpec.name
+      ~LayerSpec.start_date
+      ~LayerSpec.temporal
+      ~LayerSpec.path
+      ~LayerSpec.group
+      ~LayerSpec.vars
+   
+   

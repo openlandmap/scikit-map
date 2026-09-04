@@ -1,0 +1,6 @@
+skmap.misc.sb\_arr
+==================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: sb_arr

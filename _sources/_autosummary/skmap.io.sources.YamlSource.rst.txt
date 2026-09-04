@@ -1,0 +1,33 @@
+skmap.io.sources.YamlSource
+===========================
+
+.. currentmodule:: skmap.io.sources
+
+.. autoclass:: YamlSource
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~YamlSource.iter_specs
+      ~YamlSource.to_rasterdata
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~YamlSource.date_format
+      ~YamlSource.ignore_29feb
+   
+   

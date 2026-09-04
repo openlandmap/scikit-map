@@ -1,0 +1,6 @@
+skmap.data.toy.rdata
+====================
+
+.. currentmodule:: skmap.data.toy
+
+.. autofunction:: rdata

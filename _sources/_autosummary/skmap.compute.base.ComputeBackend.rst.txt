@@ -1,0 +1,52 @@
+skmap.compute.base.ComputeBackend
+=================================
+
+.. currentmodule:: skmap.compute.base
+
+.. autoclass:: ComputeBackend
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~ComputeBackend.apply_along_axis
+      ~ComputeBackend.convolve1d
+      ~ComputeBackend.evaluate
+      ~ComputeBackend.fft_convolve
+      ~ComputeBackend.find_peaks
+      ~ComputeBackend.mask_nan
+      ~ComputeBackend.nanmax
+      ~ComputeBackend.nanmean
+      ~ComputeBackend.nanmedian
+      ~ComputeBackend.nanmin
+      ~ComputeBackend.nanpercentile
+      ~ComputeBackend.nanstd
+      ~ComputeBackend.nansum
+      ~ComputeBackend.ols
+      ~ComputeBackend.reset_fallbacks
+      ~ComputeBackend.scale_offset
+      ~ComputeBackend.seasonal_min_max
+      ~ComputeBackend.sparse_solve
+      ~ComputeBackend.stl_decompose
+      ~ComputeBackend.theilslopes
+      ~ComputeBackend.toeplitz_matmul
+      ~ComputeBackend.tsirf
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~ComputeBackend.name
+   
+   

@@ -1,0 +1,30 @@
+skmap.data
+==========
+
+.. automodule:: skmap.data
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. autosummary::
+   :toctree:
+   :template: custom-module-template.rst
+   :recursive:
+
+   toy
+

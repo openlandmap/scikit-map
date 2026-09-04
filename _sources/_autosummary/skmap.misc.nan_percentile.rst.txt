@@ -1,0 +1,6 @@
+skmap.misc.nan\_percentile
+==========================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: nan_percentile

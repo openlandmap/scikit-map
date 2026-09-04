@@ -1,0 +1,6 @@
+skmap.misc.sample\_groups
+=========================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: sample_groups

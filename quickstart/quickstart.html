@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Quickstart &#8212; skmap library 0.7.3 documentation</title>
+    <title>Quickstart &#8212; skmap library 0.9.2 documentation</title>
   
   
   
@@ -27,47 +27,55 @@
   </noscript>
   
   <!-- Loaded before other Sphinx assets -->
-  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
-<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+  <link href="../_static/styles/theme.css?digest=cb8930eaaf36d9849b67" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=cb8930eaaf36d9849b67" rel="stylesheet" />
 
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
     <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../_static/readthedocs-custom.css?v=ec7c6751" />
   
   <!-- So that users can add custom icons -->
-  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <script defer src="../_static/scripts/fontawesome.js?digest=cb8930eaaf36d9849b67"></script>
   <!-- Pre-loaded scripts that we'll load fully later -->
-  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
-<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=cb8930eaaf36d9849b67" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=cb8930eaaf36d9849b67" />
 
-    <script src="../_static/documentation_options.js?v=c98573da"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/documentation_options.js?v=aa3b121e"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../_static/copybutton.js?v=f281be69"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'quickstart/quickstart';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Tutorials" href="../tutorials.html" />
     <link rel="prev" title="Installation" href="../index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.7" />
+  <meta name="docsearch:version" content="0.9" />
+  
+    
+    <script src="../_static/searchtools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <script src="../searchindex.js"></script>
+  
   </head>
-  
-  
-  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
-
+  <body data-default-mode="">
   
   
   <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
   
   <div id="pst-scroll-pixel-helper"></div>
   
   <button type="button" class="btn rounded-pill" id="pst-back-to-top">
     <i class="fa-solid fa-arrow-up"></i>Back to top</button>
-
+  
+  
+  
   
   <dialog id="pst-search-dialog">
     
@@ -93,7 +101,7 @@
 </div>
 
   
-    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
 <div class="bd-header__inner bd-page-width">
   <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
     <span class="fa-solid fa-bars"></span>
@@ -119,8 +127,8 @@
       
     
     
-    <img src="../_static/print_logo.svg" class="logo__image only-light" alt="skmap library 0.7.3 documentation - Home"/>
-    <img src="../_static/print_logo_white.svg" class="logo__image only-dark pst-js-only" alt="skmap library 0.7.3 documentation - Home"/>
+    <img src="../_static/print_logo.svg" class="logo__image only-light" alt="skmap library 0.9.2 documentation - Home"/>
+    <img src="../_static/print_logo_white.svg" class="logo__image only-dark pst-js-only" alt="skmap library 0.9.2 documentation - Home"/>
   
   
 </a></div>
@@ -164,11 +172,35 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-external" href="http://opendatascience.eu">
+  <a class="nav-link nav-internal" href="../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../cpp_api.html">
+    C++ API
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-external" href="http://opendatascience.eu">
     Open Data Science Europe
   </a>
 </li>
 
+                </ul>
+            </li>
+            
   </ul>
 </nav></div>
       
@@ -190,11 +222,18 @@
       
         <div class="navbar-item">
 
-<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
-  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
-  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
-  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
-</button></div>
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
       
         <div class="navbar-item"><ul class="navbar-icon-links"
     aria-label="Icon Links">
@@ -207,8 +246,7 @@
           
           
           
-          <a href="https://gitlab.com/geoharmonizer_inea/skmap" title="GitLab" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-codeberg fa-lg" aria-hidden="true"></i>
-            <span class="sr-only">GitLab</span></a>
+          <a href="https://github.com/openlandmap/scikit-map" title="Repo" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fas fa-code-branch fa-lg" aria-hidden="true"></i><span class="visually-hidden">Repo</span></a>
         </li>
 </ul></div>
       
@@ -287,6 +325,20 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../cpp_api.html">
+    C++ API
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-external" href="http://opendatascience.eu">
     Open Data Science Europe
   </a>
@@ -304,11 +356,18 @@
         
           <div class="navbar-item">
 
-<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
-  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
-  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
-  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
-</button></div>
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
         
           <div class="navbar-item"><ul class="navbar-icon-links"
     aria-label="Icon Links">
@@ -321,8 +380,7 @@
           
           
           
-          <a href="https://gitlab.com/geoharmonizer_inea/skmap" title="GitLab" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-codeberg fa-lg" aria-hidden="true"></i>
-            <span class="sr-only">GitLab</span></a>
+          <a href="https://github.com/openlandmap/scikit-map" title="Repo" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fas fa-code-branch fa-lg" aria-hidden="true"></i><span class="visually-hidden">Repo</span></a>
         </li>
 </ul></div>
         
@@ -331,7 +389,15 @@
   </div>
   
     <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item pst-sidebar-collapse"><button id="pst-collapse-sidebar-button" aria-expanded="true" aria-controls="pst-primary-sidebar">
+  <svg class="pst-icon" role="img" aria-hidden="true" focusable="false" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <path fill="currentColor" d="M3 15.5C2.36232 15.5 1.74874 15.2564 1.28478 14.8189C0.820828 14.3815 0.541576 13.7832 0.504167 13.1467L0.5 13L0.5 3C0.499965 2.36232 0.743605 1.74874 1.18107 1.28478C1.61854 0.820828 2.21676 0.541576 2.85333 0.504167L3 0.5L13 0.5C13.6377 0.499965 14.2513 0.743605 14.7152 1.18107C15.1792 1.61854 15.4584 2.21676 15.4958 2.85333L15.5 3L15.5 13C15.5 13.6377 15.2564 14.2513 14.8189 14.7152C14.3815 15.1792 13.7832 15.4584 13.1467 15.4958L13 15.5L3 15.5ZM3 13.8333L10.5 13.8333L10.5 2.16667L3 2.16667C2.79589 2.16669 2.59889 2.24163 2.44636 2.37726C2.29383 2.5129 2.19638 2.69979 2.1725 2.9025L2.16667 3L2.16667 13C2.16669 13.2041 2.24163 13.4011 2.37726 13.5536C2.5129 13.7062 2.69979 13.8036 2.9025 13.8275L3 13.8333ZM6.65583 10.325L6.5775 10.2558L4.91083 8.58917C4.76735 8.44567 4.68116 8.25476 4.66843 8.05223C4.65569 7.84971 4.71729 7.6495 4.84167 7.48917L4.91083 7.41083L6.5775 5.74417C6.72747 5.59471 6.9287 5.50794 7.14032 5.50148C7.35194 5.49502 7.55809 5.56935 7.7169 5.70937C7.8757 5.8494 7.97525 6.04463 7.99533 6.25539C8.01541 6.46616 7.95451 6.67667 7.825 6.84417L7.75583 6.9225L6.67917 8L7.75583 9.0775C7.89931 9.22099 7.98551 9.41191 7.99824 9.61443C8.01097 9.81695 7.94938 10.0172 7.825 10.1775L7.75583 10.2558C7.61234 10.3993 7.42142 10.4855 7.2189 10.4982C7.01638 10.511 6.81617 10.4494 6.65583 10.325Z"/>
+  </svg>
+  <span class="pst-collapse-sidebar-label">Collapse Sidebar</span>
+  <span class="pst-expand-sidebar-label">Expand Sidebar</span>
+</button></div>
         <div class="sidebar-primary-item">
+
 <nav class="bd-docs-nav bd-links"
      aria-label="Section Navigation">
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
@@ -394,61 +460,144 @@
   <section id="quickstart">
 <h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading">#</a></h1>
 <p>See <a class="reference internal" href="../index.html#installation-section"><span class="std std-ref">Installation</span></a> for installation instructions.</p>
-<section id="creating-a-catalog">
-<h2>Creating a catalog<a class="headerlink" href="#creating-a-catalog" title="Link to this heading">#</a></h2>
-<p>Every scikit-map project starts with a catalog. This is a Pandas Dataframe or a csv file.</p>
-<div class="pst-scrollable-table-container"><table class="table" id="id1">
-<caption><span class="caption-text">Example catalog</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
-<thead>
-<tr class="row-odd"><th class="head"><p>layer_name</p></th>
-<th class="head"><p>path</p></th>
-<th class="head"><p>type</p></th>
-<th class="head"><p>start_year</p></th>
-<th class="head"><p>end_year</p></th>
-<th class="head"></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>layer_{year}</p></td>
-<td><p>file_{year}.tif</p></td>
-<td><p>temporal</p></td>
-<td><p>2000</p></td>
-<td><p>2022</p></td>
-<td></td>
-</tr>
-<tr class="row-odd"><td><p>static</p></td>
-<td><p>static.tif</p></td>
-<td><p>common</p></td>
-<td></td>
-<td></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>Create a catalog from it like:</p>
-<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.catalog</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataCatalog</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">catalog</span> <span class="o">=</span> <span class="n">DataCatalog</span><span class="o">.</span><span class="n">create_catalog</span><span class="p">(</span>
-<span class="gp">... </span>    <span class="n">catalog_def</span><span class="o">=</span><span class="s2">&quot;docs/quickstart/example.csv&quot;</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="n">years</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">2000</span><span class="p">,</span><span class="mi">2022</span><span class="p">)),</span>
-<span class="gp">... </span>    <span class="n">base_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">())</span>
-<span class="gp">... </span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">catalog</span><span class="o">.</span><span class="n">data</span>
-<span class="go">{&#39;2000&#39;: {&#39;layer_YYYY&#39;: {&#39;path&#39;: &#39; file_2000.tif&#39;, &#39;idx&#39;: 0}}, ... &#39;common&#39;: {&#39;static&#39;: {&#39;path&#39;: &#39;static.tif&#39;, &#39;idx&#39;: 22}}}</span>
+<p><code class="docutils literal notranslate"><span class="pre">Scikit-map</span></code> is used in two places in a machine learning pipeline: for Space-time overlay and large-scale predictions.</p>
+<img alt="../_images/pipeline.svg" src="../_images/pipeline.svg" />
+<section id="loading-rasters">
+<h2>Loading rasters<a class="headerlink" href="#loading-rasters" title="Link to this heading">#</a></h2>
+<p>Every scikit-map project starts with a <code class="xref py py-class docutils literal notranslate"><span class="pre">RasterData</span></code>, which
+describes a set of raster layers.  Temporal layers carry <code class="docutils literal notranslate"><span class="pre">start_date</span></code> /
+<code class="docutils literal notranslate"><span class="pre">end_date</span></code> columns (populated by <code class="xref py py-meth docutils literal notranslate"><span class="pre">timespan()</span></code>) and
+static layers have <code class="docutils literal notranslate"><span class="pre">None</span></code> dates.</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">RasterData</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span> <span class="o">=</span> <span class="n">RasterData</span><span class="p">({</span>
+<span class="gp">... </span>    <span class="s2">"2020"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"ndvi_2020.tif"</span><span class="p">,</span> <span class="s2">"swir1_2020.tif"</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="s2">"common"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"elev.tif"</span><span class="p">,</span> <span class="s2">"slope.tif"</span><span class="p">],</span>
+<span class="gp">... </span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span><span class="o">.</span><span class="n">get_groups</span><span class="p">()</span>
+<span class="go">['2020']</span>
 </pre></div>
 </div>
+<p>The object is <strong>lazy</strong>: it holds only the file paths until you call
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">read()</span></code>. This means the space-time overlay below can
+sample points directly from the files without ever loading whole rasters into
+memory.</p>
+</section>
+<section id="loading-rasters-from-yaml">
+<h2>Loading rasters from YAML<a class="headerlink" href="#loading-rasters-from-yaml" title="Link to this heading">#</a></h2>
+<p>A layer catalogue can be described in YAML and expanded into a lazy
+<code class="xref py py-class docutils literal notranslate"><span class="pre">RasterData</span></code> via <code class="xref py py-meth docutils literal notranslate"><span class="pre">from_yaml()</span></code>.
+<code class="docutils literal notranslate"><span class="pre">{variable}</span></code> placeholders in the path template are expanded from the
+<code class="docutils literal notranslate"><span class="pre">start_year</span></code>/<code class="docutils literal notranslate"><span class="pre">end_year</span></code> range, the <code class="docutils literal notranslate"><span class="pre">band</span></code> list and the paired
+<code class="docutils literal notranslate"><span class="pre">start_month</span></code>/<code class="docutils literal notranslate"><span class="pre">end_month</span></code> lists (see <a class="reference internal" href="../_autosummary/skmap.io.sources.html#module-skmap.io.sources" title="skmap.io.sources"><code class="xref py py-mod docutils literal notranslate"><span class="pre">skmap.io.sources</span></code></a> for the full
+schema):</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">layer</span><span class="p">:</span><span class="w"> </span><span class="s">'{band}_glad.landsat.ard2.swa_m_30m_s_{year}{start_month}_{year}{end_month}_go_epsg.4326_v1'</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">'{base_path}/arco/{band}_glad.landsat.ard2.swa_m_30m_s_{year}{start_month}_{year}{end_month}_go_epsg.4326_v1.tif'</span>
+<span class="w">  </span><span class="nt">temporal_resolution</span><span class="p">:</span><span class="w"> </span><span class="s">'bimonthly'</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">'temporal'</span>
+<span class="w">  </span><span class="nt">start_year</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1997</span>
+<span class="w">  </span><span class="nt">end_year</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2024</span>
+<span class="w">  </span><span class="nt">band</span><span class="p">:</span><span class="w"> </span><span class="s">'blue,</span><span class="nv"> </span><span class="s">green,</span><span class="nv"> </span><span class="s">red,</span><span class="nv"> </span><span class="s">nir,</span><span class="nv"> </span><span class="s">swir1,</span><span class="nv"> </span><span class="s">swir2,</span><span class="nv"> </span><span class="s">thermal'</span>
+<span class="w">  </span><span class="nt">start_month</span><span class="p">:</span><span class="w"> </span><span class="s">'0101,</span><span class="nv"> </span><span class="s">0301,</span><span class="nv"> </span><span class="s">0501,</span><span class="nv"> </span><span class="s">0701,</span><span class="nv"> </span><span class="s">0901,</span><span class="nv"> </span><span class="s">1101'</span>
+<span class="w">  </span><span class="nt">end_month</span><span class="p">:</span><span class="w"> </span><span class="s">'0228,</span><span class="nv"> </span><span class="s">0430,</span><span class="nv"> </span><span class="s">0630,</span><span class="nv"> </span><span class="s">0831,</span><span class="nv"> </span><span class="s">1031,</span><span class="nv"> </span><span class="s">1231'</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">layer</span><span class="p">:</span><span class="w"> </span><span class="s">'elev'</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">'{base_path}/elev.tif'</span>
+<span class="w">  </span><span class="nt">temporal_resolution</span><span class="p">:</span><span class="w"> </span><span class="s">'longterm_or_static'</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">'common'</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span> <span class="o">=</span> <span class="n">RasterData</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="s2">"layers.yaml"</span><span class="p">,</span> <span class="n">base_path</span><span class="o">=</span><span class="s2">"/data"</span><span class="p">)</span>
+<span class="n">rdata</span><span class="o">.</span><span class="n">info</span>  <span class="c1"># one row per expanded layer, plus band/year/month columns</span>
+</pre></div>
+</div>
+<p>Temporal layers are grouped by year (<code class="docutils literal notranslate"><span class="pre">group</span></code> = <code class="docutils literal notranslate"><span class="pre">&quot;2015&quot;</span></code>, …) and static
+layers under <code class="docutils literal notranslate"><span class="pre">&quot;common&quot;</span></code>; every <code class="docutils literal notranslate"><span class="pre">{variable}</span></code> referenced in the path becomes
+an extra <code class="docutils literal notranslate"><span class="pre">info</span></code> column, so runners can group by multiple columns (e.g.
+<code class="docutils literal notranslate"><span class="pre">group</span></code> and <code class="docutils literal notranslate"><span class="pre">band</span></code>).  A <code class="docutils literal notranslate"><span class="pre">group</span></code> template overrides the default (use
+<code class="docutils literal notranslate"><span class="pre">group:</span> <span class="pre">'{band}'</span></code> for band-grouped time-series).</p>
+<p>A runnable example ships with the toy data:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">toy</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">RasterData</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span> <span class="o">=</span> <span class="n">RasterData</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">LAYERS_YAML</span><span class="p">),</span> <span class="n">base_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">DATA_DIR</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span><span class="o">.</span><span class="n">get_groups</span><span class="p">()</span>
+<span class="go">['ndvi', 'swir1']</span>
+</pre></div>
+</div>
+<p>It also demonstrates the <code class="docutils literal notranslate"><span class="pre">interval</span></code> temporal style, a <code class="docutils literal notranslate"><span class="pre">name</span></code> template
+(year-agnostic <code class="docutils literal notranslate"><span class="pre">{band}_{season}</span></code> names) and a <code class="docutils literal notranslate"><span class="pre">variant</span></code> column separating
+the gap-filled and gappy NDVI.</p>
+</section>
+<section id="loading-rasters-from-stac">
+<h2>Loading rasters from STAC<a class="headerlink" href="#loading-rasters-from-stac" title="Link to this heading">#</a></h2>
+<p><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_stac()</span></code> builds a lazy <code class="xref py py-class docutils literal notranslate"><span class="pre">RasterData</span></code>
+from a STAC catalogue.  It queries the per-collection <code class="docutils literal notranslate"><span class="pre">/items</span></code> endpoint and
+yields one <code class="docutils literal notranslate"><span class="pre">info</span></code> row per <strong>data asset</strong> (an asset whose <code class="docutils literal notranslate"><span class="pre">roles</span></code> contains
+<code class="docutils literal notranslate"><span class="pre">&quot;data&quot;</span></code>), with <code class="docutils literal notranslate"><span class="pre">collection</span></code>, <code class="docutils literal notranslate"><span class="pre">asset</span></code>, <code class="docutils literal notranslate"><span class="pre">year</span></code>, <code class="docutils literal notranslate"><span class="pre">gsd</span></code> and <code class="docutils literal notranslate"><span class="pre">epsg</span></code>
+columns.  The <code class="docutils literal notranslate"><span class="pre">datetime</span></code> window is filtered client-side.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">RasterData</span>
+
+<span class="n">rdata</span> <span class="o">=</span> <span class="n">RasterData</span><span class="o">.</span><span class="n">from_stac</span><span class="p">(</span>
+    <span class="n">url</span><span class="o">=</span><span class="s2">"https://stac.opengeohub.org/v1/cat/ecodatacube"</span><span class="p">,</span>
+    <span class="n">collections</span><span class="o">=</span><span class="s2">"ndvi_glad.landsat.ard2.seasconv_eu_ecodatacube"</span><span class="p">,</span>
+    <span class="n">datetime</span><span class="o">=</span><span class="s2">"2019-01-01/2019-12-31"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">rdata</span><span class="o">.</span><span class="n">info</span>  <span class="c1"># one row per (item, data asset); remote COG hrefs, no .read()</span>
+</pre></div>
+</div>
+<p>Layers are grouped by collection (<code class="docutils literal notranslate"><span class="pre">group</span></code> = collection id) and named
+<code class="docutils literal notranslate"><span class="pre">{asset}_{monthday}</span></code> (year-agnostic, unique within a year).  The result is
+lazy: use <code class="xref py py-meth docutils literal notranslate"><span class="pre">read()</span></code> with an <code class="docutils literal notranslate"><span class="pre">extent</span></code> for a small
+tile, or <a class="reference internal" href="../_autosummary/skmap.overlay.SpaceTimeOverlay.html#skmap.overlay.SpaceTimeOverlay" title="skmap.overlay.SpaceTimeOverlay"><code class="xref py py-class docutils literal notranslate"><span class="pre">SpaceTimeOverlay</span></code></a> to sample points, rather
+than reading the full (continental) grid.</p>
 </section>
 <section id="space-time-overlay">
 <h2>Space-Time overlay<a class="headerlink" href="#space-time-overlay" title="Link to this heading">#</a></h2>
 <img alt="../_images/spacetime_overlay.svg" src="../_images/spacetime_overlay.svg" />
-<p>TODO</p>
+<p><a class="reference internal" href="../_autosummary/skmap.overlay.SpaceTimeOverlay.html#skmap.overlay.SpaceTimeOverlay" title="skmap.overlay.SpaceTimeOverlay"><code class="xref py py-class docutils literal notranslate"><span class="pre">SpaceTimeOverlay</span></code></a> filters the temporal layers by date
+(via <code class="xref py py-meth docutils literal notranslate"><span class="pre">filter_date()</span></code>) for each date range and always
+includes the static (undated) layers.  When <code class="docutils literal notranslate"><span class="pre">date_ranges</span></code> is not given, one
+range per unique year in the points’ date column is derived automatically.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skmap.overlay</span><span class="w"> </span><span class="kn">import</span> <span class="n">SpaceTimeOverlay</span>
+
+<span class="n">samples</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">"samples.gpkg"</span><span class="p">)</span>
+<span class="n">overlay</span> <span class="o">=</span> <span class="n">SpaceTimeOverlay</span><span class="p">(</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">samples</span><span class="p">,</span>
+    <span class="n">col_date</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span>
+    <span class="n">rasterdata</span><span class="o">=</span><span class="n">rdata</span><span class="p">,</span>
+    <span class="n">raster_tiles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">train</span> <span class="o">=</span> <span class="n">overlay</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">max_ram_mb</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">out_file_name</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</pre></div>
+</div>
 </section>
 <section id="large-scale-predictions">
 <h2>Large-scale predictions<a class="headerlink" href="#large-scale-predictions" title="Link to this heading">#</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">joblib</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io.process</span><span class="w"> </span><span class="kn">import</span> <span class="n">Prediction</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">joblib</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"model.joblib"</span><span class="p">)</span>
+<span class="n">rdata</span> <span class="o">=</span> <span class="n">rdata</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>  <span class="c1"># materialize rasters for spatial prediction</span>
+<span class="n">rdata</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">Prediction</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">))</span>
+<span class="n">pred</span> <span class="o">=</span> <span class="n">rdata</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s1">'group == "prediction"'</span><span class="p">)</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+</pre></div>
+</div>
 </section>
 <section id="whales">
 <h2>Whales<a class="headerlink" href="#whales" title="Link to this heading">#</a></h2>
+<p>Derived (on-the-fly) features are computed by <a class="reference internal" href="../_autosummary/skmap.io.process.html#module-skmap.io.process" title="skmap.io.process"><code class="xref py py-mod docutils literal notranslate"><span class="pre">skmap.io.process</span></code></a> runners.
+They can be applied either to a loaded <code class="xref py py-class docutils literal notranslate"><span class="pre">RasterData</span></code> or as a
+<code class="docutils literal notranslate"><span class="pre">runners</span></code> list to the overlay:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">process</span>
+
+<span class="n">overlay</span> <span class="o">=</span> <span class="n">SpaceTimeOverlay</span><span class="p">(</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">samples</span><span class="p">,</span>
+    <span class="n">col_date</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span>
+    <span class="n">rasterdata</span><span class="o">=</span><span class="n">rdata</span><span class="p">,</span>
+    <span class="n">runners</span><span class="o">=</span><span class="p">[</span><span class="n">process</span><span class="o">.</span><span class="n">NormalizedDifference</span><span class="p">(</span><span class="s2">"ndvi"</span><span class="p">,</span> <span class="s2">"swir1"</span><span class="p">)],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
 </section>
 </section>
 
@@ -473,9 +622,11 @@
     class="page-toc tocsection onthispage">
     <i class="fa-solid fa-list"></i> On this page
   </div>
-  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
-    <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#creating-a-catalog">Creating a catalog</a></li>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-rasters">Loading rasters</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-rasters-from-yaml">Loading rasters from YAML</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-rasters-from-stac">Loading rasters from STAC</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#space-time-overlay">Space-Time overlay</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#large-scale-predictions">Large-scale predictions</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#whales">Whales</a></li>
@@ -483,13 +634,13 @@
   </nav></div>
 
   <div class="sidebar-secondary-item">
-  <div role="note" aria-label="source link">
-    <h3>This Page</h3>
-    <ul class="this-page-menu">
-      <li><a href="../_sources/quickstart/quickstart.rst.txt"
-            rel="nofollow">Show Source</a></li>
-    </ul>
-   </div></div>
+
+  <div class="tocsection sourcelink">
+    <a href="../_sources/quickstart/quickstart.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
 
 </div></div>
               
@@ -504,8 +655,8 @@
   </div>
   
   <!-- Scripts loaded after <body> so the DOM is not blocked -->
-  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
-<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+  <script defer src="../_static/scripts/bootstrap.js?digest=cb8930eaaf36d9849b67"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=cb8930eaaf36d9849b67"></script>
 
   <footer class="bd-footer">
 <div class="bd-footer__inner bd-page-width">
@@ -525,7 +676,7 @@
         <div class="footer-item">
 
   <p class="sphinx-version">
-    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
     <br/>
   </p>
 </div>
@@ -539,7 +690,7 @@
         <div class="footer-item">
 <p class="theme-version">
   <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
-  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.21.0.
 </p></div>
       
     </div>

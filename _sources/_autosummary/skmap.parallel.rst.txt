@@ -1,0 +1,52 @@
+skmap.parallel
+==============
+
+.. automodule:: skmap.parallel
+
+   
+   
+   .. rubric:: Module attributes
+
+   .. autosummary::
+      :toctree:
+   
+      CPU_COUNT
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      apply_along_axis
+      get_shared
+      job
+      put_shared
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      SharedArray
+      TaskSequencer
+      TilingProcessing
+   
+   
+
+   
+   
+   
+
+
+

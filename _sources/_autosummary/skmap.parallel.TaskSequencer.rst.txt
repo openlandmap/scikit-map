@@ -1,0 +1,25 @@
+skmap.parallel.TaskSequencer
+============================
+
+.. currentmodule:: skmap.parallel
+
+.. autoclass:: TaskSequencer
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~TaskSequencer.run
+   
+   
+
+   
+   
+   

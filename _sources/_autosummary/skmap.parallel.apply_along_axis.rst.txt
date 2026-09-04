@@ -1,0 +1,6 @@
+skmap.parallel.apply\_along\_axis
+=================================
+
+.. currentmodule:: skmap.parallel
+
+.. autofunction:: apply_along_axis

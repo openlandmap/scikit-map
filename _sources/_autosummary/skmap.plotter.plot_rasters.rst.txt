@@ -1,0 +1,6 @@
+skmap.plotter.plot\_rasters
+===========================
+
+.. currentmodule:: skmap.plotter
+
+.. autofunction:: plot_rasters

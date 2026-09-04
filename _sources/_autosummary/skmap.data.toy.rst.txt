@@ -1,0 +1,35 @@
+skmap.data.toy
+==============
+
+.. automodule:: skmap.data.toy
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      lc_samples
+      ndvi_files
+      ndvi_rdata
+      rdata
+      swir1_files
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

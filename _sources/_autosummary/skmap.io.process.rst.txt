@@ -1,0 +1,53 @@
+skmap.io.process
+================
+
+.. automodule:: skmap.io.process
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      Calc
+      Derivator
+      ExtractIndicator
+      Filler
+      FindMinMax
+      GeometricTemperature
+      GetLatitude
+      Nirv
+      NormalizedDifference
+      PeakAnalysis
+      PercentileAggregation
+      Prediction
+      Savi
+      SeasConvFill
+      SircleTransformer
+      SlopeAnalysis
+      TimeAggregate
+      TimeEnum
+      Transformer
+      TrendAnalysis
+      WhaleRunner
+      WhittakerSmooth
+   
+   
+
+   
+   
+   
+
+
+

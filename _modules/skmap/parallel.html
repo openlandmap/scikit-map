@@ -1,0 +1,1291 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>skmap.parallel &#8212; skmap library 0.9.2 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=cb8930eaaf36d9849b67" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=cb8930eaaf36d9849b67" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/readthedocs-custom.css?v=ec7c6751" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../_static/scripts/fontawesome.js?digest=cb8930eaaf36d9849b67"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=cb8930eaaf36d9849b67" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=cb8930eaaf36d9849b67" />
+
+    <script src="../../_static/documentation_options.js?v=aa3b121e"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/skmap/parallel';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="0.9" />
+  
+    
+    <script src="../../_static/searchtools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <script src="../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../_static/print_logo.svg" class="logo__image only-light" alt="skmap library 0.9.2 documentation - Home"/>
+    <img src="../../_static/print_logo_white.svg" class="logo__image only-dark pst-js-only" alt="skmap library 0.9.2 documentation - Home"/>
+  
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../index.html">
+    Home
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../in-depth/in-depth.html">
+    In-Depth
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../cpp_api.html">
+    C++ API
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-external" href="http://opendatascience.eu">
+    Open Data Science Europe
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/openlandmap/scikit-map" title="Repo" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fas fa-code-branch fa-lg" aria-hidden="true"></i><span class="visually-hidden">Repo</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../index.html">
+    Home
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../in-depth/in-depth.html">
+    In-Depth
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../cpp_api.html">
+    C++ API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="http://opendatascience.eu">
+    Open Data Science Europe
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/openlandmap/scikit-map" title="Repo" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fas fa-code-branch fa-lg" aria-hidden="true"></i><span class="visually-hidden">Repo</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">Module code</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="../skmap.html" class="nav-link">skmap</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">skmap.parallel</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for skmap.parallel</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""</span>
+<span class="sd">Parallelization helpers based on Ray</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">rasterio</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_ensure_ray</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Initialize Ray exactly once (avoids the re-init warning)."""</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+        <span class="n">ray</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">ignore_reinit_error</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rasterio.mask</span><span class="w"> </span><span class="kn">import</span> <span class="n">mask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rasterio.windows</span><span class="w"> </span><span class="kn">import</span> <span class="n">from_bounds</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shapely.geometry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Polygon</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.misc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ttprint</span>
+
+<span class="n">CPU_COUNT</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
+<span class="sd">"""</span>
+<span class="sd">Number of CPU cores available.</span>
+<span class="sd">"""</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_call_worker</span><span class="p">(</span><span class="n">worker</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Call ``worker(*args)`` (module-level so Ray can serialize it)."""</span>
+
+    <span class="c1"># Ray parallelizes at the task level; cap per-worker BLAS/OMP threads to 1</span>
+    <span class="c1"># so n_tasks x n_cores thread oversubscription cannot OOM the workers</span>
+    <span class="c1"># (observed as SIGTERM core dumps in LAPACK on many-core machines).</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"OPENBLAS_NUM_THREADS"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"1"</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"MKL_NUM_THREADS"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"1"</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"OMP_NUM_THREADS"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"1"</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"NUMEXPR_NUM_THREADS"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"1"</span>
+
+    <span class="k">return</span> <span class="n">worker</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SharedArray">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.SharedArray.html#skmap.parallel.SharedArray">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SharedArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A numpy array held in the Ray object store, accessed via an ObjectRef.</span>
+
+<span class="sd">    ``shape`` and ``dtype`` are O(1) metadata (no materialization); ``get()``</span>
+<span class="sd">    materializes the full array in process memory and should be used sparingly.</span>
+
+<span class="sd">    When ``ref`` is a numpy array the SharedArray is *local* (Ray-free, e.g.</span>
+<span class="sd">    the explicit C++ read path): ``get()`` returns the array directly and</span>
+<span class="sd">    ``ref`` exposes the array itself so the downstream helpers skip Ray.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="n">ref</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ref</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ref</span> <span class="o">=</span> <span class="n">ref</span>  <span class="c1"># ray.ObjectRef</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ref</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""ObjectRef for Ray-backed arrays; the numpy array itself for local ones."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ref</span>
+
+<div class="viewcode-block" id="SharedArray.get">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.SharedArray.html#skmap.parallel.SharedArray.get">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Materialize the full array (use sparingly)."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+
+        <span class="k">return</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ref</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"SharedArray(shape=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, dtype=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">)"</span></div>
+
+
+
+<div class="viewcode-block" id="put_shared">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.put_shared.html#skmap.parallel.put_shared">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">put_shared</span><span class="p">(</span><span class="n">array</span><span class="p">,</span> <span class="n">local</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Place ``array`` in the Ray object store and return a ``SharedArray``.</span>
+
+<span class="sd">    ``local=True`` keeps the array in-process (no Ray): the returned</span>
+<span class="sd">    ``SharedArray`` holds the numpy array directly.  The explicit C++ read</span>
+<span class="sd">    path uses it so ``backend='cpp'`` never touches Ray.</span>
+
+<span class="sd">    Accepts a numpy array (wraps it) or an existing ``SharedArray`` (reuses</span>
+<span class="sd">    its ref, no extra copy).</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">array</span><span class="p">,</span> <span class="n">SharedArray</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">array</span>
+    <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">array</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">local</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">SharedArray</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+
+    <span class="n">_ensure_ray</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">SharedArray</span><span class="p">(</span><span class="n">ray</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">arr</span><span class="p">),</span> <span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_shared">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.get_shared.html#skmap.parallel.get_shared">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_shared</span><span class="p">(</span><span class="n">sa_or_ref</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the numpy array backing a ``SharedArray``, ``ObjectRef`` or ndarray."""</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sa_or_ref</span><span class="p">,</span> <span class="n">SharedArray</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">sa_or_ref</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sa_or_ref</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">sa_or_ref</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+
+    <span class="k">return</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sa_or_ref</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_remote</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Invoke a module-level worker remotely and return its ObjectRef.</span>
+
+<span class="sd">    When the array refs are all local numpy arrays (C++ mode) the worker runs</span>
+<span class="sd">    in-process instead of touching Ray.</span>
+<span class="sd">    """</span>
+    <span class="n">refs</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">refs</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">refs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+
+    <span class="n">_ensure_ray</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">ray</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_stack_bands</span><span class="p">(</span><span class="n">band_refs</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Stack per-band arrays into a single ``(N, H*W)`` array (read assembly)."""</span>
+    <span class="n">bands</span> <span class="o">=</span> <span class="p">[</span><span class="n">get_shared</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">band_refs</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">bands</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_assemble</span><span class="p">(</span><span class="n">refs</span><span class="p">,</span> <span class="n">new_shape</span><span class="p">,</span> <span class="n">specs</span><span class="p">,</span> <span class="n">n_in</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Build a new array from an input ref and returned output slices.</span>
+
+<span class="sd">    ``refs`` is ``[ref_in]``; ``specs`` is a list of</span>
+<span class="sd">    ``(idx_list, p0, p1, slice)`` where ``idx_list`` are absolute band</span>
+<span class="sd">    indices, ``p0:p1`` the pixel range the slice covers, and ``slice`` is a</span>
+<span class="sd">    numpy array (the worker return value, already deserialized).</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+    <span class="n">arr_in</span> <span class="o">=</span> <span class="n">get_shared</span><span class="p">(</span><span class="n">refs</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">new_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">arr_in</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="n">out</span><span class="p">[:</span><span class="n">n_in</span><span class="p">]</span> <span class="o">=</span> <span class="n">arr_in</span>
+    <span class="k">for</span> <span class="n">idx_list</span><span class="p">,</span> <span class="n">p0</span><span class="p">,</span> <span class="n">p1</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">:</span>
+        <span class="n">out</span><span class="p">[</span><span class="n">idx_list</span><span class="p">,</span> <span class="n">p0</span><span class="p">:</span><span class="n">p1</span><span class="p">]</span> <span class="o">=</span> <span class="n">s</span>
+    <span class="k">return</span> <span class="n">out</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_select_bands</span><span class="p">(</span><span class="n">refs</span><span class="p">,</span> <span class="n">keep_idx</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a new array with only the bands in ``keep_idx`` (drop)."""</span>
+    <span class="k">return</span> <span class="n">get_shared</span><span class="p">(</span><span class="n">refs</span><span class="p">[</span><span class="mi">0</span><span class="p">])[</span><span class="n">keep_idx</span><span class="p">,</span> <span class="p">:]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_concat</span><span class="p">(</span><span class="n">refs</span><span class="p">,</span> <span class="n">shapes</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Concatenate several arrays along the band axis (group-run concat)."""</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">get_shared</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">refs</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="job">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.job.html#skmap.parallel.job">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">job</span><span class="p">(</span>
+    <span class="n">worker</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="n">worker_args</span><span class="p">:</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">],</span>
+    <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Execute a function in parallel using Ray [1].</span>
+
+<span class="sd">    :param worker: Function to execute in parallel.</span>
+<span class="sd">    :param worker_args: Argument iterator where each element is send</span>
+<span class="sd">      to separate job.</span>
+<span class="sd">    :param n_jobs: Number of parallel jobs to run the worker function.</span>
+<span class="sd">      By default all cores are used.</span>
+<span class="sd">    :returns: A generator with the return of all workers, in submission order.</span>
+<span class="sd">    :rtype: Generator</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    ========</span>
+
+<span class="sd">    &gt;&gt;&gt; from skmap import parallel</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; def worker(i, msg):</span>
+<span class="sd">    ...   print(f'{i}: {msg}')</span>
+<span class="sd">    ...   return f'Worker {i} finished'</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; msg = ("I'm running in parallel", )</span>
+<span class="sd">    &gt;&gt;&gt; args = iter([ (i,msg) for i in range(0,5)])</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; for result in parallel.job(worker, args): # doctest: +SKIP</span>
+<span class="sd">    ...   print(result)</span>
+
+<span class="sd">    References</span>
+<span class="sd">    ==========</span>
+
+<span class="sd">    [1] `Ray Core &lt;https://docs.ray.io/en/latest/ray-core/walkthrough.html&gt;`_</span>
+
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+
+    <span class="k">if</span> <span class="s2">"joblib_args"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">"joblib_args is deprecated and ignored; Ray is the only backend"</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">_ensure_ray</span><span class="p">()</span>
+
+    <span class="c1"># Map n_jobs to a per-task CPU allocation so that at most n_jobs tasks</span>
+    <span class="c1"># run concurrently (n_jobs=-1 uses all available CPUs).</span>
+    <span class="n">total_cpus</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ray</span><span class="o">.</span><span class="n">cluster_resources</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"CPU"</span><span class="p">,</span> <span class="n">CPU_COUNT</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">n_jobs</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">n_jobs</span> <span class="o">&gt;=</span> <span class="n">total_cpus</span><span class="p">:</span>
+        <span class="n">num_cpus</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">num_cpus</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">total_cpus</span> <span class="o">//</span> <span class="n">n_jobs</span><span class="p">)</span>
+
+    <span class="n">remote_call</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">num_cpus</span><span class="o">=</span><span class="n">num_cpus</span><span class="p">)(</span><span class="n">_call_worker</span><span class="p">)</span>
+    <span class="n">refs</span> <span class="o">=</span> <span class="p">[</span><span class="n">remote_call</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">worker</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="k">for</span> <span class="n">args</span> <span class="ow">in</span> <span class="n">worker_args</span><span class="p">]</span>
+
+    <span class="c1"># ray.get preserves submission order</span>
+    <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">refs</span><span class="p">):</span>
+        <span class="k">yield</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="apply_along_axis">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.apply_along_axis.html#skmap.parallel.apply_along_axis">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply_along_axis</span><span class="p">(</span>
+    <span class="n">worker</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="n">axis</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">arr</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">,</span>
+    <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">CPU_COUNT</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="nb">any</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="nb">any</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Execute a function through a ``numpy.array`` axis in parallel [1].</span>
+<span class="sd">    It uses Ray, so avoid to send shared memory objects as arguments.</span>
+
+<span class="sd">    :param worker: Function to execute in parallel. It needs to have</span>
+<span class="sd">      at least one argument (``numpy.array``).</span>
+<span class="sd">    :param axis: Axis used to execute the worker.</span>
+<span class="sd">    :param arr: The input array.</span>
+<span class="sd">    :param n_jobs: Number of parallel jobs to run the worker function</span>
+<span class="sd">    :param args: Additional arguments to the worker.</span>
+<span class="sd">    :param kwargs: Additional named arguments to the worker.</span>
+<span class="sd">    :returns: The output array with one dimension less than the input array.</span>
+<span class="sd">    :rtype: numpy.array</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    ========</span>
+
+<span class="sd">    &gt;&gt;&gt; import multiprocessing</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; from skmap import parallel</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; def fn(arr, const):</span>
+<span class="sd">    ...   return np.sum(arr) + const</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; const = 1</span>
+<span class="sd">    &gt;&gt;&gt; arr = np.ones((100,100,100))</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; out = parallel.apply_along_axis(fn, 0, arr, 4, const) # doctest: +SKIP</span>
+<span class="sd">    &gt;&gt;&gt; print(arr.shape, out.shape) # doctest: +SKIP</span>
+
+<span class="sd">    References</span>
+<span class="sd">    ==========</span>
+
+<span class="sd">    [1] `Best answer from Eric O Lebigot &lt;https://stackoverflow.com/a/45555516&gt;`_</span>
+
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">worker</span><span class="p">,</span> <span class="n">axis</span><span class="p">,</span> <span class="n">arr</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">apply_along_axis</span><span class="p">(</span><span class="n">worker</span><span class="p">,</span> <span class="n">axis</span><span class="p">,</span> <span class="n">arr</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">  Like numpy.apply_along_axis(), but takes advantage of multiple</span>
+<span class="sd">  cores.</span>
+<span class="sd">  """</span>
+    <span class="c1"># Effective axis where apply_along_axis() will be applied by each</span>
+    <span class="c1"># worker (any non-zero axis number would work, so as to allow the use</span>
+    <span class="c1"># of `np.array_split()`, which is only done on axis 0):</span>
+    <span class="n">effective_axis</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">axis</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">axis</span>
+    <span class="k">if</span> <span class="n">effective_axis</span> <span class="o">!=</span> <span class="n">axis</span><span class="p">:</span>
+        <span class="n">arr</span> <span class="o">=</span> <span class="n">arr</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="n">effective_axis</span><span class="p">)</span>
+
+    <span class="c1"># Chunks for the mapping (only a few chunks):</span>
+    <span class="n">chunks</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="n">worker</span><span class="p">,</span> <span class="n">effective_axis</span><span class="p">,</span> <span class="n">sub_arr</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">sub_arr</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">n_jobs</span><span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">job</span><span class="p">(</span><span class="n">run</span><span class="p">,</span> <span class="n">chunks</span><span class="p">):</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">effective_axis</span> <span class="o">!=</span> <span class="n">axis</span><span class="p">:</span>
+        <span class="c1"># Undo the swap so the reduced axis returns to its original position</span>
+        <span class="c1"># (numpy.apply_along_axis semantics: axis 0 -&gt; (out, ...)).</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="n">effective_axis</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="TilingProcessing">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.TilingProcessing.html#skmap.parallel.TilingProcessing">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TilingProcessing</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Execute a processing function in parallel considering a tiling system</span>
+<span class="sd">    and a base raster. It creates a rasterio ``window`` object for each tile</span>
+<span class="sd">    according to the pixel size of the specified base.</span>
+
+<span class="sd">    :param tiling_system_fn: Vector file path with the tiles to read.</span>
+<span class="sd">    :param base_raster_fn: Raster file path used the retrieve</span>
+<span class="sd">      the ``affine transformation`` for ``windows``.</span>
+<span class="sd">    :param verbose: Use ``True`` to print information about read tiles</span>
+<span class="sd">      and the base raster.</span>
+
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">tiling_system_fn</span><span class="o">=</span><span class="s2">"http://s3.eu-central-1.wasabisys.com/skmap/tiling_system_30km.gpkg"</span><span class="p">,</span>
+        <span class="n">base_raster_fn</span><span class="o">=</span><span class="s2">"http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif"</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">epsg_checking</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">pyproj</span><span class="w"> </span><span class="kn">import</span> <span class="n">CRS</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">tiling_system_fn</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_tiles</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">base_raster_fn</span><span class="p">)</span> <span class="k">as</span> <span class="n">base_raster</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">base_transform</span> <span class="o">=</span> <span class="n">base_raster</span><span class="o">.</span><span class="n">transform</span>
+            <span class="n">base_crs</span> <span class="o">=</span> <span class="n">base_raster</span><span class="o">.</span><span class="n">crs</span>
+
+        <span class="n">tile_epsg</span> <span class="o">=</span> <span class="n">CRS</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="o">.</span><span class="n">crs</span><span class="o">.</span><span class="n">to_wkt</span><span class="p">())</span><span class="o">.</span><span class="n">to_epsg</span><span class="p">()</span>
+        <span class="n">raster_epsg</span> <span class="o">=</span> <span class="n">CRS</span><span class="p">(</span><span class="n">base_crs</span><span class="o">.</span><span class="n">to_wkt</span><span class="p">())</span><span class="o">.</span><span class="n">to_epsg</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">epsg_checking</span> <span class="ow">and</span> <span class="n">tile_epsg</span> <span class="o">!=</span> <span class="n">raster_epsg</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">"Different SpatialReference"</span>
+                <span class="o">+</span> <span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2"> tiling_system_fn:</span><span class="se">\n</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="o">.</span><span class="n">crs</span><span class="o">.</span><span class="n">to_wkt</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+                <span class="o">+</span> <span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2"> base_raster_fn:</span><span class="se">\n</span><span class="si">{</span><span class="n">base_crs</span><span class="o">.</span><span class="n">to_wkt</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="n">pixel_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_transform</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">ttprint</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Pixel size equal </span><span class="si">{</span><span class="n">pixel_size</span><span class="si">}</span><span class="s2"> in </span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">base_raster_fn</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">ttprint</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_tiles</span><span class="si">}</span><span class="s2"> tiles available in </span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">tiling_system_fn</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+            <span class="n">ttprint</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Using EPSG:</span><span class="si">{</span><span class="n">raster_epsg</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_tile_window</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+        <span class="n">tile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tiles</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">left</span><span class="p">,</span> <span class="n">bottom</span><span class="p">,</span> <span class="n">right</span><span class="p">,</span> <span class="n">top</span> <span class="o">=</span> <span class="n">tile</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">bounds</span>
+
+        <span class="k">return</span> <span class="n">tile</span><span class="p">,</span> <span class="n">from_bounds</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">bottom</span><span class="p">,</span> <span class="n">right</span><span class="p">,</span> <span class="n">top</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_transform</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TilingProcessing.process_one">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.TilingProcessing.html#skmap.parallel.TilingProcessing.process_one">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="nb">any</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Process a single tile using the specified function args.</span>
+
+<span class="sd">        :param idx: The tile id to process. This idx is generated for all the tiles</span>
+<span class="sd">          in a sequence starting from ``0``.</span>
+<span class="sd">        :param func: A function with at least the arguments ``idx, tile, window``.</span>
+<span class="sd">        :param args: Additional arguments to send to the function.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        ========</span>
+
+<span class="sd">        &gt;&gt;&gt; from skmap.parallel import TilingProcessing</span>
+<span class="sd">        &gt;&gt;&gt; from skmap.io.base import read_rasters</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; def run(idx, tile, window, raster_files):</span>
+<span class="sd">        ...     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)</span>
+<span class="sd">        ...     print(f'Tile {idx}: data read {data.shape}')</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; raster_files = [</span>
+<span class="sd">        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter</span>
+<span class="sd">        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring</span>
+<span class="sd">        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer</span>
+<span class="sd">        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall</span>
+<span class="sd">        ... ]</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; tiling= TilingProcessing(verbose=True) # doctest: +SKIP</span>
+<span class="sd">        &gt;&gt;&gt; tiling.process_one(0, run, raster_files) # doctest: +SKIP</span>
+
+<span class="sd">        """</span>
+        <span class="n">tile</span><span class="p">,</span> <span class="n">window</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tile_window</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">tile</span><span class="p">,</span> <span class="n">window</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TilingProcessing.process_multiple">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.TilingProcessing.html#skmap.parallel.TilingProcessing.process_multiple">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_multiple</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">idx_list</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="nb">any</span><span class="p">,</span>
+        <span class="n">max_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">CPU_COUNT</span><span class="p">,</span>
+        <span class="n">use_threads</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">progress_bar</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Process in parallel a list of tile using the specified function args.</span>
+
+<span class="sd">        :param idx: The tile ids to process. This idx is generated for all the tiles</span>
+<span class="sd">          in a sequence starting from ``0``.</span>
+<span class="sd">        :param func: A function with at least the arguments ``idx, tile, window``.</span>
+<span class="sd">        :param args: Additional arguments to send to the function.</span>
+<span class="sd">        :param max_workers: Number of CPU cores to use in the parallelization.</span>
+<span class="sd">          By default all cores are used.</span>
+<span class="sd">        :param use_threads: Deprecated and ignored (Ray always uses processes).</span>
+<span class="sd">        :param progress_bar: Deprecated and ignored.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        ========</span>
+
+<span class="sd">        &gt;&gt;&gt; from skmap.parallel import TilingProcessing</span>
+<span class="sd">        &gt;&gt;&gt; from skmap.io.base import read_rasters</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; def run(idx, tile, window, raster_files):</span>
+<span class="sd">        ...     data, _ = read_rasters(raster_files=raster_files, spatial_win=window, verbose=True)</span>
+<span class="sd">        ...     print(f'Tile {idx}: data read {data.shape}')</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; raster_files = [</span>
+<span class="sd">        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201903_skmap_epsg3035_v1.0.tif', # winter</span>
+<span class="sd">        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201906_skmap_epsg3035_v1.0.tif', # spring</span>
+<span class="sd">        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201909_skmap_epsg3035_v1.0.tif', # summer</span>
+<span class="sd">        ...     'http://s3.eu-central-1.wasabisys.com/skmap/lcv/lcv_ndvi_landsat.glad.ard_p50_30m_0..0cm_201912_skmap_epsg3035_v1.0.tif'  # fall</span>
+<span class="sd">        ... ]</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; tiling= TilingProcessing(verbose=True) # doctest: +SKIP</span>
+<span class="sd">        &gt;&gt;&gt; idx_list = [0,10,100]</span>
+<span class="sd">        &gt;&gt;&gt; result = tiling.process_multiple(idx_list, run, raster_files) # doctest: +SKIP</span>
+
+<span class="sd">        """</span>
+
+        <span class="n">_args</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">idx_list</span><span class="p">:</span>
+            <span class="n">tile</span><span class="p">,</span> <span class="n">window</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tile_window</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+            <span class="n">_args</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">idx</span><span class="p">,</span> <span class="n">tile</span><span class="p">,</span> <span class="n">window</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">job</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="nb">iter</span><span class="p">(</span><span class="n">_args</span><span class="p">),</span> <span class="n">n_jobs</span><span class="o">=</span><span class="n">max_workers</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TilingProcessing.process_all">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.TilingProcessing.html#skmap.parallel.TilingProcessing.process_all">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_all</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="nb">any</span><span class="p">,</span>
+        <span class="n">max_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">CPU_COUNT</span><span class="p">,</span>
+        <span class="n">use_threads</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">progress_bar</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Process in parallel all of tile using the specified function args.</span>
+
+<span class="sd">        :param func: A function with at least the arguments ``idx, tile, window``.</span>
+<span class="sd">        :param args: Additional arguments to send to the function.</span>
+<span class="sd">        :param max_workers: Number of CPU cores to use in the parallelization.</span>
+<span class="sd">          By default all cores are used.</span>
+<span class="sd">        :param use_threads: Deprecated and ignored (Ray always uses processes).</span>
+<span class="sd">        :param progress_bar: Deprecated and ignored.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        ========</span>
+
+<span class="sd">        &gt;&gt;&gt; from skmap.parallel import TilingProcessing</span>
+<span class="sd">        &gt;&gt;&gt; from skmap.io.base import read_rasters</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; def run(idx, tile, window, msg):</span>
+<span class="sd">        ...     print(f'Tile {idx} =&gt; {msg}')</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; tiling= TilingProcessing(verbose=True) # doctest: +SKIP</span>
+<span class="sd">        &gt;&gt;&gt; msg = "Let's crunch some data."</span>
+<span class="sd">        &gt;&gt;&gt; result = tiling.process_all(run) # doctest: +SKIP</span>
+
+<span class="sd">        """</span>
+
+        <span class="n">idx_list</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_tiles</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">process_multiple</span><span class="p">(</span>
+            <span class="n">idx_list</span><span class="p">,</span>
+            <span class="n">func</span><span class="p">,</span>
+            <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+            <span class="n">max_workers</span><span class="o">=</span><span class="n">max_workers</span><span class="p">,</span>
+            <span class="n">use_threads</span><span class="o">=</span><span class="n">use_threads</span><span class="p">,</span>
+            <span class="n">progress_bar</span><span class="o">=</span><span class="n">progress_bar</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TilingProcessing.generate_tiles">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.TilingProcessing.html#skmap.parallel.TilingProcessing.generate_tiles">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate_tiles</span><span class="p">(</span>
+        <span class="n">tile_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">extent</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span>
+        <span class="n">crs</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">raster_layer_fn</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Generate a custom tiling system based on a regular grid.</span>
+
+<span class="sd">        :param tile_size: Single value used to define the width and height of a</span>
+<span class="sd">          individual tile. It assumes the same unit of ``crs`` (degree for geographic coordinate</span>
+<span class="sd">          systems and meter for projected coordinate systems). Tiles outside of the image</span>
+<span class="sd">          are clipped to fit in the informed extent.</span>
+<span class="sd">        :param extent: Extent definition considering ``minx, miny, maxx, maxy`` according</span>
+<span class="sd">          to the ``crs`` argument.</span>
+<span class="sd">        :param crs: Coordinate reference system for the tile geometries.</span>
+<span class="sd">          Can be anything accepted by pyproj.CRS.from_user_input(),</span>
+<span class="sd">          such as an authority string (EPSG:4326) or a WKT/proj4 string.</span>
+<span class="sd">        :param raster_layer_fn: If provided, for each tile the ``min``, ``max`` and ``mode``</span>
+<span class="sd">          values are calculated considering the raster pixels inside the tile. It assumes the</span>
+<span class="sd">          same ``crs`` for the raster layer and tiles.</span>
+
+<span class="sd">        :returns: Tiling system with follow columns:</span>
+<span class="sd">          ``tile_id``, ``minx``, ``miny``, ``maxx``, ``maxy`` and ``geometry``. The additional</span>
+<span class="sd">          columns ``raster_min``, ``raster_mode_value``, ``raster_mode_count`` and ``raster_max``</span>
+<span class="sd">          are returned when a raster layer is provided.</span>
+<span class="sd">        :rtype: geopandas.GeoDataFrame</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        ========</span>
+
+<span class="sd">        &gt;&gt;&gt; from skmap.parallel import TilingProcessing</span>
+<span class="sd">        &gt;&gt;&gt; skmap_extent = (900000, 930010, 6540000, 5460010)</span>
+<span class="sd">        &gt;&gt;&gt; tiling_system = TilingProcessing.generate_tiles(30000, skmap_extent, 'epsg:3035')</span>
+<span class="sd">        &gt;&gt;&gt; tiling_system.to_file(tiling_system_fn,  driver="GPKG") # doctest: +SKIP</span>
+
+<span class="sd">        """</span>
+
+        <span class="n">minx</span><span class="p">,</span> <span class="n">miny</span><span class="p">,</span> <span class="n">maxx</span><span class="p">,</span> <span class="n">maxy</span> <span class="o">=</span> <span class="n">extent</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"tile_id"</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">"minx"</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">"miny"</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">"maxx"</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">"maxy"</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">"geometry"</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="p">}</span>
+        <span class="n">tile_id</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">x1</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">minx</span><span class="p">,</span> <span class="n">maxx</span><span class="p">,</span> <span class="n">tile_size</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">y1</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">miny</span><span class="p">,</span> <span class="n">maxy</span><span class="p">,</span> <span class="n">tile_size</span><span class="p">):</span>
+                <span class="n">x2</span> <span class="o">=</span> <span class="n">x1</span> <span class="o">+</span> <span class="n">tile_size</span>
+                <span class="k">if</span> <span class="n">x2</span> <span class="o">&gt;</span> <span class="n">maxx</span><span class="p">:</span>
+                    <span class="n">x2</span> <span class="o">=</span> <span class="n">maxx</span>
+
+                <span class="n">y2</span> <span class="o">=</span> <span class="n">y1</span> <span class="o">+</span> <span class="n">tile_size</span>
+                <span class="k">if</span> <span class="n">y2</span> <span class="o">&gt;</span> <span class="n">maxy</span><span class="p">:</span>
+                    <span class="n">y2</span> <span class="o">=</span> <span class="n">maxy</span>
+
+                <span class="n">data</span><span class="p">[</span><span class="s2">"tile_id"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tile_id</span><span class="p">)</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">"minx"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">"miny"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">y1</span><span class="p">)</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">"maxx"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">"maxy"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">y2</span><span class="p">)</span>
+                <span class="n">data</span><span class="p">[</span><span class="s2">"geometry"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">Polygon</span><span class="p">([(</span><span class="n">x1</span><span class="p">,</span> <span class="n">y1</span><span class="p">),</span> <span class="p">(</span><span class="n">x2</span><span class="p">,</span> <span class="n">y1</span><span class="p">),</span> <span class="p">(</span><span class="n">x2</span><span class="p">,</span> <span class="n">y2</span><span class="p">),</span> <span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">y2</span><span class="p">)])</span>
+                <span class="p">)</span>
+
+                <span class="n">tile_id</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="n">tiles</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">set_crs</span><span class="p">(</span><span class="n">crs</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">raster_layer_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">_raster_values</span><span class="p">(</span><span class="n">tile</span><span class="p">,</span> <span class="n">raster_layer_fn</span><span class="p">):</span>
+                <span class="n">shapes</span> <span class="o">=</span> <span class="p">[</span><span class="n">tile</span><span class="p">[</span><span class="s2">"geometry"</span><span class="p">]]</span>
+
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">raster_layer_fn</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
+                        <span class="n">out_image</span><span class="p">,</span> <span class="n">out_transform</span> <span class="o">=</span> <span class="n">mask</span><span class="p">(</span>
+                            <span class="n">src</span><span class="p">,</span> <span class="n">shapes</span><span class="p">,</span> <span class="n">crop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">filled</span><span class="o">=</span><span class="kc">True</span>
+                        <span class="p">)</span>
+
+                        <span class="n">out_image</span> <span class="o">=</span> <span class="n">out_image</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"float32"</span><span class="p">)</span>
+                        <span class="n">nodata_val</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">nodatavals</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+                        <span class="n">_values</span><span class="p">,</span> <span class="n">_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">out_image</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                        <span class="n">values</span><span class="p">,</span> <span class="n">counts</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+                        <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">_values</span><span class="p">,</span> <span class="n">_counts</span><span class="p">):</span>
+                            <span class="k">if</span> <span class="n">v</span> <span class="o">!=</span> <span class="n">nodata_val</span><span class="p">:</span>
+                                <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+                                <span class="n">counts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+
+                        <span class="n">values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+                        <span class="n">counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span>
+                        <span class="n">m</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span>
+
+                        <span class="n">tile</span><span class="p">[</span><span class="s2">"raster_min"</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+                        <span class="n">tile</span><span class="p">[</span><span class="s2">"raster_mode_value"</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="n">m</span><span class="p">]</span>
+                        <span class="n">tile</span><span class="p">[</span><span class="s2">"raster_mode_count"</span><span class="p">]</span> <span class="o">=</span> <span class="n">counts</span><span class="p">[</span><span class="n">m</span><span class="p">]</span>
+                        <span class="n">tile</span><span class="p">[</span><span class="s2">"raster_max"</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+                <span class="k">except</span><span class="p">:</span>
+                    <span class="n">tile</span><span class="p">[</span><span class="s2">"raster_min"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="n">tile</span><span class="p">[</span><span class="s2">"raster_mode_value"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="n">tile</span><span class="p">[</span><span class="s2">"raster_mode_count"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="n">tile</span><span class="p">[</span><span class="s2">"raster_max"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+                <span class="k">return</span> <span class="n">tile</span>
+
+            <span class="n">args</span> <span class="o">=</span> <span class="p">[(</span><span class="n">tiles</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:],</span> <span class="n">raster_layer_fn</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">tiles</span><span class="p">))]</span>
+
+            <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">job</span><span class="p">(</span><span class="n">_raster_values</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+
+            <span class="n">tiles</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">(</span><span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">set_crs</span><span class="p">(</span><span class="n">crs</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">tiles</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TaskSequencer">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.TaskSequencer.html#skmap.parallel.TaskSequencer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TaskSequencer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Execute a pipeline of sequential tasks, in a way that the output of</span>
+<span class="sd">    one task is used as input for the next task. Each task is run in</span>
+<span class="sd">    parallel over the input data using ``skmap.parallel.job`` (Ray).</span>
+
+<span class="sd">    :param tasks: Task definition list, where each element can be: (1) a ``Callable`` function;</span>
+<span class="sd">      (2) a tuple containing a ``Callable`` function and the number of workers for the task; or</span>
+<span class="sd">      (3) a tuple containing a ``Callable`` function, the number of workers and an ``bool``</span>
+<span class="sd">      indication if the task would respect the ``mem_usage_limit``. The default number of</span>
+<span class="sd">      workers is ``1``.</span>
+<span class="sd">    :param mem_usage_limit: Deprecated and ignored (no backpressure in the Ray model).</span>
+<span class="sd">    :param wait_timeout: Deprecated and ignored.</span>
+<span class="sd">    :param verbose: Use ``True`` to print the communication and status of the tasks</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    ========</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">       from skmap.parallel import TaskSequencer</span>
+
+<span class="sd">       output = TaskSequencer(</span>
+<span class="sd">           tasks=[</span>
+<span class="sd">             task_1,</span>
+<span class="sd">             (task_2, 2)</span>
+<span class="sd">           ]</span>
+<span class="sd">       )</span>
+
+<span class="sd">    Pipeline produced by this example code::</span>
+
+<span class="sd">                       ----------      ----------</span>
+<span class="sd">        input_data -&gt;  | task_1 |  -&gt;  | task_2 |  -&gt;  output_data</span>
+<span class="sd">                        ----------      ----------</span>
+<span class="sd">                        |              |</span>
+<span class="sd">                        |-worker_1     |-worker_1</span>
+<span class="sd">                                       |-worker_2</span>
+
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">tasks</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Callable</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]],</span>
+        <span class="n">mem_usage_limit</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.75</span><span class="p">,</span>
+        <span class="n">wait_timeout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="n">verbose</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tasks</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pool_sizes</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">tasks</span><span class="p">:</span>
+            <span class="n">pool_size</span> <span class="o">=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">task</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">tuple</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">task</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="n">task</span><span class="p">,</span> <span class="n">pool_size</span> <span class="o">=</span> <span class="n">task</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">task</span><span class="p">,</span> <span class="n">pool_size</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">task</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_verbose</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Starting </span><span class="si">{</span><span class="n">pool_size</span><span class="si">}</span><span class="s2"> worker(s) for </span><span class="si">{</span><span class="n">task</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">task</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pool_sizes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pool_size</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_tasks</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tasks</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_verbose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+            <span class="n">ttprint</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TaskSequencer.run">
+<a class="viewcode-back" href="../../_autosummary/skmap.parallel.TaskSequencer.html#skmap.parallel.TaskSequencer.run">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_data</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Run the task pipeline considering the ``input_data`` argument.</span>
+
+<span class="sd">        :param input_data: Input data used to feed the first task.</span>
+
+<span class="sd">        :returns: List of returned values produced by the last task and</span>
+<span class="sd">          with the same size of the ``input_data`` argument.</span>
+<span class="sd">        :rtype: List</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        ========</span>
+
+<span class="sd">        &gt;&gt;&gt; from skmap.misc import ttprint</span>
+<span class="sd">        &gt;&gt;&gt; from skmap.parallel import TaskSequencer</span>
+<span class="sd">        &gt;&gt;&gt; import time</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; def rnd_data(const, size):</span>
+<span class="sd">        ...     data = np.random.rand(size, size, size)</span>
+<span class="sd">        ...     time.sleep(2)</span>
+<span class="sd">        ...     return (const, data)</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; def max_value(const, data):</span>
+<span class="sd">        ...     ttprint(f'Calculating the max value over {data.shape}')</span>
+<span class="sd">        ...     time.sleep(8)</span>
+<span class="sd">        ...     result = np.max(data + const)</span>
+<span class="sd">        ...     return result</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; taskSeq = TaskSequencer(</span>
+<span class="sd">        ...     tasks=[</span>
+<span class="sd">        ...         rnd_data,</span>
+<span class="sd">        ...         (max_value, 2)</span>
+<span class="sd">        ...     ],</span>
+<span class="sd">        ...     verbose=True</span>
+<span class="sd">        ... )</span>
+<span class="sd">        [...] Starting 1 worker(s) for rnd_data</span>
+<span class="sd">        [...] Starting 2 worker(s) for max_value</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; taskSeq.run(input_data=[ (const, 10) for const in range(0,3) ]) # doctest: +SKIP</span>
+<span class="sd">        &gt;&gt;&gt; taskSeq.run(input_data=[ (const, 20) for const in range(3,6) ]) # doctest: +SKIP</span>
+
+
+<span class="sd">        """</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">task</span><span class="p">,</span> <span class="n">pool_size</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tasks</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">pool_sizes</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_verbose</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Running </span><span class="si">{</span><span class="n">task</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> with </span><span class="si">{</span><span class="n">pool_size</span><span class="si">}</span><span class="s2"> worker(s)"</span><span class="p">)</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">job</span><span class="p">(</span><span class="n">task</span><span class="p">,</span> <span class="nb">iter</span><span class="p">(</span><span class="n">data</span><span class="p">),</span> <span class="n">n_jobs</span><span class="o">=</span><span class="n">pool_size</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">data</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=cb8930eaaf36d9849b67"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=cb8930eaaf36d9849b67"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2019-2021, Geo-harmonizer project team.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.21.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

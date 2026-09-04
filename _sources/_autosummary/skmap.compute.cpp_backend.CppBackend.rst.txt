@@ -1,0 +1,52 @@
+skmap.compute.cpp\_backend.CppBackend
+=====================================
+
+.. currentmodule:: skmap.compute.cpp_backend
+
+.. autoclass:: CppBackend
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~CppBackend.apply_along_axis
+      ~CppBackend.convolve1d
+      ~CppBackend.evaluate
+      ~CppBackend.fft_convolve
+      ~CppBackend.find_peaks
+      ~CppBackend.mask_nan
+      ~CppBackend.nanmax
+      ~CppBackend.nanmean
+      ~CppBackend.nanmedian
+      ~CppBackend.nanmin
+      ~CppBackend.nanpercentile
+      ~CppBackend.nanstd
+      ~CppBackend.nansum
+      ~CppBackend.ols
+      ~CppBackend.reset_fallbacks
+      ~CppBackend.scale_offset
+      ~CppBackend.seasonal_min_max
+      ~CppBackend.sparse_solve
+      ~CppBackend.stl_decompose
+      ~CppBackend.theilslopes
+      ~CppBackend.toeplitz_matmul
+      ~CppBackend.tsirf
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~CppBackend.name
+   
+   

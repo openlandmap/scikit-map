@@ -1,0 +1,25 @@
+skmap.io.process.TrendAnalysis
+==============================
+
+.. currentmodule:: skmap.io.process
+
+.. autoclass:: TrendAnalysis
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~TrendAnalysis.run
+   
+   
+
+   
+   
+   

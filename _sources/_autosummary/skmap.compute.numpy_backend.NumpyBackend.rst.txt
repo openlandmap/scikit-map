@@ -1,0 +1,52 @@
+skmap.compute.numpy\_backend.NumpyBackend
+=========================================
+
+.. currentmodule:: skmap.compute.numpy_backend
+
+.. autoclass:: NumpyBackend
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~NumpyBackend.apply_along_axis
+      ~NumpyBackend.convolve1d
+      ~NumpyBackend.evaluate
+      ~NumpyBackend.fft_convolve
+      ~NumpyBackend.find_peaks
+      ~NumpyBackend.mask_nan
+      ~NumpyBackend.nanmax
+      ~NumpyBackend.nanmean
+      ~NumpyBackend.nanmedian
+      ~NumpyBackend.nanmin
+      ~NumpyBackend.nanpercentile
+      ~NumpyBackend.nanstd
+      ~NumpyBackend.nansum
+      ~NumpyBackend.ols
+      ~NumpyBackend.reset_fallbacks
+      ~NumpyBackend.scale_offset
+      ~NumpyBackend.seasonal_min_max
+      ~NumpyBackend.sparse_solve
+      ~NumpyBackend.stl_decompose
+      ~NumpyBackend.theilslopes
+      ~NumpyBackend.toeplitz_matmul
+      ~NumpyBackend.tsirf
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~NumpyBackend.name
+   
+   

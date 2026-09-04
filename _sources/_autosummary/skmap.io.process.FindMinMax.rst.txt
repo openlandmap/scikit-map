@@ -1,0 +1,25 @@
+skmap.io.process.FindMinMax
+===========================
+
+.. currentmodule:: skmap.io.process
+
+.. autoclass:: FindMinMax
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~FindMinMax.run
+   
+   
+
+   
+   
+   

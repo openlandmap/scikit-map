@@ -1,0 +1,6 @@
+skmap.misc.sb\_vec
+==================
+
+.. currentmodule:: skmap.misc
+
+.. autofunction:: sb_vec

@@ -1,0 +1,6 @@
+skmap.io.base.save\_rasters\_cpp
+================================
+
+.. currentmodule:: skmap.io.base
+
+.. autofunction:: save_rasters_cpp

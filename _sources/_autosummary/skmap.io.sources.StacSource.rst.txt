@@ -1,0 +1,33 @@
+skmap.io.sources.StacSource
+===========================
+
+.. currentmodule:: skmap.io.sources
+
+.. autoclass:: StacSource
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~StacSource.iter_specs
+      ~StacSource.to_rasterdata
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~StacSource.date_format
+      ~StacSource.ignore_29feb
+   
+   

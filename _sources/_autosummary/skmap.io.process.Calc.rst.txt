@@ -1,0 +1,25 @@
+skmap.io.process.Calc
+=====================
+
+.. currentmodule:: skmap.io.process
+
+.. autoclass:: Calc
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~Calc.run
+   
+   
+
+   
+   
+   
