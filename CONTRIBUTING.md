@@ -14,12 +14,50 @@ For reporting issues and making feature suggestions please refer to the [issue t
 
 ### Initial setup
 
-1. Clone the repo: `git clone git@github.com:openlandmap/scikit-map.git`
-2. Install dependencies (not needed if only contributing documentation):
-   - Documentation: `uv pip install .[full,dev,docs] sphinx-autobuild`
-   - Code: `uv` doesn't like editable installs with our setup, after the above, re-run: `pip install -e .[full,dev,docs]` into a Python 3.6+ environment
+**Prerequisites (system packages):** `gdal-bin`, `libgdal-dev`, `libproj-dev`, `libgeos-dev`, `doxygen`, `pandoc`, `build-essential`, `cmake`, and `uv` ([install uv](https://docs.astral.sh/uv/getting-started/installation/)).
 
-This will ensure that a change to python files triggers a rebuild, as well as running `doxygen` again.
+1. Clone the repo:
+   ```bash
+   git clone git@github.com:openlandmap/scikit-map.git
+   cd scikit-map
+   ```
+2. Create and activate a `uv` virtual environment (Python 3.10+):
+   ```bash
+   uv venv .venv
+   source .venv/bin/activate
+   ```
+3. Install the package (editable) together with all dev, docs, and full extras:
+   ```bash
+   uv pip install -e ".[full,dev,docs]"
+   ```
+   This builds the C++ bindings (`skmap_bindings`) via CMake — the build fetches Eigen and pybind11 automatically, so network access is required.
+
+Verify the install:
+   ```bash
+   python -c "import skmap, skmap_bindings; print('ok')"
+   ```
+
+### Building the documentation
+
+The docs use Sphinx with Breathe (C++ Doxygen autodoc) and nbsphinx (Jupyter notebooks).
+
+1. Regenerate the C++ XML that Breathe consumes:
+   ```bash
+   doxygen
+   ```
+2. Build the HTML:
+   ```bash
+   sphinx-build docs/ _build/
+   ```
+   Open `_build/index.html` to view.
+
+> **Don't use `make -C docs html`** — the Makefile's `jupytext --to notebook notebooks/*.py` step fails when there are no `.py` notebooks. Use `sphinx-build docs/ _build/` directly.
+
+For live-updates during development:
+   ```bash
+   sphinx-autobuild docs/ _build/ --watch xml/
+   ```
+   (Run `doxygen` in a separate terminal if you change C++ docstrings.)
 
 ### Development: Git
 
@@ -76,21 +114,14 @@ Based on [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
 ### Documentation
 
-`scikit-map` is a mixed Python/C++ project. It auto-builds documentation from Python and C++ docstrings.
-
-1. For Python documentation live-updates run
-   ```bash
-   sphinx-autobuild docs/ _build/ --watch xml/
-   ```
-2. For C++: in the top-level directory, run `doxygen` to create xml documentation for `skmap_bindings`
-3. If you change C++ documentation, in a separate terminal run `doxygen` again and it will auto-update.
+`scikit-map` is a mixed Python/C++ project. It auto-builds documentation from Python and C++ docstrings. See [Building the documentation](#building-the-documentation) above for the build steps.
 
 ### Python code
 
 
 #### Code conventions
 
-We strongly prefer to submit code to `scikit-map` with [type hints](https://docs.python.org/3/library/typing.html). Additionally, we support Python versions as low as 3.8 and no code that uses syntax introduced in later versions of Python (e.g. the walrus operator) will be accepted.
+We strongly prefer to submit code to `scikit-map` with [type hints](https://docs.python.org/3/library/typing.html). Additionally, we support Python 3.10+ (`requires-python = ">=3.10"` in `pyproject.toml`).
 
 Python code is formatted using ruff:
 
