@@ -449,6 +449,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">rasterio.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasetWriter</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
@@ -1495,6 +1496,8 @@
 
         <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_map</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="c1"># Lazily populated by ``read()``; ``None`` means the layers are not</span>
         <span class="c1"># loaded in memory (paths only) so overlay can sample from files.</span>
@@ -1533,6 +1536,28 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_cached_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_array</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_active_group_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return a hashable key for ``date_args`` lookup from ``_active_group``.</span>
+
+<span class="sd">        When a run is partitioned by multiple columns, ``_active_group`` is a</span>
+<span class="sd">        joined string (e.g. ``"2020.red"``) mapped back to its column values</span>
+<span class="sd">        via ``_active_group_map``; the ``group`` component (or the first</span>
+<span class="sd">        column) is used as the ``date_args`` key.</span>
+<span class="sd">        """</span>
+        <span class="n">ag</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span>
+        <span class="k">if</span> <span class="n">ag</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ag</span><span class="p">,</span> <span class="n">ag</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">cols</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_cols</span>
+            <span class="k">if</span> <span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">:</span>
+                <span class="n">key</span> <span class="o">=</span> <span class="n">key</span><span class="p">[</span><span class="n">cols</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">)]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">key</span> <span class="o">=</span> <span class="n">key</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">:</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">key</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">_new_info_row</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">raster_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -1554,12 +1579,13 @@
         <span class="n">row</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">BAND_COL</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ag_key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_key</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">date_style</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">date_style</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span><span class="p">][</span><span class="s2">"date_style"</span><span class="p">]</span>
+                <span class="n">date_style</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="n">ag_key</span><span class="p">][</span><span class="s2">"date_style"</span><span class="p">]</span>
             <span class="k">if</span> <span class="n">date_format</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">date_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span><span class="p">][</span><span class="s2">"date_format"</span><span class="p">]</span>
+                <span class="n">date_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="n">ag_key</span><span class="p">][</span><span class="s2">"date_format"</span><span class="p">]</span>
 
-            <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="n">group</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="n">group</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="n">ag_key</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="n">group</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
                 <span class="s2">"date_style"</span><span class="p">:</span> <span class="n">date_style</span><span class="p">,</span>
@@ -1615,6 +1641,8 @@
         <span class="n">obj</span><span class="o">.</span><span class="n">info</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">obj</span><span class="o">.</span><span class="n">date_args</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">obj</span><span class="o">.</span><span class="n">_active_group</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">_active_group_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">]</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">_active_group_map</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">obj</span><span class="o">.</span><span class="n">array</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">obj</span><span class="o">.</span><span class="n">base_raster</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">obj</span><span class="o">.</span><span class="n">window</span> <span class="o">=</span> <span class="kc">None</span>
@@ -1724,10 +1752,10 @@
             <span class="n">gr</span> <span class="o">=</span> <span class="s2">""</span>
 
         <span class="k">if</span> <span class="n">date_format</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">date_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span><span class="p">][</span><span class="s2">"date_format"</span><span class="p">]</span>
+            <span class="n">date_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group_key</span><span class="p">()][</span><span class="s2">"date_format"</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="n">date_style</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">date_style</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span><span class="p">][</span><span class="s2">"date_style"</span><span class="p">]</span>
+            <span class="n">date_style</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_args</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group_key</span><span class="p">()][</span><span class="s2">"date_style"</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="n">ignore_29feb</span> <span class="ow">and</span> <span class="s2">"%j"</span> <span class="ow">in</span> <span class="n">date_format</span><span class="p">:</span>
             <span class="n">dt1</span> <span class="o">=</span> <span class="n">dt1</span> <span class="o">+</span> <span class="n">relativedelta</span><span class="p">(</span><span class="n">leapdays</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
@@ -1953,11 +1981,23 @@
         <span class="n">outname</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">drop_input</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">backend</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">"ComputeBackend"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">by</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">match</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">match_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">"""Execute a function over the loaded raster data, yielding per-tile results.</span>
 
 <span class="sd">        ``backend`` optionally overrides the compute backend for this run only</span>
 <span class="sd">        (it does not mutate ``self.backend``).</span>
+
+<span class="sd">        ``by`` optionally partitions a group runner by one or more ``info``</span>
+<span class="sd">        columns instead of the default ``group`` column (e.g.</span>
+<span class="sd">        ``by=["year", "band"]``).</span>
+
+<span class="sd">        ``match_col`` (default ``name``) is the ``info`` column searched for</span>
+<span class="sd">        each input band name of a whale runner (e.g.</span>
+<span class="sd">        ``match_col="band"``); ``match`` optionally adds further column==value</span>
+<span class="sd">        constraints to disambiguate.</span>
 <span class="sd">        """</span>
 
         <span class="c1"># Propagate the compute backend so the runner uses it instead of</span>
@@ -1977,7 +2017,7 @@
                 <span class="n">input_groups</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">TEMPORAL_COL</span><span class="p">]</span> <span class="o">==</span> <span class="n">process</span><span class="o">.</span><span class="n">temporal</span>
                 <span class="p">][</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_group_run</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">group</span><span class="p">,</span> <span class="n">outname</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_group_run</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">group</span><span class="p">,</span> <span class="n">outname</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="n">by</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">drop_input</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">input_groups</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
@@ -1993,6 +2033,13 @@
             <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"rdata"</span><span class="p">:</span> <span class="bp">self</span><span class="p">}</span>
             <span class="k">if</span> <span class="n">outname</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">kwargs</span><span class="p">[</span><span class="s2">"outname"</span><span class="p">]</span> <span class="o">=</span> <span class="n">outname</span>
+            <span class="n">sig</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">signature</span><span class="p">(</span><span class="n">process</span><span class="o">.</span><span class="n">run</span><span class="p">)</span><span class="o">.</span><span class="n">parameters</span>
+            <span class="k">if</span> <span class="n">match</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">"match"</span> <span class="ow">in</span> <span class="n">sig</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s2">"match"</span><span class="p">]</span> <span class="o">=</span> <span class="n">match</span>
+            <span class="k">if</span> <span class="n">match_col</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">"match_col"</span> <span class="ow">in</span> <span class="n">sig</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s2">"match_col"</span><span class="p">]</span> <span class="o">=</span> <span class="n">match_col</span>
+            <span class="k">if</span> <span class="n">by</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">"by"</span> <span class="ow">in</span> <span class="n">sig</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s2">"by"</span><span class="p">]</span> <span class="o">=</span> <span class="n">by</span>
 
             <span class="n">_</span><span class="p">,</span> <span class="n">new_info</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
@@ -2034,29 +2081,45 @@
         <span class="n">process</span><span class="p">:</span> <span class="n">SKMapGroupRunner</span><span class="p">,</span>
         <span class="n">group</span><span class="p">:</span> <span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
         <span class="n">outname</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">by</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
             <span class="n">group</span> <span class="o">=</span> <span class="p">[</span><span class="n">group</span><span class="p">]</span>
+
+        <span class="n">by</span> <span class="o">=</span> <span class="n">by</span> <span class="ow">or</span> <span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">by</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">by</span> <span class="o">=</span> <span class="p">[</span><span class="n">by</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_cols</span> <span class="o">=</span> <span class="n">by</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_map</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="n">to_add_info</span> <span class="o">=</span> <span class="p">[]</span>
 
         <span class="n">group_list</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">ginfo_list</span> <span class="o">=</span> <span class="p">[]</span>
 
-        <span class="k">for</span> <span class="n">_group</span><span class="p">,</span> <span class="n">ginfo</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">ginfo</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">by</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">ginfo</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">TEMPORAL_COL</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">process</span><span class="o">.</span><span class="n">temporal</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_verbose</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"Skipping </span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">_group</span><span class="si">}</span><span class="s2"> group"</span>
+                    <span class="sa">f</span><span class="s2">"Skipping </span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> group"</span>
                 <span class="p">)</span>
                 <span class="k">continue</span>
 
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">_group</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">group</span><span class="p">:</span>
+            <span class="c1"># ``group`` filters on the first partition column's values</span>
+            <span class="c1"># (GROUP_COL by default, preserving the old behaviour).</span>
+            <span class="n">gval</span> <span class="o">=</span> <span class="n">key</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">by</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">key</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">gval</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">group</span><span class="p">:</span>
                 <span class="k">continue</span>
 
-            <span class="n">expr_group</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="si">}</span><span class="s1"> == "</span><span class="si">{</span><span class="n">_group</span><span class="si">}</span><span class="s1">"'</span>
-            <span class="n">ginfo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">expr_group</span><span class="p">)</span>
+            <span class="c1"># A multi-column key becomes a joined string for naming; the</span>
+            <span class="c1"># original tuple is kept in _active_group_map so _filter can</span>
+            <span class="c1"># reconstruct the per-column constraints.</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="n">group_name</span> <span class="o">=</span> <span class="s2">"."</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">key</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_map</span><span class="p">[</span><span class="n">group_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">key</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">group_name</span> <span class="o">=</span> <span class="n">key</span>
 
-            <span class="n">group_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_group</span><span class="p">)</span>
+            <span class="n">group_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">group_name</span><span class="p">)</span>
             <span class="n">ginfo_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ginfo</span><span class="p">)</span>
 
         <span class="n">process_name</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
@@ -2093,6 +2156,8 @@
         <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_map</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">to_add_info</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">new_info</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">to_add_info</span><span class="p">)</span>
@@ -2247,6 +2312,26 @@
         <span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="RasterData.select">
+<a class="viewcode-back" href="../../../_autosummary/skmap.io.base.RasterData.html#skmap.io.base.RasterData.select">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">select</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">match</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"RasterData"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return a copy keeping only rows where each column equals a value.</span>
+
+<span class="sd">        Filters by arbitrary ``info`` columns (not just ``group``), e.g.</span>
+<span class="sd">        ``rdata.select(band="red", year=2020)``.  Useful to pre-filter a</span>
+<span class="sd">        multi-column catalogue before running a runner.</span>
+<span class="sd">        """</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span>
+        <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">match</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">info</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"Column </span><span class="si">{</span><span class="n">col</span><span class="si">!r}</span><span class="s2"> not in RasterData.info "</span>
+                    <span class="sa">f</span><span class="s2">"(columns: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
+                <span class="p">)</span>
+            <span class="n">info</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="n">info</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">==</span> <span class="n">val</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_filter</span><span class="p">(</span><span class="n">info</span><span class="p">,</span> <span class="n">return_copy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
     <span class="k">def</span><span class="w"> </span><span class="nf">_filter</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">info</span><span class="p">,</span>
@@ -2257,7 +2342,12 @@
     <span class="p">):</span>
         <span class="c1"># Active filters</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">info</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="si">}</span><span class="s1"> == "</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span><span class="si">}</span><span class="s1">"'</span><span class="p">)</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_group_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group_cols</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+                    <span class="n">info</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="n">info</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">==</span> <span class="n">val</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">info</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="si">}</span><span class="s1"> == "</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_active_group</span><span class="si">}</span><span class="s1">"'</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">return_idx</span><span class="p">:</span>
             <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
@@ -2311,31 +2401,73 @@
         <span class="k">return</span> <span class="n">groups</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_band_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_band_index</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">match</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">match_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Return the array band index (row position) of a named layer.</span>
 
 <span class="sd">        The array is always ``(N, H*W)`` with band ``k`` corresponding to the</span>
 <span class="sd">        ``k``-th row of ``self.info``, so positional lookup (not the possibly</span>
 <span class="sd">        stale ``info.index`` values) is used.</span>
+
+<span class="sd">        ``match_col`` (default ``name``) is the ``info`` column searched for</span>
+<span class="sd">        ``name``, so layers can be resolved by a variable column (e.g.</span>
+<span class="sd">        ``match_col="band"``) when the catalogue is organised by a column</span>
+<span class="sd">        other than ``group``.  ``match`` optionally adds further column==value</span>
+<span class="sd">        constraints to disambiguate.  If more than one row matches, a</span>
+<span class="sd">        ``KeyError`` is raised (callers must disambiguate rather than</span>
+<span class="sd">        silently pick the first).</span>
 <span class="sd">        """</span>
+        <span class="n">match_col</span> <span class="o">=</span> <span class="n">match_col</span> <span class="ow">or</span> <span class="n">RasterData</span><span class="o">.</span><span class="n">NAME_COL</span>
         <span class="n">info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="n">mask</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">NAME_COL</span><span class="p">]</span> <span class="o">==</span> <span class="n">name</span>
+        <span class="k">if</span> <span class="n">match_col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">info</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Column </span><span class="si">{</span><span class="n">match_col</span><span class="si">!r}</span><span class="s2"> not in RasterData.info "</span>
+                <span class="sa">f</span><span class="s2">"(columns: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
+            <span class="p">)</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="n">match_col</span><span class="p">]</span> <span class="o">==</span> <span class="n">name</span>
         <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">mask</span> <span class="o">&amp;=</span> <span class="n">info</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">]</span> <span class="o">==</span> <span class="n">group</span>
+        <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">match</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">info</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">"Column </span><span class="si">{</span><span class="n">col</span><span class="si">!r}</span><span class="s2"> not in RasterData.info "</span>
+                        <span class="sa">f</span><span class="s2">"(columns: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
+                    <span class="p">)</span>
+                <span class="n">mask</span> <span class="o">&amp;=</span> <span class="n">info</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">==</span> <span class="n">val</span>
         <span class="n">hits</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">mask</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">hits</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Layer </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> not found in RasterData groups </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">get_groups</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+                <span class="sa">f</span><span class="s2">"Layer </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> not found in column </span><span class="si">{</span><span class="n">match_col</span><span class="si">!r}</span><span class="s2">"</span>
+                <span class="o">+</span> <span class="p">(</span><span class="sa">f</span><span class="s2">" with match=</span><span class="si">{</span><span class="n">match</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">match</span> <span class="k">else</span> <span class="s2">""</span><span class="p">)</span>
+                <span class="o">+</span> <span class="p">(</span><span class="sa">f</span><span class="s2">" in group </span><span class="si">{</span><span class="n">group</span><span class="si">!r}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">""</span><span class="p">)</span>
+                <span class="o">+</span> <span class="sa">f</span><span class="s2">" (groups: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">get_groups</span><span class="p">()</span><span class="si">}</span><span class="s2">)"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">hits</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Layer </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> matched </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">hits</span><span class="p">)</span><span class="si">}</span><span class="s2"> rows; "</span>
+                <span class="sa">f</span><span class="s2">"add a match constraint to disambiguate"</span>
             <span class="p">)</span>
         <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">hits</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_get_covs_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">covs_lst</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_covs_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">covs_lst</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">match_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Map covariate names to band indices per group (``common`` falls back).</span>
 
 <span class="sd">        Returns an int matrix of shape ``(len(covs_lst), n_groups)`` where each</span>
 <span class="sd">        column is a group and each row a covariate; a covariate missing from a</span>
 <span class="sd">        group falls back to the ``common`` group.</span>
+
+<span class="sd">        ``match_col`` (default ``name``) is the ``info`` column searched for</span>
+<span class="sd">        each covariate name, so covariates can be resolved by a variable</span>
+<span class="sd">        column (e.g. ``match_col="band"``) when the catalogue is organised by</span>
+<span class="sd">        a column other than ``group``.</span>
 <span class="sd">        """</span>
+        <span class="n">match_col</span> <span class="o">=</span> <span class="n">match_col</span> <span class="ow">or</span> <span class="n">RasterData</span><span class="o">.</span><span class="n">NAME_COL</span>
         <span class="n">groups</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_groups</span><span class="p">()</span>
         <span class="n">info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">covs_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">covs_lst</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">groups</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
@@ -2343,11 +2475,11 @@
             <span class="n">ginfo</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="n">info</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">]</span> <span class="o">==</span> <span class="n">g</span><span class="p">]</span>
             <span class="n">common</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="n">info</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"common"</span><span class="p">]</span>
             <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">covs_lst</span><span class="p">):</span>
-                <span class="n">hits</span> <span class="o">=</span> <span class="n">ginfo</span><span class="p">[</span><span class="n">ginfo</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">NAME_COL</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="p">]</span>
+                <span class="n">hits</span> <span class="o">=</span> <span class="n">ginfo</span><span class="p">[</span><span class="n">ginfo</span><span class="p">[</span><span class="n">match_col</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="p">]</span>
                 <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">hits</span><span class="p">):</span>
                     <span class="n">covs_idx</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">hits</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">chits</span> <span class="o">=</span> <span class="n">common</span><span class="p">[</span><span class="n">common</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">NAME_COL</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="p">]</span>
+                    <span class="n">chits</span> <span class="o">=</span> <span class="n">common</span><span class="p">[</span><span class="n">common</span><span class="p">[</span><span class="n">match_col</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="p">]</span>
                     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">chits</span><span class="p">):</span>
                         <span class="n">covs_idx</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">chits</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
                     <span class="k">else</span><span class="p">:</span>
@@ -2377,15 +2509,20 @@
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_covs_idx_by_year</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">covs_lst</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">years</span><span class="p">:</span> <span class="n">List</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">covs_lst</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">years</span><span class="p">:</span> <span class="n">List</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">match_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Map covariate names to band indices per *year*.</span>
 
 <span class="sd">        Returns ``(covs_idx, years)`` where ``covs_idx`` has shape</span>
 <span class="sd">        ``(len(covs_lst), n_years)``.  Temporal covariates are matched by</span>
-<span class="sd">        ``name`` **and** ``start_date`` year (resolving year-agnostic names</span>
-<span class="sd">        such as ``ndvi_winter`` that repeat once per year); static covariates</span>
-<span class="sd">        (the ``common`` group) use the same band index for every year.</span>
+<span class="sd">        ``match_col`` (default ``name``) **and** ``start_date`` year</span>
+<span class="sd">        (resolving year-agnostic names such as ``ndvi_winter`` that repeat</span>
+<span class="sd">        once per year); static covariates (the ``common`` group) use the same</span>
+<span class="sd">        band index for every year.</span>
+
+<span class="sd">        ``match_col`` lets covariates be resolved by a variable column (e.g.</span>
+<span class="sd">        ``match_col="band"``) when the catalogue is organised by a column</span>
+<span class="sd">        other than ``group``.</span>
 
 <span class="sd">        A static-only catalogue (no temporal layers) yields ``n_years == 1``</span>
 <span class="sd">        with a ``None`` year placeholder, so a single prediction is produced</span>
@@ -2394,6 +2531,7 @@
 <span class="sd">        :raises ValueError: if temporal layers exist but lack ``start_date``</span>
 <span class="sd">          (year-based prediction requires dates).</span>
 <span class="sd">        """</span>
+        <span class="n">match_col</span> <span class="o">=</span> <span class="n">match_col</span> <span class="ow">or</span> <span class="n">RasterData</span><span class="o">.</span><span class="n">NAME_COL</span>
         <span class="n">info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">temporal</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="n">info</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">TEMPORAL_COL</span><span class="p">]]</span>
 
@@ -2424,11 +2562,11 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">year_info</span> <span class="o">=</span> <span class="n">temporal</span><span class="p">[</span><span class="n">temporal</span><span class="p">[</span><span class="s2">"start_date"</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">year</span> <span class="o">==</span> <span class="n">y</span><span class="p">]</span>
             <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">covs_lst</span><span class="p">):</span>
-                <span class="n">hits</span> <span class="o">=</span> <span class="n">year_info</span><span class="p">[</span><span class="n">year_info</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">NAME_COL</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="p">]</span>
+                <span class="n">hits</span> <span class="o">=</span> <span class="n">year_info</span><span class="p">[</span><span class="n">year_info</span><span class="p">[</span><span class="n">match_col</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="p">]</span>
                 <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">hits</span><span class="p">):</span>
                     <span class="n">covs_idx</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">hits</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">chits</span> <span class="o">=</span> <span class="n">common</span><span class="p">[</span><span class="n">common</span><span class="p">[</span><span class="n">RasterData</span><span class="o">.</span><span class="n">NAME_COL</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="p">]</span>
+                    <span class="n">chits</span> <span class="o">=</span> <span class="n">common</span><span class="p">[</span><span class="n">common</span><span class="p">[</span><span class="n">match_col</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="p">]</span>
                     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">chits</span><span class="p">):</span>
                         <span class="n">covs_idx</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">chits</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
                     <span class="k">else</span><span class="p">:</span>

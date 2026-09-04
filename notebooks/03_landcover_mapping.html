@@ -645,7 +645,7 @@ Name: count, dtype: int64
 <h1><span class="section-number">6. </span>Building the catalog<a class="headerlink" href="#Building-the-catalog" title="Link to this heading">#</a></h1>
 <p>A :class:<code class="docutils literal notranslate"><span class="pre">~skmap.io.RasterData</span></code> is loaded directly from the toy <code class="docutils literal notranslate"><span class="pre">layers.yaml</span></code> catalogue via :meth:<code class="docutils literal notranslate"><span class="pre">~skmap.io.RasterData.from_yaml</span></code>. The catalogue expands the NDVI/SWIR-1 seasonal composites (with year-agnostic season names) and the static terrain layers. We keep the gap-filled NDVI (<code class="docutils literal notranslate"><span class="pre">variant</span> <span class="pre">!=</span> <span class="pre">'gappy'</span></code>) and restrict the temporal layers to the full years 2015-2019.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">toy</span><span class="o">.</span><span class="n">LAYERS_YAML</span>
@@ -653,7 +653,7 @@ Name: count, dtype: int64
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
@@ -662,7 +662,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">backend</span><span class="o">=</span><span class="s1">'cpp'</span> <span class="c1"># numba, numpy</span>
@@ -676,7 +676,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
@@ -1326,7 +1326,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
 </div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">overlay</span> <span class="o">=</span> <span class="n">SpaceTimeOverlay</span><span class="p">(</span>
@@ -1356,7 +1356,7 @@ Dropping 0 points out of 38 because out of extent
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -1501,7 +1501,7 @@ Dropping 0 points out of 38 because out of extent
 <h1><span class="section-number">8. </span>Training<a class="headerlink" href="#Training" title="Link to this heading">#</a></h1>
 <p>The overlaid table is a plain pandas DataFrame, so we can feed it directly to scikit-learn. We use a random forest and evaluate it with 5-fold cross-validation.</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.preprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">LabelEncoder</span>
@@ -1514,7 +1514,7 @@ Dropping 0 points out of 38 because out of extent
 </div>
 </div>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.ensemble</span><span class="w"> </span><span class="kn">import</span> <span class="n">RandomForestClassifier</span>
@@ -1535,7 +1535,7 @@ Dropping 0 points out of 38 because out of extent
 </div>
 <p>Let’s inspect the per-class metrics.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">y_pred</span> <span class="o">=</span> <span class="n">cross_val_predict</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
@@ -1575,7 +1575,7 @@ Land principally occupied by agriculture, with significant areas of natural vege
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
@@ -1594,7 +1594,7 @@ Land principally occupied by agriculture, with significant areas of natural vege
 </div>
 <p>Now, we train the final model:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
@@ -1602,7 +1602,7 @@ Land principally occupied by agriculture, with significant areas of natural vege
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -3029,7 +3029,7 @@ forceTheme('sk-container-id-1');</script></body></div>
 <h1><span class="section-number">9. </span>Predictions (mapping)<a class="headerlink" href="#Predictions-(mapping)" title="Link to this heading">#</a></h1>
 <p>To produce maps for <strong>all years at once</strong>, we read the full 2015-2019 raster grid and run :class:<code class="docutils literal notranslate"><span class="pre">~skmap.io.process.Prediction</span></code>. It concatenates every year into a single feature matrix (with the static <code class="docutils literal notranslate"><span class="pre">elev</span></code>/<code class="docutils literal notranslate"><span class="pre">slope</span></code> covariates repeated for each year) and runs the model <strong>once</strong>, appending <code class="docutils literal notranslate"><span class="pre">(n_out</span> <span class="pre">·</span> <span class="pre">n_years,</span> <span class="pre">H*W)</span></code> prediction bands to the raster. With a label classifier <code class="docutils literal notranslate"><span class="pre">n_out</span> <span class="pre">==</span> <span class="pre">1</span></code>, so band <code class="docutils literal notranslate"><span class="pre">k</span></code> is the map for year <code class="docutils literal notranslate"><span class="pre">2015</span> <span class="pre">+</span> <span class="pre">k</span></code>.</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Read the full multi-year grid (filled NDVI + SWIR1 + statics, 2015-2019)</span>
@@ -3038,24 +3038,31 @@ forceTheme('sk-container-id-1');</script></body></div>
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">get</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-(42, 65536)
+array([[71., 73., 56., ..., 92., 90., 78.],
+       [73., 72., 75., ..., 78., 79., 76.],
+       [80., 79., 75., ..., 80., 80., 80.],
+       ...,
+       [60., 57., 58., ..., 51., 51., 49.],
+       [47., 45., 43., ..., 64., 64., 65.],
+       [10., 14.,  6., ...,  3.,  5.,  2.]],
+      shape=(42, 65536), dtype=float32)
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io.process</span><span class="w"> </span><span class="kn">import</span> <span class="n">Prediction</span>
@@ -3067,7 +3074,7 @@ forceTheme('sk-container-id-1');</script></body></div>
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -3182,7 +3189,7 @@ forceTheme('sk-container-id-1');</script></body></div>
 <h1><span class="section-number">10. </span>Visualizing the maps<a class="headerlink" href="#Visualizing-the-maps" title="Link to this heading">#</a></h1>
 <p>Finally we plot the predicted land-cover map for each year with :func:<code class="docutils literal notranslate"><span class="pre">~skmap.plotter.plot_rasters</span></code>.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[25]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.colors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ListedColormap</span>
@@ -3237,7 +3244,7 @@ Mapped land cover classes
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[26]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">cmap</span><span class="o">=</span><span class="n">colors</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s1">'Land cover </span><span class="si">{group}</span><span class="s1"> (</span><span class="si">{year}</span><span class="s1">)'</span><span class="p">)</span>
@@ -3245,7 +3252,7 @@ Mapped land cover classes
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[26]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
 </pre></div>
 </div>
 <div class="output_area docutils container">

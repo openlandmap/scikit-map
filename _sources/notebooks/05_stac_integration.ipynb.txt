@@ -384,6 +384,35 @@
   },
   {
    "cell_type": "markdown",
+   "id": "fd6a3c29",
+   "metadata": {},
+   "source": [
+    "### Multi-column runners on a STAC catalogue\n",
+    "\n",
+    "The `info` frame carries one column per STAC variable (`collection`,\n",
+    "`asset`, `year`, `gsd`, `epsg`), so runners are not limited to the\n",
+    "predefined `group` column:\n",
+    "\n",
+    "* **`select(...)`** filters layers by any variable column, e.g.\n",
+    "  `rdata.select(asset=\"red\", year=2019)`;\n",
+    "* **`match_col=`** tells a runner (e.g.\n",
+    "  `process.NormalizedDifference(\"red\", \"nir\")`) to resolve its input\n",
+    "  bands from a variable column instead of `name`;\n",
+    "* **`by=`** computes **one output band per partition** — e.g.\n",
+    "  `by=\"year\"` produces a derived band for every year, with the partition\n",
+    "  values stored back into the new `info` rows.\n",
+    "\n",
+    "```python\n",
+    "rdata.run(\n",
+    "    process.NormalizedDifference(\"red\", \"nir\"),\n",
+    "    match_col=\"asset\",   # \"red\"/\"nir\" live in the asset column\n",
+    "    by=\"year\",           # one NDVI band per year\n",
+    ")\n",
+    "```"
+   ]
+  },
+  {
+   "cell_type": "markdown",
    "id": "4799fd73",
    "metadata": {},
    "source": [
@@ -653,6 +682,37 @@
     "`read(extent=...)` reads only a bounding box (here the samples' AOI in\n",
     "EPSG:3035), and `plot` renders each bimonthly composite with a\n",
     "`{field}` title template.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "8875d0d2-9dca-423d-b96b-890f986171a6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from skmap.io.base import _read_rasters_cpp"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "3c952145-d517-43e8-8337-894086e37944",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "<function skmap.io.base._read_rasters_cpp(raster_files, band, window, n_jobs, dtype, gdal_opts, verbose, overview=None)>"
+      ]
+     },
+     "execution_count": 6,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "base."
    ]
   },
   {

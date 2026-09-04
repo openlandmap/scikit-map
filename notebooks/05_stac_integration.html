@@ -773,6 +773,22 @@ See :class:`skmap.io.sources.StacSource` for the query rules.
 [&#39;ndvi_glad.swa.ard2_go_landmetric&#39;, &#39;ndwi_glad.swa.ard2_go_landmetric&#39;]
 </pre></div></div>
 </div>
+<section id="Multi-column-runners-on-a-STAC-catalogue">
+<h3><span class="section-number">12.1.1. </span>Multi-column runners on a STAC catalogue<a class="headerlink" href="#Multi-column-runners-on-a-STAC-catalogue" title="Link to this heading">#</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">info</span></code> frame carries one column per STAC variable (<code class="docutils literal notranslate"><span class="pre">collection</span></code>, <code class="docutils literal notranslate"><span class="pre">asset</span></code>, <code class="docutils literal notranslate"><span class="pre">year</span></code>, <code class="docutils literal notranslate"><span class="pre">gsd</span></code>, <code class="docutils literal notranslate"><span class="pre">epsg</span></code>), so runners are not limited to the predefined <code class="docutils literal notranslate"><span class="pre">group</span></code> column:</p>
+<ul class="simple">
+<li><p><strong>``select(…)``</strong> filters layers by any variable column, e.g. <code class="docutils literal notranslate"><span class="pre">rdata.select(asset=&quot;red&quot;,</span> <span class="pre">year=2019)</span></code>;</p></li>
+<li><p><strong>``match_col=``</strong> tells a runner (e.g. <code class="docutils literal notranslate"><span class="pre">process.NormalizedDifference(&quot;red&quot;,</span> <span class="pre">&quot;nir&quot;)</span></code>) to resolve its input bands from a variable column instead of <code class="docutils literal notranslate"><span class="pre">name</span></code>;</p></li>
+<li><p><strong>``by=``</strong> computes <strong>one output band per partition</strong> — e.g. <code class="docutils literal notranslate"><span class="pre">by=&quot;year&quot;</span></code> produces a derived band for every year, with the partition values stored back into the new <code class="docutils literal notranslate"><span class="pre">info</span></code> rows.</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">process</span><span class="o">.</span><span class="n">NormalizedDifference</span><span class="p">(</span><span class="s2">"red"</span><span class="p">,</span> <span class="s2">"nir"</span><span class="p">),</span>
+    <span class="n">match_col</span><span class="o">=</span><span class="s2">"asset"</span><span class="p">,</span>   <span class="c1"># "red"/"nir" live in the asset column</span>
+    <span class="n">by</span><span class="o">=</span><span class="s2">"year"</span><span class="p">,</span>           <span class="c1"># one NDVI band per year</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
 </section>
 <section id="Space-time-overlay-with-toy-reference-samples">
 <h2><span class="section-number">12.2. </span>Space-time overlay with toy reference samples<a class="headerlink" href="#Space-time-overlay-with-toy-reference-samples" title="Link to this heading">#</a></h2>
@@ -972,6 +988,31 @@ Dropping 0 points out of 57 because out of extent
 <section id="Reading-a-small-tile-and-plotting">
 <h2><span class="section-number">12.3. </span>Reading a small tile and plotting<a class="headerlink" href="#Reading-a-small-tile-and-plotting" title="Link to this heading">#</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">read(extent=...)</span></code> reads only a bounding box (here the samples’ AOI in EPSG:3035), and <code class="docutils literal notranslate"><span class="pre">plot</span></code> renders each bimonthly composite with a <code class="docutils literal notranslate"><span class="pre">{field}</span></code> title template.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">_read_rasters_cpp</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">base</span><span class="o">.</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;function skmap.io.base._read_rasters_cpp(raster_files, band, window, n_jobs, dtype, gdal_opts, verbose, overview=None)&gt;
+</pre></div></div>
+</div>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
 </pre></div>
@@ -1086,7 +1127,10 @@ During handling of the above exception, another exception occurred:
   </div>
   <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="pst-show_toc_level nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Loading-layers-from-the-STAC-catalogue">12.1. Loading layers from the STAC catalogue</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Loading-layers-from-the-STAC-catalogue">12.1. Loading layers from the STAC catalogue</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#Multi-column-runners-on-a-STAC-catalogue">12.1.1. Multi-column runners on a STAC catalogue</a></li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Space-time-overlay-with-toy-reference-samples">12.2. Space-time overlay with toy reference samples</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Reading-a-small-tile-and-plotting">12.3. Reading a small tile and plotting</a></li>
 </ul>

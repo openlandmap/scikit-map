@@ -607,15 +607,25 @@ a class default).</p>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="#skmap.io.process.WhaleRunner.run" title="skmap.io.process.WhaleRunner.run"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run</span></code></a></p></td>
-<td><p>Process <code class="docutils literal notranslate"><span class="pre">data</span></code> and write the result under <code class="docutils literal notranslate"><span class="pre">outname</span></code>.</p></td>
+<td><p>Compute the derived band(s) and append them to <code class="docutils literal notranslate"><span class="pre">rdata</span></code>.</p></td>
 </tr>
 </tbody>
 </table>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.process.WhaleRunner.run">
-<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/process.html#WhaleRunner.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.process.WhaleRunner.run" title="Link to this definition">#</a></dt>
-<dd><p>Process <code class="docutils literal notranslate"><span class="pre">data</span></code> and write the result under <code class="docutils literal notranslate"><span class="pre">outname</span></code>.</p>
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/process.html#WhaleRunner.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.process.WhaleRunner.run" title="Link to this definition">#</a></dt>
+<dd><p>Compute the derived band(s) and append them to <code class="docutils literal notranslate"><span class="pre">rdata</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">match_col</span></code> (default <code class="docutils literal notranslate"><span class="pre">name</span></code>) is the <code class="docutils literal notranslate"><span class="pre">info</span></code> column searched for
+each input band name, so bands can be resolved by a variable column
+(e.g. <code class="docutils literal notranslate"><span class="pre">match_col=&quot;band&quot;</span></code>) when the catalogue is organised by a
+column other than <code class="docutils literal notranslate"><span class="pre">group</span></code>.  <code class="docutils literal notranslate"><span class="pre">match</span></code> optionally adds further
+column==value constraints to disambiguate.</p>
+<p><code class="docutils literal notranslate"><span class="pre">by</span></code> optionally partitions the computation by one or more <code class="docutils literal notranslate"><span class="pre">info</span></code>
+columns (e.g. <code class="docutils literal notranslate"><span class="pre">by=&quot;year&quot;</span></code>), producing one output band per partition
+instead of a single band.  Each partition’s column values are added
+to the <code class="docutils literal notranslate"><span class="pre">match</span></code> constraints so input bands resolve within that
+partition.</p>
 </dd></dl>
 
 </dd></dl>

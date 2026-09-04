@@ -32,6 +32,7 @@ skmap.io.base.RasterData
       ~RasterData.read
       ~RasterData.rename
       ~RasterData.run
+      ~RasterData.select
       ~RasterData.select_valid
       ~RasterData.timespan
       ~RasterData.to_dir
