@@ -30,18 +30,15 @@ class SKMapRunner(SKMapBase, ABC):
 
 
 class SKMapGroupRunner(SKMapBase, ABC):
-    """Abstract runner that processes data grouped by ``group`` (e.g. by year)."""
+    """Abstract runner that processes data partitioned by ``feature``."""
 
-    def __init__(self, verbose: bool = True, temporal: bool = False) -> None:
+    def __init__(self, verbose: bool = True) -> None:
         self.verbose = verbose
-        self.temporal = temporal
         from skmap.compute import NumpyBackend
 
         self.backend = NumpyBackend()
 
-        temporal: bool = False
-
     @abstractmethod
-    def run(self, data, group: str, outname: str) -> None:
-        """Process ``data`` for ``group`` and write the result under ``outname``."""
+    def run(self, data, feature: str, outname: str) -> None:
+        """Process ``data`` for ``feature`` and write the result under ``outname``."""
         pass
