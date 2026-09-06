@@ -6,6 +6,7 @@
 
    Home <self>
    Quickstart <quickstart/quickstart>
+   Data Structure <data-structure>
    Tutorials <tutorials>
    In-Depth <in-depth/in-depth>
    API Reference <_autosummary/skmap>

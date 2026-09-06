@@ -46,13 +46,36 @@ Main functionalities
 The examples below use the bundled **toy data** (`skmap.data.toy`), so they run
 without downloading anything.
 
+### Data structure
+
+A `RasterData` is a **4-D data cube** — `(x, y, time interval, feature)` —
+collapsed into a single 2-D array for memory locality and parallel tiling:
+
+```
+array: (N, H*W)          info: N rows (the row index)
+
+row 0..23    ndvi   2015 winter, 2015 spring, ... 2020 fall   (chronological)
+row 24..47   swir1  2015 winter, 2015 spring, ... 2020 fall
+row 48..49   elev, slope (common: no time interval)
+```
+
+Rows follow the catalogue construction order (e.g. year-major, band-minor,
+date-minor for a year-organised catalogue). The `info` DataFrame has one row
+per array row and is the authoritative index. **Mandatory columns** —
+`input_path`, `input_band`, `name`, `start_date`, `end_date`, `feature`,
+`is_common` — are always propagated to derived features; optional columns
+(`year`, `season`, `band`, ...) are not. `is_common=True` marks static
+features that are replicated across every prediction interval; temporal
+features carry a `(start_date, end_date)` interval.
+
 ### Loading raster data
 
 A layer catalogue is described in YAML and expanded into a lazy
-`RasterData` via `from_yaml`. Temporal layers are grouped by year/band, static
-layers under `"common"`; `{variable}` placeholders in the path template expand
-over the `start_year`/`end_year` range, the `band` list and the paired
-`start_month`/`end_month` lists (see `skmap.io.sources` for the schema).
+`RasterData` via `from_yaml`. Each layer is a `feature` (e.g. `ndvi`, `elev`)
+with a time interval (`start_date`/`end_date`); common (static) features have
+no interval and are flagged `is_common`. `{variable}` placeholders in the path
+template expand over the `start_year`/`end_year` range, the `band` list and the
+paired `start_month`/`end_month` lists (see `skmap.io.sources` for the schema).
 
 ```python
 from skmap.data import toy
@@ -64,45 +87,41 @@ rdata = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
 rdata = (
     rdata
     .filter("variant != 'gappy'")
-    .filter_date("2015-01-01", "2019-12-31", include_non_temporal=True, by_start_date=True)
+    .filter_date("2015-01-01", "2019-12-31", include_common=True, by_start_date=True)
     .read()
 )
-rdata.info          # one row per layer: group, name, start_date, end_date, band, year, ...
-rdata.get_groups() # ['ndvi', 'swir1']  ("common" is excluded by get_groups)
+rdata.info          # one row per layer: feature, name, start_date, end_date, is_common, ...
+rdata.get_features() # ['elev', 'ndvi', 'slope', 'swir1']
 ```
 
-A plain dict of `group -> [file paths]` works too:
+A plain dict of `feature -> [file paths]` works too:
 
 ```python
 rdata = RasterData({
-    "2020":   ["ndvi_2020.tif", "swir1_2020.tif"],
-    "common": ["elev.tif", "slope.tif"],
+    "ndvi":  ["ndvi_2020.tif", "ndvi_2021.tif"],
+    "elev":  ["elev.tif"],
+    "slope": ["slope.tif"],
 })
 ```
 
 ### Multi-column selection and runners
 
-The `info` frame carries one column per catalogue variable (`band`, `year`,
-`season`, `collection`, `asset`, ...), so runners are not limited to the
-predefined `group` column:
+Runners resolve their input bands by the mandatory `feature` column and
+partition work by the time interval, so they are not limited to any single
+catalogue layout:
 
 ```python
-# Filter layers by any variable column
-rdata.select(band="ndvi", year=2019)
+# Filter layers by any column
+rdata.select(feature="ndvi", year=2019)
 
-# Resolve a runner's input bands from a variable column, producing one
-# output band per (year, season) partition
-rdata.run(
-    process.NormalizedDifference("ndvi", "swir1"),
-    match_col="band",        # "ndvi"/"swir1" live in the `band` column
-    by=["year", "season"],   # one derived band per partition
-)
+# One derived band per time interval (temporal inputs) or a single band
+# (common inputs); the output feature is named by `outname`.
+rdata.run(process.NormalizedDifference("ndvi", "swir1"), outname="nd_swir")
 ```
 
-`match_col` also applies to `Prediction` and `Calc` (their `feature_names` /
-expression variables are looked up in that column), and `by` repartitions
-group runners (`SeasConvFill`, `TimeAggregate`, ...) by any column instead of
-`group`.
+`match_col` (default `feature`) and `match` disambiguate lookups, and `by`
+repartitions group runners (`SeasConvFill`, `TimeAggregate`, ...) by any
+column(s) instead of `feature`.
 
 ### Time-series gap filling and smoothing
 
@@ -116,11 +135,11 @@ rdata = (
     # Seasonal-convolution gap filling
     .run(process.SeasConvFill(season_size=4), drop_input=True)
     # Whittaker smoothing on the filled series
-    .run(process.WhittakerSmooth(), group="ndvi.seasconv", drop_input=True)
-    .rename(groups={"ndvi.seasconv.whittaker": "ndvi"})
+    .run(process.WhittakerSmooth(), feature="ndvi_seasconv", drop_input=True)
+    .rename(features={"ndvi_seasconv_whittaker": "ndvi"})
     # Yearly aggregation: 50th percentile + std
     .run(process.TimeAggregate(time=[process.TimeEnum.YEARLY], operations=["p50", "std"]),
-          group=["ndvi"])
+          feature=["ndvi"])
 )
 ```
 
@@ -169,7 +188,7 @@ overlay = SpaceTimeOverlay(
 
 `Prediction` runs a fitted scikit-learn model over the whole grid in **one model
 call** for all years, appending the result as new bands under the `"prediction"`
-group. `drop_input=True` drops the consumed covariates so only the predictions
+feature. `drop_input=True` drops the consumed covariates so only the predictions
 remain.
 
 ```python
@@ -201,7 +220,7 @@ from skmap.io import save_rasters
 out_files = [f"pred_{y}.tif" for y in rdata.get_years()]
 save_rasters(rdata.base_raster, out_files, pred)
 
-# Or write a whole group at once
+# Or write a whole feature at once
 rdata.to_dir("predictions/")
 
 # Inline plots with {field} title templates

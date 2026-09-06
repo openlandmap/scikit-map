@@ -20,11 +20,12 @@ static layers have ``None`` dates.
 
     >>> from skmap.io import RasterData
     >>> rdata = RasterData({
-    ...     "2020": ["ndvi_2020.tif", "swir1_2020.tif"],
-    ...     "common": ["elev.tif", "slope.tif"],
+    ...     "ndvi": ["ndvi_2020.tif"],
+    ...     "elev": ["elev.tif"],
+    ...     "slope": ["slope.tif"],
     ... })
-    >>> rdata.get_groups()
-    ['2020']
+    >>> rdata.get_features()
+    ['elev', 'ndvi', 'slope']
 
 The object is **lazy**: it holds only the file paths until you call
 :meth:`~skmap.io.RasterData.read`. This means the space-time overlay below can
@@ -63,19 +64,19 @@ schema):
     rdata = RasterData.from_yaml("layers.yaml", base_path="/data")
     rdata.info  # one row per expanded layer, plus band/year/month columns
 
-Temporal layers are grouped by year (``group`` = ``"2015"``, ...) and static
-layers under ``"common"``; every ``{variable}`` referenced in the path becomes
-an extra ``info`` column, so runners can group by multiple columns (e.g.
-``group`` and ``band``).  A ``group`` template overrides the default (use
-``group: '{band}'`` for band-grouped time-series).
+Temporal layers carry a ``feature`` (the band/variable, e.g. ``"blue"``) and
+a time interval; static layers are ``is_common``.  Every ``{variable}``
+referenced in the path becomes an extra ``info`` column, so runners can
+partition by multiple columns.  A ``feature`` template overrides the default
+(use ``feature: '{band}'`` for band-grouped time-series).
 
 A runnable example ships with the toy data::
 
     >>> from skmap.data import toy
     >>> from skmap.io import RasterData
     >>> rdata = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
-    >>> rdata.get_groups()
-    ['ndvi', 'swir1']
+    >>> rdata.get_features()
+    ['elev', 'ndvi', 'slope', 'swir1']
 
 It also demonstrates the ``interval`` temporal style, a ``name`` template
 (year-agnostic ``{band}_{season}`` names) and a ``variant`` column separating
@@ -101,7 +102,7 @@ columns.  The ``datetime`` window is filtered client-side.
     )
     rdata.info  # one row per (item, data asset); remote COG hrefs, no .read()
 
-Layers are grouped by collection (``group`` = collection id) and named
+Layers are keyed by asset (``feature`` = asset key) and named
 ``{asset}_{monthday}`` (year-agnostic, unique within a year).  The result is
 lazy: use :meth:`~skmap.io.RasterData.read` with an ``extent`` for a small
 tile, or :class:`~skmap.overlay.SpaceTimeOverlay` to sample points, rather
@@ -142,7 +143,7 @@ Large-scale predictions
     model = joblib.load("model.joblib")
     rdata = rdata.read()  # materialize rasters for spatial prediction
     rdata.run(Prediction(model=model))
-    pred = rdata.filter('group == "prediction"').array.get()
+    pred = rdata.filter('feature == "prediction"').array.get()
 
 Whales
 ======
