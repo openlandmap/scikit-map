@@ -42,12 +42,12 @@ except ImportError as e:
     raise
 
 class Transformer(SKMapGroupRunner, ABC):
-    def __init__(self, name: str, verbose: bool = True, temporal=False) -> None:
-        super().__init__(verbose=verbose, temporal=temporal)
+    def __init__(self, name: str, verbose: bool = True) -> None:
+        super().__init__(verbose=verbose)
         self.name = name
-        self.name_qa = f"{self.name}{RasterData.TRANSFORM_SEP}qa"
+        self.name_qa = f"{self.name}_qa"
 
-    def _new_info(self, rdata, group, outname, nm):
+    def _new_info(self, rdata, feature, outname, nm):
         info = rdata._info()
         new_info = []
 
@@ -56,14 +56,14 @@ class Transformer(SKMapGroupRunner, ABC):
             end_dt = row[RasterData.END_DT_COL]
             raster_file = row[RasterData.PATH_COL]
 
-            name = rdata._set_date(outname, start_dt, end_dt, nm=nm, gr=group)
+            name = rdata._set_date(outname, start_dt, end_dt, nm=nm, feature=feature)
 
-            new_group = f"{group}.{nm}"
+            new_feature = f"{feature}_{nm}"
 
             new_info.append(
                 rdata._new_info_row(
                     raster_file,
-                    group=new_group,
+                    feature=new_feature,
                     name=name,
                     dates=[start_dt, end_dt],
                 )
@@ -74,18 +74,18 @@ class Transformer(SKMapGroupRunner, ABC):
     def run(
         self,
         rdata: RasterData,
-        group_list: list,
+        feature_list: list,
         ginfo_list: list,
         outname: str = None,
     ):
         if outname is None:
-            outname = "skmap_{nm}_{gr}_{dt}"
+            outname = "{feature}_{nm}_{dt}"
 
         new_arrays = []
         new_infos = []
 
-        for group in group_list:
-            rdata._active_group = group
+        for feature in feature_list:
+            rdata._active_feature = feature
             array = rdata._array()
 
             result = self._run(array)
@@ -95,15 +95,15 @@ class Transformer(SKMapGroupRunner, ABC):
             else:
                 new_array, new_array_qa = result, None
 
-            new_info = self._new_info(rdata, group, outname, self.name)
+            new_info = self._new_info(rdata, feature, outname, self.name)
             if new_array_qa is not None:
-                new_info += self._new_info(rdata, group, outname, self.name_qa)
+                new_info += self._new_info(rdata, feature, outname, self.name_qa)
                 new_array = np.concatenate([new_array, new_array_qa], axis=0)
 
             new_arrays.append(new_array)
             new_infos.append(DataFrame(new_info))
 
-        rdata._active_group = None
+        rdata._active_feature = None
 
         new_array = np.concatenate(new_arrays, axis=0)
         new_info = pd.concat(new_infos)
@@ -115,8 +115,8 @@ class Transformer(SKMapGroupRunner, ABC):
         pass
 
 class Derivator(SKMapGroupRunner, ABC):
-    def __init__(self, verbose: bool = True, temporal=False) -> None:
-        super().__init__(verbose=verbose, temporal=temporal)
+    def __init__(self, verbose: bool = True) -> None:
+        super().__init__(verbose=verbose)
 
     def _resize_for_output(self, rdata, n_new_bands):
         # The SharedArray model has no in-place resize; output bands are
@@ -126,7 +126,7 @@ class Derivator(SKMapGroupRunner, ABC):
     def run(
         self,
         rdata: RasterData,
-        group_list: str,
+        feature_list: str,
         ginfo_list: str,
         outname: str = None,
     ):
@@ -136,7 +136,7 @@ class Derivator(SKMapGroupRunner, ABC):
 
         kwargs = {
             "rdata": rdata,
-            "group_list": group_list,
+            "feature_list": feature_list,
             "ginfo_list": ginfo_list,
         }
         if outname is not None:
@@ -148,13 +148,13 @@ class Derivator(SKMapGroupRunner, ABC):
 
     @abstractmethod
     def _run(
-        self, rdata: RasterData, group_list: str, ginfo_list: str, outname: str
+        self, rdata: RasterData, feature_list: str, ginfo_list: str, outname: str
     ):
         pass
 
 class Filler(Transformer, ABC):
-    def __init__(self, name: str, verbose: bool = True, temporal=False) -> None:
-        super().__init__(name=name, verbose=verbose, temporal=temporal)
+    def __init__(self, name: str, verbose: bool = True) -> None:
+        super().__init__(name=name, verbose=verbose)
 
     def _n_gaps(self, data=None):
         nan_data = np.isnan(data)
@@ -229,7 +229,7 @@ class SircleTransformer(Transformer):
         n_jobs: int = os.cpu_count(),
         verbose=False,
     ) -> None:
-        super().__init__(name="SIRCLE", verbose=verbose, temporal=True)
+        super().__init__(name="SIRCLE", verbose=verbose)
         self.wv_0 = wv_0
         self.wv_f = wv_f
         self.wv_p = wv_p
@@ -397,7 +397,7 @@ class SeasConvFill(Filler):
         n_jobs: int = os.cpu_count(),
         verbose=False,
     ) -> None:
-        super().__init__(name="seasconv", verbose=verbose, temporal=True)
+        super().__init__(name="seasconv", verbose=verbose)
         self.season_size = season_size
         self.return_qa = return_qa
         self.att_seas = att_seas
@@ -497,7 +497,7 @@ class WhittakerSmooth(Transformer):
     def __init__(
         self, lmbd=1, d=2, n_jobs: int = os.cpu_count(), verbose=False
     ) -> None:
-        super().__init__(name="whittaker", verbose=verbose, temporal=True)
+        super().__init__(name="whittaker", verbose=verbose)
 
         self.lmbd = lmbd
         self.d = d
@@ -566,7 +566,7 @@ class TimeAggregate(Derivator):
         n_jobs: int = os.cpu_count(),
         verbose=False,
     ) -> None:
-        super().__init__(verbose=verbose, temporal=True)
+        super().__init__(verbose=verbose)
 
         self.time = time
         self.operations = operations
@@ -598,7 +598,7 @@ class TimeAggregate(Derivator):
         else:
             return op
 
-    def _aggregate(self, new_idx, ref_array, array_idx, group, tm, dt1, dt2):
+    def _aggregate(self, new_idx, ref_array, array_idx, feature, tm, dt1, dt2):
         array = parallel.get_shared(ref_array)
 
         ops = []
@@ -646,10 +646,10 @@ class TimeAggregate(Derivator):
                 for idx, p0, p1, s in out_slices
             ]
 
-        return (group, ops, tm, dt1, dt2, out_slices)
+        return (feature, ops, tm, dt1, dt2, out_slices)
 
     def _args_monthly(
-        self, rdata, group, start_dt, end_dt, date_format, months=1, daysp=None
+        self, rdata, feature, start_dt, end_dt, date_format, months=1, daysp=None
     ):
         args = []
         ref_array = rdata.array.ref
@@ -684,7 +684,7 @@ class TimeAggregate(Derivator):
                     (
                         ref_array,
                         array_idx,
-                        group,
+                        feature,
                         tm,
                         datetime.strptime(dt1, date_format),
                         datetime.strptime(dt2, date_format),
@@ -693,7 +693,7 @@ class TimeAggregate(Derivator):
 
         return args
 
-    def _args_yearly(self, rdata, group, start_dt, end_dt, date_format):
+    def _args_yearly(self, rdata, feature, start_dt, end_dt, date_format):
         args = []
         ref_array = rdata.array.ref
 
@@ -720,7 +720,7 @@ class TimeAggregate(Derivator):
                     (
                         ref_array,
                         array_idx,
-                        group,
+                        feature,
                         tm,
                         datetime.strptime(dt1, date_format),
                         datetime.strptime(dt2, date_format),
@@ -729,7 +729,7 @@ class TimeAggregate(Derivator):
 
         return args
 
-    def _args_monthly_longterm(self, rdata, group, start_dt, end_dt, date_format):
+    def _args_monthly_longterm(self, rdata, feature, start_dt, end_dt, date_format):
         args = []
         ref_array = rdata.array.ref
 
@@ -761,54 +761,54 @@ class TimeAggregate(Derivator):
             tm = f"m{month}"
             if len(array_idx_list) > 0:
                 # args += [ (np.concatenate(in_array, axis=-1), tm, start_dt, end_dt) ]
-                args += [(ref_array, array_idx_list, group, tm, start_dt, end_dt)]
+                args += [(ref_array, array_idx_list, feature, tm, start_dt, end_dt)]
 
         return args
 
     def _run(
         self,
         rdata: RasterData,
-        group_list: list,
+        feature_list: list,
         ginfo_list: list,
         outname: str = "skmap_aggregate.{gr}_{op}_{dt}",
     ):
         args = []
 
-        for group, ginfo in zip(group_list, ginfo_list):
+        for feature, ginfo in zip(feature_list, ginfo_list):
             date_format = "%Y%m%d"
             start_dt = ginfo[RasterData.START_DT_COL].min()
             end_dt = ginfo[RasterData.END_DT_COL].max()
 
-            rdata._active_group = group
+            rdata._active_feature = feature
 
             for t in self.time:
                 if t == TimeEnum.MONTHLY_LONGTERM:
                     args += self._args_monthly_longterm(
-                        rdata, group, start_dt, end_dt, date_format
+                        rdata, feature, start_dt, end_dt, date_format
                     )
                 elif t == TimeEnum.YEARLY:
                     args += self._args_yearly(
-                        rdata, group, start_dt, end_dt, date_format
+                        rdata, feature, start_dt, end_dt, date_format
                     )
                 elif t == TimeEnum.MONTHLY:
                     args += self._args_monthly(
-                        rdata, group, start_dt, end_dt, date_format, 1
+                        rdata, feature, start_dt, end_dt, date_format, 1
                     )
                 elif t == TimeEnum.MONTHLY_15P:
                     args += self._args_monthly(
-                        rdata, group, start_dt, end_dt, date_format, 1, 15
+                        rdata, feature, start_dt, end_dt, date_format, 1, 15
                     )
                 elif t == TimeEnum.BIMONTHLY:
                     args += self._args_monthly(
-                        rdata, group, start_dt, end_dt, date_format, 2
+                        rdata, feature, start_dt, end_dt, date_format, 2
                     )
                 elif t == TimeEnum.BIMONTHLY_15P:
                     args += self._args_monthly(
-                        rdata, group, start_dt, end_dt, date_format, 2, 15
+                        rdata, feature, start_dt, end_dt, date_format, 2, 15
                     )
                 elif t == TimeEnum.QUARTERLY:
                     args += self._args_monthly(
-                        rdata, group, start_dt, end_dt, date_format, 3
+                        rdata, feature, start_dt, end_dt, date_format, 3
                     )
                 else:
                     raise Exception(f"Aggregation by {t} not implemented")
@@ -834,30 +834,30 @@ class TimeAggregate(Derivator):
         )
 
         specs = []
-        for group, ops, tm, dt1, dt2, out_slices in parallel.job(
+        for feature, ops, tm, dt1, dt2, out_slices in parallel.job(
             self._aggregate, args
         ):
             specs.extend(out_slices)
             for op in ops:
-                _group = group
+                _feature = feature
                 if tm != "":
-                    _group = f"{group}.{tm}"
+                    _feature = f"{feature}_{tm}"
 
-                rdata._active_group = group
-                name = rdata._set_date(outname, dt1, dt2, op=op, gr=_group)
+                rdata._active_feature = feature
+                name = rdata._set_date(outname, dt1, dt2, op=op, feature=_feature)
 
-                new_group = f"{_group}.{op}"
+                new_feature = f"{_feature}_{op}"
 
                 new_info.append(
                     rdata._new_info_row(
                         rdata.base_raster,
                         name=name,
-                        group=new_group,
+                        feature=new_feature,
                         dates=[dt1, dt2],
                     )
                 )
 
-        rdata._active_group = None
+        rdata._active_feature = None
 
         out_ref = parallel._remote(
             parallel._assemble, [ref_in], new_shape, specs, idx_offset
@@ -885,7 +885,7 @@ class PeakAnalysis(Derivator):
         n_jobs: int = os.cpu_count(),
         verbose=False,
     ) -> None:
-        super().__init__(verbose=verbose, temporal=True)
+        super().__init__(verbose=verbose)
 
         self.season_size = season_size
         self.min_height = min_height
@@ -968,14 +968,14 @@ class PeakAnalysis(Derivator):
     def _run(
         self,
         rdata: RasterData,
-        group_list: list,
+        feature_list: list,
         ginfo_list: list,
         outname: str = "skmap_{gr}.{nm}_{pr}_{dt}",
     ):
         new_info = []
 
-        for group, ginfo in zip(group_list, ginfo_list):
-            rdata._active_group = group
+        for feature, ginfo in zip(feature_list, ginfo_list):
+            rdata._active_feature = feature
 
             start_dt_min = ginfo[RasterData.START_DT_COL].min()
             end_dt_max = ginfo[RasterData.END_DT_COL].max()
@@ -1018,15 +1018,15 @@ class PeakAnalysis(Derivator):
                     range(_i, _i + len(self.name_misc)), self.name_misc
                 ):
                     name = rdata._set_date(
-                        outname, start_dt_min, end_dt_max, nm=nm, pr=pr, gr=group
+                        outname, start_dt_min, end_dt_max, nm=nm, pr=pr, feature=feature
                     )
 
-                    new_group = f"{group}.{nm}.{pr}"
+                    new_feature = f"{feature}_{nm}_{pr}"
 
                     new_info.append(
                         rdata._new_info_row(
                             rdata.base_raster,
-                            group=new_group,
+                            feature=new_feature,
                             name=name,
                             dates=[start_dt_min, end_dt_max],
                         )
@@ -1046,7 +1046,7 @@ class SlopeAnalysis(Derivator):
         n_jobs: int = os.cpu_count(),
         verbose=False,
     ) -> None:
-        super().__init__(verbose=verbose, temporal=True)
+        super().__init__(verbose=verbose)
 
         self.scale_expr = scale_expr
         self.scaling = scaling
@@ -1096,14 +1096,14 @@ class SlopeAnalysis(Derivator):
     def _run(
         self,
         rdata: RasterData,
-        group_list: list,
+        feature_list: list,
         ginfo_list: list,
         outname: str = "{gr}.{nm}_{pr}_{dt}",
     ):
         new_info = []
 
-        for group, ginfo in zip(group_list, ginfo_list):
-            rdata._active_group = group
+        for feature, ginfo in zip(feature_list, ginfo_list):
+            rdata._active_feature = feature
 
             start_dt_min = ginfo[RasterData.START_DT_COL].min()
             end_dt_max = ginfo[RasterData.END_DT_COL].max()
@@ -1134,15 +1134,15 @@ class SlopeAnalysis(Derivator):
             nm = "theilslopes"
             pr = "m"
             name = rdata._set_date(
-                outname, start_dt_min, end_dt_max, nm=nm, pr=pr, gr=group
+                outname, start_dt_min, end_dt_max, nm=nm, pr=pr, feature=feature
             )
 
-            new_group = f"{group}.{nm}.{pr}"
+            new_feature = f"{feature}_{nm}_{pr}"
 
             new_info.append(
                 rdata._new_info_row(
                     rdata.base_raster,
-                    group=new_group,
+                    feature=new_feature,
                     name=name,
                     dates=[start_dt_min, end_dt_max],
                 )
@@ -1163,7 +1163,7 @@ class FindMinMax(Derivator):
         n_jobs: int = os.cpu_count(),
         verbose=False,
     ) -> None:
-        super().__init__(verbose=verbose, temporal=True)
+        super().__init__(verbose=verbose)
 
         self.scale_expr = scale_expr
         self.season_size = season_size
@@ -1228,14 +1228,14 @@ class FindMinMax(Derivator):
     def _run(
         self,
         rdata: RasterData,
-        group_list: list,
+        feature_list: list,
         ginfo_list: list,
         outname: str = "{gr}.{nm}_{pr}_{dt}",
     ):
         new_info = []
 
-        for group, ginfo in zip(group_list, ginfo_list):
-            rdata._active_group = group
+        for feature, ginfo in zip(feature_list, ginfo_list):
+            rdata._active_feature = feature
 
             start_dt_min = ginfo[RasterData.START_DT_COL].min()
             end_dt_max = ginfo[RasterData.END_DT_COL].max()
@@ -1275,15 +1275,15 @@ class FindMinMax(Derivator):
                 start_dt_min = ginfo.iloc[i0][RasterData.START_DT_COL]
                 end_dt_max = ginfo.iloc[i1][RasterData.END_DT_COL]
                 name = rdata._set_date(
-                    outname, start_dt_min, end_dt_max, nm=nm, pr=pr, gr=group
+                    outname, start_dt_min, end_dt_max, nm=nm, pr=pr, feature=feature
                 )
 
-                new_group = f"{group}.{nm}"
+                new_feature = f"{feature}_{nm}"
 
                 new_info.append(
                     rdata._new_info_row(
                         rdata.base_raster,
-                        group=new_group,
+                        feature=new_feature,
                         name=name,
                         dates=[start_dt_min, end_dt_max],
                     )
@@ -1305,7 +1305,7 @@ class TrendAnalysis(Derivator):
         n_jobs: int = os.cpu_count(),
         verbose=False,
     ) -> None:
-        super().__init__(verbose=verbose, temporal=True)
+        super().__init__(verbose=verbose)
 
         self.season_size = season_size
         self.season_smoother = season_smoother
@@ -1388,15 +1388,15 @@ class TrendAnalysis(Derivator):
     def _run(
         self,
         rdata: RasterData,
-        group_list: list,
+        feature_list: list,
         ginfo_list: list,
         outname: str = "skmap_{gr}.{nm}_{pr}_{dt}",
     ):
         new_arrays = []
         new_infos = []
 
-        for group, ginfo in zip(group_list, ginfo_list):
-            rdata._active_group = group
+        for feature, ginfo in zip(feature_list, ginfo_list):
+            rdata._active_feature = feature
             array = rdata._array()
             info = rdata._info()
 
@@ -1416,15 +1416,15 @@ class TrendAnalysis(Derivator):
                 nm, pr = ("trend", "m")
 
                 name = rdata._set_date(
-                    outname, start_dt, end_dt, nm=nm, pr=pr, gr=group
+                    outname, start_dt, end_dt, nm=nm, pr=pr, feature=feature
                 )
 
-                new_group = f"{group}.{nm}.{pr}"
+                new_feature = f"{feature}_{nm}_{pr}"
 
                 new_info.append(
                     rdata._new_info_row(
                         rdata.base_raster,
-                        group=new_group,
+                        feature=new_feature,
                         name=name,
                         dates=[start_dt, end_dt],
                     )
@@ -1438,15 +1438,15 @@ class TrendAnalysis(Derivator):
                 new_array[ts_size + i, :] *= scale
 
                 name = rdata._set_date(
-                    outname, start_dt_min, end_dt_max, nm=nm, pr=pr, gr=group
+                    outname, start_dt_min, end_dt_max, nm=nm, pr=pr, feature=feature
                 )
 
-                new_group = f"{group}.{nm}.{pr}"
+                new_feature = f"{feature}_{nm}_{pr}"
 
                 new_info.append(
                     rdata._new_info_row(
                         rdata.base_raster,
-                        group=new_group,
+                        feature=new_feature,
                         name=name,
                         dates=[start_dt_min, end_dt_max],
                     )
@@ -1455,7 +1455,7 @@ class TrendAnalysis(Derivator):
             new_arrays.append(new_array)
             new_infos.append(DataFrame(new_info))
 
-        rdata._active_group = None
+        rdata._active_feature = None
         return np.concatenate(new_arrays, axis=0), pd.concat(new_infos)
 
 class Calc(SKMapRunner):
@@ -1465,7 +1465,7 @@ class Calc(SKMapRunner):
     def __init__(
         self,
         expressions: dict,
-        mask_group: str = None,
+        mask_feature: str = None,
         mask_values: list = [],
         n_jobs: int = os.cpu_count(),
         match_col: str = None,
@@ -1474,33 +1474,33 @@ class Calc(SKMapRunner):
         self.n_jobs = n_jobs
 
         self.expressions = expressions
-        self.mask_group = mask_group
+        self.mask_feature = mask_feature
         self.mask_values = mask_values
         self.match_col = match_col
         self.date_cols = [RasterData.START_DT_COL, RasterData.END_DT_COL]
 
-    def _map(self, ref_array, gmap, new_gmap):
+    def _map(self, ref_array, gmap, new_fmap):
         array_dict = {}
         array = parallel.get_shared(ref_array)
 
         array_mask = None
-        if self.mask_group is not None and len(self.mask_values) >= 1:
-            idx = gmap[self.mask_group]
+        if self.mask_feature is not None and len(self.mask_values) >= 1:
+            idx = gmap[self.mask_feature]
             array_mask = np.isin(array[idx, :], self.mask_values)
 
-        for group in gmap.keys():
-            idx = gmap[group]
-            array_dict[group] = array[idx, :]
-            if array_mask is not None and group != self.mask_group:
-                array_dict[group][array_mask] = np.nan
+        for f in gmap.keys():
+            idx = gmap[f]
+            array_dict[f] = array[idx, :]
+            if array_mask is not None and f != self.mask_feature:
+                array_dict[f][array_mask] = np.nan
 
         out_slices = []
-        for group in self.expressions.keys():
-            expression = self.expressions[group]
-            if group in gmap:
-                idx = gmap[group]
+        for f in self.expressions.keys():
+            expression = self.expressions[f]
+            if f in gmap:
+                idx = gmap[f]
             else:
-                idx = new_gmap[group]
+                idx = new_fmap[f]
             out_slices.append(
                 (
                     [idx],
@@ -1515,17 +1515,17 @@ class Calc(SKMapRunner):
         return fidx, out_slices
 
     def run(self, rdata: RasterData, outname: str = "skmap_{gr}_{dt}"):
-        self.groups = list(rdata.info[RasterData.GROUP_COL].unique())
+        self.features = list(rdata.info[RasterData.FEATURE_COL].unique())
 
-        self.new_groups = []
+        self.new_features = []
         for key in self.expressions.keys():
-            if key not in self.groups:
-                self.new_groups.append(key)
+            if key not in self.features:
+                self.new_features.append(key)
 
-        n_new_groups = len(self.new_groups)
-        # Count the date groups so we can resize the array up front.
+        n_new_features = len(self.new_features)
+        # Count the date intervals so we can resize the array up front.
         n_date_groups = len(list(rdata.info.groupby(self.date_cols)))
-        n_new_rasters = n_new_groups * n_date_groups
+        n_new_rasters = n_new_features * n_date_groups
 
         idx_offset = rdata._idx_offset()
         new_shape = (idx_offset + n_new_rasters, rdata.array.shape[1])
@@ -1538,28 +1538,28 @@ class Calc(SKMapRunner):
         idx_counter = 0
         for _, rows in rdata.info.groupby(self.date_cols):
             gidx = rows.index
-            ggroup = list(rdata.info.iloc[gidx]["group"])
+            gfeature = list(rdata.info.iloc[gidx]["feature"])
 
             gmap = {}
-            new_gmap = {}
+            new_fmap = {}
 
             if self.match_col is not None:
                 # Key the expression namespace by a variable column (e.g.
-                # ``band``) instead of the group column, so expressions can
+                # ``band``) instead of the feature column, so expressions can
                 # reference ``red``/``nir`` when the catalogue is organised
                 # by year.
                 gvals = list(rdata.info.iloc[gidx][self.match_col])
                 for idx, val in zip(gidx, gvals):
                     gmap[val] = idx
             else:
-                for idx, group in zip(gidx, ggroup):
-                    gmap[group] = idx
+                for idx, f in zip(gidx, gfeature):
+                    gmap[f] = idx
 
-            new_group_offset = idx_offset + (idx_counter * n_new_groups)
-            for idx, new_group in zip(range(0, n_new_groups), self.new_groups):
-                new_gmap[new_group] = new_group_offset + idx
+            new_feature_offset = idx_offset + (idx_counter * n_new_features)
+            for idx, new_feature in zip(range(0, n_new_features), self.new_features):
+                new_fmap[new_feature] = new_feature_offset + idx
 
-            args.append((ref_array, gmap, new_gmap))
+            args.append((ref_array, gmap, new_fmap))
             idx_counter += 1
 
         new_info = []
@@ -1577,26 +1577,26 @@ class Calc(SKMapRunner):
                 row[RasterData.START_DT_COL],
                 row[RasterData.END_DT_COL],
             )
-            group = row[RasterData.GROUP_COL]
+            feature = row[RasterData.FEATURE_COL]
 
-            date_format = rdata.date_args[group]["date_format"]
-            date_style = rdata.date_args[group]["date_style"]
+            date_format = rdata.date_args["date_format"]
+            date_style = rdata.date_args["date_style"]
 
-            for new_group in self.new_groups:
+            for new_feature in self.new_features:
                 name = rdata._set_date(
                     outname,
                     start_dt,
                     end_dt,
                     date_format=date_format,
                     date_style=date_style,
-                    gr=new_group,
+                    feature=new_feature,
                 )
                 new_info.append(
                     rdata._new_info_row(
                         rdata.base_raster,
                         date_format=date_format,
                         date_style=date_style,
-                        group=new_group,
+                        feature=new_feature,
                         name=name,
                         dates=[start_dt, end_dt],
                     )
@@ -1614,16 +1614,16 @@ class Calc(SKMapRunner):
         return None, DataFrame(new_info)
 
     def _calc(self, array_dict):
-        if self.mask_group is not None and len(self.mask_values) >= 1:
-            array_mask = np.isin(array_dict[self.mask_group], self.mask_values)
+        if self.mask_feature is not None and len(self.mask_values) >= 1:
+            array_mask = np.isin(array_dict[self.mask_feature], self.mask_values)
 
             for g in array_dict.keys():
-                if g != self.mask_group:
+                if g != self.mask_feature:
                     array_dict[g][array_mask] = np.nan
 
-        for group in self.expressions.keys():
-            expression = self.expressions[group]
-            array_dict[group] = self.backend.evaluate(expression, local_dict=array_dict)
+        for f in self.expressions.keys():
+            expression = self.expressions[f]
+            array_dict[f] = self.backend.evaluate(expression, local_dict=array_dict)
 
         return array_dict
 
@@ -1636,7 +1636,7 @@ class Prediction(SKMapRunner):
     for every year, and the model is invoked **once**.  The result is
     reshaped to ``(n_out·n_years, H*W)`` — out-band major, year minor —
     and appended to ``rdata.array``; one info row per (output, year) is
-    added under ``group`` (default ``"prediction"``).  Each row carries a
+    added under ``feature`` (default ``"prediction"``).  Each row carries a
     ``year`` column (the prediction year, or ``None`` for a static
     catalogue).
 
@@ -1662,10 +1662,10 @@ class Prediction(SKMapRunner):
     :param target_names: output names for multi-output / probability
       models.  Replaces the ``prob_0``/``out_0`` suffix with the given
       names (``prediction_<name>``).  Must have ``n_out`` entries.
-    :param group: info group for the appended prediction bands.
+    :param feature: info feature for the appended prediction bands.
     :param match_col: ``info`` column searched for each ``feature_names``
       entry (default ``name``).  Use e.g. ``match_col="band"`` when the
-      catalogue is organised by a column other than ``group``.
+      catalogue is organised by a column other than ``feature``.
     """
 
     def __init__(
@@ -1675,7 +1675,7 @@ class Prediction(SKMapRunner):
         predict_proba: bool = False,
         valid_only=True,
         target_names=None,
-        group: str = "prediction",
+        feature: str = "prediction",
         match_col: str = None,
         verbose: bool = True,
     ) -> None:
@@ -1685,7 +1685,7 @@ class Prediction(SKMapRunner):
         self.predict_proba = predict_proba
         self.valid_only = valid_only
         self.target_names = target_names
-        self.group = group
+        self.feature = feature
         self.match_col = match_col
 
     def _resolve_feature_names(self):
@@ -1782,14 +1782,13 @@ class Prediction(SKMapRunner):
         """Build one info row for a prediction band, setting the ``year``."""
         if year is None:
             row = rdata._new_info_row(
-                rdata.base_raster, group=self.group, name=name
+                rdata.base_raster, feature=self.feature, name=name
             )
-            row[RasterData.TEMPORAL_COL] = False
             row["year"] = None
             return row
         row = rdata._new_info_row(
             rdata.base_raster,
-            group=self.group,
+            feature=self.feature,
             name=name,
             dates=[f"{year}-01-01", f"{year}-12-31"],
             date_format="%Y-%m-%d",
@@ -1830,8 +1829,8 @@ class WhaleRunner(SKMapRunner):
 
     Each whale computes one derived band from existing bands (looked up by
     name via :meth:`RasterData._band_index`) and appends it to
-    ``rdata.array``. The new band is added to ``info`` under ``group``
-    (default: the primary input band's group) and ``name`` (``outname`` or
+    ``rdata.array``. The new band is added to ``info`` under ``feature``
+    (default: the primary input band's feature) and ``name`` (``outname`` or
     a class default).
 
     # ponytail: computed in the main process with numpy vectorization; a
@@ -1848,7 +1847,7 @@ class WhaleRunner(SKMapRunner):
         self,
         rdata: RasterData,
         name: str,
-        group: str = None,
+        feature: str = None,
         match: dict = "__auto__",
         match_col: str = "__auto__",
     ) -> np.ndarray:
@@ -1856,7 +1855,7 @@ class WhaleRunner(SKMapRunner):
             match = self._current_match
         if match_col == "__auto__":
             match_col = self._current_match_col
-        return rdata._arr()[rdata._band_index(name, group, match, match_col), :]
+        return rdata._arr()[rdata._band_index(name, feature, match, match_col), :]
 
     def _primary_band(self) -> str:
         raise NotImplementedError
@@ -1868,30 +1867,36 @@ class WhaleRunner(SKMapRunner):
         self,
         rdata: RasterData,
         outname: str = None,
-        group: str = None,
         match: dict = None,
         match_col: str = None,
         by=None,
     ):
         """Compute the derived band(s) and append them to ``rdata``.
 
-        ``match_col`` (default ``name``) is the ``info`` column searched for
-        each input band name, so bands can be resolved by a variable column
-        (e.g. ``match_col="band"``) when the catalogue is organised by a
-        column other than ``group``.  ``match`` optionally adds further
-        column==value constraints to disambiguate.
+        ``match_col`` (default ``feature``) is the ``info`` column searched for
+        each input band name.  ``match`` optionally adds further column==value
+        constraints to disambiguate.
 
         ``by`` optionally partitions the computation by one or more ``info``
-        columns (e.g. ``by="year"``), producing one output band per partition
-        instead of a single band.  Each partition's column values are added
-        to the ``match`` constraints so input bands resolve within that
-        partition.
+        columns, producing one output band per partition.  For temporal input
+        features the default partition is the time interval
+        (``start_date``/``end_date``); common features produce a single band.
+
+        The new feature is named ``outname`` (or the class name lowercased).
         """
         if by is None:
-            return self._run_single(rdata, outname, group, match, match_col)
+            info = rdata.info.reset_index(drop=True)
+            col = match_col or RasterData.FEATURE_COL
+            mask = info[col] == self._primary_band()
+            if match:
+                for c, v in match.items():
+                    mask &= info[c] == v
+            if mask.any() and info.loc[mask, RasterData.IS_COMMON_COL].all():
+                return self._run_single(rdata, outname, match, match_col)
+            by = [RasterData.START_DT_COL, RasterData.END_DT_COL]
         return self._run_grouped(rdata, outname, match, match_col, by)
 
-    def _run_single(self, rdata, outname, group, match, match_col):
+    def _run_single(self, rdata, outname, match, match_col):
         self._current_match = match
         self._current_match_col = match_col
         try:
@@ -1899,12 +1904,8 @@ class WhaleRunner(SKMapRunner):
             new_band = np.asarray(self._compute(rdata, arr), dtype=arr.dtype)
             new_band = new_band.reshape(1, -1)
 
-            if group is None:
-                primary = rdata._band_index(
-                    self._primary_band(), match=match, match_col=match_col
-                )
-                group = rdata.info.iloc[primary][RasterData.GROUP_COL]
-            name = outname or self.__class__.__name__.lower()
+            feature = outname or self.__class__.__name__.lower()
+            name = feature
 
             rdata._set_array(
                 parallel.put_shared(
@@ -1913,18 +1914,26 @@ class WhaleRunner(SKMapRunner):
                 )
             )
             new_info = DataFrame(
-                [rdata._new_info_row(rdata.base_raster, group=group, name=name)]
+                [rdata._new_info_row(rdata.base_raster, feature=feature, name=name)]
             )
             return None, new_info
         finally:
             self._current_match = None
             self._current_match_col = None
 
+    @staticmethod
+    def _fmt_key(k):
+        if isinstance(k, (pd.Timestamp, datetime)):
+            return k.strftime("%Y%m%d")
+        if isinstance(k, float) and k.is_integer():
+            return str(int(k))
+        return str(k)
+
     def _run_grouped(self, rdata, outname, match, match_col, by):
         if isinstance(by, str):
             by = [by]
         arr = rdata._arr()
-        base_name = outname or self.__class__.__name__.lower()
+        feature = outname or self.__class__.__name__.lower()
 
         new_bands = []
         new_infos = []
@@ -1944,29 +1953,19 @@ class WhaleRunner(SKMapRunner):
                 self._current_match = None
                 self._current_match_col = None
 
-            primary = rdata._band_index(
-                self._primary_band(), match=gmatch, match_col=match_col
-            )
-            group_name = rdata.info.iloc[primary][RasterData.GROUP_COL]
+            suffix = "_".join(self._fmt_key(k) for k in key_vals)
+            name = f"{feature}_{suffix}" if suffix else feature
 
-            def _fmt(k):
-                # float columns with NaN (e.g. a float year on static rows)
-                # format integral values without the ".0".
-                if isinstance(k, float) and k.is_integer():
-                    return str(int(k))
-                return str(k)
-
-            name = f"{base_name}_{'_'.join(_fmt(k) for k in key_vals)}"
+            start_dt = ginfo[RasterData.START_DT_COL].iloc[0]
+            end_dt = ginfo[RasterData.END_DT_COL].iloc[0]
+            dates = [start_dt, end_dt] if not pd.isna(start_dt) else []
 
             new_bands.append(new_band)
-            row = rdata._new_info_row(
-                rdata.base_raster, group=group_name, name=name
+            new_infos.append(
+                rdata._new_info_row(
+                    rdata.base_raster, feature=feature, name=name, dates=dates
+                )
             )
-            # carry the partition values so the derived bands stay
-            # selectable by the same variable columns
-            for col, val in zip(by, key_vals):
-                row[col] = val
-            new_infos.append(row)
 
         rdata._set_array(
             parallel.put_shared(
@@ -2132,7 +2131,7 @@ class GetLatitude(WhaleRunner):
     def _primary_band(self):
         raise RuntimeError("GetLatitude has no input band")
 
-    def run(self, rdata: RasterData, outname: str = None, group: str = None):
+    def run(self, rdata: RasterData, outname: str = None):
         import rasterio
 
         arr = rdata._arr()
@@ -2143,9 +2142,8 @@ class GetLatitude(WhaleRunner):
         lats = transform.f + (np.arange(h) + row_off + 0.5) * transform.e
         new_band = np.repeat(lats, w).astype(arr.dtype).reshape(1, -1)
 
-        if group is None:
-            group = "common"
-        name = outname or "latitude"
+        feature = outname or "latitude"
+        name = feature
 
         rdata._set_array(
             parallel.put_shared(
@@ -2154,7 +2152,7 @@ class GetLatitude(WhaleRunner):
             )
         )
         new_info = DataFrame(
-            [rdata._new_info_row(rdata.base_raster, group=group, name=name)]
+            [rdata._new_info_row(rdata.base_raster, feature=feature, name=name)]
         )
         return None, new_info
 
