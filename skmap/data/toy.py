@@ -37,12 +37,17 @@ def rdata(verbose=True, backend="numpy"):
         subsequent :meth:`RasterData.run` calls; see :mod:`skmap.compute`.
     """
 
+    # one feature per static raster (elev, slope)
+    static = {
+        Path(f).stem.split(".")[0]: f for f in _static_raster()
+    }
+
     return (
         RasterData(
             {
                 "ndvi": _temporal_raster("ndvi", "filled"),
                 "swir1": _temporal_raster("swir1"),
-                "static": _static_raster(),
+                **static,
             },
             verbose=verbose,
             backend=backend,

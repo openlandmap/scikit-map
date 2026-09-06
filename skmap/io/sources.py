@@ -27,8 +27,8 @@ trained and predicted across years).
 The resulting :class:`~skmap.io.RasterData` is **lazy** (paths + dates only,
 no ``.read()``).  Its ``info`` DataFrame carries the standard columns plus one
 column per data variable (``band``, ``variant``, ``season``, ``perc``,
-``year``, ``start_month``, ``end_month``, ...), so runners can group by
-multiple columns (e.g. ``group`` and ``band``).
+``year``, ``start_month``, ``end_month``, ...), so runners can partition
+by multiple columns (e.g. ``feature`` and ``band``).
 """
 
 from __future__ import annotations
@@ -50,12 +50,12 @@ class LayerSpec:
     """One expanded raster layer (a single row of a RasterData ``info``)."""
 
     path: str
-    group: str
+    feature: str
     band_idx: int = 1
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     name: Optional[str] = None
-    temporal: bool = False
+    is_common: bool = False
     vars: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -91,12 +91,12 @@ class LayerSource(ABC):
         rows = []
         for s in specs:
             row = {
-                RasterData.GROUP_COL: s.group,
+                RasterData.FEATURE_COL: s.feature,
                 RasterData.PATH_COL: s.path,
                 RasterData.BAND_COL: s.band_idx,
                 RasterData.START_DT_COL: s.start_date,
                 RasterData.END_DT_COL: s.end_date,
-                RasterData.TEMPORAL_COL: s.temporal,
+                RasterData.IS_COMMON_COL: s.is_common,
                 RasterData.NAME_COL: s.name,
             }
             for k in var_cols:
@@ -125,7 +125,7 @@ class TemplateExpander:
     COLUMN_EXCLUDES = META_FIELDS | YEAR_FIELDS | {
         "name",
         "base_path",
-        "group",
+        "feature",
         "start_date",
         "end_date",
         "date_unit",
@@ -143,7 +143,7 @@ class TemplateExpander:
         """Expand one catalogue entry into :class:`LayerSpec` objects."""
         path_tmpl = entry["path"]
         name_tmpl = entry.get("name", "")
-        group_tmpl = entry.get("group", "")
+        feature_tmpl = entry.get("feature", "")
         temporal_resolution = entry.get("temporal_resolution", "longterm_or_static")
         type_ = entry.get("type", "temporal")
 
@@ -160,7 +160,7 @@ class TemplateExpander:
 
         if temporal_resolution == "interval":
             yield from self._expand_interval(
-                entry, base_path, path_tmpl, name_tmpl, group_tmpl, type_, scalars, list_axes
+                entry, base_path, path_tmpl, name_tmpl, feature_tmpl, type_, scalars, list_axes
             )
             return
 
@@ -223,11 +223,11 @@ class TemplateExpander:
 
             yield LayerSpec(
                 path=path,
-                group=self._group(type_, vars_, group_tmpl),
+                feature=self._feature(type_, vars_, feature_tmpl, name, path),
                 start_date=start_date,
                 end_date=end_date,
                 name=name,
-                temporal=start_date is not None,
+                is_common=start_date is None,
                 vars=self._spec_vars(vars_),
             )
 
@@ -238,7 +238,7 @@ class TemplateExpander:
         base_path: str,
         path_tmpl: str,
         name_tmpl: str,
-        group_tmpl: str,
+        feature_tmpl: str,
         type_: str,
         scalars: Dict[str, Any],
         list_axes: Dict[str, List[str]],
@@ -294,11 +294,11 @@ class TemplateExpander:
 
                 yield LayerSpec(
                     path=path,
-                    group=self._group(type_, vars_, group_tmpl),
+                    feature=self._feature(type_, vars_, feature_tmpl, name, path),
                     start_date=dt1,
                     end_date=dt2,
                     name=name,
-                    temporal=True,
+                    is_common=False,
                     vars=self._spec_vars(vars_),
                 )
 
@@ -321,11 +321,23 @@ class TemplateExpander:
         except KeyError as e:
             raise ValueError(f"Unresolved variable {e} in template: {tmpl!r}") from e
 
-    def _group(self, type_: str, vars_: Dict[str, Any], group_tmpl: str = "") -> str:
-        if group_tmpl:
-            return self._format(group_tmpl, vars_)
+    def _feature(
+        self,
+        type_: str,
+        vars_: Dict[str, Any],
+        feature_tmpl: str = "",
+        name: Optional[str] = None,
+        path: str = "",
+    ) -> str:
+        if feature_tmpl:
+            return self._format(feature_tmpl, vars_)
+        for key in ("band", "asset"):
+            if key in vars_:
+                return str(vars_[key])
+        if name:
+            return name
         if type_ == "common":
-            return "common"
+            return Path(str(path).split("?")[0]).stem
         return str(vars_.get("year", "default"))
 
     def _compute_dates(
@@ -511,13 +523,13 @@ class StacSource(LayerSource):
                 continue
             yield LayerSpec(
                 path=asset.get("href"),
-                group=cid,
+                feature=key,
                 start_date=start,
                 end_date=end,
                 # year-agnostic but unique within a year (overlay requirement),
                 # like the YAML ``{band}_{season}`` names
                 name=f"{key}_{start:%m%d}",
-                temporal=True,
+                is_common=False,
                 vars={
                     "collection": cid,
                     "asset": key,
