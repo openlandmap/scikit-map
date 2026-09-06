@@ -114,7 +114,7 @@ class _ParallelOverlay:
                     str(src.transform.to_gdal()),
                 ]
             )
-            row["group"] = str(hashlib.md5(key.encode("utf-8")).hexdigest())
+            row["layer_family"] = str(hashlib.md5(key.encode("utf-8")).hexdigest())
 
         return row
 
@@ -252,14 +252,14 @@ class _ParallelOverlay:
 
         query_pixels = {}
 
-        for _, layers in self.layers.groupby("group"):
-            group = layers.iloc[0]["group"]
+        for _, layers in self.layers.groupby("layer_family"):
+            layer_family = layers.iloc[0]["layer_family"]
             path = layers.iloc[0]["path"]
 
             if self.verbose:
-                ttprint(f"Finding query pixels for {group} ({layers.shape[0]} layers)")
+                ttprint(f"Finding query pixels for {layer_family} ({layers.shape[0]} layers)")
 
-            query_pixels[group] = self._find_blocks_for_src(path, samples)
+            query_pixels[layer_family] = self._find_blocks_for_src(path, samples)
 
         if self.verbose:
             ttprint("End")
@@ -292,7 +292,7 @@ class _PointAccessor:
         return self._data
 
     def _band_index(
-        self, name: str, group: str = None, match: dict = None, match_col: str = None
+        self, name: str, feature: str = None, match: dict = None, match_col: str = None
     ) -> int:
         return self._names.index(name)
 
@@ -334,7 +334,7 @@ class SpaceOverlay:
     :param points: The path for vector file or ``geopandas.GeoDataFrame`` with
         the points.
     :param rasterdata: a :class:`~skmap.io.RasterData` (unread) whose band
-        names/group structure describe the raster layers to sample.
+        names/feature structure describe the raster layers to sample.
     :param runners: optional list of :mod:`skmap.io.process` whale runners
         computed on the sampled points after the overlay (e.g.
         ``NormalizedDifference``, ``Savi``, ``GetLatitude``).
@@ -555,7 +555,7 @@ class SpaceOverlay:
         sb.fillArray(data_overlay, self.n_threads, np.nan)
         for i, key in enumerate(keys):
             key_layer_ids = [
-                int(l) for l in list(layers[layers["group"] == key]["layer_id"])
+                int(l) for l in list(layers[layers["layer_family"] == key]["layer_id"])
             ]
             key_query_pixels = query_pixels[key]
             assert key_query_pixels.shape[0] == query_pixels[keys[0]].shape[0], (
@@ -577,7 +577,7 @@ class SpaceOverlay:
             layer_path_dict = layers.set_index("layer_id")["path"].to_dict()
             if self.verbose:
                 ttprint(
-                    f"Loading and sampling {len(set(key_layer_ids))} raster layers for group {key}"
+                    f"Loading and sampling {len(set(key_layer_ids))} raster layers for layer family {key}"
                 )
             # layer_nodata_dict = layers.set_index("layer_id")["nodata"].to_dict()
             key_layer_ids_comb, unique_blocks_ids_comb = map(
@@ -805,7 +805,7 @@ class SpaceTimeOverlay:
                 if n_layers == 0:
                     # No raster layers cover this range (e.g. the catalogue ends
                     # before the points' last year): skip it rather than build an
-                    # empty overlay (which has no ``group`` column).
+                    # empty overlay (which has no ``layer_family`` column).
                     print(f"No raster layers in [{start}, {end}], skipping it")
                     continue
 
