@@ -1009,7 +1009,7 @@ class RasterData(SKMapBase):
 
         rows = []
         for feature, files in raster_files.items():
-            if isinstance(files, str):
+            if isinstance(files, (str, Path)):
                 files = [files]
             for r in files:
                 if isinstance(r, tuple):
@@ -1135,7 +1135,12 @@ class RasterData(SKMapBase):
             is_common = len(dates) == 0
         row[RasterData.IS_COMMON_COL] = is_common
 
-        if len(dates) > 0 and date_style is not None:
+        if len(dates) > 0:
+            if date_style is None:
+                date_style = self.date_args["date_style"]
+            if date_format is None:
+                date_format = self.date_args["date_format"]
+
             dt1, dt2 = (dates[0], dates[1])
 
             if isinstance(dt1, str):
@@ -1946,10 +1951,10 @@ class RasterData(SKMapBase):
         column is a temporal feature and each row a covariate; a covariate
         missing from a feature falls back to the common (``is_common``) layers.
 
-        ``match_col`` (default ``feature``) is the ``info`` column searched for
+        ``match_col`` (default ``name``) is the ``info`` column searched for
         each covariate name.
         """
-        match_col = match_col or RasterData.FEATURE_COL
+        match_col = match_col or RasterData.NAME_COL
         info = self.info.reset_index(drop=True)
         common = info[info[RasterData.IS_COMMON_COL]]
         features = sorted(
@@ -2009,7 +2014,7 @@ class RasterData(SKMapBase):
         :raises ValueError: if temporal layers exist but lack ``start_date``
           (year-based prediction requires dates).
         """
-        match_col = match_col or RasterData.FEATURE_COL
+        match_col = match_col or RasterData.NAME_COL
         info = self.info.reset_index(drop=True)
         temporal = info[~info[RasterData.IS_COMMON_COL]]
 

@@ -37,7 +37,7 @@ def test_drop_returns_self(rdata):
 def test_rename_returns_self(rdata):
     result = rdata.rename({"ndvi": "ndvi_renamed"})
     assert result is rdata
-    assert "ndvi_renamed" in rdata.info["group"].values
+    assert "ndvi_renamed" in rdata.info["feature"].values
 
 
 def test_timespan_read_chain():
@@ -64,9 +64,9 @@ def test_select_returns_new_object(rdata):
 def test_select_does_not_share_date_args(rdata):
     """Regression: filtered copies must not share the date_args dict."""
     sub = rdata.filter("index < 3")
-    sub.date_args["ndvi"]["date_format"] = "%Y"
+    sub.date_args["date_format"] = "%Y"
     # original untouched
-    assert rdata.date_args["ndvi"]["date_format"] != "%Y"
+    assert rdata.date_args["date_format"] != "%Y"
 
 
 def test_select_does_not_share_raster_files(rdata):
@@ -95,8 +95,8 @@ def test_filter_date_returns_new_object(rdata):
     assert sub.array.shape[0] < rdata.array.shape[0]
 
 
-def test_filter_date_include_non_temporal():
-    """include_non_temporal keeps static (undated) layers alongside the date filter."""
+def test_filter_date_include_common():
+    """include_common keeps static (undated) layers alongside the date filter."""
     from skmap.data import toy
 
     swir_tmpl = str(toy.swir1_files()[0]).replace("20141202_20150320", "{dt}")
@@ -105,15 +105,15 @@ def test_filter_date_include_non_temporal():
         / "static"
         / "elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
     )
-    r = RasterData({"swir1": swir_tmpl, "static": elev}).timespan(
+    r = RasterData({"swir1": swir_tmpl, "elev": elev}).timespan(
         "20141202", "20201201", "days", [109, 96, 80, 80]
     )
     # default: static dropped
     sub = r.filter_date("2015-01-01", "2015-12-31")
-    assert "static" not in sub.info["group"].unique()
+    assert "elev" not in sub.info["feature"].unique()
     # include_non_temporal=True: static kept
-    sub2 = r.filter_date("2015-01-01", "2015-12-31", include_non_temporal=True)
-    assert "static" in sub2.info["group"].unique()
+    sub2 = r.filter_date("2015-01-01", "2015-12-31", include_common=True)
+    assert "elev" in sub2.info["feature"].unique()
     assert len(sub2.info) == len(sub.info) + 1  # +1 static elev
 
 

@@ -797,7 +797,7 @@ class SpaceTimeOverlay:
                 # by_start_date assigns cross-year (e.g. winter) composites to
                 # the year they start in.
                 range_rdata = self.rdata.filter_date(
-                    start, end, date_format=date_format, include_non_temporal=True,
+                    start, end, date_format=date_format, include_common=True,
                     by_start_date=True,
                 )
                 n_layers = len(range_rdata.info)

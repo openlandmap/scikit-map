@@ -43,8 +43,8 @@ class TestBackendAttribute:
 
     def test_backend_propagates_to_calc(self, rdata_numpy):
         rdata_numpy.backend = CppBackend()
-        calc = Calc({"ndvi.seasconv": "ndvi * 2"}, verbose=False)
-        # run a SeasConvFill first so the 'ndvi.seasconv' group exists
+        calc = Calc({"ndvi_x2": "ndvi * 2"}, verbose=False)
+        # run a SeasConvFill first so the 'ndvi_seasconv' feature exists
         rdata_numpy.run(SeasConvFill(season_size=4, verbose=False))
         rdata_numpy.run(calc)
         assert calc.backend is rdata_numpy.backend

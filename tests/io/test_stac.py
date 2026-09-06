@@ -103,17 +103,17 @@ class TestIterSpecs:
             "ch4_p10_2km_a", "ch4_p50_2km_a", "ch4_p90_2km_a"
         ]
 
-    def test_group_is_collection(self):
+    def test_feature_is_asset(self):
         s = _stub({NDVI_CID: NDVI_ITEMS})
         specs = list(s.iter_specs())
-        assert all(sp.group == NDVI_CID for sp in specs)
+        assert all(sp.feature == "ndvi_m_30m_s" for sp in specs)
 
     def test_dates_from_start_end_datetime(self):
         s = _stub({NDVI_CID: NDVI_ITEMS})
         specs = list(s.iter_specs())
         assert specs[0].start_date == datetime(2022, 11, 1)
         assert specs[0].end_date == datetime(2022, 12, 31)
-        assert specs[0].temporal is True
+        assert specs[0].is_common is False
 
     def test_date_filter_client_side(self):
         s = _stub({NDVI_CID: NDVI_ITEMS}, datetime="2022-09-01/2022-11-30")
@@ -154,13 +154,13 @@ class TestFromStac:
         for col in ["collection", "asset", "year", "gsd", "epsg"]:
             assert col in r.info.columns
 
-        assert set(r.info["group"].unique()) == {NDVI_CID}
+        assert set(r.info["feature"].unique()) == {"ndvi_m_30m_s"}
         assert set(r.info["asset"].unique()) == {"ndvi_m_30m_s"}
         assert set(r.info["year"].unique()) == {2022}
 
         # date_args populated for the (dated) collection group
-        assert r.date_args[NDVI_CID]["date_style"] == "interval"
-        assert r.date_args[NDVI_CID]["date_format"] == "%Y%m%d"
+        assert r.date_args["date_style"] == "interval"
+        assert r.date_args["date_format"] == "%Y%m%d"
 
     def test_filter_by_collection_column(self, monkeypatch):
         monkeypatch.setattr(StacSource, "_root_url", lambda self: ROOT_URL)
@@ -170,7 +170,7 @@ class TestFromStac:
             lambda self, cid: NDVI_ITEMS if cid == NDVI_CID else CH4_ITEMS,
         )
         r = RasterData.from_stac(url=CATALOG_URL, collections=[NDVI_CID, CH4_CID])
-        assert set(r.get_groups()) == {NDVI_CID, CH4_CID}
+        assert set(r.get_features()) == {"ndvi_m_30m_s", "ch4_p10_2km_a", "ch4_p50_2km_a", "ch4_p90_2km_a"}
         ndvi = r.filter(f"collection == '{NDVI_CID}'")
         assert set(ndvi.info["collection"].unique()) == {NDVI_CID}
 
@@ -282,5 +282,5 @@ def test_network_ecodatacube():
     assert r.array is None
     assert len(r.info) >= 1
     assert r.info["input_path"].str.endswith(".tif").all()
-    assert set(r.info["group"].unique()) == {NDVI_CID}
+    assert set(r.info["feature"].unique()) == {"ndvi_m_30m_s"}
     assert set(r.info["epsg"].unique()) == {3035}

@@ -11,16 +11,17 @@ from skmap.io import RasterData, process
 
 @pytest.fixture
 def static_rdata():
-    """A RasterData with short covariate names elev/slope in a common group."""
+    """A RasterData with two common features (elev, slope)."""
 
     elev = "elev.lowestmode_gedi.eml_mf_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
     slope = "slope.percent_gedi.eml_m_30m_s_20000101_20181231_nl_epsg.3035_v0.3.tif"
     toy_dir = toy.DATA_DIR
-    rdata = RasterData(
-        {"common": [str(toy_dir / "static" / elev), str(toy_dir / "static" / slope)]}
+    return RasterData(
+        {
+            "elev": [str(toy_dir / "static" / elev)],
+            "slope": [str(toy_dir / "static" / slope)],
+        }
     ).read()
-    rdata.info["name"] = ["elev", "slope"]
-    return rdata
 
 
 def test_normalized_difference(static_rdata):

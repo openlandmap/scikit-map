@@ -106,7 +106,7 @@ class TestSpaceTimeOverlay:
         so_2019 = SpaceOverlay(
             points=pts_2019,
             rasterdata=rdata_2019.filter_date(
-                "2019-01-01", "2019-12-31", include_non_temporal=True
+                "2019-01-01", "2019-12-31", include_common=True
             ),
         )
         res_2019 = so_2019.run(max_ram_mb=512, out_file_name=None)
@@ -123,7 +123,7 @@ class TestSpaceTimeOverlay:
     def test_skips_range_with_no_layers(self, capsys):
         """A year with no matching layers is skipped, not crashed.
 
-        Regression for KeyError: 'group' when a date range (here 2020) has
+        Regression for KeyError: 'layer_family' when a date range (here 2020) has
         points but the catalogue has no layers covering it.
         """
         pts = gpd.read_file(self.SAMPLES)

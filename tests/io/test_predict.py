@@ -32,7 +32,7 @@ def _toy_multiyear_rdata():
         .filter_date(
             "2015-01-01",
             "2019-12-31",
-            include_non_temporal=True,
+            include_common=True,
             by_start_date=True,
         )
         .read()
@@ -71,7 +71,7 @@ class _CallCounter:
 
 def _prediction_bands(rdata):
     """Return the appended prediction bands (n_out·n_years, H*W)."""
-    idx = rdata.info[rdata.info["group"] == "prediction"].index
+    idx = rdata.info[rdata.info["feature"] == "prediction"].index
     return rdata.array.get()[idx]
 
 
@@ -89,10 +89,10 @@ def test_prediction_regressor():
 
     rdata.run(Prediction(model=model, feature_names=["elev", "slope"]))
 
-    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    pred_info = rdata.info[rdata.info["feature"] == "prediction"]
     assert len(pred_info) == 1
     assert pred_info["name"].iloc[0] == "prediction"
-    assert not pred_info["temporal"].iloc[0]
+    assert bool(pred_info["is_common"].iloc[0]) is True
 
     pred = _prediction_bands(rdata)
     assert pred.shape == (1, 256 * 256)
@@ -124,7 +124,7 @@ def test_prediction_proba():
         Prediction(model=model, feature_names=["elev", "slope"], predict_proba=True)
     )
 
-    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    pred_info = rdata.info[rdata.info["feature"] == "prediction"]
     assert list(pred_info["name"]) == [
         "prediction_prob_0", "prediction_prob_1", "prediction"
     ]
@@ -156,7 +156,7 @@ def test_prediction_multiyear_one_call():
     pred = _prediction_bands(rdata)
     assert pred.shape == (5, n_pix)  # n_out(=1) * n_years
 
-    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    pred_info = rdata.info[rdata.info["feature"] == "prediction"]
     assert list(pred_info["name"]) == ["prediction"] * 5
     assert list(pred_info["start_date"].dt.year) == [2015, 2016, 2017, 2018, 2019]
 
@@ -185,7 +185,7 @@ def test_prediction_multiyear_classifier_layout():
     assert pred.shape == (n_class * 5 + 5, n_pix)  # proba + dominant
     assert model.calls == 1
 
-    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    pred_info = rdata.info[rdata.info["feature"] == "prediction"]
     assert list(pred_info["name"]) == [
         f"prediction_prob_{i}" for i in range(n_class) for _ in range(5)
     ] + ["prediction"] * 5
@@ -212,7 +212,7 @@ def test_prediction_temporal_without_dates_raises():
     """Temporal layers without start_date are rejected (dates required)."""
     rdata = toy.ndvi_rdata()
     rdata.info = rdata.info.drop(columns=["start_date", "end_date"], errors="ignore")
-    assert rdata.info["temporal"].any()
+    assert (~rdata.info["is_common"]).any()
     assert "start_date" not in rdata.info.columns
 
     model = _CallCounter(n_out=1)
@@ -240,7 +240,7 @@ def test_prediction_target_names():
             valid_only=False,
         )
     )
-    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    pred_info = rdata.info[rdata.info["feature"] == "prediction"]
     assert list(pred_info["name"]) == [
         f"prediction_{t}" for t in ("water", "pasture", "forest") for _ in range(5)
     ] + ["prediction"] * 5
@@ -270,7 +270,7 @@ def test_prediction_year_column():
     rdata = _toy_multiyear_rdata()
     model = _CallCounter(n_out=1)
     rdata.run(Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False))
-    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    pred_info = rdata.info[rdata.info["feature"] == "prediction"]
     assert list(pred_info["year"]) == [2015, 2016, 2017, 2018, 2019]
 
 
@@ -278,7 +278,7 @@ def test_prediction_year_column_static():
     rdata = _toy_raster_rdata()
     model = _CallCounter(n_out=1)
     rdata.run(Prediction(model=model, feature_names=["elev", "slope"]))
-    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    pred_info = rdata.info[rdata.info["feature"] == "prediction"]
     assert len(pred_info) == 1
     assert pred_info["year"].iloc[0] is None or pd.isna(pred_info["year"].iloc[0])
 
@@ -295,7 +295,7 @@ def test_prediction_drop_input():
         Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False),
         drop_input=True,
     )
-    assert set(rdata.info["group"]) == {"prediction"}
+    assert set(rdata.info["feature"]) == {"prediction"}
     assert rdata.array.shape[0] == 5  # n_out(=1) * n_years
 
 
@@ -309,7 +309,7 @@ def test_prediction_drop_input_proba():
         ),
         drop_input=True,
     )
-    assert set(rdata.info["group"]) == {"prediction"}
+    assert set(rdata.info["feature"]) == {"prediction"}
     # proba (n_class*5) + dominant (5)
     assert rdata.array.shape[0] == 3 * 5 + 5
 
@@ -396,7 +396,7 @@ def test_get_titles_template():
     model = _CallCounter(n_out=1)
     rdata.run(Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False))
 
-    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    pred_info = rdata.info[rdata.info["feature"] == "prediction"]
     titles = rdata._get_titles("Land Cover {year} {name}", ["prediction"])
     assert len(titles) == len(pred_info)
     assert titles[0] == "Land Cover 2015 prediction"
@@ -420,6 +420,6 @@ def test_get_titles_literal():
     model = _CallCounter(n_out=1)
     rdata.run(Prediction(model=model, feature_names=_TY_FEATURES, valid_only=False))
 
-    pred_info = rdata.info[rdata.info["group"] == "prediction"]
+    pred_info = rdata.info[rdata.info["feature"] == "prediction"]
     titles = rdata._get_titles("Land Cover", ["prediction"])
     assert titles == ["Land Cover"] * len(pred_info)

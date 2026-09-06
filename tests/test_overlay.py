@@ -55,7 +55,7 @@ class TestParallelOverlay(TestOverlayBase):
         assert po.layers.to_dict() == {
             "name": {0: self.ELEV_NAME},
             "path": {0: self.ELEV_FILE.as_posix()},
-            "group": {0: "8c36693f22356214e61afb7002635270"},
+            "layer_family": {0: "8c36693f22356214e61afb7002635270"},
         }
         assert po.query_pixels["8c36693f22356214e61afb7002635270"].to_dict() == {
             "block_id": {0: 50, 1: 71},
@@ -119,13 +119,10 @@ class TestSpaceOverlay(TestOverlayBase):
         """SpaceOverlay works on a lazy (unread) RasterData: no .read() call."""
         rdata = RasterData(
             {
-                "common": [
-                    self.ELEV_FILE.as_posix(),
-                    self.SLOPE_FILE.as_posix(),
-                ]
+                "elev": [self.ELEV_FILE.as_posix()],
+                "slope": [self.SLOPE_FILE.as_posix()],
             }
         )
-        rdata.info["name"] = ["elev", "slope"]
         assert rdata.array is None
 
         so = SpaceOverlay(
@@ -142,18 +139,15 @@ class TestSpaceOverlay(TestOverlayBase):
         assert res["elev"].tolist() == [70.0, 284.0]
         assert res["slope"].tolist() == [31.0, 59.0]
 
-    def test_run_multiple_layers_same_group(self) -> None:
-        # Regression: a group with more than one layer used to return NaN for
+    def test_run_multiple_layers_same_family(self) -> None:
+        # Regression: a layer family with more than one layer used to return NaN for
         # every layer except the last one (extractOverlay hash-map collapse).
         rdata = RasterData(
             {
-                "common": [
-                    self.ELEV_FILE.as_posix(),
-                    self.SLOPE_FILE.as_posix(),
-                ]
+                "elev": [self.ELEV_FILE.as_posix()],
+                "slope": [self.SLOPE_FILE.as_posix()],
             }
         )
-        rdata.info["name"] = ["elev", "slope"]
         so = SpaceOverlay(
             points=gpd.GeoDataFrame(
                 geometry=[Point(x, y) for x, y in zip(self.PTS_X, self.PTS_Y)],
@@ -172,13 +166,10 @@ class TestSpaceOverlay(TestOverlayBase):
 
         rdata = RasterData(
             {
-                "common": [
-                    self.ELEV_FILE.as_posix(),
-                    self.SLOPE_FILE.as_posix(),
-                ]
+                "elev": [self.ELEV_FILE.as_posix()],
+                "slope": [self.SLOPE_FILE.as_posix()],
             }
         )
-        rdata.info["name"] = ["elev", "slope"]
         nd = process.NormalizedDifference("elev", "slope")
         nd.outname = "nd"
         lat = process.GetLatitude()

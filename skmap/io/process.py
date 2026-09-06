@@ -770,7 +770,7 @@ class TimeAggregate(Derivator):
         rdata: RasterData,
         feature_list: list,
         ginfo_list: list,
-        outname: str = "skmap_aggregate.{gr}_{op}_{dt}",
+        outname: str = "{feature}_{op}_{dt}",
     ):
         args = []
 
@@ -970,7 +970,7 @@ class PeakAnalysis(Derivator):
         rdata: RasterData,
         feature_list: list,
         ginfo_list: list,
-        outname: str = "skmap_{gr}.{nm}_{pr}_{dt}",
+        outname: str = "{feature}_{nm}_{pr}_{dt}",
     ):
         new_info = []
 
@@ -1098,7 +1098,7 @@ class SlopeAnalysis(Derivator):
         rdata: RasterData,
         feature_list: list,
         ginfo_list: list,
-        outname: str = "{gr}.{nm}_{pr}_{dt}",
+        outname: str = "{feature}_{nm}_{pr}_{dt}",
     ):
         new_info = []
 
@@ -1230,7 +1230,7 @@ class FindMinMax(Derivator):
         rdata: RasterData,
         feature_list: list,
         ginfo_list: list,
-        outname: str = "{gr}.{nm}_{pr}_{dt}",
+        outname: str = "{feature}_{nm}_{pr}_{dt}",
     ):
         new_info = []
 
@@ -1390,7 +1390,7 @@ class TrendAnalysis(Derivator):
         rdata: RasterData,
         feature_list: list,
         ginfo_list: list,
-        outname: str = "skmap_{gr}.{nm}_{pr}_{dt}",
+        outname: str = "{feature}_{nm}_{pr}_{dt}",
     ):
         new_arrays = []
         new_infos = []
@@ -1514,7 +1514,7 @@ class Calc(SKMapRunner):
 
         return fidx, out_slices
 
-    def run(self, rdata: RasterData, outname: str = "skmap_{gr}_{dt}"):
+    def run(self, rdata: RasterData, outname: str = "{feature}_{dt}"):
         self.features = list(rdata.info[RasterData.FEATURE_COL].unique())
 
         self.new_features = []

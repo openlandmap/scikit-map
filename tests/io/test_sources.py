@@ -70,10 +70,10 @@ class TestTemplateExpander:
 
         by_path = _specs_by_path(specs)
         s = by_path["/data/blue_20150101_20150228.tif"]
-        assert s.group == "2015"
+        assert s.feature == "blue"
         assert s.start_date == datetime(2015, 1, 1)
         assert s.end_date == datetime(2015, 2, 28)
-        assert s.temporal is True
+        assert s.is_common is False
         assert s.vars == {
             "band": "blue",
             "year": 2015,
@@ -82,7 +82,7 @@ class TestTemplateExpander:
         }
 
         s = by_path["/data/green_20160301_20160430.tif"]
-        assert s.group == "2016"
+        assert s.feature == "green"
         assert s.start_date == datetime(2016, 3, 1)
         assert s.end_date == datetime(2016, 4, 30)
 
@@ -100,7 +100,7 @@ class TestTemplateExpander:
         by_path = _specs_by_path(specs)
         assert by_path["/data/ndvi_2015.tif"].start_date == datetime(2015, 1, 1)
         assert by_path["/data/ndvi_2015.tif"].end_date == datetime(2015, 12, 31)
-        assert by_path["/data/ndvi_2016.tif"].group == "2016"
+        assert by_path["/data/ndvi_2016.tif"].feature == "ndvi"
 
     def test_monthly_expansion(self):
         entry = {
@@ -129,9 +129,9 @@ class TestTemplateExpander:
         assert len(specs) == 1
         s = specs[0]
         assert s.path == "/data/elev.tif"
-        assert s.group == "common"
+        assert s.feature == "elev"
         assert s.start_date is None and s.end_date is None
-        assert s.temporal is False
+        assert s.is_common is True
 
     def test_cross_year_end_month(self):
         entry = {
@@ -172,8 +172,8 @@ class TestYamlSource:
         # 8 temporal + 2 static = 10
         assert len(specs) == 10
 
-        groups = sorted({s.group for s in specs})
-        assert groups == ["2015", "2016", "common"]
+        features = sorted({s.feature for s in specs})
+        assert features == ["blue", "clm_p50", "elev", "green"]
 
         by_path = _specs_by_path(specs)
         assert "/data/arco/blue_test_20150101_20150228.tif" in by_path
@@ -201,7 +201,7 @@ class TestFromYaml:
         assert len(r.info) == 10
 
         # group = year for temporal, "common" for static
-        assert set(r.info["group"].unique()) == {"2015", "2016", "common"}
+        assert set(r.info["feature"].unique()) == {"blue", "green", "clm_p50", "elev"}
 
         # extra variable columns present, NaN where absent
         for col in ["band", "year", "start_month", "end_month", "perc"]:
@@ -217,7 +217,8 @@ class TestFromYaml:
         # static rows: no dates, no band/year
         elev = r.info[r.info["name"] == "elev"]
         assert len(elev) == 1
-        assert elev["group"].iloc[0] == "common"
+        assert elev["feature"].iloc[0] == "elev"
+        assert bool(elev["is_common"].iloc[0]) is True
         assert pd.isna(elev["start_date"].iloc[0])
         assert pd.isna(elev["band"].iloc[0])
 
@@ -229,9 +230,8 @@ class TestFromYaml:
         r = RasterData.from_yaml(
             yaml_file, base_path="/data", date_format="%Y-%m-%d", ignore_29feb=False
         )
-        for g in ["2015", "2016"]:
-            assert r.date_args[g]["date_format"] == "%Y-%m-%d"
-            assert r.date_args[g]["ignore_29feb"] is False
+        assert r.date_args["date_format"] == "%Y-%m-%d"
+        assert r.date_args["ignore_29feb"] is False
 
     def test_to_rasterdata_roundtrip(self, yaml_file):
         src = YamlSource(yaml_file, base_path="/data")
@@ -239,7 +239,7 @@ class TestFromYaml:
         assert isinstance(r, RasterData)
         assert r.array is None
         assert len(r.info) == 10
-        assert r.get_groups() == ["2015", "2016"]
+        assert r.get_features() == ["blue", "clm_p50", "elev", "green"]
 
     def test_filter_by_extra_column(self, yaml_file):
         """Extra variable columns are queryable via filter()."""
@@ -272,8 +272,8 @@ class TestIntervalExpansion:
         assert s.path == "/d/ndvi/ndvi_s_20141202_20150320.tif"
         assert s.start_date == datetime(2014, 12, 2)
         assert s.end_date == datetime(2015, 3, 20)
-        assert s.group == "2014"
-        assert s.temporal is True
+        assert s.feature == "ndvi"
+        assert s.is_common is False
 
     def test_interval_name_template_is_year_agnostic(self):
         specs = list(TemplateExpander().expand(self.ENTRY, base_path="/d"))
@@ -315,7 +315,7 @@ class TestToyLayersYaml:
         r = RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR))
         assert r.array is None  # lazy
         assert len(r.info) == 74  # 24+24 ndvi + 24 swir1 + 2 static
-        assert set(r.get_groups()) == {"ndvi", "swir1"}
+        assert set(r.get_features()) == {"elev", "ndvi", "slope", "swir1"}
 
     def test_season_names_are_year_agnostic(self):
         from skmap.data import toy
@@ -357,13 +357,13 @@ class TestFilterDateByStartDate:
         # 2019 winter composite starts 2019-12-02, ends 2020-03-20
         sub = filled.filter_date(
             "2019-01-01", "2019-12-31",
-            include_non_temporal=True, by_start_date=True,
+            include_common=True, by_start_date=True,
         )
         assert "ndvi_winter" in set(sub.info["name"].unique())
 
         # without by_start_date it is dropped (end crosses the year boundary)
         sub2 = filled.filter_date(
-            "2019-01-01", "2019-12-31", include_non_temporal=True
+            "2019-01-01", "2019-12-31", include_common=True
         )
         assert "ndvi_winter" not in set(sub2.info["name"].unique())
 

@@ -60,7 +60,7 @@ def test_timeaggregate_backends_match(ref_aggregate, backend):
 
 @pytest.fixture(scope="module")
 def ref_calc():
-    """Run Calc on the numpy backend using the non-dotted 'ndvi' input group."""
+    """Run Calc on the numpy backend using the 'ndvi' input feature."""
     r = _make_rdata(NumpyBackend(), gappy=True)
     r.run(Calc({"ndvi_x2": "ndvi * 2"}, verbose=False))
     return r.array.get().copy()
