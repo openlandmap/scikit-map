@@ -158,6 +158,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../tutorials.html">
     Tutorials
   </a>
@@ -170,13 +177,6 @@
   </a>
 </li>
 
-
-<li class="nav-item current active">
-  <a class="nav-link nav-internal" href="skmap.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -185,6 +185,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="skmap.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../cpp_api.html">
     C++ API
@@ -306,6 +313,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../quickstart/quickstart.html">
     Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
   </a>
 </li>
 
@@ -602,7 +616,7 @@
 <td><p>Generates an animation with the given band(s) and saves it.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.drop" title="skmap.io.base.RasterData.drop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">drop</span></code></a></p></td>
-<td><p>Return a copy with the named layers removed.</p></td>
+<td><p>Return a copy with the named features removed.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.expand_valid" title="skmap.io.base.RasterData.expand_valid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">expand_valid</span></code></a></p></td>
 <td><p>Expand a <code class="docutils literal notranslate"><span class="pre">(n_valid,)</span></code> / <code class="docutils literal notranslate"><span class="pre">(n_valid,</span> <span class="pre">k)</span></code> array back to <code class="docutils literal notranslate"><span class="pre">H*W</span></code>.</p></td>
@@ -625,8 +639,8 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.from_yaml" title="skmap.io.base.RasterData.from_yaml"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_yaml</span></code></a></p></td>
 <td><p>Build a lazy RasterData from a YAML layer catalogue (classmethod).</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.get_groups" title="skmap.io.base.RasterData.get_groups"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_groups</span></code></a></p></td>
-<td><p>Return the group names, excluding the shared <code class="docutils literal notranslate"><span class="pre">common</span></code> group.</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.get_features" title="skmap.io.base.RasterData.get_features"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_features</span></code></a></p></td>
+<td><p>Return the sorted unique feature names.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.get_years" title="skmap.io.base.RasterData.get_years"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_years</span></code></a></p></td>
 <td><p>Sorted unique years of the temporal layers (from <code class="docutils literal notranslate"><span class="pre">start_date</span></code>).</p></td>
@@ -641,7 +655,7 @@
 <td><p>Read the selected layers into a SharedArray and return <code class="docutils literal notranslate"><span class="pre">self</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.rename" title="skmap.io.base.RasterData.rename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rename</span></code></a></p></td>
-<td><p>Return a copy with layers renamed according to a mapping.</p></td>
+<td><p>Return a copy with features renamed according to a mapping.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.run" title="skmap.io.base.RasterData.run"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run</span></code></a></p></td>
 <td><p>Execute a function over the loaded raster data, yielding per-tile results.</p></td>
@@ -653,7 +667,7 @@
 <td><p>Return the <code class="docutils literal notranslate"><span class="pre">(n_valid,</span> <span class="pre">n_bands)</span></code> array of non-NaN pixel rows.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.timespan" title="skmap.io.base.RasterData.timespan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">timespan</span></code></a></p></td>
-<td><p>Return the <code class="docutils literal notranslate"><span class="pre">(start_date,</span> <span class="pre">end_date)</span></code> span covered by the loaded layers.</p></td>
+<td><p>Expand <code class="docutils literal notranslate"><span class="pre">{dt}</span></code> placeholders into concrete dated layers.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.to_dir" title="skmap.io.base.RasterData.to_dir"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_dir</span></code></a></p></td>
 <td><p>Write the selected layers to a local directory as GeoTIFFs.</p></td>
@@ -676,10 +690,16 @@
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">END_DT_COL</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">GROUP_COL</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">FEATURE_COL</span></code></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">INTERVAL_DT_SEP</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">IS_COMMON_COL</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">MANDATORY_COLS</span></code></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">NAME_COL</span></code></p></td>
@@ -694,12 +714,6 @@
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">START_DT_COL</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">TEMPORAL_COL</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">TRANSFORM_SEP</span></code></p></td>
-<td><p></p></td>
-</tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#skmap.io.base.RasterData.valid_pixels" title="skmap.io.base.RasterData.valid_pixels"><code class="xref py py-obj docutils literal notranslate"><span class="pre">valid_pixels</span></code></a></p></td>
 <td><p>Boolean mask over <code class="docutils literal notranslate"><span class="pre">H*W</span></code> of pixels with no NaN in any band.</p></td>
 </tr>
@@ -708,15 +722,15 @@
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.animate">
-<span class="sig-name descname"><span class="pre">animate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Spectral_r'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">groups</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scaling</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cbar_title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_title_text</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'index'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_title_fontsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vminmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(None,</span> <span class="pre">None)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">250</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_gif</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.animate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.animate" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">animate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Spectral_r'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scaling</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cbar_title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_title_text</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'index'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_title_fontsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vminmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(None,</span> <span class="pre">None)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">250</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_gif</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.animate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.animate" title="Link to this definition">#</a></dt>
 <dd><p>Generates an animation with the given band(s) and saves it.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>cmap</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – colormap name that will derived from <code class="docutils literal notranslate"><span class="pre">matplotlib.colormaps()</span></code></p></li>
-<li><p><strong>groups</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a></span>) – used to select the band(s) or to generate a composite
+<li><p><strong>features</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a></span>) – used to select the feature(s) or to generate a composite
 image that will be used as animation frame. Default is <code class="docutils literal notranslate"><span class="pre">None</span></code>,
-which selects the first band on <code class="docutils literal notranslate"><span class="pre">RasterData</span></code>.</p></li>
+which selects the first feature on <code class="docutils literal notranslate"><span class="pre">RasterData</span></code>.</p></li>
 <li><p><strong>scaling</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span>) – scaling can be used to increase/decrease the frame size.
 Default is 2.</p></li>
 <li><p><strong>cbar_title</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – title for the colorbar.</p></li>
@@ -733,8 +747,8 @@ Default is 2.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.drop">
-<span class="sig-name descname"><span class="pre">drop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.drop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.drop" title="Link to this definition">#</a></dt>
-<dd><p>Return a copy with the named layers removed.</p>
+<span class="sig-name descname"><span class="pre">drop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">feature</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.drop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.drop" title="Link to this definition">#</a></dt>
+<dd><p>Return a copy with the named features removed.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -762,14 +776,14 @@ Default is 2.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.filter_date">
-<span class="sig-name descname"><span class="pre">filter_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'%Y-%m-%d'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_overlap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_non_temporal</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by_start_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_array</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_copy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.filter_date"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.filter_date" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">filter_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'%Y-%m-%d'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_overlap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_common</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by_start_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_array</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_copy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.filter_date"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.filter_date" title="Link to this definition">#</a></dt>
 <dd><p>Return a copy keeping only layers whose date falls within <code class="docutils literal notranslate"><span class="pre">[start,</span> <span class="pre">end]</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>include_non_temporal</strong> – when <code class="docutils literal notranslate"><span class="pre">True</span></code>, also keep layers without a
-date (static layers with <code class="docutils literal notranslate"><span class="pre">None</span></code> in the start-date column), so
-they are preserved alongside the date-filtered temporal layers.</p></li>
+<li><p><strong>include_common</strong> – when <code class="docutils literal notranslate"><span class="pre">True</span></code>, also keep common (static) layers
+without a date, so they are preserved alongside the date-filtered
+temporal layers.</p></li>
 <li><p><strong>by_start_date</strong> – when <code class="docutils literal notranslate"><span class="pre">True</span></code>, a layer is kept when its
 <code class="docutils literal notranslate"><span class="pre">start_date</span></code> falls within <code class="docutils literal notranslate"><span class="pre">[start_date,</span> <span class="pre">end_date]</span></code> (the
 <code class="docutils literal notranslate"><span class="pre">end_date</span></code> column is ignored).  This assigns cross-year
@@ -785,9 +799,10 @@ start in.</p></li>
 <span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">info</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'numpy'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'%Y%m%d'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_29feb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.from_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.from_info" title="Link to this definition">#</a></dt>
 <dd><p>Build a RasterData from a pre-built <code class="docutils literal notranslate"><span class="pre">info</span></code> DataFrame (classmethod).</p>
 <p>Used by the layer sources (<a class="reference internal" href="skmap.io.sources.html#module-skmap.io.sources" title="skmap.io.sources"><code class="xref py py-mod docutils literal notranslate"><span class="pre">skmap.io.sources</span></code></a>) to construct a lazy
-RasterData whose <code class="docutils literal notranslate"><span class="pre">info</span></code> already carries dates, groups, names and any
-extra per-layer variable columns.  Unlike <code class="docutils literal notranslate"><span class="pre">__init__</span></code>, the incoming
-<code class="docutils literal notranslate"><span class="pre">temporal</span></code> column is preserved as-is (static layers stay <code class="docutils literal notranslate"><span class="pre">False</span></code>).</p>
+RasterData whose <code class="docutils literal notranslate"><span class="pre">info</span></code> already carries the mandatory columns
+(<code class="docutils literal notranslate"><span class="pre">input_path</span></code>, <code class="docutils literal notranslate"><span class="pre">input_band</span></code>, <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">start_date</span></code>,
+<code class="docutils literal notranslate"><span class="pre">end_date</span></code>, <code class="docutils literal notranslate"><span class="pre">feature</span></code>, <code class="docutils literal notranslate"><span class="pre">is_common</span></code>) plus any optional per-layer
+variable columns.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -809,16 +824,13 @@ See <a class="reference internal" href="skmap.io.sources.StacSource.html#skmap.i
 rules.  The result holds paths + dates only (no <code class="docutils literal notranslate"><span class="pre">.read()</span></code>); its
 <code class="docutils literal notranslate"><span class="pre">info</span></code> carries one column per <code class="docutils literal notranslate"><span class="pre">{variable}</span></code> referenced in the path
 templates (e.g. <code class="docutils literal notranslate"><span class="pre">band</span></code>, <code class="docutils literal notranslate"><span class="pre">year</span></code>, <code class="docutils literal notranslate"><span class="pre">start_month</span></code>, <code class="docutils literal notranslate"><span class="pre">end_month</span></code>,
-<code class="docutils literal notranslate"><span class="pre">perc</span></code>) so runners can group by multiple columns.</p>
+<code class="docutils literal notranslate"><span class="pre">perc</span></code>) so runners can partition by multiple columns.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="skmap.io.base.RasterData.get_groups">
-<span class="sig-name descname"><span class="pre">get_groups</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.get_groups"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.get_groups" title="Link to this definition">#</a></dt>
-<dd><p>Return the group names, excluding the shared <code class="docutils literal notranslate"><span class="pre">common</span></code> group.</p>
-<p>A RasterData organised by year (plus a <code class="docutils literal notranslate"><span class="pre">common</span></code> group) can drive
-per-group prediction and overlay. A dataset with only <code class="docutils literal notranslate"><span class="pre">common</span></code>
-layers returns <code class="docutils literal notranslate"><span class="pre">[&quot;common&quot;]</span></code>.</p>
+<dt class="sig sig-object py" id="skmap.io.base.RasterData.get_features">
+<span class="sig-name descname"><span class="pre">get_features</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.get_features"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.get_features" title="Link to this definition">#</a></dt>
+<dd><p>Return the sorted unique feature names.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
@@ -841,14 +853,14 @@ layers returns <code class="docutils literal notranslate"><span class="pre">[&qu
 
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">groups</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Spectral_r'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cbar_title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_title_text</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'index'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_title_fontsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vminmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(None,</span> <span class="pre">None)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_img</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layout_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.plot" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Spectral_r'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cbar_title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_title_text</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'index'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_title_fontsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vminmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(None,</span> <span class="pre">None)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_img</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layout_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.plot" title="Link to this definition">#</a></dt>
 <dd><p>Generates a grid plot to view and save with a colorscale with a desired layout.
 :param cmap                 : This sets the colorscale with given matplotlib.colormap. Default is Spectral_r
 :param cbar_title           : This sets the colorbar title if the cbar exists in the plot. Default is None.
 :param img_title_text       : This sets the image titles that will be display on top of the each image. Default is <cite>index</cite>.
 :param img_ltitle_fontsize  : This sets the fontsize of the image label which will be on top of the image. Default is 10.
 :param v_minmax             : This sets the loower and upper limits of the data that will be plot and the colorbar. Default is None and will be calculated on he fly.
-:param groups                : This used for to generate composite plot. Pass one or tree group names (groups) which will be used to generate. Default is None.
+:param features              : This is used to generate a composite plot. Pass one or three feature names. Default is None.
 :param to_img               : This sets the directory adn the format of the file where the generated image will be saved. Default is None.
 :param dpi                  : dot per inch value to save the figure. If the <cite>to_img</cite> param provided
 :param layout_col           : This controls the column count that will be used in the grid plot. Default is 3.</p>
@@ -908,30 +920,30 @@ use (default 0.7).</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.rename">
-<span class="sig-name descname"><span class="pre">rename</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">groups</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.rename"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.rename" title="Link to this definition">#</a></dt>
-<dd><p>Return a copy with layers renamed according to a mapping.</p>
+<span class="sig-name descname"><span class="pre">rename</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">features</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.rename"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.rename" title="Link to this definition">#</a></dt>
+<dd><p>Return a copy with features renamed according to a mapping.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.run">
-<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">process</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drop_input</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.run" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">process</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">feature</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drop_input</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.run" title="Link to this definition">#</a></dt>
 <dd><p>Execute a function over the loaded raster data, yielding per-tile results.</p>
 <p><code class="docutils literal notranslate"><span class="pre">backend</span></code> optionally overrides the compute backend for this run only
 (it does not mutate <code class="docutils literal notranslate"><span class="pre">self.backend</span></code>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">feature</span></code> optionally restricts a group runner to the given feature
+names (default: all temporal features).</p>
 <p><code class="docutils literal notranslate"><span class="pre">by</span></code> optionally partitions a group runner by one or more <code class="docutils literal notranslate"><span class="pre">info</span></code>
-columns instead of the default <code class="docutils literal notranslate"><span class="pre">group</span></code> column (e.g.
-<code class="docutils literal notranslate"><span class="pre">by=[&quot;year&quot;,</span> <span class="pre">&quot;band&quot;]</span></code>).</p>
-<p><code class="docutils literal notranslate"><span class="pre">match_col</span></code> (default <code class="docutils literal notranslate"><span class="pre">name</span></code>) is the <code class="docutils literal notranslate"><span class="pre">info</span></code> column searched for
-each input band name of a whale runner (e.g.
-<code class="docutils literal notranslate"><span class="pre">match_col=&quot;band&quot;</span></code>); <code class="docutils literal notranslate"><span class="pre">match</span></code> optionally adds further column==value
-constraints to disambiguate.</p>
+columns instead of the default <code class="docutils literal notranslate"><span class="pre">feature</span></code> column.</p>
+<p><code class="docutils literal notranslate"><span class="pre">match_col</span></code> (default <code class="docutils literal notranslate"><span class="pre">feature</span></code>) is the <code class="docutils literal notranslate"><span class="pre">info</span></code> column searched for
+each input band name of a whale runner; <code class="docutils literal notranslate"><span class="pre">match</span></code> optionally adds
+further column==value constraints to disambiguate.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.select">
 <span class="sig-name descname"><span class="pre">select</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">match</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.select"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.select" title="Link to this definition">#</a></dt>
 <dd><p>Return a copy keeping only rows where each column equals a value.</p>
-<p>Filters by arbitrary <code class="docutils literal notranslate"><span class="pre">info</span></code> columns (not just <code class="docutils literal notranslate"><span class="pre">group</span></code>), e.g.
+<p>Filters by arbitrary <code class="docutils literal notranslate"><span class="pre">info</span></code> columns (not just <code class="docutils literal notranslate"><span class="pre">feature</span></code>), e.g.
 <code class="docutils literal notranslate"><span class="pre">rdata.select(band=&quot;red&quot;,</span> <span class="pre">year=2020)</span></code>.  Useful to pre-filter a
 multi-column catalogue before running a runner.</p>
 <dl class="field-list simple">
@@ -954,19 +966,19 @@ multi-column catalogue before running a runner.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.timespan">
-<span class="sig-name descname"><span class="pre">timespan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_unit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_step</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_style</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'interval'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'%Y%m%d'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_29feb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.timespan"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.timespan" title="Link to this definition">#</a></dt>
-<dd><p>Return the <code class="docutils literal notranslate"><span class="pre">(start_date,</span> <span class="pre">end_date)</span></code> span covered by the loaded layers.</p>
+<span class="sig-name descname"><span class="pre">timespan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_unit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_step</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_style</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'interval'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">date_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'%Y%m%d'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_29feb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">feature</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.timespan"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.timespan" title="Link to this definition">#</a></dt>
+<dd><p>Expand <code class="docutils literal notranslate"><span class="pre">{dt}</span></code> placeholders into concrete dated layers.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.to_dir">
-<span class="sig-name descname"><span class="pre">to_dir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_expr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nodata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_in_dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_outfiles</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_each_outfile</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.to_dir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.to_dir" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">to_dir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">feature_expr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nodata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_in_dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_outfiles</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_each_outfile</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.to_dir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.to_dir" title="Link to this definition">#</a></dt>
 <dd><p>Write the selected layers to a local directory as GeoTIFFs.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="skmap.io.base.RasterData.to_s3">
-<span class="sig-name descname"><span class="pre">to_s3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">host</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">access_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">secret_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">secure</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmp_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_expr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nodata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_in_dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose_cp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.to_s3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.to_s3" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">to_s3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">host</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">access_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">secret_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">secure</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmp_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">feature_expr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nodata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_in_dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose_cp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/io/base.html#RasterData.to_s3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.io.base.RasterData.to_s3" title="Link to this definition">#</a></dt>
 <dd><p>Write the selected layers to an S3-compatible bucket as GeoTIFFs.</p>
 </dd></dl>
 
@@ -1013,7 +1025,7 @@ multi-column catalogue before running a runner.</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#skmap.io.base.RasterData.from_info"><code class="docutils literal notranslate"><span class="pre">RasterData.from_info()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#skmap.io.base.RasterData.from_stac"><code class="docutils literal notranslate"><span class="pre">RasterData.from_stac()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#skmap.io.base.RasterData.from_yaml"><code class="docutils literal notranslate"><span class="pre">RasterData.from_yaml()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#skmap.io.base.RasterData.get_groups"><code class="docutils literal notranslate"><span class="pre">RasterData.get_groups()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#skmap.io.base.RasterData.get_features"><code class="docutils literal notranslate"><span class="pre">RasterData.get_features()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#skmap.io.base.RasterData.get_years"><code class="docutils literal notranslate"><span class="pre">RasterData.get_years()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#skmap.io.base.RasterData.plot"><code class="docutils literal notranslate"><span class="pre">RasterData.plot()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#skmap.io.base.RasterData.point_query"><code class="docutils literal notranslate"><span class="pre">RasterData.point_query()</span></code></a></li>

@@ -158,6 +158,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../tutorials.html">
     Tutorials
   </a>
@@ -170,13 +177,6 @@
   </a>
 </li>
 
-
-<li class="nav-item current active">
-  <a class="nav-link nav-internal" href="skmap.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -185,6 +185,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="skmap.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../cpp_api.html">
     C++ API
@@ -306,6 +313,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../quickstart/quickstart.html">
     Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
   </a>
 </li>
 
@@ -613,8 +627,8 @@ trained and predicted across years).</p>
 <p>The resulting <code class="xref py py-class docutils literal notranslate"><span class="pre">RasterData</span></code> is <strong>lazy</strong> (paths + dates only,
 no <code class="docutils literal notranslate"><span class="pre">.read()</span></code>).  Its <code class="docutils literal notranslate"><span class="pre">info</span></code> DataFrame carries the standard columns plus one
 column per data variable (<code class="docutils literal notranslate"><span class="pre">band</span></code>, <code class="docutils literal notranslate"><span class="pre">variant</span></code>, <code class="docutils literal notranslate"><span class="pre">season</span></code>, <code class="docutils literal notranslate"><span class="pre">perc</span></code>,
-<code class="docutils literal notranslate"><span class="pre">year</span></code>, <code class="docutils literal notranslate"><span class="pre">start_month</span></code>, <code class="docutils literal notranslate"><span class="pre">end_month</span></code>, …), so runners can group by
-multiple columns (e.g. <code class="docutils literal notranslate"><span class="pre">group</span></code> and <code class="docutils literal notranslate"><span class="pre">band</span></code>).</p>
+<code class="docutils literal notranslate"><span class="pre">year</span></code>, <code class="docutils literal notranslate"><span class="pre">start_month</span></code>, <code class="docutils literal notranslate"><span class="pre">end_month</span></code>, …), so runners can partition
+by multiple columns (e.g. <code class="docutils literal notranslate"><span class="pre">feature</span></code> and <code class="docutils literal notranslate"><span class="pre">band</span></code>).</p>
 <p class="rubric">Classes</p>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>

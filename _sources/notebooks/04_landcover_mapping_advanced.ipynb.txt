@@ -32,7 +32,14 @@
    "cell_type": "code",
    "execution_count": 1,
    "id": "98346254",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:25.752926Z",
+     "iopub.status.busy": "2026-09-06T13:07:25.752218Z",
+     "iopub.status.idle": "2026-09-06T13:07:25.761788Z",
+     "shell.execute_reply": "2026-09-06T13:07:25.759676Z"
+    }
+   },
    "outputs": [],
    "source": [
     "import os\n",
@@ -45,16 +52,47 @@
    "cell_type": "code",
    "execution_count": 2,
    "id": "4b1dbb77",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:25.767602Z",
+     "iopub.status.busy": "2026-09-06T13:07:25.767220Z",
+     "iopub.status.idle": "2026-09-06T13:07:29.094562Z",
+     "shell.execute_reply": "2026-09-06T13:07:29.093254Z"
+    }
+   },
    "outputs": [
     {
      "name": "stdout",
      "output_type": "stream",
      "text": [
-      "Dropping 0 points out of 41 because out of extent\n",
-      "Dropping 0 points out of 37 because out of extent\n",
-      "Dropping 0 points out of 40 because out of extent\n",
-      "Dropping 0 points out of 43 because out of extent\n",
+      "Dropping 0 points out of 41 because out of extent\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Dropping 0 points out of 37 because out of extent\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Dropping 0 points out of 40 because out of extent\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Dropping 0 points out of 43 because out of extent\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
       "Dropping 0 points out of 38 because out of extent\n"
      ]
     },
@@ -90,7 +128,7 @@
     "rdata = (\n",
     "    RasterData.from_yaml(str(toy.LAYERS_YAML),  backend=backend, base_path=str(toy.DATA_DIR))\n",
     "    .filter(\"variant != 'gappy'\")\n",
-    "    .filter_date(\"2015-01-01\", \"2019-12-31\", include_non_temporal=True, by_start_date=True)\n",
+    "    .filter_date(\"2015-01-01\", \"2019-12-31\", include_common=True, by_start_date=True)\n",
     ")\n",
     "\n",
     "overlay = SpaceTimeOverlay(\n",
@@ -117,7 +155,14 @@
    "cell_type": "code",
    "execution_count": 3,
    "id": "23463720-281a-4e0a-84ee-59eba57fd8d3",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:29.097057Z",
+     "iopub.status.busy": "2026-09-06T13:07:29.096755Z",
+     "iopub.status.idle": "2026-09-06T13:07:30.139497Z",
+     "shell.execute_reply": "2026-09-06T13:07:30.137954Z"
+    }
+   },
    "outputs": [],
    "source": [
     "from sklearn.preprocessing import LabelEncoder\n",
@@ -144,7 +189,14 @@
    "cell_type": "code",
    "execution_count": 4,
    "id": "e8e0c883",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:30.144805Z",
+     "iopub.status.busy": "2026-09-06T13:07:30.144411Z",
+     "iopub.status.idle": "2026-09-06T13:07:34.006982Z",
+     "shell.execute_reply": "2026-09-06T13:07:34.003510Z"
+    }
+   },
    "outputs": [
     {
      "name": "stdout",
@@ -170,7 +222,14 @@
    "cell_type": "code",
    "execution_count": 5,
    "id": "98c86450",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:34.013774Z",
+     "iopub.status.busy": "2026-09-06T13:07:34.013104Z",
+     "iopub.status.idle": "2026-09-06T13:07:34.883125Z",
+     "shell.execute_reply": "2026-09-06T13:07:34.879655Z"
+    }
+   },
    "outputs": [
     {
      "name": "stdout",
@@ -203,7 +262,14 @@
    "cell_type": "code",
    "execution_count": 6,
    "id": "84e5b125",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:34.890540Z",
+     "iopub.status.busy": "2026-09-06T13:07:34.889749Z",
+     "iopub.status.idle": "2026-09-06T13:07:35.015745Z",
+     "shell.execute_reply": "2026-09-06T13:07:35.013390Z"
+    }
+   },
    "outputs": [
     {
      "data": {
@@ -237,7 +303,14 @@
    "cell_type": "code",
    "execution_count": 7,
    "id": "36f43be9",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:35.022493Z",
+     "iopub.status.busy": "2026-09-06T13:07:35.022025Z",
+     "iopub.status.idle": "2026-09-06T13:07:35.629386Z",
+     "shell.execute_reply": "2026-09-06T13:07:35.625135Z"
+    }
+   },
    "outputs": [
     {
      "name": "stdout",
@@ -273,7 +346,14 @@
    "cell_type": "code",
    "execution_count": 8,
    "id": "59ae7cad",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:35.637409Z",
+     "iopub.status.busy": "2026-09-06T13:07:35.636030Z",
+     "iopub.status.idle": "2026-09-06T13:07:41.380697Z",
+     "shell.execute_reply": "2026-09-06T13:07:41.378584Z"
+    }
+   },
    "outputs": [
     {
      "name": "stdout",
@@ -306,7 +386,14 @@
    "cell_type": "code",
    "execution_count": 9,
    "id": "f9a45158",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:41.387593Z",
+     "iopub.status.busy": "2026-09-06T13:07:41.386694Z",
+     "iopub.status.idle": "2026-09-06T13:07:42.584654Z",
+     "shell.execute_reply": "2026-09-06T13:07:42.583116Z"
+    }
+   },
    "outputs": [
     {
      "name": "stdout",
@@ -337,7 +424,14 @@
    "cell_type": "code",
    "execution_count": 10,
    "id": "f6fa698c",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:42.589069Z",
+     "iopub.status.busy": "2026-09-06T13:07:42.588588Z",
+     "iopub.status.idle": "2026-09-06T13:07:42.737455Z",
+     "shell.execute_reply": "2026-09-06T13:07:42.734910Z"
+    }
+   },
    "outputs": [
     {
      "name": "stdout",
@@ -370,7 +464,7 @@
     "model call**: the years are concatenated into a single feature matrix with\n",
     "the static covariates repeated for each year.  For a probability classifier\n",
     "it appends one probability band per ``(class, year)`` *and* a dominant-class\n",
-    "band (argmax) per year, all under the ``prediction`` group.  ``drop_input``\n",
+    "band (argmax) per year, all under the ``prediction`` feature.  ``drop_input``\n",
     "removes the consumed covariates so only the predictions remain.\n"
    ]
   },
@@ -378,7 +472,14 @@
    "cell_type": "code",
    "execution_count": 11,
    "id": "c0eecae3",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:42.743668Z",
+     "iopub.status.busy": "2026-09-06T13:07:42.743354Z",
+     "iopub.status.idle": "2026-09-06T13:07:44.662207Z",
+     "shell.execute_reply": "2026-09-06T13:07:44.660199Z"
+    }
+   },
    "outputs": [
     {
      "data": {
@@ -401,12 +502,12 @@
        "  <thead>\n",
        "    <tr style=\"text-align: right;\">\n",
        "      <th></th>\n",
-       "      <th>group</th>\n",
+       "      <th>feature</th>\n",
        "      <th>input_path</th>\n",
        "      <th>input_band</th>\n",
        "      <th>start_date</th>\n",
        "      <th>end_date</th>\n",
-       "      <th>temporal</th>\n",
+       "      <th>is_common</th>\n",
        "      <th>name</th>\n",
        "      <th>band</th>\n",
        "      <th>variant</th>\n",
@@ -422,7 +523,7 @@
        "      <td>1</td>\n",
        "      <td>2015-01-01</td>\n",
        "      <td>2015-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction_Broad-leaved forest</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -436,7 +537,7 @@
        "      <td>1</td>\n",
        "      <td>2016-01-01</td>\n",
        "      <td>2016-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction_Broad-leaved forest</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -450,7 +551,7 @@
        "      <td>1</td>\n",
        "      <td>2017-01-01</td>\n",
        "      <td>2017-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction_Broad-leaved forest</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -464,7 +565,7 @@
        "      <td>1</td>\n",
        "      <td>2018-01-01</td>\n",
        "      <td>2018-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction_Broad-leaved forest</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -478,7 +579,7 @@
        "      <td>1</td>\n",
        "      <td>2019-01-01</td>\n",
        "      <td>2019-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction_Broad-leaved forest</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -506,7 +607,7 @@
        "      <td>1</td>\n",
        "      <td>2015-01-01</td>\n",
        "      <td>2015-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -520,7 +621,7 @@
        "      <td>1</td>\n",
        "      <td>2016-01-01</td>\n",
        "      <td>2016-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -534,7 +635,7 @@
        "      <td>1</td>\n",
        "      <td>2017-01-01</td>\n",
        "      <td>2017-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -548,7 +649,7 @@
        "      <td>1</td>\n",
        "      <td>2018-01-01</td>\n",
        "      <td>2018-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -562,7 +663,7 @@
        "      <td>1</td>\n",
        "      <td>2019-01-01</td>\n",
        "      <td>2019-12-31</td>\n",
-       "      <td>True</td>\n",
+       "      <td>False</td>\n",
        "      <td>prediction</td>\n",
        "      <td>NaN</td>\n",
        "      <td>NaN</td>\n",
@@ -575,7 +676,7 @@
        "</div>"
       ],
       "text/plain": [
-       "         group                                         input_path  input_band  \\\n",
+       "       feature                                         input_path  input_band  \\\n",
        "0   prediction  /root/scikit-map/skmap/data/toy/ndvi/filled/nd...           1   \n",
        "1   prediction  /root/scikit-map/skmap/data/toy/ndvi/filled/nd...           1   \n",
        "2   prediction  /root/scikit-map/skmap/data/toy/ndvi/filled/nd...           1   \n",
@@ -588,18 +689,18 @@
        "73  prediction  /root/scikit-map/skmap/data/toy/ndvi/filled/nd...           1   \n",
        "74  prediction  /root/scikit-map/skmap/data/toy/ndvi/filled/nd...           1   \n",
        "\n",
-       "   start_date   end_date  temporal                            name band  \\\n",
-       "0  2015-01-01 2015-12-31      True  prediction_Broad-leaved forest  NaN   \n",
-       "1  2016-01-01 2016-12-31      True  prediction_Broad-leaved forest  NaN   \n",
-       "2  2017-01-01 2017-12-31      True  prediction_Broad-leaved forest  NaN   \n",
-       "3  2018-01-01 2018-12-31      True  prediction_Broad-leaved forest  NaN   \n",
-       "4  2019-01-01 2019-12-31      True  prediction_Broad-leaved forest  NaN   \n",
-       "..        ...        ...       ...                             ...  ...   \n",
-       "70 2015-01-01 2015-12-31      True                      prediction  NaN   \n",
-       "71 2016-01-01 2016-12-31      True                      prediction  NaN   \n",
-       "72 2017-01-01 2017-12-31      True                      prediction  NaN   \n",
-       "73 2018-01-01 2018-12-31      True                      prediction  NaN   \n",
-       "74 2019-01-01 2019-12-31      True                      prediction  NaN   \n",
+       "   start_date   end_date  is_common                            name band  \\\n",
+       "0  2015-01-01 2015-12-31      False  prediction_Broad-leaved forest  NaN   \n",
+       "1  2016-01-01 2016-12-31      False  prediction_Broad-leaved forest  NaN   \n",
+       "2  2017-01-01 2017-12-31      False  prediction_Broad-leaved forest  NaN   \n",
+       "3  2018-01-01 2018-12-31      False  prediction_Broad-leaved forest  NaN   \n",
+       "4  2019-01-01 2019-12-31      False  prediction_Broad-leaved forest  NaN   \n",
+       "..        ...        ...        ...                             ...  ...   \n",
+       "70 2015-01-01 2015-12-31      False                      prediction  NaN   \n",
+       "71 2016-01-01 2016-12-31      False                      prediction  NaN   \n",
+       "72 2017-01-01 2017-12-31      False                      prediction  NaN   \n",
+       "73 2018-01-01 2018-12-31      False                      prediction  NaN   \n",
+       "74 2019-01-01 2019-12-31      False                      prediction  NaN   \n",
        "\n",
        "   variant season    year  \n",
        "0      NaN    NaN  2015.0  \n",
@@ -629,7 +730,7 @@
     "rdata = (\n",
     "    RasterData.from_yaml(str(toy.LAYERS_YAML), base_path=str(toy.DATA_DIR), backend=backend)\n",
     "    .filter(\"variant != 'gappy'\")\n",
-    "    .filter_date(\"2015-01-01\", \"2019-12-31\", include_non_temporal=True, by_start_date=True)\n",
+    "    .filter_date(\"2015-01-01\", \"2019-12-31\", include_common=True, by_start_date=True)\n",
     "    .read()\n",
     ")\n",
     "\n",
@@ -652,12 +753,19 @@
    "cell_type": "code",
    "execution_count": 12,
    "id": "2983c490-d2d0-4489-87eb-f94e7dd7780e",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:44.666903Z",
+     "iopub.status.busy": "2026-09-06T13:07:44.666550Z",
+     "iopub.status.idle": "2026-09-06T13:07:44.673632Z",
+     "shell.execute_reply": "2026-09-06T13:07:44.671719Z"
+    }
+   },
    "outputs": [
     {
      "data": {
       "text/plain": [
-       "group\n",
+       "feature\n",
        "prediction    75\n",
        "Name: count, dtype: int64"
       ]
@@ -668,14 +776,21 @@
     }
    ],
    "source": [
-    "rdata.info['group'].value_counts()"
+    "rdata.info['feature'].value_counts()"
    ]
   },
   {
    "cell_type": "code",
    "execution_count": 13,
    "id": "16075b2a-3499-4082-b94b-db57319e3566",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:44.677860Z",
+     "iopub.status.busy": "2026-09-06T13:07:44.677613Z",
+     "iopub.status.idle": "2026-09-06T13:07:44.793218Z",
+     "shell.execute_reply": "2026-09-06T13:07:44.791895Z"
+    }
+   },
    "outputs": [
     {
      "name": "stdout",
@@ -738,9 +853,16 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 23,
+   "execution_count": 14,
    "id": "4bab501d-af19-4a84-9160-60164d08a971",
-   "metadata": {},
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-09-06T13:07:44.798254Z",
+     "iopub.status.busy": "2026-09-06T13:07:44.797928Z",
+     "iopub.status.idle": "2026-09-06T13:07:45.650223Z",
+     "shell.execute_reply": "2026-09-06T13:07:45.648755Z"
+    }
+   },
    "outputs": [
     {
      "data": {
@@ -749,14 +871,14 @@
        "<Figure size 1290x640 with 9 Axes>"
       ]
      },
-     "execution_count": 23,
+     "execution_count": 14,
      "metadata": {},
      "output_type": "execute_result"
     }
    ],
    "source": [
     "cls = 'Pastures'\n",
-    "rdata.filter(f\"name == 'prediction'\").plot(cmap=colors, img_title_text='Land cover {group} ({year})')"
+    "rdata.filter(f\"name == 'prediction'\").plot(cmap=colors, img_title_text='Land cover {feature} ({year})')"
    ]
   }
  ],

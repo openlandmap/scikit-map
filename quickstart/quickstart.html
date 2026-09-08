@@ -51,7 +51,7 @@
     <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Tutorials" href="../tutorials.html" />
+    <link rel="next" title="Data structure" href="../data-structure.html" />
     <link rel="prev" title="Installation" href="../index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -158,6 +158,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../tutorials.html">
     Tutorials
   </a>
@@ -170,13 +177,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../_autosummary/skmap.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -185,6 +185,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../cpp_api.html">
     C++ API
@@ -306,6 +313,13 @@
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="#">
     Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
   </a>
 </li>
 
@@ -470,11 +484,12 @@ describes a set of raster layers.  Temporal layers carry <code class="docutils l
 static layers have <code class="docutils literal notranslate"><span class="pre">None</span></code> dates.</p>
 <div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">RasterData</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span> <span class="o">=</span> <span class="n">RasterData</span><span class="p">({</span>
-<span class="gp">... </span>    <span class="s2">"2020"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"ndvi_2020.tif"</span><span class="p">,</span> <span class="s2">"swir1_2020.tif"</span><span class="p">],</span>
-<span class="gp">... </span>    <span class="s2">"common"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"elev.tif"</span><span class="p">,</span> <span class="s2">"slope.tif"</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="s2">"ndvi"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"ndvi_2020.tif"</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="s2">"elev"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"elev.tif"</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="s2">"slope"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"slope.tif"</span><span class="p">],</span>
 <span class="gp">... </span><span class="p">})</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span><span class="o">.</span><span class="n">get_groups</span><span class="p">()</span>
-<span class="go">['2020']</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span><span class="o">.</span><span class="n">get_features</span><span class="p">()</span>
+<span class="go">['elev', 'ndvi', 'slope']</span>
 </pre></div>
 </div>
 <p>The object is <strong>lazy</strong>: it holds only the file paths until you call
@@ -510,17 +525,17 @@ schema):</p>
 <span class="n">rdata</span><span class="o">.</span><span class="n">info</span>  <span class="c1"># one row per expanded layer, plus band/year/month columns</span>
 </pre></div>
 </div>
-<p>Temporal layers are grouped by year (<code class="docutils literal notranslate"><span class="pre">group</span></code> = <code class="docutils literal notranslate"><span class="pre">&quot;2015&quot;</span></code>, …) and static
-layers under <code class="docutils literal notranslate"><span class="pre">&quot;common&quot;</span></code>; every <code class="docutils literal notranslate"><span class="pre">{variable}</span></code> referenced in the path becomes
-an extra <code class="docutils literal notranslate"><span class="pre">info</span></code> column, so runners can group by multiple columns (e.g.
-<code class="docutils literal notranslate"><span class="pre">group</span></code> and <code class="docutils literal notranslate"><span class="pre">band</span></code>).  A <code class="docutils literal notranslate"><span class="pre">group</span></code> template overrides the default (use
-<code class="docutils literal notranslate"><span class="pre">group:</span> <span class="pre">'{band}'</span></code> for band-grouped time-series).</p>
+<p>Temporal layers carry a <code class="docutils literal notranslate"><span class="pre">feature</span></code> (the band/variable, e.g. <code class="docutils literal notranslate"><span class="pre">&quot;blue&quot;</span></code>) and
+a time interval; static layers are <code class="docutils literal notranslate"><span class="pre">is_common</span></code>.  Every <code class="docutils literal notranslate"><span class="pre">{variable}</span></code>
+referenced in the path becomes an extra <code class="docutils literal notranslate"><span class="pre">info</span></code> column, so runners can
+partition by multiple columns.  A <code class="docutils literal notranslate"><span class="pre">feature</span></code> template overrides the default
+(use <code class="docutils literal notranslate"><span class="pre">feature:</span> <span class="pre">'{band}'</span></code> for band-grouped time-series).</p>
 <p>A runnable example ships with the toy data:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">toy</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">RasterData</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span> <span class="o">=</span> <span class="n">RasterData</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">LAYERS_YAML</span><span class="p">),</span> <span class="n">base_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">DATA_DIR</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span><span class="o">.</span><span class="n">get_groups</span><span class="p">()</span>
-<span class="go">['ndvi', 'swir1']</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rdata</span><span class="o">.</span><span class="n">get_features</span><span class="p">()</span>
+<span class="go">['elev', 'ndvi', 'slope', 'swir1']</span>
 </pre></div>
 </div>
 <p>It also demonstrates the <code class="docutils literal notranslate"><span class="pre">interval</span></code> temporal style, a <code class="docutils literal notranslate"><span class="pre">name</span></code> template
@@ -544,7 +559,7 @@ columns.  The <code class="docutils literal notranslate"><span class="pre">datet
 <span class="n">rdata</span><span class="o">.</span><span class="n">info</span>  <span class="c1"># one row per (item, data asset); remote COG hrefs, no .read()</span>
 </pre></div>
 </div>
-<p>Layers are grouped by collection (<code class="docutils literal notranslate"><span class="pre">group</span></code> = collection id) and named
+<p>Layers are keyed by asset (<code class="docutils literal notranslate"><span class="pre">feature</span></code> = asset key) and named
 <code class="docutils literal notranslate"><span class="pre">{asset}_{monthday}</span></code> (year-agnostic, unique within a year).  The result is
 lazy: use <code class="xref py py-meth docutils literal notranslate"><span class="pre">read()</span></code> with an <code class="docutils literal notranslate"><span class="pre">extent</span></code> for a small
 tile, or <a class="reference internal" href="../_autosummary/skmap.overlay.SpaceTimeOverlay.html#skmap.overlay.SpaceTimeOverlay" title="skmap.overlay.SpaceTimeOverlay"><code class="xref py py-class docutils literal notranslate"><span class="pre">SpaceTimeOverlay</span></code></a> to sample points, rather
@@ -579,7 +594,7 @@ range per unique year in the points’ date column is derived automatically.</p>
 <span class="n">model</span> <span class="o">=</span> <span class="n">joblib</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"model.joblib"</span><span class="p">)</span>
 <span class="n">rdata</span> <span class="o">=</span> <span class="n">rdata</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>  <span class="c1"># materialize rasters for spatial prediction</span>
 <span class="n">rdata</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">Prediction</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">))</span>
-<span class="n">pred</span> <span class="o">=</span> <span class="n">rdata</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s1">'group == "prediction"'</span><span class="p">)</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+<span class="n">pred</span> <span class="o">=</span> <span class="n">rdata</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s1">'feature == "prediction"'</span><span class="p">)</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
 </pre></div>
 </div>
 </section>

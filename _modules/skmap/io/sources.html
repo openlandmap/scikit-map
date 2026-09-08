@@ -155,6 +155,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../data-structure.html">
+    Data Structure
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../tutorials.html">
     Tutorials
   </a>
@@ -167,13 +174,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../../_autosummary/skmap.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -182,6 +182,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../../cpp_api.html">
     C++ API
@@ -301,6 +308,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../quickstart/quickstart.html">
     Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../data-structure.html">
+    Data Structure
   </a>
 </li>
 
@@ -471,8 +485,8 @@
 <span class="sd">The resulting :class:`~skmap.io.RasterData` is **lazy** (paths + dates only,</span>
 <span class="sd">no ``.read()``).  Its ``info`` DataFrame carries the standard columns plus one</span>
 <span class="sd">column per data variable (``band``, ``variant``, ``season``, ``perc``,</span>
-<span class="sd">``year``, ``start_month``, ``end_month``, ...), so runners can group by</span>
-<span class="sd">multiple columns (e.g. ``group`` and ``band``).</span>
+<span class="sd">``year``, ``start_month``, ``end_month``, ...), so runners can partition</span>
+<span class="sd">by multiple columns (e.g. ``feature`` and ``band``).</span>
 <span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
@@ -496,12 +510,12 @@
 <span class="w">    </span><span class="sd">"""One expanded raster layer (a single row of a RasterData ``info``)."""</span>
 
     <span class="n">path</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">group</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">feature</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">band_idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
     <span class="n">start_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">end_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="n">temporal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">is_common</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="nb">vars</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -545,12 +559,12 @@
         <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">:</span>
             <span class="n">row</span> <span class="o">=</span> <span class="p">{</span>
-                <span class="n">RasterData</span><span class="o">.</span><span class="n">GROUP_COL</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">group</span><span class="p">,</span>
+                <span class="n">RasterData</span><span class="o">.</span><span class="n">FEATURE_COL</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">feature</span><span class="p">,</span>
                 <span class="n">RasterData</span><span class="o">.</span><span class="n">PATH_COL</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">path</span><span class="p">,</span>
                 <span class="n">RasterData</span><span class="o">.</span><span class="n">BAND_COL</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">band_idx</span><span class="p">,</span>
                 <span class="n">RasterData</span><span class="o">.</span><span class="n">START_DT_COL</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">start_date</span><span class="p">,</span>
                 <span class="n">RasterData</span><span class="o">.</span><span class="n">END_DT_COL</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">end_date</span><span class="p">,</span>
-                <span class="n">RasterData</span><span class="o">.</span><span class="n">TEMPORAL_COL</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">temporal</span><span class="p">,</span>
+                <span class="n">RasterData</span><span class="o">.</span><span class="n">IS_COMMON_COL</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">is_common</span><span class="p">,</span>
                 <span class="n">RasterData</span><span class="o">.</span><span class="n">NAME_COL</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
             <span class="p">}</span>
             <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">var_cols</span><span class="p">:</span>
@@ -583,7 +597,7 @@
     <span class="n">COLUMN_EXCLUDES</span> <span class="o">=</span> <span class="n">META_FIELDS</span> <span class="o">|</span> <span class="n">YEAR_FIELDS</span> <span class="o">|</span> <span class="p">{</span>
         <span class="s2">"name"</span><span class="p">,</span>
         <span class="s2">"base_path"</span><span class="p">,</span>
-        <span class="s2">"group"</span><span class="p">,</span>
+        <span class="s2">"feature"</span><span class="p">,</span>
         <span class="s2">"start_date"</span><span class="p">,</span>
         <span class="s2">"end_date"</span><span class="p">,</span>
         <span class="s2">"date_unit"</span><span class="p">,</span>
@@ -603,7 +617,7 @@
 <span class="w">        </span><span class="sd">"""Expand one catalogue entry into :class:`LayerSpec` objects."""</span>
         <span class="n">path_tmpl</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"path"</span><span class="p">]</span>
         <span class="n">name_tmpl</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
-        <span class="n">group_tmpl</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"group"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="n">feature_tmpl</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"feature"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
         <span class="n">temporal_resolution</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"temporal_resolution"</span><span class="p">,</span> <span class="s2">"longterm_or_static"</span><span class="p">)</span>
         <span class="n">type_</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">,</span> <span class="s2">"temporal"</span><span class="p">)</span>
 
@@ -620,7 +634,7 @@
 
         <span class="k">if</span> <span class="n">temporal_resolution</span> <span class="o">==</span> <span class="s2">"interval"</span><span class="p">:</span>
             <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_expand_interval</span><span class="p">(</span>
-                <span class="n">entry</span><span class="p">,</span> <span class="n">base_path</span><span class="p">,</span> <span class="n">path_tmpl</span><span class="p">,</span> <span class="n">name_tmpl</span><span class="p">,</span> <span class="n">group_tmpl</span><span class="p">,</span> <span class="n">type_</span><span class="p">,</span> <span class="n">scalars</span><span class="p">,</span> <span class="n">list_axes</span>
+                <span class="n">entry</span><span class="p">,</span> <span class="n">base_path</span><span class="p">,</span> <span class="n">path_tmpl</span><span class="p">,</span> <span class="n">name_tmpl</span><span class="p">,</span> <span class="n">feature_tmpl</span><span class="p">,</span> <span class="n">type_</span><span class="p">,</span> <span class="n">scalars</span><span class="p">,</span> <span class="n">list_axes</span>
             <span class="p">)</span>
             <span class="k">return</span>
 
@@ -683,11 +697,11 @@
 
             <span class="k">yield</span> <span class="n">LayerSpec</span><span class="p">(</span>
                 <span class="n">path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span>
-                <span class="n">group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_group</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="n">vars_</span><span class="p">,</span> <span class="n">group_tmpl</span><span class="p">),</span>
+                <span class="n">feature</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_feature</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="n">vars_</span><span class="p">,</span> <span class="n">feature_tmpl</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">),</span>
                 <span class="n">start_date</span><span class="o">=</span><span class="n">start_date</span><span class="p">,</span>
                 <span class="n">end_date</span><span class="o">=</span><span class="n">end_date</span><span class="p">,</span>
                 <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
-                <span class="n">temporal</span><span class="o">=</span><span class="n">start_date</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">is_common</span><span class="o">=</span><span class="n">start_date</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="nb">vars</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_spec_vars</span><span class="p">(</span><span class="n">vars_</span><span class="p">),</span>
             <span class="p">)</span></div>
 
@@ -699,7 +713,7 @@
         <span class="n">base_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">path_tmpl</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">name_tmpl</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">group_tmpl</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">feature_tmpl</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">type_</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">scalars</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
         <span class="n">list_axes</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
@@ -755,11 +769,11 @@
 
                 <span class="k">yield</span> <span class="n">LayerSpec</span><span class="p">(</span>
                     <span class="n">path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span>
-                    <span class="n">group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_group</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="n">vars_</span><span class="p">,</span> <span class="n">group_tmpl</span><span class="p">),</span>
+                    <span class="n">feature</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_feature</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="n">vars_</span><span class="p">,</span> <span class="n">feature_tmpl</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">),</span>
                     <span class="n">start_date</span><span class="o">=</span><span class="n">dt1</span><span class="p">,</span>
                     <span class="n">end_date</span><span class="o">=</span><span class="n">dt2</span><span class="p">,</span>
                     <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
-                    <span class="n">temporal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">is_common</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                     <span class="nb">vars</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_spec_vars</span><span class="p">(</span><span class="n">vars_</span><span class="p">),</span>
                 <span class="p">)</span>
 
@@ -782,11 +796,23 @@
         <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unresolved variable </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2"> in template: </span><span class="si">{</span><span class="n">tmpl</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_group</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">vars_</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">group_tmpl</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">group_tmpl</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="p">(</span><span class="n">group_tmpl</span><span class="p">,</span> <span class="n">vars_</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_feature</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">type_</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">vars_</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">feature_tmpl</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">feature_tmpl</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="p">(</span><span class="n">feature_tmpl</span><span class="p">,</span> <span class="n">vars_</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"band"</span><span class="p">,</span> <span class="s2">"asset"</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">vars_</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">vars_</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">name</span>
         <span class="k">if</span> <span class="n">type_</span> <span class="o">==</span> <span class="s2">"common"</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">"common"</span>
+            <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"?"</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">stem</span>
         <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">vars_</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"year"</span><span class="p">,</span> <span class="s2">"default"</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_compute_dates</span><span class="p">(</span>
@@ -984,13 +1010,13 @@
                 <span class="k">continue</span>
             <span class="k">yield</span> <span class="n">LayerSpec</span><span class="p">(</span>
                 <span class="n">path</span><span class="o">=</span><span class="n">asset</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"href"</span><span class="p">),</span>
-                <span class="n">group</span><span class="o">=</span><span class="n">cid</span><span class="p">,</span>
+                <span class="n">feature</span><span class="o">=</span><span class="n">key</span><span class="p">,</span>
                 <span class="n">start_date</span><span class="o">=</span><span class="n">start</span><span class="p">,</span>
                 <span class="n">end_date</span><span class="o">=</span><span class="n">end</span><span class="p">,</span>
                 <span class="c1"># year-agnostic but unique within a year (overlay requirement),</span>
                 <span class="c1"># like the YAML ``{band}_{season}`` names</span>
                 <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">start</span><span class="si">:</span><span class="s2">%m%d</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
-                <span class="n">temporal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">is_common</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="nb">vars</span><span class="o">=</span><span class="p">{</span>
                     <span class="s2">"collection"</span><span class="p">:</span> <span class="n">cid</span><span class="p">,</span>
                     <span class="s2">"asset"</span><span class="p">:</span> <span class="n">key</span><span class="p">,</span>

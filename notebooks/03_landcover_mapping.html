@@ -160,6 +160,13 @@
 </li>
 
 
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
+  </a>
+</li>
+
+
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../tutorials.html">
     Tutorials
@@ -173,13 +180,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../_autosummary/skmap.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -188,6 +188,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../cpp_api.html">
     C++ API
@@ -309,6 +316,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../quickstart/quickstart.html">
     Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
   </a>
 </li>
 
@@ -669,9 +683,9 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
 <span class="n">rdata</span> <span class="o">=</span> <span class="p">(</span>
     <span class="n">RasterData</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">LAYERS_YAML</span><span class="p">),</span> <span class="n">base_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">DATA_DIR</span><span class="p">),</span> <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">)</span>
     <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"variant != 'gappy'"</span><span class="p">)</span>
-    <span class="o">.</span><span class="n">filter_date</span><span class="p">(</span><span class="s2">"2015-01-01"</span><span class="p">,</span> <span class="s2">"2019-12-31"</span><span class="p">,</span> <span class="n">include_non_temporal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">by_start_date</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">filter_date</span><span class="p">(</span><span class="s2">"2015-01-01"</span><span class="p">,</span> <span class="s2">"2019-12-31"</span><span class="p">,</span> <span class="n">include_common</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">by_start_date</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="p">)</span>
-<span class="n">rdata</span><span class="o">.</span><span class="n">get_groups</span><span class="p">()</span>
+<span class="n">rdata</span><span class="o">.</span><span class="n">get_features</span><span class="p">()</span>
 <br/></pre></div>
 </div>
 </div>
@@ -681,7 +695,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-[&#39;ndvi&#39;, &#39;swir1&#39;]
+[&#39;elev&#39;, &#39;ndvi&#39;, &#39;slope&#39;, &#39;swir1&#39;]
 </pre></div></div>
 </div>
 </section>
@@ -689,7 +703,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
 <h1><span class="section-number">7. </span>Space-time overlay<a class="headerlink" href="#id1" title="Link to this heading">#</a></h1>
 <p>:class:<code class="docutils literal notranslate"><span class="pre">~skmap.overlay.SpaceTimeOverlay</span></code> groups the points by year (using the <code class="docutils literal notranslate"><span class="pre">date</span></code> column) and, for each year, samples the matching raster layers at the point locations. The result is a table with the original columns plus one column per raster feature.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">info</span>
@@ -697,7 +711,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -719,12 +733,12 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>group</th>
+      <th>feature</th>
       <th>input_path</th>
       <th>input_band</th>
       <th>start_date</th>
       <th>end_date</th>
-      <th>temporal</th>
+      <th>is_common</th>
       <th>name</th>
       <th>band</th>
       <th>variant</th>
@@ -740,7 +754,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2015-03-21</td>
       <td>2015-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -754,7 +768,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2015-06-25</td>
       <td>2015-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -768,7 +782,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2015-09-13</td>
       <td>2015-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -782,7 +796,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2015-12-02</td>
       <td>2016-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -796,7 +810,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2016-03-21</td>
       <td>2016-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -810,7 +824,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2016-06-25</td>
       <td>2016-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -824,7 +838,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2016-09-13</td>
       <td>2016-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -838,7 +852,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2016-12-02</td>
       <td>2017-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -852,7 +866,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2017-03-21</td>
       <td>2017-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -866,7 +880,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2017-06-25</td>
       <td>2017-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -880,7 +894,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2017-09-13</td>
       <td>2017-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -894,7 +908,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2017-12-02</td>
       <td>2018-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -908,7 +922,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2018-03-21</td>
       <td>2018-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -922,7 +936,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2018-06-25</td>
       <td>2018-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -936,7 +950,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2018-09-13</td>
       <td>2018-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -950,7 +964,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2018-12-02</td>
       <td>2019-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -964,7 +978,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2019-03-21</td>
       <td>2019-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -978,7 +992,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2019-06-25</td>
       <td>2019-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -992,7 +1006,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2019-09-13</td>
       <td>2019-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -1006,7 +1020,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2019-12-02</td>
       <td>2020-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>filled</td>
@@ -1020,7 +1034,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2015-03-21</td>
       <td>2015-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_spring</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1034,7 +1048,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2015-06-25</td>
       <td>2015-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_summer</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1048,7 +1062,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2015-09-13</td>
       <td>2015-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_fall</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1062,7 +1076,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2015-12-02</td>
       <td>2016-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_winter</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1076,7 +1090,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2016-03-21</td>
       <td>2016-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_spring</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1090,7 +1104,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2016-06-25</td>
       <td>2016-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_summer</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1104,7 +1118,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2016-09-13</td>
       <td>2016-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_fall</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1118,7 +1132,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2016-12-02</td>
       <td>2017-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_winter</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1132,7 +1146,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2017-03-21</td>
       <td>2017-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_spring</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1146,7 +1160,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2017-06-25</td>
       <td>2017-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_summer</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1160,7 +1174,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2017-09-13</td>
       <td>2017-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_fall</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1174,7 +1188,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2017-12-02</td>
       <td>2018-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_winter</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1188,7 +1202,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2018-03-21</td>
       <td>2018-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_spring</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1202,7 +1216,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2018-06-25</td>
       <td>2018-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_summer</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1216,7 +1230,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2018-09-13</td>
       <td>2018-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_fall</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1230,7 +1244,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2018-12-02</td>
       <td>2019-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_winter</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1244,7 +1258,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2019-03-21</td>
       <td>2019-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_spring</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1258,7 +1272,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2019-06-25</td>
       <td>2019-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_summer</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1272,7 +1286,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2019-09-13</td>
       <td>2019-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_fall</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1286,7 +1300,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
       <td>1</td>
       <td>2019-12-02</td>
       <td>2020-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>swir1_winter</td>
       <td>swir1</td>
       <td>NaN</td>
@@ -1295,12 +1309,12 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
     </tr>
     <tr>
       <th>40</th>
-      <td>common</td>
+      <td>elev</td>
       <td>/root/scikit-map/skmap/data/toy/static/elev.lo...</td>
       <td>1</td>
       <td>NaT</td>
       <td>NaT</td>
-      <td>False</td>
+      <td>True</td>
       <td>elev</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -1309,12 +1323,12 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
     </tr>
     <tr>
       <th>41</th>
-      <td>common</td>
+      <td>slope</td>
       <td>/root/scikit-map/skmap/data/toy/static/slope.p...</td>
       <td>1</td>
       <td>NaT</td>
       <td>NaT</td>
-      <td>False</td>
+      <td>True</td>
       <td>slope</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -1326,7 +1340,7 @@ PosixPath(&#39;/root/scikit-map/skmap/data/toy/layers.yaml&#39;)
 </div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">overlay</span> <span class="o">=</span> <span class="n">SpaceTimeOverlay</span><span class="p">(</span>
@@ -1356,7 +1370,7 @@ Dropping 0 points out of 38 because out of extent
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -1501,7 +1515,7 @@ Dropping 0 points out of 38 because out of extent
 <h1><span class="section-number">8. </span>Training<a class="headerlink" href="#Training" title="Link to this heading">#</a></h1>
 <p>The overlaid table is a plain pandas DataFrame, so we can feed it directly to scikit-learn. We use a random forest and evaluate it with 5-fold cross-validation.</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.preprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">LabelEncoder</span>
@@ -1514,7 +1528,7 @@ Dropping 0 points out of 38 because out of extent
 </div>
 </div>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.ensemble</span><span class="w"> </span><span class="kn">import</span> <span class="n">RandomForestClassifier</span>
@@ -1535,7 +1549,7 @@ Dropping 0 points out of 38 because out of extent
 </div>
 <p>Let’s inspect the per-class metrics.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">y_pred</span> <span class="o">=</span> <span class="n">cross_val_predict</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
@@ -1575,7 +1589,7 @@ Land principally occupied by agriculture, with significant areas of natural vege
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
@@ -1594,7 +1608,7 @@ Land principally occupied by agriculture, with significant areas of natural vege
 </div>
 <p>Now, we train the final model:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
@@ -1602,7 +1616,7 @@ Land principally occupied by agriculture, with significant areas of natural vege
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -3029,7 +3043,7 @@ forceTheme('sk-container-id-1');</script></body></div>
 <h1><span class="section-number">9. </span>Predictions (mapping)<a class="headerlink" href="#Predictions-(mapping)" title="Link to this heading">#</a></h1>
 <p>To produce maps for <strong>all years at once</strong>, we read the full 2015-2019 raster grid and run :class:<code class="docutils literal notranslate"><span class="pre">~skmap.io.process.Prediction</span></code>. It concatenates every year into a single feature matrix (with the static <code class="docutils literal notranslate"><span class="pre">elev</span></code>/<code class="docutils literal notranslate"><span class="pre">slope</span></code> covariates repeated for each year) and runs the model <strong>once</strong>, appending <code class="docutils literal notranslate"><span class="pre">(n_out</span> <span class="pre">·</span> <span class="pre">n_years,</span> <span class="pre">H*W)</span></code> prediction bands to the raster. With a label classifier <code class="docutils literal notranslate"><span class="pre">n_out</span> <span class="pre">==</span> <span class="pre">1</span></code>, so band <code class="docutils literal notranslate"><span class="pre">k</span></code> is the map for year <code class="docutils literal notranslate"><span class="pre">2015</span> <span class="pre">+</span> <span class="pre">k</span></code>.</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Read the full multi-year grid (filled NDVI + SWIR1 + statics, 2015-2019)</span>
@@ -3038,7 +3052,7 @@ forceTheme('sk-container-id-1');</script></body></div>
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
@@ -3046,7 +3060,7 @@ forceTheme('sk-container-id-1');</script></body></div>
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
@@ -3062,7 +3076,7 @@ array([[71., 73., 56., ..., 92., 90., 78.],
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io.process</span><span class="w"> </span><span class="kn">import</span> <span class="n">Prediction</span>
@@ -3074,7 +3088,7 @@ array([[71., 73., 56., ..., 92., 90., 78.],
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -3096,12 +3110,12 @@ array([[71., 73., 56., ..., 92., 90., 78.],
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>group</th>
+      <th>feature</th>
       <th>input_path</th>
       <th>input_band</th>
       <th>start_date</th>
       <th>end_date</th>
-      <th>temporal</th>
+      <th>is_common</th>
       <th>name</th>
       <th>band</th>
       <th>variant</th>
@@ -3117,7 +3131,7 @@ array([[71., 73., 56., ..., 92., 90., 78.],
       <td>1</td>
       <td>2015-01-01</td>
       <td>2015-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -3131,7 +3145,7 @@ array([[71., 73., 56., ..., 92., 90., 78.],
       <td>1</td>
       <td>2016-01-01</td>
       <td>2016-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -3145,7 +3159,7 @@ array([[71., 73., 56., ..., 92., 90., 78.],
       <td>1</td>
       <td>2017-01-01</td>
       <td>2017-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -3159,7 +3173,7 @@ array([[71., 73., 56., ..., 92., 90., 78.],
       <td>1</td>
       <td>2018-01-01</td>
       <td>2018-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -3173,7 +3187,7 @@ array([[71., 73., 56., ..., 92., 90., 78.],
       <td>1</td>
       <td>2019-01-01</td>
       <td>2019-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -3189,7 +3203,7 @@ array([[71., 73., 56., ..., 92., 90., 78.],
 <h1><span class="section-number">10. </span>Visualizing the maps<a class="headerlink" href="#Visualizing-the-maps" title="Link to this heading">#</a></h1>
 <p>Finally we plot the predicted land-cover map for each year with :func:<code class="docutils literal notranslate"><span class="pre">~skmap.plotter.plot_rasters</span></code>.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.colors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ListedColormap</span>
@@ -3244,15 +3258,15 @@ Mapped land cover classes
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">cmap</span><span class="o">=</span><span class="n">colors</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s1">'Land cover </span><span class="si">{group}</span><span class="s1"> (</span><span class="si">{year}</span><span class="s1">)'</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">cmap</span><span class="o">=</span><span class="n">colors</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s1">'Land cover </span><span class="si">{feature}</span><span class="s1"> (</span><span class="si">{year}</span><span class="s1">)'</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
 </pre></div>
 </div>
 <div class="output_area docutils container">

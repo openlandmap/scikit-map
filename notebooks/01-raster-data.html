@@ -160,6 +160,13 @@
 </li>
 
 
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
+  </a>
+</li>
+
+
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../tutorials.html">
     Tutorials
@@ -173,13 +180,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../_autosummary/skmap.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -188,6 +188,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../cpp_api.html">
     C++ API
@@ -309,6 +316,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../quickstart/quickstart.html">
     Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
   </a>
 </li>
 
@@ -492,23 +506,6 @@
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span> <span class="n">RasterData</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">LAYERS_YAML</span><span class="p">),</span> <span class="n">base_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">DATA_DIR</span><span class="p">),</span> <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
-</pre></div>
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-&lt;skmap.io.base.RasterData at 0x7fab29ce87d0&gt;
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
@@ -536,8 +533,8 @@
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-2026-09-01 10:32:15,554 WARNING services.py:2248 -- WARNING: The object store is using /tmp/ray instead of /dev/shm because /dev/shm has only 67108864 bytes available. This will harm performance! You may be able to free up space by deleting files in /dev/shm. If you are inside a Docker container, you can increase /dev/shm size by passing &#39;--shm-size=10.24gb&#39; to &#39;docker run&#39; (or add it to the run_options list in a Ray cluster config). Make sure to set this to more than 30% of available RAM.
-2026-09-01 10:32:19,779 INFO worker.py:2024 -- Started a local Ray instance.
+2026-09-06 13:11:29,960 WARNING services.py:2248 -- WARNING: The object store is using /tmp/ray instead of /dev/shm because /dev/shm has only 67108864 bytes available. This will harm performance! You may be able to free up space by deleting files in /dev/shm. If you are inside a Docker container, you can increase /dev/shm size by passing &#39;--shm-size=10.24gb&#39; to &#39;docker run&#39; (or add it to the run_options list in a Ray cluster config). Make sure to set this to more than 30% of available RAM.
+2026-09-06 13:11:33,163 INFO worker.py:2024 -- Started a local Ray instance.
 </pre></div></div>
 </div>
 <p>A <code class="docutils literal notranslate"><span class="pre">RasterData</span></code> instance is basically a Pandas <a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html">DataFrame</a> accessible through the <code class="docutils literal notranslate"><span class="pre">info</span></code> attribute</p>
@@ -572,12 +569,12 @@
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>group</th>
+      <th>feature</th>
       <th>input_path</th>
       <th>input_band</th>
       <th>start_date</th>
       <th>end_date</th>
-      <th>temporal</th>
+      <th>is_common</th>
       <th>name</th>
       <th>band</th>
       <th>variant</th>
@@ -593,7 +590,7 @@
       <td>1</td>
       <td>2014-12-02</td>
       <td>2015-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -607,7 +604,7 @@
       <td>1</td>
       <td>2015-03-21</td>
       <td>2015-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -621,7 +618,7 @@
       <td>1</td>
       <td>2015-06-25</td>
       <td>2015-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -635,7 +632,7 @@
       <td>1</td>
       <td>2015-09-13</td>
       <td>2015-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -649,7 +646,7 @@
       <td>1</td>
       <td>2015-12-02</td>
       <td>2016-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -663,7 +660,7 @@
       <td>1</td>
       <td>2016-03-21</td>
       <td>2016-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -677,7 +674,7 @@
       <td>1</td>
       <td>2016-06-25</td>
       <td>2016-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -691,7 +688,7 @@
       <td>1</td>
       <td>2016-09-13</td>
       <td>2016-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -705,7 +702,7 @@
       <td>1</td>
       <td>2016-12-02</td>
       <td>2017-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -719,7 +716,7 @@
       <td>1</td>
       <td>2017-03-21</td>
       <td>2017-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -733,7 +730,7 @@
       <td>1</td>
       <td>2017-06-25</td>
       <td>2017-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -747,7 +744,7 @@
       <td>1</td>
       <td>2017-09-13</td>
       <td>2017-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -761,7 +758,7 @@
       <td>1</td>
       <td>2017-12-02</td>
       <td>2018-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -775,7 +772,7 @@
       <td>1</td>
       <td>2018-03-21</td>
       <td>2018-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -789,7 +786,7 @@
       <td>1</td>
       <td>2018-06-25</td>
       <td>2018-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -803,7 +800,7 @@
       <td>1</td>
       <td>2018-09-13</td>
       <td>2018-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -817,7 +814,7 @@
       <td>1</td>
       <td>2018-12-02</td>
       <td>2019-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -831,7 +828,7 @@
       <td>1</td>
       <td>2019-03-21</td>
       <td>2019-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -845,7 +842,7 @@
       <td>1</td>
       <td>2019-06-25</td>
       <td>2019-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -859,7 +856,7 @@
       <td>1</td>
       <td>2019-09-13</td>
       <td>2019-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -873,7 +870,7 @@
       <td>1</td>
       <td>2019-12-02</td>
       <td>2020-03-20</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_winter</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -887,7 +884,7 @@
       <td>1</td>
       <td>2020-03-21</td>
       <td>2020-06-24</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_spring</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -901,7 +898,7 @@
       <td>1</td>
       <td>2020-06-25</td>
       <td>2020-09-12</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_summer</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -915,7 +912,7 @@
       <td>1</td>
       <td>2020-09-13</td>
       <td>2020-12-01</td>
-      <td>True</td>
+      <td>False</td>
       <td>ndvi_fall</td>
       <td>ndvi</td>
       <td>gappy</td>
@@ -996,12 +993,12 @@
 </pre></div>
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_01-raster-data_14_0.png" src="../_images/notebooks_01-raster-data_14_0.png" />
+<img alt="../_images/notebooks_01-raster-data_13_0.png" src="../_images/notebooks_01-raster-data_13_0.png" />
 </div>
 </div>
 <p>… and an animation.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">animate</span><span class="p">(</span><span class="n">cmap</span><span class="o">=</span><span class="s2">"RdYlGn"</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
@@ -1009,7 +1006,7 @@
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -1197,42 +1194,42 @@ input[type=range].anim-slider {
 </style>
 
 <div class="animation">
-  <img id="_anim_img9ea291465b024cc1919c65bfba05ebe6">
+  <img id="_anim_img7ebfa85ce6724442b7be1b92f9b971bc">
   <div class="anim-controls">
-    <input id="_anim_slider9ea291465b024cc1919c65bfba05ebe6" type="range" class="anim-slider"
+    <input id="_anim_slider7ebfa85ce6724442b7be1b92f9b971bc" type="range" class="anim-slider"
            name="points" min="0" max="1" step="1" value="0"
-           oninput="anim9ea291465b024cc1919c65bfba05ebe6.set_frame(parseInt(this.value));">
+           oninput="anim7ebfa85ce6724442b7be1b92f9b971bc.set_frame(parseInt(this.value));">
     <div class="anim-buttons">
-      <button title="Decrease speed" aria-label="Decrease speed" onclick="anim9ea291465b024cc1919c65bfba05ebe6.slower()">
+      <button title="Decrease speed" aria-label="Decrease speed" onclick="anim7ebfa85ce6724442b7be1b92f9b971bc.slower()">
           <i class="fa fa-minus"></i></button>
-      <button title="First frame" aria-label="First frame" onclick="anim9ea291465b024cc1919c65bfba05ebe6.first_frame()">
+      <button title="First frame" aria-label="First frame" onclick="anim7ebfa85ce6724442b7be1b92f9b971bc.first_frame()">
         <i class="fa fa-fast-backward"></i></button>
-      <button title="Previous frame" aria-label="Previous frame" onclick="anim9ea291465b024cc1919c65bfba05ebe6.previous_frame()">
+      <button title="Previous frame" aria-label="Previous frame" onclick="anim7ebfa85ce6724442b7be1b92f9b971bc.previous_frame()">
           <i class="fa fa-step-backward"></i></button>
-      <button title="Play backwards" aria-label="Play backwards" onclick="anim9ea291465b024cc1919c65bfba05ebe6.reverse_animation()">
+      <button title="Play backwards" aria-label="Play backwards" onclick="anim7ebfa85ce6724442b7be1b92f9b971bc.reverse_animation()">
           <i class="fa fa-play fa-flip-horizontal"></i></button>
-      <button title="Pause" aria-label="Pause" onclick="anim9ea291465b024cc1919c65bfba05ebe6.pause_animation()">
+      <button title="Pause" aria-label="Pause" onclick="anim7ebfa85ce6724442b7be1b92f9b971bc.pause_animation()">
           <i class="fa fa-pause"></i></button>
-      <button title="Play" aria-label="Play" onclick="anim9ea291465b024cc1919c65bfba05ebe6.play_animation()">
+      <button title="Play" aria-label="Play" onclick="anim7ebfa85ce6724442b7be1b92f9b971bc.play_animation()">
           <i class="fa fa-play"></i></button>
-      <button title="Next frame" aria-label="Next frame" onclick="anim9ea291465b024cc1919c65bfba05ebe6.next_frame()">
+      <button title="Next frame" aria-label="Next frame" onclick="anim7ebfa85ce6724442b7be1b92f9b971bc.next_frame()">
           <i class="fa fa-step-forward"></i></button>
-      <button title="Last frame" aria-label="Last frame" onclick="anim9ea291465b024cc1919c65bfba05ebe6.last_frame()">
+      <button title="Last frame" aria-label="Last frame" onclick="anim7ebfa85ce6724442b7be1b92f9b971bc.last_frame()">
           <i class="fa fa-fast-forward"></i></button>
-      <button title="Increase speed" aria-label="Increase speed" onclick="anim9ea291465b024cc1919c65bfba05ebe6.faster()">
+      <button title="Increase speed" aria-label="Increase speed" onclick="anim7ebfa85ce6724442b7be1b92f9b971bc.faster()">
           <i class="fa fa-plus"></i></button>
     </div>
-    <form title="Repetition mode" aria-label="Repetition mode" action="#n" name="_anim_loop_select9ea291465b024cc1919c65bfba05ebe6"
+    <form title="Repetition mode" aria-label="Repetition mode" action="#n" name="_anim_loop_select7ebfa85ce6724442b7be1b92f9b971bc"
           class="anim-state">
-      <input type="radio" name="state" value="once" id="_anim_radio1_9ea291465b024cc1919c65bfba05ebe6"
+      <input type="radio" name="state" value="once" id="_anim_radio1_7ebfa85ce6724442b7be1b92f9b971bc"
              >
-      <label for="_anim_radio1_9ea291465b024cc1919c65bfba05ebe6">Once</label>
-      <input type="radio" name="state" value="loop" id="_anim_radio2_9ea291465b024cc1919c65bfba05ebe6"
+      <label for="_anim_radio1_7ebfa85ce6724442b7be1b92f9b971bc">Once</label>
+      <input type="radio" name="state" value="loop" id="_anim_radio2_7ebfa85ce6724442b7be1b92f9b971bc"
              checked>
-      <label for="_anim_radio2_9ea291465b024cc1919c65bfba05ebe6">Loop</label>
-      <input type="radio" name="state" value="reflect" id="_anim_radio3_9ea291465b024cc1919c65bfba05ebe6"
+      <label for="_anim_radio2_7ebfa85ce6724442b7be1b92f9b971bc">Loop</label>
+      <input type="radio" name="state" value="reflect" id="_anim_radio3_7ebfa85ce6724442b7be1b92f9b971bc"
              >
-      <label for="_anim_radio3_9ea291465b024cc1919c65bfba05ebe6">Reflect</label>
+      <label for="_anim_radio3_7ebfa85ce6724442b7be1b92f9b971bc">Reflect</label>
     </form>
   </div>
 </div>
@@ -1242,9 +1239,9 @@ input[type=range].anim-slider {
   /* Instantiate the Animation class. */
   /* The IDs given should match those used in the template above. */
   (function() {
-    var img_id = "_anim_img9ea291465b024cc1919c65bfba05ebe6";
-    var slider_id = "_anim_slider9ea291465b024cc1919c65bfba05ebe6";
-    var loop_select_id = "_anim_loop_select9ea291465b024cc1919c65bfba05ebe6";
+    var img_id = "_anim_img7ebfa85ce6724442b7be1b92f9b971bc";
+    var slider_id = "_anim_slider7ebfa85ce6724442b7be1b92f9b971bc";
+    var loop_select_id = "_anim_loop_select7ebfa85ce6724442b7be1b92f9b971bc";
     var frames = new Array(24);
 
   frames[0] = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeYAAAIeCAYAAABuuqwmAAAAOnRFWHRTb2Z0d2FyZQBNYXRwbG90\
@@ -188850,7 +188847,7 @@ CDMAhAgzAIS8ko6VKlu/oGkAAAAASUVORK5CYII=\
     /* set a timeout to make sure all the above elements are created before
        the object is initialized. */
     setTimeout(function() {
-        anim9ea291465b024cc1919c65bfba05ebe6 = new Animation(frames, img_id, slider_id, 250,
+        anim7ebfa85ce6724442b7be1b92f9b971bc = new Animation(frames, img_id, slider_id, 250,
                                  loop_select_id);
     }, 0);
   })()
@@ -188859,7 +188856,7 @@ CDMAhAgzAIS8ko6VKlu/oGkAAAAASUVORK5CYII=\
 <p>After visualizing the data, it’s possible to notice some data gaps in the NDVI series.</p>
 <p><code class="docutils literal notranslate"><span class="pre">Scikit-map</span></code> supports several data processing task including <strong>gapfilling, smoothing, time aggregation, math operations, trend analysis, etc</strong>. Let’s run a gapfilling process and visualize the result.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">process</span>
@@ -188870,7 +188867,7 @@ CDMAhAgzAIS8ko6VKlu/oGkAAAAASUVORK5CYII=\
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -189058,42 +189055,42 @@ input[type=range].anim-slider {
 </style>
 
 <div class="animation">
-  <img id="_anim_img20738165076b4bfd80f175982585c382">
+  <img id="_anim_img4c3bd76eeb6640fdad1398eaa97ec6ee">
   <div class="anim-controls">
-    <input id="_anim_slider20738165076b4bfd80f175982585c382" type="range" class="anim-slider"
+    <input id="_anim_slider4c3bd76eeb6640fdad1398eaa97ec6ee" type="range" class="anim-slider"
            name="points" min="0" max="1" step="1" value="0"
-           oninput="anim20738165076b4bfd80f175982585c382.set_frame(parseInt(this.value));">
+           oninput="anim4c3bd76eeb6640fdad1398eaa97ec6ee.set_frame(parseInt(this.value));">
     <div class="anim-buttons">
-      <button title="Decrease speed" aria-label="Decrease speed" onclick="anim20738165076b4bfd80f175982585c382.slower()">
+      <button title="Decrease speed" aria-label="Decrease speed" onclick="anim4c3bd76eeb6640fdad1398eaa97ec6ee.slower()">
           <i class="fa fa-minus"></i></button>
-      <button title="First frame" aria-label="First frame" onclick="anim20738165076b4bfd80f175982585c382.first_frame()">
+      <button title="First frame" aria-label="First frame" onclick="anim4c3bd76eeb6640fdad1398eaa97ec6ee.first_frame()">
         <i class="fa fa-fast-backward"></i></button>
-      <button title="Previous frame" aria-label="Previous frame" onclick="anim20738165076b4bfd80f175982585c382.previous_frame()">
+      <button title="Previous frame" aria-label="Previous frame" onclick="anim4c3bd76eeb6640fdad1398eaa97ec6ee.previous_frame()">
           <i class="fa fa-step-backward"></i></button>
-      <button title="Play backwards" aria-label="Play backwards" onclick="anim20738165076b4bfd80f175982585c382.reverse_animation()">
+      <button title="Play backwards" aria-label="Play backwards" onclick="anim4c3bd76eeb6640fdad1398eaa97ec6ee.reverse_animation()">
           <i class="fa fa-play fa-flip-horizontal"></i></button>
-      <button title="Pause" aria-label="Pause" onclick="anim20738165076b4bfd80f175982585c382.pause_animation()">
+      <button title="Pause" aria-label="Pause" onclick="anim4c3bd76eeb6640fdad1398eaa97ec6ee.pause_animation()">
           <i class="fa fa-pause"></i></button>
-      <button title="Play" aria-label="Play" onclick="anim20738165076b4bfd80f175982585c382.play_animation()">
+      <button title="Play" aria-label="Play" onclick="anim4c3bd76eeb6640fdad1398eaa97ec6ee.play_animation()">
           <i class="fa fa-play"></i></button>
-      <button title="Next frame" aria-label="Next frame" onclick="anim20738165076b4bfd80f175982585c382.next_frame()">
+      <button title="Next frame" aria-label="Next frame" onclick="anim4c3bd76eeb6640fdad1398eaa97ec6ee.next_frame()">
           <i class="fa fa-step-forward"></i></button>
-      <button title="Last frame" aria-label="Last frame" onclick="anim20738165076b4bfd80f175982585c382.last_frame()">
+      <button title="Last frame" aria-label="Last frame" onclick="anim4c3bd76eeb6640fdad1398eaa97ec6ee.last_frame()">
           <i class="fa fa-fast-forward"></i></button>
-      <button title="Increase speed" aria-label="Increase speed" onclick="anim20738165076b4bfd80f175982585c382.faster()">
+      <button title="Increase speed" aria-label="Increase speed" onclick="anim4c3bd76eeb6640fdad1398eaa97ec6ee.faster()">
           <i class="fa fa-plus"></i></button>
     </div>
-    <form title="Repetition mode" aria-label="Repetition mode" action="#n" name="_anim_loop_select20738165076b4bfd80f175982585c382"
+    <form title="Repetition mode" aria-label="Repetition mode" action="#n" name="_anim_loop_select4c3bd76eeb6640fdad1398eaa97ec6ee"
           class="anim-state">
-      <input type="radio" name="state" value="once" id="_anim_radio1_20738165076b4bfd80f175982585c382"
+      <input type="radio" name="state" value="once" id="_anim_radio1_4c3bd76eeb6640fdad1398eaa97ec6ee"
              >
-      <label for="_anim_radio1_20738165076b4bfd80f175982585c382">Once</label>
-      <input type="radio" name="state" value="loop" id="_anim_radio2_20738165076b4bfd80f175982585c382"
+      <label for="_anim_radio1_4c3bd76eeb6640fdad1398eaa97ec6ee">Once</label>
+      <input type="radio" name="state" value="loop" id="_anim_radio2_4c3bd76eeb6640fdad1398eaa97ec6ee"
              checked>
-      <label for="_anim_radio2_20738165076b4bfd80f175982585c382">Loop</label>
-      <input type="radio" name="state" value="reflect" id="_anim_radio3_20738165076b4bfd80f175982585c382"
+      <label for="_anim_radio2_4c3bd76eeb6640fdad1398eaa97ec6ee">Loop</label>
+      <input type="radio" name="state" value="reflect" id="_anim_radio3_4c3bd76eeb6640fdad1398eaa97ec6ee"
              >
-      <label for="_anim_radio3_20738165076b4bfd80f175982585c382">Reflect</label>
+      <label for="_anim_radio3_4c3bd76eeb6640fdad1398eaa97ec6ee">Reflect</label>
     </form>
   </div>
 </div>
@@ -189103,9 +189100,9 @@ input[type=range].anim-slider {
   /* Instantiate the Animation class. */
   /* The IDs given should match those used in the template above. */
   (function() {
-    var img_id = "_anim_img20738165076b4bfd80f175982585c382";
-    var slider_id = "_anim_slider20738165076b4bfd80f175982585c382";
-    var loop_select_id = "_anim_loop_select20738165076b4bfd80f175982585c382";
+    var img_id = "_anim_img4c3bd76eeb6640fdad1398eaa97ec6ee";
+    var slider_id = "_anim_slider4c3bd76eeb6640fdad1398eaa97ec6ee";
+    var loop_select_id = "_anim_loop_select4c3bd76eeb6640fdad1398eaa97ec6ee";
     var frames = new Array(24);
 
   frames[0] = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeYAAAIeCAYAAABuuqwmAAAAOnRFWHRTb2Z0d2FyZQBNYXRwbG90\
@@ -381278,15 +381275,15 @@ gg==\
     /* set a timeout to make sure all the above elements are created before
        the object is initialized. */
     setTimeout(function() {
-        anim20738165076b4bfd80f175982585c382 = new Animation(frames, img_id, slider_id, 250,
+        anim4c3bd76eeb6640fdad1398eaa97ec6ee = new Animation(frames, img_id, slider_id, 250,
                                  loop_select_id);
     }, 0);
   })()
 </script></div>
 </div>
-<p>The <code class="docutils literal notranslate"><span class="pre">info</span></code> attribute shows that the new group <code class="docutils literal notranslate"><span class="pre">ndvi.seasconv</span></code> was created, and the old one <code class="docutils literal notranslate"><span class="pre">ndvi</span></code> was deleted according to <code class="docutils literal notranslate"><span class="pre">drop_input=True</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">info</span></code> attribute shows that the new feature <code class="docutils literal notranslate"><span class="pre">ndvi_seasconv</span></code> was created, and the old one <code class="docutils literal notranslate"><span class="pre">ndvi</span></code> was deleted according to <code class="docutils literal notranslate"><span class="pre">drop_input=True</span></code>.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">info</span>
@@ -381294,7 +381291,7 @@ gg==\
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -381316,12 +381313,12 @@ gg==\
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>group</th>
+      <th>feature</th>
       <th>input_path</th>
       <th>input_band</th>
       <th>start_date</th>
       <th>end_date</th>
-      <th>temporal</th>
+      <th>is_common</th>
       <th>name</th>
       <th>band</th>
       <th>variant</th>
@@ -381332,13 +381329,13 @@ gg==\
   <tbody>
     <tr>
       <th>0</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2014-12-02</td>
       <td>2015-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20141202_20150320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20141202_20150320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381346,13 +381343,13 @@ gg==\
     </tr>
     <tr>
       <th>1</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2015-03-21</td>
       <td>2015-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20150321_20150624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20150321_20150624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381360,13 +381357,13 @@ gg==\
     </tr>
     <tr>
       <th>2</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2015-06-25</td>
       <td>2015-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20150625_20150912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20150625_20150912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381374,13 +381371,13 @@ gg==\
     </tr>
     <tr>
       <th>3</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2015-09-13</td>
       <td>2015-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20150913_20151201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20150913_20151201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381388,13 +381385,13 @@ gg==\
     </tr>
     <tr>
       <th>4</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2015-12-02</td>
       <td>2016-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20151202_20160320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20151202_20160320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381402,13 +381399,13 @@ gg==\
     </tr>
     <tr>
       <th>5</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2016-03-21</td>
       <td>2016-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20160321_20160624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20160321_20160624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381416,13 +381413,13 @@ gg==\
     </tr>
     <tr>
       <th>6</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2016-06-25</td>
       <td>2016-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20160625_20160912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20160625_20160912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381430,13 +381427,13 @@ gg==\
     </tr>
     <tr>
       <th>7</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2016-09-13</td>
       <td>2016-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20160913_20161201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20160913_20161201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381444,13 +381441,13 @@ gg==\
     </tr>
     <tr>
       <th>8</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2016-12-02</td>
       <td>2017-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20161202_20170320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20161202_20170320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381458,13 +381455,13 @@ gg==\
     </tr>
     <tr>
       <th>9</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2017-03-21</td>
       <td>2017-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20170321_20170624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20170321_20170624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381472,13 +381469,13 @@ gg==\
     </tr>
     <tr>
       <th>10</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2017-06-25</td>
       <td>2017-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20170625_20170912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20170625_20170912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381486,13 +381483,13 @@ gg==\
     </tr>
     <tr>
       <th>11</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2017-09-13</td>
       <td>2017-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20170913_20171201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20170913_20171201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381500,13 +381497,13 @@ gg==\
     </tr>
     <tr>
       <th>12</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2017-12-02</td>
       <td>2018-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20171202_20180320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20171202_20180320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381514,13 +381511,13 @@ gg==\
     </tr>
     <tr>
       <th>13</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2018-03-21</td>
       <td>2018-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20180321_20180624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20180321_20180624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381528,13 +381525,13 @@ gg==\
     </tr>
     <tr>
       <th>14</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2018-06-25</td>
       <td>2018-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20180625_20180912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20180625_20180912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381542,13 +381539,13 @@ gg==\
     </tr>
     <tr>
       <th>15</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2018-09-13</td>
       <td>2018-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20180913_20181201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20180913_20181201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381556,13 +381553,13 @@ gg==\
     </tr>
     <tr>
       <th>16</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2018-12-02</td>
       <td>2019-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20181202_20190320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20181202_20190320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381570,13 +381567,13 @@ gg==\
     </tr>
     <tr>
       <th>17</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2019-03-21</td>
       <td>2019-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20190321_20190624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20190321_20190624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381584,13 +381581,13 @@ gg==\
     </tr>
     <tr>
       <th>18</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2019-06-25</td>
       <td>2019-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20190625_20190912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20190625_20190912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381598,13 +381595,13 @@ gg==\
     </tr>
     <tr>
       <th>19</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2019-09-13</td>
       <td>2019-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20190913_20191201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20190913_20191201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381612,13 +381609,13 @@ gg==\
     </tr>
     <tr>
       <th>20</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2019-12-02</td>
       <td>2020-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20191202_20200320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20191202_20200320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381626,13 +381623,13 @@ gg==\
     </tr>
     <tr>
       <th>21</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2020-03-21</td>
       <td>2020-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20200321_20200624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20200321_20200624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381640,13 +381637,13 @@ gg==\
     </tr>
     <tr>
       <th>22</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2020-06-25</td>
       <td>2020-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20200625_20200912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20200625_20200912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381654,13 +381651,13 @@ gg==\
     </tr>
     <tr>
       <th>23</th>
-      <td>ndvi.seasconv</td>
+      <td>ndvi_seasconv</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2020-09-13</td>
       <td>2020-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20200913_20201201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20200913_20201201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381691,14 +381688,14 @@ gg==\
         <span class="c1"># Renaming back the output to ndvi</span>
     <span class="p">)</span>
     <span class="o">.</span><span class="n">rename</span><span class="p">(</span>
-        <span class="n">groups</span><span class="o">=</span><span class="p">{</span><span class="s2">"ndvi.seasconv"</span><span class="p">:</span> <span class="s2">"ndvi"</span><span class="p">}</span>
+        <span class="n">features</span><span class="o">=</span><span class="p">{</span><span class="s2">"ndvi_seasconv"</span><span class="p">:</span> <span class="s2">"ndvi"</span><span class="p">}</span>
         <span class="c1"># Running yearly aggregation by std. and percentile 50th</span>
     <span class="p">)</span>
     <span class="o">.</span><span class="n">run</span><span class="p">(</span>
         <span class="n">process</span><span class="o">.</span><span class="n">TimeAggregate</span><span class="p">(</span>
             <span class="n">time</span><span class="o">=</span><span class="p">[</span><span class="n">process</span><span class="o">.</span><span class="n">TimeEnum</span><span class="o">.</span><span class="n">YEARLY</span><span class="p">],</span> <span class="n">operations</span><span class="o">=</span><span class="p">[</span><span class="s2">"p50"</span><span class="p">,</span> <span class="s2">"std"</span><span class="p">]</span>
         <span class="p">),</span>
-        <span class="n">group</span><span class="o">=</span><span class="p">[</span><span class="s2">"ndvi"</span><span class="p">],</span>
+        <span class="n">feature</span><span class="o">=</span><span class="p">[</span><span class="s2">"ndvi"</span><span class="p">],</span>
     <span class="p">)</span>
 <span class="p">)</span>
 
@@ -381711,8 +381708,8 @@ gg==\
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-<span class="ansi-cyan-fg">(_call_worker pid=322843)</span> /skmap/lib/python3.12/site-packages/numpy/lib/_nanfunctions_impl.py:1593: RuntimeWarning: All-NaN slice encountered
-<span class="ansi-cyan-fg">(_call_worker pid=322843)</span>   return fnb._ureduce(a,
+<span class="ansi-cyan-fg">(_call_worker pid=2811182)</span> /skmap/lib/python3.12/site-packages/numpy/lib/_nanfunctions_impl.py:1593: RuntimeWarning: All-NaN slice encountered
+<span class="ansi-cyan-fg">(_call_worker pid=2811182)</span>   return fnb._ureduce(a,
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -381738,12 +381735,12 @@ gg==\
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>group</th>
+      <th>feature</th>
       <th>input_path</th>
       <th>input_band</th>
       <th>start_date</th>
       <th>end_date</th>
-      <th>temporal</th>
+      <th>is_common</th>
       <th>name</th>
       <th>band</th>
       <th>variant</th>
@@ -381759,8 +381756,8 @@ gg==\
       <td>1</td>
       <td>2014-12-02</td>
       <td>2015-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20141202_20150320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20141202_20150320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381773,8 +381770,8 @@ gg==\
       <td>1</td>
       <td>2015-03-21</td>
       <td>2015-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20150321_20150624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20150321_20150624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381787,8 +381784,8 @@ gg==\
       <td>1</td>
       <td>2015-06-25</td>
       <td>2015-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20150625_20150912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20150625_20150912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381801,8 +381798,8 @@ gg==\
       <td>1</td>
       <td>2015-09-13</td>
       <td>2015-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20150913_20151201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20150913_20151201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381815,8 +381812,8 @@ gg==\
       <td>1</td>
       <td>2015-12-02</td>
       <td>2016-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20151202_20160320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20151202_20160320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381829,8 +381826,8 @@ gg==\
       <td>1</td>
       <td>2016-03-21</td>
       <td>2016-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20160321_20160624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20160321_20160624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381843,8 +381840,8 @@ gg==\
       <td>1</td>
       <td>2016-06-25</td>
       <td>2016-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20160625_20160912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20160625_20160912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381857,8 +381854,8 @@ gg==\
       <td>1</td>
       <td>2016-09-13</td>
       <td>2016-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20160913_20161201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20160913_20161201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381871,8 +381868,8 @@ gg==\
       <td>1</td>
       <td>2016-12-02</td>
       <td>2017-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20161202_20170320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20161202_20170320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381885,8 +381882,8 @@ gg==\
       <td>1</td>
       <td>2017-03-21</td>
       <td>2017-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20170321_20170624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20170321_20170624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381899,8 +381896,8 @@ gg==\
       <td>1</td>
       <td>2017-06-25</td>
       <td>2017-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20170625_20170912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20170625_20170912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381913,8 +381910,8 @@ gg==\
       <td>1</td>
       <td>2017-09-13</td>
       <td>2017-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20170913_20171201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20170913_20171201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381927,8 +381924,8 @@ gg==\
       <td>1</td>
       <td>2017-12-02</td>
       <td>2018-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20171202_20180320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20171202_20180320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381941,8 +381938,8 @@ gg==\
       <td>1</td>
       <td>2018-03-21</td>
       <td>2018-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20180321_20180624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20180321_20180624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381955,8 +381952,8 @@ gg==\
       <td>1</td>
       <td>2018-06-25</td>
       <td>2018-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20180625_20180912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20180625_20180912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381969,8 +381966,8 @@ gg==\
       <td>1</td>
       <td>2018-09-13</td>
       <td>2018-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20180913_20181201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20180913_20181201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381983,8 +381980,8 @@ gg==\
       <td>1</td>
       <td>2018-12-02</td>
       <td>2019-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20181202_20190320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20181202_20190320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -381997,8 +381994,8 @@ gg==\
       <td>1</td>
       <td>2019-03-21</td>
       <td>2019-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20190321_20190624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20190321_20190624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382011,8 +382008,8 @@ gg==\
       <td>1</td>
       <td>2019-06-25</td>
       <td>2019-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20190625_20190912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20190625_20190912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382025,8 +382022,8 @@ gg==\
       <td>1</td>
       <td>2019-09-13</td>
       <td>2019-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20190913_20191201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20190913_20191201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382039,8 +382036,8 @@ gg==\
       <td>1</td>
       <td>2019-12-02</td>
       <td>2020-03-20</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20191202_20200320</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20191202_20200320</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382053,8 +382050,8 @@ gg==\
       <td>1</td>
       <td>2020-03-21</td>
       <td>2020-06-24</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20200321_20200624</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20200321_20200624</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382067,8 +382064,8 @@ gg==\
       <td>1</td>
       <td>2020-06-25</td>
       <td>2020-09-12</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20200625_20200912</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20200625_20200912</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382081,8 +382078,8 @@ gg==\
       <td>1</td>
       <td>2020-09-13</td>
       <td>2020-12-01</td>
-      <td>True</td>
-      <td>skmap_seasconv_ndvi_20200913_20201201</td>
+      <td>False</td>
+      <td>ndvi_seasconv_20200913_20201201</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382090,13 +382087,13 @@ gg==\
     </tr>
     <tr>
       <th>24</th>
-      <td>ndvi.yearly.std</td>
+      <td>ndvi_yearly_std</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2015-01-01</td>
       <td>2015-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_std_20150101_20151231</td>
+      <td>False</td>
+      <td>ndvi_yearly_std_20150101_20151231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382104,13 +382101,13 @@ gg==\
     </tr>
     <tr>
       <th>25</th>
-      <td>ndvi.yearly.p50</td>
+      <td>ndvi_yearly_p50</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2015-01-01</td>
       <td>2015-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_p50_20150101_20151231</td>
+      <td>False</td>
+      <td>ndvi_yearly_p50_20150101_20151231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382118,13 +382115,13 @@ gg==\
     </tr>
     <tr>
       <th>26</th>
-      <td>ndvi.yearly.std</td>
+      <td>ndvi_yearly_std</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2016-01-01</td>
       <td>2016-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_std_20160101_20161231</td>
+      <td>False</td>
+      <td>ndvi_yearly_std_20160101_20161231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382132,13 +382129,13 @@ gg==\
     </tr>
     <tr>
       <th>27</th>
-      <td>ndvi.yearly.p50</td>
+      <td>ndvi_yearly_p50</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2016-01-01</td>
       <td>2016-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_p50_20160101_20161231</td>
+      <td>False</td>
+      <td>ndvi_yearly_p50_20160101_20161231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382146,13 +382143,13 @@ gg==\
     </tr>
     <tr>
       <th>28</th>
-      <td>ndvi.yearly.std</td>
+      <td>ndvi_yearly_std</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2017-01-01</td>
       <td>2017-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_std_20170101_20171231</td>
+      <td>False</td>
+      <td>ndvi_yearly_std_20170101_20171231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382160,13 +382157,13 @@ gg==\
     </tr>
     <tr>
       <th>29</th>
-      <td>ndvi.yearly.p50</td>
+      <td>ndvi_yearly_p50</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2017-01-01</td>
       <td>2017-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_p50_20170101_20171231</td>
+      <td>False</td>
+      <td>ndvi_yearly_p50_20170101_20171231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382174,13 +382171,13 @@ gg==\
     </tr>
     <tr>
       <th>30</th>
-      <td>ndvi.yearly.std</td>
+      <td>ndvi_yearly_std</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2018-01-01</td>
       <td>2018-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_std_20180101_20181231</td>
+      <td>False</td>
+      <td>ndvi_yearly_std_20180101_20181231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382188,13 +382185,13 @@ gg==\
     </tr>
     <tr>
       <th>31</th>
-      <td>ndvi.yearly.p50</td>
+      <td>ndvi_yearly_p50</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2018-01-01</td>
       <td>2018-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_p50_20180101_20181231</td>
+      <td>False</td>
+      <td>ndvi_yearly_p50_20180101_20181231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382202,13 +382199,13 @@ gg==\
     </tr>
     <tr>
       <th>32</th>
-      <td>ndvi.yearly.std</td>
+      <td>ndvi_yearly_std</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2019-01-01</td>
       <td>2019-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_std_20190101_20191231</td>
+      <td>False</td>
+      <td>ndvi_yearly_std_20190101_20191231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382216,13 +382213,13 @@ gg==\
     </tr>
     <tr>
       <th>33</th>
-      <td>ndvi.yearly.p50</td>
+      <td>ndvi_yearly_p50</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2019-01-01</td>
       <td>2019-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_p50_20190101_20191231</td>
+      <td>False</td>
+      <td>ndvi_yearly_p50_20190101_20191231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382230,13 +382227,13 @@ gg==\
     </tr>
     <tr>
       <th>34</th>
-      <td>ndvi.yearly.std</td>
+      <td>ndvi_yearly_std</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2020-01-01</td>
       <td>2020-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_std_20200101_20201231</td>
+      <td>False</td>
+      <td>ndvi_yearly_std_20200101_20201231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382244,13 +382241,13 @@ gg==\
     </tr>
     <tr>
       <th>35</th>
-      <td>ndvi.yearly.p50</td>
+      <td>ndvi_yearly_p50</td>
       <td>/root/scikit-map/skmap/data/toy/ndvi/gappy/ndv...</td>
       <td>1</td>
       <td>2020-01-01</td>
       <td>2020-12-31</td>
-      <td>True</td>
-      <td>skmap_aggregate.ndvi.yearly_p50_20200101_20201231</td>
+      <td>False</td>
+      <td>ndvi_yearly_p50_20200101_20201231</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382265,7 +382262,7 @@ gg==\
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">groups</span><span class="o">=</span><span class="p">[</span><span class="s2">"ndvi.yearly.p50"</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"RdYlGn"</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s2">"date"</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s2">"ndvi_yearly_p50"</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"RdYlGn"</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s2">"date"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -382274,24 +382271,24 @@ gg==\
 </pre></div>
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_01-raster-data_24_0.png" src="../_images/notebooks_01-raster-data_24_0.png" />
+<img alt="../_images/notebooks_01-raster-data_23_0.png" src="../_images/notebooks_01-raster-data_23_0.png" />
 </div>
 </div>
-<section id="Layer-groups">
-<h2><span class="section-number">1.1. </span>Layer groups<a class="headerlink" href="#Layer-groups" title="Link to this heading">#</a></h2>
-<p>RasterData supports different set of layer, organizing them by groups. <strong>Multiple bands</strong> of a raster time-series, a for example NDVI and SWIR-1 band, can be organized different groups. However it’s also possible to have <strong>different time-series</strong> size in each group, and even <strong>static raster layers</strong> without a specific date interval.</p>
-<p>To demonstrate that let’s load another toy dataset which provides multi group support.</p>
+<section id="Features">
+<h2><span class="section-number">1.1. </span>Features<a class="headerlink" href="#Features" title="Link to this heading">#</a></h2>
+<p>RasterData supports different set of layer, organizing them by features. <strong>Multiple bands</strong> of a raster time-series, a for example NDVI and SWIR-1 band, can be organized as different features. However it’s also possible to have <strong>different time-series</strong> size in each feature, and even <strong>static raster layers</strong> without a specific date interval.</p>
+<p>To demonstrate that let’s load another toy dataset which provides multi feature support.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Multi-group dataset: NDVI + SWIR-1 + static (loaded from layers.yaml)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Multi-feature dataset: NDVI + SWIR-1 + static (loaded from layers.yaml)</span>
 <span class="n">rdata</span> <span class="o">=</span> <span class="p">(</span>
     <span class="n">RasterData</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">LAYERS_YAML</span><span class="p">),</span> <span class="n">base_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">DATA_DIR</span><span class="p">),</span> <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">)</span>
     <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"variant != 'gappy'"</span><span class="p">)</span>
     <span class="o">.</span><span class="n">read</span><span class="p">()</span>
 <span class="p">)</span>
-<span class="n">rdata</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s2">"group"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"barh"</span><span class="p">)</span>
+<span class="n">rdata</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s2">"feature"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"barh"</span><span class="p">)</span>
 <br/></pre></div>
 </div>
 </div>
@@ -382301,22 +382298,22 @@ gg==\
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-&lt;Axes: ylabel=&#39;group&#39;&gt;
+&lt;Axes: ylabel=&#39;feature&#39;&gt;
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_01-raster-data_27_1.png" src="../_images/notebooks_01-raster-data_27_1.png" />
+<img alt="../_images/notebooks_01-raster-data_26_1.png" src="../_images/notebooks_01-raster-data_26_1.png" />
 </div>
 </div>
-<p>How the <code class="docutils literal notranslate"><span class="pre">static</span></code> group looks like?</p>
+<p>How the common features look like?</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"group == 'common'"</span><span class="p">)</span><span class="o">.</span><span class="n">info</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"is_common == True"</span><span class="p">)</span><span class="o">.</span><span class="n">info</span>
 <br/></pre></div>
 </div>
 </div>
@@ -382343,12 +382340,12 @@ gg==\
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>group</th>
+      <th>feature</th>
       <th>input_path</th>
       <th>input_band</th>
       <th>start_date</th>
       <th>end_date</th>
-      <th>temporal</th>
+      <th>is_common</th>
       <th>name</th>
       <th>band</th>
       <th>variant</th>
@@ -382359,12 +382356,12 @@ gg==\
   <tbody>
     <tr>
       <th>0</th>
-      <td>common</td>
+      <td>elev</td>
       <td>/root/scikit-map/skmap/data/toy/static/elev.lo...</td>
       <td>1</td>
       <td>NaT</td>
       <td>NaT</td>
-      <td>False</td>
+      <td>True</td>
       <td>elev</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382373,12 +382370,12 @@ gg==\
     </tr>
     <tr>
       <th>1</th>
-      <td>common</td>
+      <td>slope</td>
       <td>/root/scikit-map/skmap/data/toy/static/slope.p...</td>
       <td>1</td>
       <td>NaT</td>
       <td>NaT</td>
-      <td>False</td>
+      <td>True</td>
       <td>slope</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -382389,7 +382386,7 @@ gg==\
 </table>
 </div></div>
 </div>
-<p>In a multi group <code class="docutils literal notranslate"><span class="pre">RasterData</span></code>, most of the processing tasks are executed for each group separately.</p>
+<p>In a multi feature <code class="docutils literal notranslate"><span class="pre">RasterData</span></code>, most of the processing tasks are executed for each feature separately.</p>
 <p>To demonstrate it, let’s run the annual aggregation by percentile 95th.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
@@ -382403,12 +382400,12 @@ gg==\
 </pre></div>
 </div>
 </div>
-<p>And you can see two more groups in <code class="docutils literal notranslate"><span class="pre">rdata</span></code>.</p>
+<p>And you can see two more features in <code class="docutils literal notranslate"><span class="pre">rdata</span></code>.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s2">"group"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"barh"</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s2">"feature"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"barh"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -382418,14 +382415,14 @@ gg==\
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-&lt;Axes: ylabel=&#39;group&#39;&gt;
+&lt;Axes: ylabel=&#39;feature&#39;&gt;
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_01-raster-data_33_1.png" src="../_images/notebooks_01-raster-data_33_1.png" />
+<img alt="../_images/notebooks_01-raster-data_32_1.png" src="../_images/notebooks_01-raster-data_32_1.png" />
 </div>
 </div>
 <p>Let’s visualize one of them.</p>
@@ -382433,7 +382430,7 @@ gg==\
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">groups</span><span class="o">=</span><span class="p">[</span><span class="s2">"swir1.yearly.p95"</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"bone"</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s2">"date"</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s2">"swir1_yearly_p95"</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"bone"</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s2">"date"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -382442,15 +382439,15 @@ gg==\
 </pre></div>
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_01-raster-data_35_0.png" src="../_images/notebooks_01-raster-data_35_0.png" />
+<img alt="../_images/notebooks_01-raster-data_34_0.png" src="../_images/notebooks_01-raster-data_34_0.png" />
 </div>
 </div>
 </section>
 <section id="Multi-column-selection-and-runners">
 <h2><span class="section-number">1.2. </span>Multi-column selection and runners<a class="headerlink" href="#Multi-column-selection-and-runners" title="Link to this heading">#</a></h2>
-<p>Catalogue sources (YAML, STAC) add one <code class="docutils literal notranslate"><span class="pre">info</span></code> column per <code class="docutils literal notranslate"><span class="pre">{variable}</span></code> placeholder — the toy catalogue carries <code class="docutils literal notranslate"><span class="pre">band</span></code>, <code class="docutils literal notranslate"><span class="pre">variant</span></code>, <code class="docutils literal notranslate"><span class="pre">season</span></code> and <code class="docutils literal notranslate"><span class="pre">year</span></code> alongside the standard columns. Use <code class="docutils literal notranslate"><span class="pre">select(...)</span></code> to filter layers by any of these columns instead of only <code class="docutils literal notranslate"><span class="pre">group</span></code>:</p>
+<p>Catalogue sources (YAML, STAC) add one <code class="docutils literal notranslate"><span class="pre">info</span></code> column per <code class="docutils literal notranslate"><span class="pre">{variable}</span></code> placeholder — the toy catalogue carries <code class="docutils literal notranslate"><span class="pre">band</span></code>, <code class="docutils literal notranslate"><span class="pre">variant</span></code>, <code class="docutils literal notranslate"><span class="pre">season</span></code> and <code class="docutils literal notranslate"><span class="pre">year</span></code> alongside the standard columns. Use <code class="docutils literal notranslate"><span class="pre">select(...)</span></code> to filter layers by any of these columns instead of only <code class="docutils literal notranslate"><span class="pre">feature</span></code>:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Multi-column selection: NDVI winter composites across all years</span>
@@ -382462,12 +382459,12 @@ gg==\
     <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"variant != 'gappy'"</span><span class="p">)</span>
     <span class="o">.</span><span class="n">read</span><span class="p">()</span>
 <span class="p">)</span>
-<span class="n">rdata_multi</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">band</span><span class="o">=</span><span class="s2">"ndvi"</span><span class="p">,</span> <span class="n">season</span><span class="o">=</span><span class="s2">"winter"</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">[[</span><span class="s2">"group"</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">,</span> <span class="s2">"year"</span><span class="p">,</span> <span class="s2">"season"</span><span class="p">]]</span>
+<span class="n">rdata_multi</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">feature</span><span class="o">=</span><span class="s2">"ndvi"</span><span class="p">,</span> <span class="n">season</span><span class="o">=</span><span class="s2">"winter"</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">[[</span><span class="s2">"feature"</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">,</span> <span class="s2">"year"</span><span class="p">,</span> <span class="s2">"season"</span><span class="p">]]</span>
 </pre></div>
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -382489,7 +382486,7 @@ gg==\
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>group</th>
+      <th>feature</th>
       <th>name</th>
       <th>year</th>
       <th>season</th>
@@ -382542,27 +382539,27 @@ gg==\
 </table>
 </div></div>
 </div>
-<p>Runners can likewise resolve their input bands by a variable column and compute <strong>one output band per partition</strong>, regardless of how the catalogue was grouped. Pass <code class="docutils literal notranslate"><span class="pre">match_col</span></code> (the column holding the band names) and <code class="docutils literal notranslate"><span class="pre">by</span></code> (the partition columns) to <code class="docutils literal notranslate"><span class="pre">run</span></code>:</p>
+<p>Runners can likewise resolve their input bands by a variable column and compute <strong>one output band per partition</strong>, regardless of how the catalogue was organised. Pass <code class="docutils literal notranslate"><span class="pre">match_col</span></code> (the column holding the band names) and <code class="docutils literal notranslate"><span class="pre">by</span></code> (the partition columns) to <code class="docutils literal notranslate"><span class="pre">run</span></code>:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">skmap.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">process</span>
 
 <span class="c1"># One normalised-difference band per (year, season): "ndvi" and "swir1" are</span>
-<span class="c1"># resolved from the `band` column, not from `name` or `group`.</span>
+<span class="c1"># resolved from the `band` column, not from `name` or `feature`.</span>
 <span class="n">rdata_multi</span> <span class="o">=</span> <span class="n">rdata_multi</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">process</span><span class="o">.</span><span class="n">NormalizedDifference</span><span class="p">(</span><span class="s2">"ndvi"</span><span class="p">,</span> <span class="s2">"swir1"</span><span class="p">),</span>
     <span class="n">match_col</span><span class="o">=</span><span class="s2">"band"</span><span class="p">,</span>
     <span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s2">"year"</span><span class="p">,</span> <span class="s2">"season"</span><span class="p">],</span>
     <span class="n">outname</span><span class="o">=</span><span class="s2">"nd_swir"</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">rdata_multi</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"name.str.startswith('nd_swir')"</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">[[</span><span class="s2">"group"</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">,</span> <span class="s2">"year"</span><span class="p">,</span> <span class="s2">"season"</span><span class="p">]]</span>
+<span class="n">rdata_multi</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"name.str.startswith('nd_swir')"</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">[[</span><span class="s2">"feature"</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">,</span> <span class="s2">"year"</span><span class="p">,</span> <span class="s2">"season"</span><span class="p">]]</span>
 </pre></div>
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
 </pre></div>
 </div>
 <div class="output_area rendered_html docutils container">
@@ -382584,7 +382581,7 @@ gg==\
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>group</th>
+      <th>feature</th>
       <th>name</th>
       <th>year</th>
       <th>season</th>
@@ -382593,171 +382590,171 @@ gg==\
   <tbody>
     <tr>
       <th>0</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2014_winter</td>
-      <td>2014.0</td>
-      <td>winter</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2015_fall</td>
-      <td>2015.0</td>
-      <td>fall</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2015_spring</td>
-      <td>2015.0</td>
-      <td>spring</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2015_summer</td>
-      <td>2015.0</td>
-      <td>summer</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2015_winter</td>
-      <td>2015.0</td>
-      <td>winter</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>5</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2016_fall</td>
-      <td>2016.0</td>
-      <td>fall</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>6</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2016_spring</td>
-      <td>2016.0</td>
-      <td>spring</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>7</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2016_summer</td>
-      <td>2016.0</td>
-      <td>summer</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>8</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2016_winter</td>
-      <td>2016.0</td>
-      <td>winter</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>9</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2017_fall</td>
-      <td>2017.0</td>
-      <td>fall</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>10</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2017_spring</td>
-      <td>2017.0</td>
-      <td>spring</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>11</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2017_summer</td>
-      <td>2017.0</td>
-      <td>summer</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>12</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2017_winter</td>
-      <td>2017.0</td>
-      <td>winter</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>13</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2018_fall</td>
-      <td>2018.0</td>
-      <td>fall</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>14</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2018_spring</td>
-      <td>2018.0</td>
-      <td>spring</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>15</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2018_summer</td>
-      <td>2018.0</td>
-      <td>summer</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>16</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2018_winter</td>
-      <td>2018.0</td>
-      <td>winter</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>17</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2019_fall</td>
-      <td>2019.0</td>
-      <td>fall</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>18</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2019_spring</td>
-      <td>2019.0</td>
-      <td>spring</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>19</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2019_summer</td>
-      <td>2019.0</td>
-      <td>summer</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>20</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2019_winter</td>
-      <td>2019.0</td>
-      <td>winter</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>21</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2020_fall</td>
-      <td>2020.0</td>
-      <td>fall</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>22</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2020_spring</td>
-      <td>2020.0</td>
-      <td>spring</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>23</th>
-      <td>ndvi</td>
+      <td>nd_swir</td>
       <td>nd_swir_2020_summer</td>
-      <td>2020.0</td>
-      <td>summer</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
   </tbody>
 </table>
@@ -382789,7 +382786,7 @@ gg==\
   </div>
   <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="pst-show_toc_level nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Layer-groups">1.1. Layer groups</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Features">1.1. Features</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Multi-column-selection-and-runners">1.2. Multi-column selection and runners</a></li>
 </ul>
   </nav></div>

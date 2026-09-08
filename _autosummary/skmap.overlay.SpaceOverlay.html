@@ -158,6 +158,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../tutorials.html">
     Tutorials
   </a>
@@ -170,13 +177,6 @@
   </a>
 </li>
 
-
-<li class="nav-item current active">
-  <a class="nav-link nav-internal" href="skmap.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -185,6 +185,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="skmap.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../cpp_api.html">
     C++ API
@@ -306,6 +313,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../quickstart/quickstart.html">
     Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
   </a>
 </li>
 
@@ -603,7 +617,7 @@ arbitrarily large rasters can be queried without loading them into memory.</p>
 <li><p><strong>points</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">GeoDataFrame</span></code> | <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <code class="xref py py-class docutils literal notranslate"><span class="pre">DataFrame</span></code></span>) – The path for vector file or <code class="docutils literal notranslate"><span class="pre">geopandas.GeoDataFrame</span></code> with
 the points.</p></li>
 <li><p><strong>rasterdata</strong> – a <code class="xref py py-class docutils literal notranslate"><span class="pre">RasterData</span></code> (unread) whose band
-names/group structure describe the raster layers to sample.</p></li>
+names/feature structure describe the raster layers to sample.</p></li>
 <li><p><strong>runners</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>]</span>) – optional list of <a class="reference internal" href="skmap.io.process.html#module-skmap.io.process" title="skmap.io.process"><code class="xref py py-mod docutils literal notranslate"><span class="pre">skmap.io.process</span></code></a> whale runners
 computed on the sampled points after the overlay (e.g.
 <code class="docutils literal notranslate"><span class="pre">NormalizedDifference</span></code>, <code class="docutils literal notranslate"><span class="pre">Savi</span></code>, <code class="docutils literal notranslate"><span class="pre">GetLatitude</span></code>).</p></li>

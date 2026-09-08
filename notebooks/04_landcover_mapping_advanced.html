@@ -160,6 +160,13 @@
 </li>
 
 
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
+  </a>
+</li>
+
+
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../tutorials.html">
     Tutorials
@@ -173,13 +180,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../_autosummary/skmap.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -188,6 +188,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../cpp_api.html">
     C++ API
@@ -309,6 +316,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../quickstart/quickstart.html">
     Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../data-structure.html">
+    Data Structure
   </a>
 </li>
 
@@ -524,7 +538,7 @@
 <span class="n">rdata</span> <span class="o">=</span> <span class="p">(</span>
     <span class="n">RasterData</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">LAYERS_YAML</span><span class="p">),</span>  <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span> <span class="n">base_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">DATA_DIR</span><span class="p">))</span>
     <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"variant != 'gappy'"</span><span class="p">)</span>
-    <span class="o">.</span><span class="n">filter_date</span><span class="p">(</span><span class="s2">"2015-01-01"</span><span class="p">,</span> <span class="s2">"2019-12-31"</span><span class="p">,</span> <span class="n">include_non_temporal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">by_start_date</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">filter_date</span><span class="p">(</span><span class="s2">"2015-01-01"</span><span class="p">,</span> <span class="s2">"2019-12-31"</span><span class="p">,</span> <span class="n">include_common</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">by_start_date</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="p">)</span>
 
 <span class="n">overlay</span> <span class="o">=</span> <span class="n">SpaceTimeOverlay</span><span class="p">(</span>
@@ -770,7 +784,7 @@ Predictions: [ 9  9  0  0 12]
 </section>
 <section id="Multi-year-spatial-prediction">
 <h2><span class="section-number">11.6. </span>Multi-year spatial prediction<a class="headerlink" href="#Multi-year-spatial-prediction" title="Link to this heading">#</a></h2>
-<p>:class:<code class="docutils literal notranslate"><span class="pre">~skmap.io.process.Prediction</span></code> predicts <strong>all years in one model call</strong>: the years are concatenated into a single feature matrix with the static covariates repeated for each year. For a probability classifier it appends one probability band per <code class="docutils literal notranslate"><span class="pre">(class,</span> <span class="pre">year)</span></code> <em>and</em> a dominant-class band (argmax) per year, all under the <code class="docutils literal notranslate"><span class="pre">prediction</span></code> group. <code class="docutils literal notranslate"><span class="pre">drop_input</span></code> removes the consumed covariates so only the predictions remain.</p>
+<p>:class:<code class="docutils literal notranslate"><span class="pre">~skmap.io.process.Prediction</span></code> predicts <strong>all years in one model call</strong>: the years are concatenated into a single feature matrix with the static covariates repeated for each year. For a probability classifier it appends one probability band per <code class="docutils literal notranslate"><span class="pre">(class,</span> <span class="pre">year)</span></code> <em>and</em> a dominant-class band (argmax) per year, all under the <code class="docutils literal notranslate"><span class="pre">prediction</span></code> feature. <code class="docutils literal notranslate"><span class="pre">drop_input</span></code> removes the consumed covariates so only the predictions remain.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
@@ -781,7 +795,7 @@ Predictions: [ 9  9  0  0 12]
 <span class="n">rdata</span> <span class="o">=</span> <span class="p">(</span>
     <span class="n">RasterData</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">LAYERS_YAML</span><span class="p">),</span> <span class="n">base_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">toy</span><span class="o">.</span><span class="n">DATA_DIR</span><span class="p">),</span> <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">)</span>
     <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"variant != 'gappy'"</span><span class="p">)</span>
-    <span class="o">.</span><span class="n">filter_date</span><span class="p">(</span><span class="s2">"2015-01-01"</span><span class="p">,</span> <span class="s2">"2019-12-31"</span><span class="p">,</span> <span class="n">include_non_temporal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">by_start_date</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">filter_date</span><span class="p">(</span><span class="s2">"2015-01-01"</span><span class="p">,</span> <span class="s2">"2019-12-31"</span><span class="p">,</span> <span class="n">include_common</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">by_start_date</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="o">.</span><span class="n">read</span><span class="p">()</span>
 <span class="p">)</span>
 
@@ -824,12 +838,12 @@ Predictions: [ 9  9  0  0 12]
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>group</th>
+      <th>feature</th>
       <th>input_path</th>
       <th>input_band</th>
       <th>start_date</th>
       <th>end_date</th>
-      <th>temporal</th>
+      <th>is_common</th>
       <th>name</th>
       <th>band</th>
       <th>variant</th>
@@ -845,7 +859,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2015-01-01</td>
       <td>2015-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction_Broad-leaved forest</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -859,7 +873,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2016-01-01</td>
       <td>2016-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction_Broad-leaved forest</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -873,7 +887,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2017-01-01</td>
       <td>2017-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction_Broad-leaved forest</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -887,7 +901,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2018-01-01</td>
       <td>2018-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction_Broad-leaved forest</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -901,7 +915,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2019-01-01</td>
       <td>2019-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction_Broad-leaved forest</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -929,7 +943,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2015-01-01</td>
       <td>2015-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -943,7 +957,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2016-01-01</td>
       <td>2016-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -957,7 +971,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2017-01-01</td>
       <td>2017-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -971,7 +985,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2018-01-01</td>
       <td>2018-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -985,7 +999,7 @@ Predictions: [ 9  9  0  0 12]
       <td>1</td>
       <td>2019-01-01</td>
       <td>2019-12-31</td>
-      <td>True</td>
+      <td>False</td>
       <td>prediction</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -1001,7 +1015,7 @@ Predictions: [ 9  9  0  0 12]
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">'group'</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rdata</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">'feature'</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
@@ -1011,7 +1025,7 @@ Predictions: [ 9  9  0  0 12]
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-group
+feature
 prediction    75
 Name: count, dtype: int64
 </pre></div></div>
@@ -1073,16 +1087,16 @@ Mapped land cover classes
 </div>
 <p>The dominant-class band and plot the dominant class map:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="bp">cls</span> <span class="o">=</span> <span class="s1">'Pastures'</span>
-<span class="n">rdata</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="sa">f</span><span class="s2">"name == 'prediction'"</span><span class="p">)</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">cmap</span><span class="o">=</span><span class="n">colors</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s1">'Land cover </span><span class="si">{group}</span><span class="s1"> (</span><span class="si">{year}</span><span class="s1">)'</span><span class="p">)</span>
+<span class="n">rdata</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="sa">f</span><span class="s2">"name == 'prediction'"</span><span class="p">)</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">cmap</span><span class="o">=</span><span class="n">colors</span><span class="p">,</span> <span class="n">img_title_text</span><span class="o">=</span><span class="s1">'Land cover </span><span class="si">{feature}</span><span class="s1"> (</span><span class="si">{year}</span><span class="s1">)'</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
 <div class="output_area docutils container">

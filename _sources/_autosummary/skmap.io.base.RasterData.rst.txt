@@ -25,7 +25,7 @@ skmap.io.base.RasterData
       ~RasterData.from_info
       ~RasterData.from_stac
       ~RasterData.from_yaml
-      ~RasterData.get_groups
+      ~RasterData.get_features
       ~RasterData.get_years
       ~RasterData.plot
       ~RasterData.point_query
@@ -49,14 +49,14 @@ skmap.io.base.RasterData
       ~RasterData.BAND_COL
       ~RasterData.DT_COL
       ~RasterData.END_DT_COL
-      ~RasterData.GROUP_COL
+      ~RasterData.FEATURE_COL
       ~RasterData.INTERVAL_DT_SEP
+      ~RasterData.IS_COMMON_COL
+      ~RasterData.MANDATORY_COLS
       ~RasterData.NAME_COL
       ~RasterData.PATH_COL
       ~RasterData.PLACEHOLDER_DT
       ~RasterData.START_DT_COL
-      ~RasterData.TEMPORAL_COL
-      ~RasterData.TRANSFORM_SEP
       ~RasterData.valid_pixels
    
    

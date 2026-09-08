@@ -155,6 +155,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../data-structure.html">
+    Data Structure
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../tutorials.html">
     Tutorials
   </a>
@@ -167,13 +174,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../../_autosummary/skmap.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -182,6 +182,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../_autosummary/skmap.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../../cpp_api.html">
     C++ API
@@ -301,6 +308,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../quickstart/quickstart.html">
     Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../data-structure.html">
+    Data Structure
   </a>
 </li>
 
@@ -483,12 +497,17 @@
 <span class="sd">        subsequent :meth:`RasterData.run` calls; see :mod:`skmap.compute`.</span>
 <span class="sd">    """</span>
 
+    <span class="c1"># one feature per static raster (elev, slope)</span>
+    <span class="n">static</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">Path</span><span class="p">(</span><span class="n">f</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"."</span><span class="p">)[</span><span class="mi">0</span><span class="p">]:</span> <span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">_static_raster</span><span class="p">()</span>
+    <span class="p">}</span>
+
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">RasterData</span><span class="p">(</span>
             <span class="p">{</span>
                 <span class="s2">"ndvi"</span><span class="p">:</span> <span class="n">_temporal_raster</span><span class="p">(</span><span class="s2">"ndvi"</span><span class="p">,</span> <span class="s2">"filled"</span><span class="p">),</span>
                 <span class="s2">"swir1"</span><span class="p">:</span> <span class="n">_temporal_raster</span><span class="p">(</span><span class="s2">"swir1"</span><span class="p">),</span>
-                <span class="s2">"static"</span><span class="p">:</span> <span class="n">_static_raster</span><span class="p">(),</span>
+                <span class="o">**</span><span class="n">static</span><span class="p">,</span>
             <span class="p">},</span>
             <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
             <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span>

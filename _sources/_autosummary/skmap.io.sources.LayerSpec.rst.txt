@@ -27,11 +27,11 @@ skmap.io.sources.LayerSpec
    
       ~LayerSpec.band_idx
       ~LayerSpec.end_date
+      ~LayerSpec.is_common
       ~LayerSpec.name
       ~LayerSpec.start_date
-      ~LayerSpec.temporal
       ~LayerSpec.path
-      ~LayerSpec.group
+      ~LayerSpec.feature
       ~LayerSpec.vars
    
    
