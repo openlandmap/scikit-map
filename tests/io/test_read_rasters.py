@@ -88,3 +88,44 @@ def test_read_rasters_empty_list():
     """Reading an empty list of raster files raises IndexError."""
     with pytest.raises(IndexError):
         read_rasters(raster_files=[], backend="python", verbose=False)
+
+def test_read_raster_missing_file_returns_data_exists_false():
+    """A failed read returns a well-defined (array, idx, data_exists=False) result.
+
+    Regression: ``data_exists`` was only assigned inside the try block, so a
+    read failure crashed with UnboundLocalError instead of reporting the
+    missing raster.
+    """
+    from skmap.io.base import _read_raster
+
+    arr, idx, data_exists = _read_raster(
+        0, ["/nonexistent/x.tif"], [1], None, None, None, None, False,
+        1.0, {}, None, False,
+    )
+    assert data_exists is False
+    assert idx == 0
+    assert arr is None  # no window / expected_shape -> nothing to fall back on
+
+    # with a window the fallback array is NaN-filled, not a scalar
+    arr, _, data_exists = _read_raster(
+        0, ["/nonexistent/x.tif"], [1], Window(0, 0, 8, 8), None, None,
+        None, False, 1.0, {}, None, False,
+    )
+    assert data_exists is False
+    assert arr.shape == (8, 8)
+    assert np.isnan(arr).all()
+
+
+def test_read_rasters_missing_file_raises_clear_error(ndvi_filled):
+    """A file that opens in metadata but fails in the worker names the raster.
+
+    ``_read_shape`` opens only the *last* file, so a missing file earlier in
+    the list reaches the worker's except branch — which used to crash with
+    UnboundLocalError instead of reporting the raster.
+    """
+    with pytest.raises(Exception, match="not exists"):
+        read_rasters(
+            raster_files=["/nonexistent/x.tif", ndvi_filled[0]],
+            backend="python",
+            verbose=False,
+        )

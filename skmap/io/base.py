@@ -104,6 +104,11 @@ def _read_raster(
     raster_file = raster_files[raster_idx]
     ds, band_data = None, None
     nodata = None
+    # Initialised up-front: on a read failure the except branch must still
+    # return a well-defined (array_mm, data_exists=False) result instead of
+    # crashing with UnboundLocalError (which masked the real read error).
+    array_mm = None
+    data_exists = False
 
     try:
         ds = rasterio.open(raster_file)
@@ -145,13 +150,13 @@ def _read_raster(
             if verbose:
                 ttprint(f"ERROR: Failed to read {raster_file} window {window}")
             array_mm = np.empty((int(window.height), int(window.width)))
-            array_mm = _nodata_replacement(dtype)
+            array_mm[:] = _nodata_replacement(dtype)
 
         if expected_shape is not None:
             if verbose:
                 ttprint(f"Full nan image for {raster_file}")
             array_mm = np.empty(expected_shape)
-            array_mm = _nodata_replacement(dtype)
+            array_mm[:] = _nodata_replacement(dtype)
 
     if data_exists:
         if data_mask is not None:
@@ -172,7 +177,7 @@ def _read_raster(
             if verbose:
                 ttprint("End _nodata_replacement")
 
-    if scale != 1.0:
+    if scale != 1.0 and array_mm is not None:
         if verbose:
             ttprint("Start scaling")
         array_mm = array_mm * scale
@@ -1633,8 +1638,9 @@ class RasterData(SKMapBase):
                 continue
 
             # ``feature`` filters on the first partition column's values
-            # (FEATURE_COL by default).
-            fval = key if len(by) == 1 else key[0]
+            # (FEATURE_COL by default).  A single-column groupby yields
+            # 1-tuple keys, so unwrap them.
+            fval = key[0] if isinstance(key, tuple) else key
             if len(feature) > 0 and fval not in feature:
                 continue
 
