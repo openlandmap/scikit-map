@@ -335,6 +335,11 @@ void TransArray::maskData(std::vector<uint_t> row_select,
       "scikit-map ERROR 54: mask has fewer rows (" +
           std::to_string(masks.rows()) + ") than row_select size (" +
           std::to_string(row_select.size()) + ")");
+  skmapAssertIfTrue(
+      (uint_t)masks.cols() != (uint_t)m_data.cols(),
+      "scikit-map ERROR 56: mask has " + std::to_string(masks.cols()) +
+          " columns but data has " + std::to_string(m_data.cols()) +
+          " columns (mask must be (n_selected_rows, n_pixels))");
   for (uint_t i = 0; i < row_select.size(); ++i)
     skmapAssertIfTrue(
         row_select[i] >= (uint_t)m_data.rows(),
@@ -354,6 +359,21 @@ void TransArray::maskDataRows(std::vector<uint_t> row_select,
                               Eigen::Ref<MatFloat> mask,
                               float_t value_of_mask_to_mask,
                               float_t new_value_in_data) {
+  skmapAssertIfTrue(
+      (uint_t)mask.rows() < 1,
+      "scikit-map ERROR 57: mask must have at least one row");
+  skmapAssertIfTrue(
+      (uint_t)mask.cols() != (uint_t)m_data.cols(),
+      "scikit-map ERROR 58: mask has " + std::to_string(mask.cols()) +
+          " columns but data has " + std::to_string(m_data.cols()) +
+          " columns (mask must be (1, n_pixels))");
+  for (uint_t i = 0; i < row_select.size(); ++i)
+    skmapAssertIfTrue(
+        row_select[i] >= (uint_t)m_data.rows(),
+        "scikit-map ERROR 59: row_select[" + std::to_string(i) + "] = " +
+            std::to_string(row_select[i]) + " is out of bounds (data has " +
+            std::to_string(m_data.rows()) + " rows)");
+
   auto maskDataRow = [&](uint_t i) {
     m_data.row(row_select[i]) =
         (mask.row(0).array() == value_of_mask_to_mask)
