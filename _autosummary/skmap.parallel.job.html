@@ -603,7 +603,7 @@
 <h1>skmap.parallel.job<a class="headerlink" href="#skmap-parallel-job" title="Link to this heading">#</a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="skmap.parallel.job">
-<span class="sig-name descname"><span class="pre">job</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">worker</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">worker_args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/parallel.html#job"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.parallel.job" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">job</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">worker</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">worker_args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/skmap/parallel.html#job"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#skmap.parallel.job" title="Link to this definition">#</a></dt>
 <dd><p>Execute a function in parallel using Ray [1].</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -613,10 +613,15 @@
 to separate job.</p></li>
 <li><p><strong>n_jobs</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>) – Number of parallel jobs to run the worker function.
 By default all cores are used.</p></li>
+<li><p><strong>refs</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – when <code class="docutils literal notranslate"><span class="pre">True</span></code>, yield <code class="docutils literal notranslate"><span class="pre">(result,</span> <span class="pre">object_ref)</span></code> pairs so the
+caller can reuse the worker’s return value already held in the Ray
+object store instead of re-<code class="docutils literal notranslate"><span class="pre">put</span></code>-ing a copy (see <code class="docutils literal notranslate"><span class="pre">read_rasters</span></code>).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A generator with the return of all workers, in submission order.</p>
+<dd class="field-even"><p>A generator with the return of all workers, in submission order.
+Results are fetched one at a time (streaming) so the driver only ever
+materializes a single worker’s return value, not the whole batch.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Generator</p>
