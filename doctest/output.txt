@@ -1,4 +1,4 @@
-Results of doctest builder run on 2026-09-08 13:08:30
+Results of doctest builder run on 2026-09-08 21:46:00
 =====================================================
 
 Document: _autosummary/skmap.io.base.RasterData
