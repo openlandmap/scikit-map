@@ -135,8 +135,16 @@ def _remote(fn, *args):
 
 
 def _stack_bands(band_refs, shape):
-    """Stack per-band arrays into a single ``(N, H*W)`` array (read assembly)."""
-    bands = [get_shared(r) for r in band_refs]
+    """Stack per-band arrays into a single ``(N, H*W)`` array (read assembly).
+
+    ``band_refs`` are the ``_read_raster`` task-return refs, whose values are
+    ``(array, raster_idx, data_exists)`` tuples — reuse them directly instead
+    of re-``put``-ing copies of the bands into the object store.
+    """
+    bands = []
+    for r in band_refs:
+        b = get_shared(r)
+        bands.append(b[0] if isinstance(b, tuple) else b)
     return np.stack(bands, axis=0).reshape(shape)
 
 
@@ -172,6 +180,7 @@ def job(
     worker: Callable,
     worker_args: Iterator[tuple],
     n_jobs: int = -1,
+    refs: bool = False,
     **kwargs,
 ):
     """
@@ -182,7 +191,12 @@ def job(
       to separate job.
     :param n_jobs: Number of parallel jobs to run the worker function.
       By default all cores are used.
+    :param refs: when ``True``, yield ``(result, object_ref)`` pairs so the
+      caller can reuse the worker's return value already held in the Ray
+      object store instead of re-``put``-ing a copy (see ``read_rasters``).
     :returns: A generator with the return of all workers, in submission order.
+      Results are fetched one at a time (streaming) so the driver only ever
+      materializes a single worker's return value, not the whole batch.
     :rtype: Generator
 
     Examples
@@ -228,11 +242,17 @@ def job(
         num_cpus = max(1, total_cpus // n_jobs)
 
     remote_call = ray.remote(num_cpus=num_cpus)(_call_worker)
-    refs = [remote_call.remote(worker, args) for args in worker_args]
+    refs_out = [remote_call.remote(worker, args) for args in worker_args]
 
-    # ray.get preserves submission order
-    for result in ray.get(refs):
-        yield result
+    # Stream the results one at a time (submission order preserved): the
+    # driver materializes a single worker return at a time instead of the
+    # whole batch, which keeps peak driver memory flat for large catalogues.
+    for object_ref in refs_out:
+        result = ray.get(object_ref)
+        if refs:
+            yield (result, object_ref)
+        else:
+            yield result
 
 
 def apply_along_axis(

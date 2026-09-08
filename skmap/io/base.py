@@ -683,17 +683,21 @@ def read_rasters(
 
     # Workers return band arrays (Ray return values = ObjectRefs); a single
     # _stack_bands worker assembles them in the object store so the main
-    # process never materializes the full array.
+    # process never materializes the full array.  The task-return refs are
+    # reused directly — re-putting each band would churn a second full copy
+    # through the object store per read.
     band_refs = []
-    for array, raster_idx, data_exists in parallel.job(
+    for result, object_ref in parallel.job(
         _read_raster,
         args,
         n_jobs=n_jobs,
+        refs=True,
     ):
+        array_mm, raster_idx, data_exists = result
         if not data_exists:
             raster_file = raster_files[raster_idx]
             raise Exception(f"The raster {raster_file} not exists")
-        band_refs.append((raster_idx, parallel.put_shared(array.reshape(-1)).ref))
+        band_refs.append((raster_idx, object_ref))
 
     band_refs.sort(key=lambda x: x[0])
     refs = [r for _, r in band_refs]
