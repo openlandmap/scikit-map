@@ -484,7 +484,28 @@ class TiledDataExporter(TiledData):
                 array_t[:,offset_prop] = prop_mean
         sb.transposeArray(array_t, self.n_threads, self.array)
             
-      
+    def derive_static_quantiles_and_mean(self, trees_pred, expm1):
+        assert self.mode == 'static_quantiles'
+        self.n_pixels = trees_pred.array.shape[1]
+        self.array = sb_arr(self.n_layers, self.n_pixels)
+        trees_t = sb_arr(self.n_pixels, trees_pred.array.shape[0])
+        output_t = sb_arr(self.n_pixels, self.n_layers)
+        prop_mean = sb_vec(self.n_pixels)
+        sb.transposeArray(trees_pred.array, self.n_threads, trees_t)
+        sb.nanMean(trees_t, self.n_threads, prop_mean)
+
+        if expm1:
+            np.expm1(prop_mean, out=prop_mean)
+            np.expm1(trees_t, out=trees_t)
+
+        sb.computePercentiles(
+            trees_t, self.n_threads, range(trees_t.shape[1]),
+            output_t, range(1, self.n_layers),
+            [q * 100 for q in self.quantiles])
+
+        output_t[:, 0] = prop_mean
+        sb.transposeArray(output_t, self.n_threads, self.array)
+
     def derive_static_depths_quantiles_and_mean(self, depths_trees_pred, expm1):
         assert self.mode == 'static_depths_quantiles', "Mode must be static_depths_quantiles"
         self.n_pixels = int(depths_trees_pred[0].array.shape[1])
